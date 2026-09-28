@@ -5,7 +5,7 @@ move up as the channel grows.
 
 ## The big wins (do these first, any game)
 
-1. **Hook in the first 3 seconds.** Open on the most dramatic shot, not a
+1. **Hook in the first 1–3 seconds.** Open on the most dramatic shot, not a
    title card. Retention matters more than animation quality.
 2. **Consistent host character.** Same look, same voice, every video. This is
    what turns viewers into subscribers (and later sells merch).
@@ -60,7 +60,7 @@ move up as the channel grows.
 
 ## Learning path for Krew
 
-1. Week 1–2: OBS + CapCut. Make 5 Minecraft Shorts. Focus on hooks.
+1. Week 1–2: OBS + CapCut. Make 5 Minecraft shorts (vertical). Focus on hooks.
 2. Week 3–4: Mine-imator. Animate a simple 30-second scene with the host.
 3. Month 2: Replay Mod/Flashback + shaders for cinematic shots.
 4. Month 3: Blender basics (Blender Guru's donut tutorial) + MCprep.
@@ -69,10 +69,11 @@ move up as the channel grows.
 
 ## Quality checklist (before every upload)
 
-- [ ] Hook in first 3 seconds
+- [ ] Hook in first 1–3 seconds
 - [ ] Real-world fact checked
 - [ ] Camera is moving in most shots
 - [ ] Text/charts explain the real-world concept clearly
 - [ ] Sound effects + music (commercial-use licensed)
 - [ ] Follows that game's fan-content policy
-- [ ] 3–5 Shorts cut from the long video
+- [ ] Vertical 9:16, ~30–60s, burned-in captions
+- [ ] Exported for YouTube Shorts, Instagram Reels, and TikTok

@@ -7,6 +7,30 @@ businesses, apps, websites, and products that make money.
 
 ---
 
+## Big picture: a network of channels, not one channel
+
+Patrick runs a **network of short-form video channels**. Every channel uses
+the same agent pipeline (research → script → animation → voice → edit →
+post → analyze), so launching a new channel means writing a new channel
+config, not rebuilding anything.
+
+**Where we post:** YouTube Shorts, Instagram Reels, and TikTok. Every video is
+vertical (9:16), short (~30–60 seconds), and posted to all three.
+
+**Quality bar for every video, on every channel:**
+- **Hook** in the first 1–3 seconds that makes people stop scrolling.
+- **Entertaining** — good animation, movement, humor, sound; people should
+  enjoy it even if they didn't come to learn.
+- **Clear** — by the end, the viewer actually understands the lesson.
+  One idea per video.
+
+**Channel #1:** Video Games Explain the Real World (Minecraft first).
+Each game can graduate into its own channel once it proves itself, and
+completely different niches get their own channels later. Channel ideas are
+tracked in `docs/automation-plan.md`.
+
+---
+
 ## Revenue Pillar #1: Video Games Explain the Real World
 
 **The idea:** Take real-world topics (money, science, history, business,
@@ -62,8 +86,8 @@ before we launch that game's series.)
 
 ### How it makes money
 
-1. **Ad revenue** — YouTube Partner Program (long-form + Shorts), TikTok
-   Creator Rewards, Facebook/Instagram Reels.
+1. **Ad revenue / creator payouts** — YouTube Shorts (Partner Program),
+   TikTok creator programs, Instagram Reels bonuses/programs.
 2. **Sponsorships** — gaming gear, educational apps, finance apps for teens.
 3. **Our own products** — courses, worksheets for teachers/homeschool parents
    ("Minecraft Economics" lesson packs), an app later.
@@ -77,23 +101,26 @@ before we launch that game's series.)
 | Agent | Job |
 |---|---|
 | Trend Scout | Finds trending games + real-world topics people search for |
-| Script Writer | Writes the "game explains real world" script with a hook in the first 3 seconds |
+| Script Writer | Writes the ~30–60s "game explains real world" script with a hook in the first 1–3 seconds |
 | Fact Checker | Makes sure the real-world part is accurate |
 | Storyboard Artist | Turns the script into shots |
 | Animator / Asset Agent | Builds scenes, drives the tools in the animation playbook |
 | Voice Agent | AI voiceover in the host character's consistent voice |
-| Editor | Cuts long-form + 3–5 Shorts from every episode |
-| Publisher | Titles, thumbnails, descriptions, posting schedule |
+| Editor | Assembles the vertical short with captions, overlays, sound |
+| Hook & Clarity Critic | Scores every draft: does the hook stop the scroll, is it fun, will a viewer understand the lesson? Sends weak drafts back |
+| Publisher | Captions, titles, hashtags, cover frames; posts to YouTube Shorts, Instagram Reels, TikTok |
 | Analyst | Watches views/retention/revenue and tells the team what to make next |
 | Policy Guard | Checks each video against that game's fan-content rules before posting |
 
 ### Milestones
 
-1. Launch the Minecraft series; post consistently (e.g. 3 Shorts + 1 long video/week).
-2. Hit YouTube Partner Program requirements on the Minecraft series.
+1. Launch the Minecraft series on YouTube Shorts, Instagram Reels, and TikTok; post consistently.
+2. Hit monetization requirements on each platform.
 3. Add Terraria + Roblox using the same pipeline.
 4. Add Fortnite, Call of Duty, Pokémon-style, Mario-style series.
 5. Launch our own mascot, lesson packs, and merch.
+6. Launch additional channels (new niches) on the same pipeline.
 
 See **[docs/animation-playbook.md](docs/animation-playbook.md)** for how to
-animate each game better.
+animate each game better, and **[docs/automation-plan.md](docs/automation-plan.md)**
+for how the whole pipeline gets automated.
