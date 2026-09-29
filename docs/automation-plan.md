@@ -53,13 +53,18 @@ be loosened per channel once it's proven.
 |---|---|
 | Agent brains | Claude API / Claude Agent SDK |
 | Content board + approvals | Notion or Google Sheets (open question) |
-| Voice | ElevenLabs API (one voice per channel host) |
+| Voice | ElevenLabs hosted MCP (one voice per channel host) |
+| 3D animation | Blender 5.2 + official Claude Blender connector |
+| Music + sound effects | Epidemic Sound connector / ElevenLabs |
+| Trend research | vidIQ connector |
 | Overlays, charts, captions, assembly | Remotion (video from code) + FFmpeg |
 | Captions/transcripts | Whisper |
 | Game footage | OBS + Replay Mod/Flashback, Mine-imator/Blender (see animation playbook) |
 | Posting | YouTube Data API, Instagram Graph API (Business/Creator account), TikTok Content Posting API |
 | Scheduling | Routines / GitHub Actions |
 | Code, configs, plans | This repo |
+
+Connector details and setup steps: [blender-setup-plan.md](blender-setup-plan.md).
 
 ## Phases
 

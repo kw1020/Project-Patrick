@@ -122,5 +122,6 @@ before we launch that game's series.)
 6. Launch additional channels (new niches) on the same pipeline.
 
 See **[docs/animation-playbook.md](docs/animation-playbook.md)** for how to
-animate each game better, and **[docs/automation-plan.md](docs/automation-plan.md)**
+animate each game better, **[docs/blender-setup-plan.md](docs/blender-setup-plan.md)**
+for the Blender + connectors setup, and **[docs/automation-plan.md](docs/automation-plan.md)**
 for how the whole pipeline gets automated.

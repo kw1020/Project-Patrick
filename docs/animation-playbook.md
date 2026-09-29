@@ -1,5 +1,8 @@
 # Animation Playbook — Video Games Explain the Real World
 
+> **Blender is the main path.** Step-by-step setup, connectors, and tools:
+> [blender-setup-plan.md](blender-setup-plan.md).
+
 How to make the videos look better, faster, and cheaper. Start at Level 1 and
 move up as the channel grows.
 
@@ -39,8 +42,8 @@ move up as the channel grows.
 ### Level 4 — AI-assisted production (Patrick's agents)
 - **Voice:** ElevenLabs (or similar) for a consistent host voice.
 - **Lip sync / talking head:** Adobe Character Animator, or AI lip-sync tools.
-- **AI video generation** (Runway, Kling, Google Veo, and whatever leads the
-  market when we start) for B-roll, transitions, and real-world cutaways —
+- **AI video generation** (Kling 3.0, Veo 3.1, Runway Gen-4.5 as of Sept 2026;
+  Sora was discontinued) for B-roll, transitions, and real-world cutaways —
   not for copying game characters.
 - **AI music** only from tools whose license allows commercial use.
 - Patrick's agents write the script, generate the shot list, voice it, and
@@ -50,7 +53,7 @@ move up as the channel grows.
 
 | Game | Best capture/animation tools |
 |---|---|
-| **Minecraft** | **Mine-imator** (free, easiest Minecraft animator); **Blender + MCprep** addon (pro-level); **Replay Mod / Flashback** (record then re-shoot camera paths); **Mineways / jmc2obj** (export your world into Blender); shaders like Complementary or BSL |
+| **Minecraft** | **Blender 5.2 + official Claude Blender connector** (main path); **Mine-imator** (easy, but no real updates since 2023); **Blender + MCprep** addon (pro-level); **Flashback / Replay Mod** (record then re-shoot camera paths); **Mineways / jmc2obj** (export your world into Blender); shaders like Complementary or BSL |
 | **Terraria** | 2D style: sprite animation in **Aseprite**; puppet animation in **Moho**, **Spine**, or **Adobe Animate**; **tModLoader** for custom in-game scenes |
 | **Roblox** | **Roblox Studio** built-in animation editor + Moon Animator plugin; export to Blender for cinematics |
 | **Fortnite** | **UEFN (Unreal Editor for Fortnite)** to build custom scenes; **Replay mode** for cinematic cameras; **Unreal Engine 5 Sequencer** for full cinematics |
