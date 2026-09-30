@@ -191,6 +191,13 @@ as possible. Research done 2026-09-29; re-check versions before installing.
 
 ## 7. Krew's computer: gaming PC, 16 GB RAM
 
+Scanned from Task Manager (2026-09-30):
+- **CPU:** AMD Ryzen 7 8700F (8 cores / 16 threads, up to ~4.5 GHz). Strong.
+- **RAM:** 16 GB, and **13 GB (83%) was already in use before opening Blender**,
+  so close background apps (browser tabs, Discord, launchers) before working.
+- **GPU:** NVIDIA GeForce RTX (exact model TBD).
+- **Storage:** NVMe SSD (fast). Keep Blender projects and renders on it.
+
 This is enough to do everything locally, with no render farm needed. 16 GB is
 the minimum for comfortable Blender work, so keep the setup lean:
 
@@ -211,7 +218,7 @@ the minimum for comfortable Blender work, so keep the setup lean:
 
 ## 8. Open questions for Krew
 
-1. Which graphics card is in the PC? It affects EEVEE speed.
+1. Exact RTX model and its VRAM (Task Manager → Performance → GPU 0).
 2. Is Claude Desktop installed on it?
 3. OK to pay for **Epidemic Sound** and **ElevenLabs**, or start with free
    options (YouTube Audio Library + ElevenLabs free tier)?
