@@ -189,10 +189,29 @@ as possible. Research done 2026-09-29; re-check versions before installing.
 
 ---
 
-## 7. Open questions for Krew
+## 7. Krew's computer: gaming PC, 16 GB RAM
 
-1. What computer do you have (RAM + graphics card)? This decides local
-   rendering vs render farm.
+This is enough to do everything locally, with no render farm needed. 16 GB is
+the minimum for comfortable Blender work, so keep the setup lean:
+
+- **Render with EEVEE**, not Cycles. It uses the gaming GPU and renders a 30–60s
+  vertical short in minutes. Use Cycles only for special shots.
+- **Don't run Minecraft and Blender at the same time.** Record in Minecraft,
+  close it, then open Blender. They both use a lot of RAM.
+- **Export small world chunks** with jmc2obj/Mineways, only what the camera
+  sees, not the whole map.
+- **Render settings:** 1080×1920, 30fps, EEVEE. Use "Simplify" in the
+  viewport while animating, and render to a PNG image sequence so a crash
+  doesn't lose the whole render.
+- **Save often** (Blender auto-save on), especially before each Claude
+  connector request.
+- **Upgrade later, not now:** going to 32 GB RAM is a cheap upgrade and is
+  the first thing to buy once the channel earns.
+- SheepIt stays a backup only.
+
+## 8. Open questions for Krew
+
+1. Which graphics card is in the PC? It affects EEVEE speed.
 2. Is Claude Desktop installed on it?
 3. OK to pay for **Epidemic Sound** and **ElevenLabs**, or start with free
    options (YouTube Audio Library + ElevenLabs free tier)?
