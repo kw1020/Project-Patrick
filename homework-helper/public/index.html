@@ -143,6 +143,12 @@ form.addEventListener("submit", async (e) => {
       history.pop();
       return;
     }
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      out.textContent = err.error || "Something went wrong. Try again.";
+      history.pop();
+      return;
+    }
     store("patrick-code", codeInput.value);
     codeBox.hidden = !!codeInput.value;
     const reader = res.body.getReader();

@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import express from "express";
+import { checkAndCount, newDeviceId } from "./licenses.js";
 
 const PORT = process.env.PORT || 3000;
 // Each paying customer gets a code. Comma-separated, e.g. "alex-2026,sam-2026".
@@ -22,8 +23,23 @@ How you help:
 - Keep it short and clear. Use simple language. Use plain text math (like x^2, sqrt(5), 3/4) instead of LaTeX.`;
 
 const app = express();
+app.set("trust proxy", 1); // so secure cookies work behind Render/Railway HTTPS
 app.use(express.json({ limit: "20mb" }));
 app.use(express.static("public"));
+
+// Each browser gets a secret device ID cookie; codes get locked to the first one that uses them.
+function deviceIdFor(req, res) {
+  const match = /(?:^|;\s*)patrick_device=([a-f0-9]{48})/.exec(req.headers.cookie || "");
+  if (match) return match[1];
+  const id = newDeviceId();
+  res.cookie("patrick_device", id, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: req.secure,
+    maxAge: 5 * 365 * 24 * 60 * 60 * 1000,
+  });
+  return id;
+}
 
 app.post("/api/ask", async (req, res) => {
   const { code, messages } = req.body || {};
@@ -32,6 +48,10 @@ app.post("/api/ask", async (req, res) => {
   }
   if (!Array.isArray(messages) || messages.length === 0) {
     return res.status(400).json({ error: "No question sent." });
+  }
+  if (ACCESS_CODES.length) {
+    const check = checkAndCount(code, deviceIdFor(req, res));
+    if (!check.ok) return res.status(check.status).json({ error: check.error });
   }
 
   res.setHeader("Content-Type", "text/plain; charset=utf-8");
