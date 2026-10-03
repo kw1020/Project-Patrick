@@ -10,6 +10,25 @@ const ACCESS_CODES = (process.env.PATRICK_ACCESS_CODES || "")
   .filter(Boolean);
 
 const client = new Anthropic();
+// Demo mode: no API key yet, so Patrick sends a sample answer to show how the app works.
+const DEMO = !process.env.ANTHROPIC_API_KEY && !process.env.ANTHROPIC_AUTH_TOKEN;
+const DEMO_ANSWER = `(Demo mode: add an API key to get real answers.)
+
+Let's solve 2x + 5 = 17 step by step.
+
+Step 1: Get the x-term by itself. Subtract 5 from both sides.
+  2x + 5 - 5 = 17 - 5
+  2x = 12
+
+Step 2: Get x alone. Divide both sides by 2.
+  2x / 2 = 12 / 2
+  x = 6
+
+Answer: **x = 6**
+
+Check it: 2(6) + 5 = 12 + 5 = 17 ✓
+
+Your turn: solve 3x + 4 = 19. (Hint: do the same two steps!)`;
 
 const SYSTEM_PROMPT = `You are Patrick, a friendly, patient homework tutor for a middle/high school student.
 
@@ -57,6 +76,14 @@ app.post("/api/ask", async (req, res) => {
   res.setHeader("Content-Type", "text/plain; charset=utf-8");
   res.setHeader("Cache-Control", "no-cache");
 
+  if (DEMO) {
+    for (const word of DEMO_ANSWER.split(/(?<= )/)) {
+      res.write(word);
+      await new Promise((r) => setTimeout(r, 15));
+    }
+    return res.end();
+  }
+
   try {
     const stream = client.beta.messages.stream({
       model: "claude-opus-5-5",
@@ -94,5 +121,6 @@ app.post("/api/ask", async (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`Patrick Homework Helper running at http://localhost:${PORT}`);
+  if (DEMO) console.warn("Demo mode: no ANTHROPIC_API_KEY set, sending sample answers.");
   if (!ACCESS_CODES.length) console.warn("Warning: PATRICK_ACCESS_CODES not set — anyone can use it.");
 });

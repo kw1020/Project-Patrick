@@ -103,6 +103,12 @@ document.getElementById("newChat").addEventListener("click", () => {
   preview.textContent = "";
 });
 
+// Shows Patrick's text safely, turning **this** into bold.
+function render(el, txt) {
+  const safe = txt.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  el.innerHTML = safe.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+}
+
 function bubble(cls, content, imgUrl) {
   const div = document.createElement("div");
   div.className = "msg " + cls;
@@ -124,7 +130,8 @@ form.addEventListener("submit", async (e) => {
   if (pendingImage) content.push({ type: "image", source: { type: "base64", media_type: pendingImage.media_type, data: pendingImage.data } });
   content.push({ type: "text", text: q || "Help me with this homework." });
 
-  bubble("me", q, pendingImage && pendingImage.url);
+  const mine = bubble("me", q, pendingImage && pendingImage.url).parentElement;
+  const sentImage = pendingImage;
   history.push({ role: "user", content });
   text.value = ""; pendingImage = null; photo.value = ""; preview.textContent = "";
   send.disabled = true;
@@ -138,9 +145,15 @@ form.addEventListener("submit", async (e) => {
       body: JSON.stringify({ code: codeInput.value, messages: history }),
     });
     if (res.status === 401) {
+      // Wrong or missing code: undo the question so they can just fix the code and hit Ask again.
       codeBox.hidden = false; store("patrick-code", null);
-      out.textContent = "Enter your access code above, then ask again.";
+      mine.remove(); out.parentElement.remove();
       history.pop();
+      text.value = q;
+      if (sentImage) { pendingImage = sentImage; preview.textContent = "Photo added ✓"; }
+      codeInput.placeholder = codeInput.value ? "Wrong code, try again" : "Enter your access code first";
+      codeInput.value = "";
+      codeInput.focus();
       return;
     }
     if (!res.ok) {
@@ -157,7 +170,7 @@ form.addEventListener("submit", async (e) => {
       const { done, value } = await reader.read();
       if (done) break;
       answer += dec.decode(value, { stream: true });
-      out.textContent = answer;
+      render(out, answer);
       out.parentElement.scrollIntoView({ block: "end" });
     }
     history.push({ role: "assistant", content: answer || "(no answer)" });

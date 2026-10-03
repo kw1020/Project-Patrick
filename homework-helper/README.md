@@ -12,6 +12,8 @@ Patrick's first paid product. Students type a question or snap a photo of their 
    ```
 3. Open http://localhost:3000
 
+No API key yet? Leave out `ANTHROPIC_API_KEY` and Patrick runs in **demo mode**, sending a sample math answer so you can try the app.
+
 `PATRICK_ACCESS_CODES` is a comma-separated list. Give each paying customer their own code, and remove a code if they stop paying.
 
 ## Stopping sharing
