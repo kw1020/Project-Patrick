@@ -1,6 +1,6 @@
-# Patrick Homework Helper
+# Patrick Homework Doer
 
-Patrick's first paid product. Students type a question or snap a photo of their homework (math, reading, science, anything), and Patrick walks them through it step by step.
+Patrick's first paid product. Students type a question or snap a photo of their homework (math, reading, science, anything), and Patrick does it and hands back finished answers, with the work shown.
 
 ## Run it
 

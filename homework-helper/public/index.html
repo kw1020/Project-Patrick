@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Patrick Homework Helper</title>
+<title>Patrick Homework Doer</title>
 <style>
   :root { --bg:#f6f7fb; --card:#fff; --text:#1b1d24; --muted:#6b7080; --accent:#3b5bfd; --me:#e8edff; --border:#dfe2ea; }
   @media (prefers-color-scheme: dark) {
@@ -32,8 +32,8 @@
 </head>
 <body>
 <main>
-  <h1>📚 Patrick Homework Helper</h1>
-  <p class="sub">Snap a photo of your homework or type a question. Patrick walks you through it step by step.</p>
+  <h1>📚 Patrick Homework Doer</h1>
+  <p class="sub">Snap a photo of your homework. Patrick does it and gives you the answers.</p>
 
   <div id="codeBox" hidden>
     <input id="code" type="password" placeholder="Access code">
@@ -42,12 +42,12 @@
   <div id="chat"></div>
 
   <form id="form">
-    <textarea id="text" placeholder="Type your question (or just add a photo)…"></textarea>
+    <textarea id="text" placeholder="Type the homework (or just add a photo)…"></textarea>
     <div class="row">
       <label class="btn">📷 Photo<input id="photo" type="file" accept="image/*" hidden></label>
       <span id="preview"></span>
-      <button type="button" id="newChat">New question</button>
-      <button type="submit" id="send">Ask Patrick</button>
+      <button type="button" id="newChat">New homework</button>
+      <button type="submit" id="send">Do my homework</button>
     </div>
   </form>
 </main>
@@ -128,7 +128,7 @@ form.addEventListener("submit", async (e) => {
 
   const content = [];
   if (pendingImage) content.push({ type: "image", source: { type: "base64", media_type: pendingImage.media_type, data: pendingImage.data } });
-  content.push({ type: "text", text: q || "Help me with this homework." });
+  content.push({ type: "text", text: q || "Do this homework. Give me the answers for every question." });
 
   const mine = bubble("me", q, pendingImage && pendingImage.url).parentElement;
   const sentImage = pendingImage;

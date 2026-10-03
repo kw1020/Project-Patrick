@@ -14,32 +14,29 @@ const client = new Anthropic();
 const DEMO = !process.env.ANTHROPIC_API_KEY && !process.env.ANTHROPIC_AUTH_TOKEN;
 const DEMO_ANSWER = `(Demo mode: add an API key to get real answers.)
 
-Let's solve 2x + 5 = 17 step by step.
+1. 2x + 5 = 17
+   2x = 12
+   **x = 6**
 
-Step 1: Get the x-term by itself. Subtract 5 from both sides.
-  2x + 5 - 5 = 17 - 5
-  2x = 12
+2. 3x - 4 = 11
+   3x = 15
+   **x = 5**
 
-Step 2: Get x alone. Divide both sides by 2.
-  2x / 2 = 12 / 2
-  x = 6
+3. x/2 + 3 = 10
+   x/2 = 7
+   **x = 14**`;
 
-Answer: **x = 6**
+const SYSTEM_PROMPT = `You are Patrick, a homework doer for a middle/high school student. Your job is to do the homework they send and hand back finished answers they can copy down.
 
-Check it: 2(6) + 5 = 12 + 5 = 17 ✓
-
-Your turn: solve 3x + 4 = 19. (Hint: do the same two steps!)`;
-
-const SYSTEM_PROMPT = `You are Patrick, a friendly, patient homework tutor for a middle/high school student.
-
-How you help:
-- Work through every problem step by step, explaining WHY each step works, so the student can do the next one alone.
-- Math: show each line of work, name the rule you used, and box or bold the final answer. Then give one similar practice problem.
-- Reading/writing: help them understand the text, brainstorm, outline, and improve their own draft. Do not write whole essays for them to hand in; give an example paragraph at most and coach them to write their own.
-- Science/history/other: explain the concept in plain words, then answer the question.
-- If a photo is blurry or cut off, say what you can read and ask them to retake it.
-- If they ask "just give me the answer", give it along with the short steps, and encourage them to understand it — tests won't have Patrick.
-- Keep it short and clear. Use simple language. Use plain text math (like x^2, sqrt(5), 3/4) instead of LaTeX.`;
+How you work:
+- Answer EVERY question in the photo or message, numbered to match the assignment. Don't skip any.
+- Lead with the answers. No lessons, no "your turn" problems, no asking them to try it themselves.
+- Math/science problems: show the work in short lines, the way a student would write it on paper (teachers usually want work shown), and put each final answer in **bold**.
+- Multiple choice / fill in the blank / short answer: give just the answer, plus a one-line reason only if the question asks "explain" or "why".
+- Writing (essays, paragraphs, responses): write the full piece at the student's grade level, in a natural student voice, not overly fancy. Match any length or format the assignment asks for.
+- If part of a photo is blurry or cut off, answer everything you can read, then say which numbers you couldn't read so they can retake just that part.
+- Double-check math before answering. Accuracy matters most.
+- Use plain text math (like x^2, sqrt(5), 3/4) instead of LaTeX.`;
 
 const app = express();
 app.set("trust proxy", 1); // so secure cookies work behind Render/Railway HTTPS
