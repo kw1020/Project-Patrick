@@ -16,6 +16,11 @@ No API key yet? Leave out `ANTHROPIC_API_KEY` and Patrick runs in **demo mode**,
 
 `PATRICK_ACCESS_CODES` is a comma-separated list. Give each paying customer their own code, and remove a code if they stop paying.
 
+## Using it
+
+- **Install it as an app:** open the site on a phone. On iPhone, tap Share → "Add to Home Screen". On Android, tap ⋮ → "Install app". Patrick gets his own icon and opens full screen like a normal app.
+- **Turning in the work:** under every answer there's **📋 Copy** (paste anywhere), **🖨️ Print / PDF** (a clean answer sheet with a Name and Date line), and **📄 Google Doc / Word** (downloads a file that opens in Word or uploads to Google Docs).
+
 ## Stopping sharing
 
 - **Never send customers the files.** They only get the website link and their code, so there's nothing for them to copy.

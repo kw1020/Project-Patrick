@@ -4,6 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Patrick Homework Doer</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icon-192.png">
+<link rel="apple-touch-icon" href="/icon-180.png">
+<meta name="theme-color" content="#3b5bfd">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Patrick">
 <style>
   :root { --bg:#f6f7fb; --card:#fff; --text:#1b1d24; --muted:#6b7080; --accent:#3b5bfd; --me:#e8edff; --border:#dfe2ea; }
   @media (prefers-color-scheme: dark) {
@@ -27,6 +33,8 @@
   button:disabled { opacity:.5; cursor:default; }
   label.btn { background:var(--card); border:1px solid var(--border); }
   #preview { color:var(--muted); font-size:.9rem; }
+  .actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:-4px; }
+  .actions button { background:var(--card); color:var(--text); border:1px solid var(--border); padding:8px 12px; font-size:.9rem; }
   #newChat { background:transparent; color:var(--muted); padding:10px 4px; }
 </style>
 </head>
@@ -121,6 +129,47 @@ function bubble(cls, content, imgUrl) {
   return span;
 }
 
+const plain = (txt) => txt.replace(/\*\*(.+?)\*\*/g, "$1").replace(/^\(Demo mode.*\)\n+/, "");
+const escapeHtml = (t) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+// A clean answer sheet, used for printing and for the Google Docs / Word download.
+function sheetHtml(answer) {
+  const date = new Date().toLocaleDateString();
+  const body = escapeHtml(plain(answer));
+  return `<!doctype html><html><head><meta charset="utf-8"><title>Homework ${date}</title>
+<style>body{font:12pt/1.6 Arial,sans-serif;margin:0.75in;color:#000}p{margin:0 0 12pt}.top{margin-bottom:18pt}pre{font:inherit;white-space:pre-wrap;margin:0}</style>
+</head><body><div class="top">Name: ______________________ &nbsp;&nbsp; Date: ${date}</div><pre>${body}</pre></body></html>`;
+}
+
+// Buttons under each finished answer: copy it, print it, or download it as a doc.
+function addActions(afterEl, answer) {
+  const row = document.createElement("div");
+  row.className = "actions";
+  const make = (label, fn) => { const b = document.createElement("button"); b.type = "button"; b.textContent = label; b.onclick = () => fn(b); row.appendChild(b); };
+  make("📋 Copy", async (b) => {
+    try { await navigator.clipboard.writeText(plain(answer)); b.textContent = "✓ Copied"; }
+    catch { b.textContent = "Couldn't copy"; }
+    setTimeout(() => (b.textContent = "📋 Copy"), 1500);
+  });
+  make("🖨️ Print / PDF", () => {
+    const w = window.open("", "_blank");
+    if (!w) return;
+    w.document.write(sheetHtml(answer));
+    w.document.close();
+    w.onload = () => w.print();
+    setTimeout(() => w.print(), 400);
+  });
+  make("📄 Google Doc / Word", () => {
+    const blob = new Blob([sheetHtml(answer)], { type: "application/msword" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `homework-${new Date().toISOString().slice(0, 10)}.doc`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  });
+  afterEl.after(row);
+}
+
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
   const q = text.value.trim();
@@ -174,6 +223,7 @@ form.addEventListener("submit", async (e) => {
       out.parentElement.scrollIntoView({ block: "end" });
     }
     history.push({ role: "assistant", content: answer || "(no answer)" });
+    if (answer) addActions(out.parentElement, answer);
   } catch {
     out.textContent = "Couldn't reach Patrick. Check your internet and try again.";
     history.pop();
@@ -181,6 +231,7 @@ form.addEventListener("submit", async (e) => {
     send.disabled = false;
   }
 });
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
 </script>
 </body>
 </html>
