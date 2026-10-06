@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Patrick Homework Doer</title>
+<title>Patrick</title>
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" href="/icon-192.png">
 <link rel="apple-touch-icon" href="/icon-180.png">
@@ -47,13 +47,56 @@
   .hw button { background:var(--accent); color:#fff; padding:8px 14px; }
   .tag { background:#e5484d; color:#fff; border-radius:6px; font-size:.75rem; padding:1px 6px; margin-left:6px; }
   .msg.note { background:transparent; color:var(--muted); font-size:.9rem; border-style:dashed; }
+  header { display:flex; align-items:center; gap:8px; }
+  header h1 { flex:1; }
+  #gear { background:var(--card); border:1px solid var(--border); color:var(--text); font-size:1.1rem; padding:8px 12px; }
+  .tool { font-weight:600; margin:0 0 4px; }
+  #settings { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:14px; margin-bottom:12px; }
+  #settings h2 { font-size:1.1rem; margin:0 0 8px; }
+  #settings h3 { font-size:1rem; margin:16px 0 4px; }
+  #settings input { width:100%; padding:10px; border-radius:10px; border:1px solid var(--border); background:var(--bg); color:var(--text); font:inherit; margin-top:6px; }
+  #settings .status { font-size:.9rem; margin:4px 0 0; }
+  .ok { color:#2f9e5b; } .bad { color:#e5484d; }
+  #settings .row { margin-top:12px; }
+  #saveSettings { background:var(--accent); color:#fff; }
+  #closeSettings { background:transparent; color:var(--muted); }
+  #banner { background:#fff4d6; color:#5c4400; border-radius:12px; padding:10px 14px; margin-bottom:12px; }
+  #banner button { background:#5c4400; color:#fff; padding:6px 12px; margin-left:6px; }
   #newChat { background:transparent; color:var(--muted); padding:10px 4px; }
 </style>
 </head>
 <body>
 <main>
-  <h1>📚 Patrick Homework Doer</h1>
-  <p class="sub">Snap a photo of your homework. Patrick does it and gives you the answers.</p>
+  <header>
+    <h1>🤖 Patrick</h1>
+    <button type="button" id="gear" title="Settings" hidden>⚙️</button>
+  </header>
+  <p class="tool">📐 Math &amp; Homework</p>
+  <p class="sub">Snap a photo of your homework or load it from Canvas. Patrick does it and gives you the answers.</p>
+
+  <div id="banner" hidden>Patrick needs your API key to give real answers. <button type="button" id="openSettings">Open Settings</button></div>
+
+  <section id="settings" hidden>
+    <h2>⚙️ Settings</h2>
+    <p class="help">Keys are saved only on this computer. Leave a box empty to keep what's already saved.</p>
+
+    <h3>🧠 Patrick's brain (Anthropic API key)</h3>
+    <input id="setAnthropic" type="password" placeholder="Paste your API key" autocomplete="off">
+    <p class="status" id="anthropicStatus"></p>
+    <p class="help">Get one at <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com/settings/keys</a>. New keys may expire after 30 days, so paste a new one here when that happens.</p>
+
+    <h3>📚 Canvas</h3>
+    <input id="setCanvasUrl" placeholder="Canvas address, like yourschool.instructure.com" autocomplete="off">
+    <input id="setCanvasToken" type="password" placeholder="Canvas access token" autocomplete="off">
+    <p class="status" id="canvasStatus"></p>
+    <p class="help">In Canvas: Account → Settings → Approved Integrations → <b>+ New Access Token</b>.</p>
+
+    <div class="row">
+      <button type="button" id="saveSettings">Save</button>
+      <button type="button" id="closeSettings">Close</button>
+    </div>
+    <p class="status" id="saveStatus"></p>
+  </section>
 
   <div id="codeBox" hidden>
     <input id="code" type="password" placeholder="Access code">
@@ -61,9 +104,11 @@
 
   <details id="canvas">
     <summary>📚 Get homework from Canvas</summary>
+    <div id="canvasLogin">
     <input id="canvasUrl" placeholder="Canvas address, like yourschool.instructure.com" autocomplete="off">
     <input id="canvasToken" type="password" placeholder="Canvas access token" autocomplete="off">
     <p class="help">To get a token: in Canvas, go to <b>Account → Settings</b>, scroll to <b>Approved Integrations</b>, tap <b>+ New Access Token</b>, name it "Patrick", and paste the token here. It's saved only on this device, and you never give Patrick your password.</p>
+    </div>
     <button type="button" id="loadHw">Load my assignments</button>
     <div id="hwList"></div>
   </details>
@@ -97,7 +142,7 @@ let pendingImage = null; // { media_type, data, url }
 function store(key, val) { try { val == null ? localStorage.removeItem(key) : localStorage.setItem(key, val); } catch {} }
 function load(key) { try { return localStorage.getItem(key); } catch { return null; } }
 codeInput.value = load("patrick-code") || "";
-codeBox.hidden = !!codeInput.value;
+codeBox.hidden = true; // shown only if this copy of Patrick uses access codes (see showSettings)
 
 // Shrink photos so uploads are fast and cheap.
 function shrink(file) {
@@ -278,7 +323,10 @@ async function canvasCall(path, extra) {
   const res = await fetch(path, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ code: codeInput.value, canvasUrl: canvasUrl.value, token: canvasToken.value.trim(), ...extra }),
+    // Hidden login boxes mean Canvas is saved in Settings, so let the server use that.
+    body: JSON.stringify(document.getElementById("canvasLogin").hidden
+      ? { code: codeInput.value, ...extra }
+      : { code: codeInput.value, canvasUrl: canvasUrl.value, token: canvasToken.value.trim(), ...extra }),
   });
   const data = await res.json().catch(() => ({}));
   if (res.status === 401) { askForCode(); throw new Error("Enter your access code first, then try again."); }
@@ -343,6 +391,68 @@ async function doAssignment(a, btn) {
     btn.textContent = "Do it";
   }
 }
+// ---- Settings ----
+const settingsBox = document.getElementById("settings");
+const gear = document.getElementById("gear");
+const banner = document.getElementById("banner");
+const setAnthropic = document.getElementById("setAnthropic");
+const setCanvasUrl = document.getElementById("setCanvasUrl");
+const setCanvasToken = document.getElementById("setCanvasToken");
+const saveStatus = document.getElementById("saveStatus");
+
+function showSettings(st) {
+  if (st.codesRequired !== undefined) codeBox.hidden = !st.codesRequired || !!codeInput.value;
+  gear.hidden = !st.editable;
+  banner.hidden = !(st.editable && !st.anthropicKeySet);
+  if (!st.editable) return;
+  const a = document.getElementById("anthropicStatus");
+  a.textContent = st.anthropicKeySet ? `✓ Key saved (${st.anthropicKeyHint})` : "No key yet. Patrick is in demo mode.";
+  a.className = "status " + (st.anthropicKeySet ? "ok" : "bad");
+  const c = document.getElementById("canvasStatus");
+  c.textContent = st.canvasTokenSet ? `✓ Connected to ${st.canvasUrl} (token ${st.canvasTokenHint})` : "Not connected (optional).";
+  c.className = "status " + (st.canvasTokenSet ? "ok" : "");
+  setCanvasUrl.value = st.canvasUrl || "";
+  // With Canvas saved in Settings, the Canvas panel only needs the Load button.
+  document.getElementById("canvasLogin").hidden = st.canvasTokenSet;
+}
+
+async function refreshSettings() {
+  try { showSettings(await (await fetch("/api/settings")).json()); } catch {}
+}
+
+function toggleSettings(open) {
+  settingsBox.hidden = !open;
+  if (open) { saveStatus.textContent = ""; settingsBox.scrollIntoView({ block: "start" }); }
+}
+gear.onclick = () => toggleSettings(settingsBox.hidden);
+document.getElementById("openSettings").onclick = () => toggleSettings(true);
+document.getElementById("closeSettings").onclick = () => toggleSettings(false);
+
+document.getElementById("saveSettings").onclick = async (e) => {
+  const btn = e.target;
+  const body = { canvasUrl: setCanvasUrl.value };
+  if (setAnthropic.value.trim()) body.anthropicKey = setAnthropic.value;
+  if (setCanvasToken.value.trim()) body.canvasToken = setCanvasToken.value;
+  btn.disabled = true;
+  saveStatus.className = "status";
+  saveStatus.textContent = body.anthropicKey ? "Checking your key…" : "Saving…";
+  try {
+    const res = await fetch("/api/settings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const st = await res.json();
+    if (!res.ok) throw new Error(st.error || "Couldn't save.");
+    setAnthropic.value = ""; setCanvasToken.value = "";
+    showSettings(st);
+    saveStatus.className = "status ok";
+    saveStatus.textContent = "✓ Saved. You're good to go.";
+  } catch (err) {
+    saveStatus.className = "status bad";
+    saveStatus.textContent = err.message;
+  } finally {
+    btn.disabled = false;
+  }
+};
+refreshSettings();
+
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
 </script>
 </body>

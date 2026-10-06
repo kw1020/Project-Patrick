@@ -3,6 +3,7 @@ import express from "express";
 import { spawn } from "node:child_process";
 import { checkAndCount, newDeviceId } from "./licenses.js";
 import { gatherAssignment, listAssignments, UserError } from "./canvas.js";
+import { anthropicKey, hint, loadSettings, saveSettings } from "./settings.js";
 
 // The PC launcher saves the API key in a .env file next to this one.
 try {
@@ -17,9 +18,19 @@ const ACCESS_CODES = (process.env.PATRICK_ACCESS_CODES || "")
   .map((c) => c.trim())
   .filter(Boolean);
 
-const client = new Anthropic();
-// Demo mode: no API key yet, so Patrick sends a sample answer to show how the app works.
-const DEMO = !process.env.ANTHROPIC_API_KEY && !process.env.ANTHROPIC_AUTH_TOKEN;
+// Uses the key from the Settings page (or .env). Returns null when there's no key yet,
+// which puts Patrick in demo mode: he sends a sample answer to show how the app works.
+let client = null;
+let clientKey = null;
+function getClient() {
+  const key = anthropicKey();
+  if (!key && !process.env.ANTHROPIC_AUTH_TOKEN) return null;
+  if (!client || key !== clientKey) {
+    client = new Anthropic(key ? { apiKey: key } : {});
+    clientKey = key;
+  }
+  return client;
+}
 const DEMO_ANSWER = `(Demo mode: add an API key to get real answers.)
 
 1. 2x + 5 = 17
@@ -84,9 +95,18 @@ function canvasError(res, err) {
 }
 
 // The student's Canvas token is only used for this request; it's never saved on the server.
+// Canvas details typed into the panel win; otherwise use the ones saved in Settings.
+function canvasLogin(body) {
+  const saved = loadSettings();
+  return {
+    canvasUrl: body?.canvasUrl || saved.canvasUrl,
+    token: body?.token || saved.canvasToken,
+  };
+}
+
 app.post("/api/canvas/assignments", async (req, res) => {
   if (!allowed(req, res, { count: false })) return;
-  const { canvasUrl, token } = req.body || {};
+  const { canvasUrl, token } = canvasLogin(req.body);
   try {
     res.json({ assignments: await listAssignments(canvasUrl, token) });
   } catch (err) {
@@ -96,7 +116,8 @@ app.post("/api/canvas/assignments", async (req, res) => {
 
 app.post("/api/canvas/gather", async (req, res) => {
   if (!allowed(req, res, { count: false })) return;
-  const { canvasUrl, token, courseId, assignmentId } = req.body || {};
+  const { courseId, assignmentId } = req.body || {};
+  const { canvasUrl, token } = canvasLogin(req.body);
   try {
     res.json(await gatherAssignment(canvasUrl, token, courseId, assignmentId));
   } catch (err) {
@@ -114,7 +135,8 @@ app.post("/api/ask", async (req, res) => {
   res.setHeader("Content-Type", "text/plain; charset=utf-8");
   res.setHeader("Cache-Control", "no-cache");
 
-  if (DEMO) {
+  const ai = getClient();
+  if (!ai) {
     for (const word of DEMO_ANSWER.split(/(?<= )/)) {
       res.write(word);
       await new Promise((r) => setTimeout(r, 15));
@@ -123,7 +145,7 @@ app.post("/api/ask", async (req, res) => {
   }
 
   try {
-    const stream = client.beta.messages.stream({
+    const stream = ai.beta.messages.stream({
       model: "claude-opus-5-5",
       max_tokens: 64000,
       output_config: { effort: "medium" },
@@ -157,6 +179,59 @@ app.post("/api/ask", async (req, res) => {
   }
 });
 
+// ---- Settings page ----
+// Only the computer Patrick runs on can see or change keys, never someone on the internet.
+function fromThisComputer(req) {
+  const peer = req.socket.remoteAddress || "";
+  const loopback = ["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(peer);
+  const origin = req.headers.origin;
+  const sameSite = !origin || origin === `http://${req.headers.host}`;
+  return loopback && !req.headers["x-forwarded-for"] && sameSite;
+}
+
+function settingsView() {
+  const s = loadSettings();
+  const key = anthropicKey();
+  return {
+    anthropicKeySet: !!key,
+    anthropicKeyHint: hint(key),
+    canvasUrl: s.canvasUrl || "",
+    canvasTokenSet: !!s.canvasToken,
+    canvasTokenHint: hint(s.canvasToken),
+  };
+}
+
+app.get("/api/settings", (req, res) => {
+  const codesRequired = ACCESS_CODES.length > 0;
+  if (!fromThisComputer(req)) return res.json({ editable: false, codesRequired, anthropicKeySet: !!getClient() });
+  res.json({ editable: true, codesRequired, ...settingsView() });
+});
+
+app.post("/api/settings", async (req, res) => {
+  if (!fromThisComputer(req)) return res.status(403).json({ error: "Settings can only be changed on the computer running Patrick." });
+  const { anthropicKey: newKey, canvasUrl, canvasToken } = req.body || {};
+  const changes = {};
+  if (typeof newKey === "string") {
+    const key = newKey.trim();
+    if (key) {
+      // Check the key with a free call before saving it.
+      try {
+        await new Anthropic({ apiKey: key }).models.list({ limit: 1 });
+      } catch (err) {
+        const why = err instanceof Anthropic.AuthenticationError ? "Anthropic says that key isn't valid. Copy it again and paste the whole thing."
+          : err instanceof Anthropic.PermissionDeniedError ? "That key isn't allowed to use the API. Check Billing and the key's workspace."
+          : "Couldn't check the key. Check your internet and try again.";
+        return res.status(400).json({ error: why });
+      }
+    }
+    changes.anthropicKey = key || null;
+  }
+  if (typeof canvasUrl === "string") changes.canvasUrl = canvasUrl.trim() || null;
+  if (typeof canvasToken === "string") changes.canvasToken = canvasToken.trim() || null;
+  saveSettings(changes);
+  res.json({ editable: true, ...settingsView() });
+});
+
 // Opens Patrick in the default browser (used by the PC launcher).
 function openBrowser() {
   const [cmd, args] =
@@ -166,10 +241,12 @@ function openBrowser() {
   spawn(cmd, args, { detached: true, stdio: "ignore" }).on("error", () => {}).unref();
 }
 
-const server = app.listen(PORT, (err) => {
+// On a PC, only listen on this computer so others on the Wi-Fi can't use it.
+const HOST = process.env.PATRICK_OPEN ? "127.0.0.1" : undefined;
+const server = app.listen(PORT, HOST, (err) => {
   if (err) return; // handled by the "error" listener below
   console.log(`Patrick is running at ${URL_HERE}`);
-  if (DEMO) console.warn("Demo mode: no ANTHROPIC_API_KEY set, sending sample answers.");
+  if (!getClient()) console.warn("Demo mode: no API key yet. Add one on Patrick's Settings page.");
   if (!ACCESS_CODES.length && !process.env.PATRICK_OPEN) console.warn("Warning: PATRICK_ACCESS_CODES not set — anyone can use it.");
   if (process.env.PATRICK_OPEN) {
     console.log("Keep this window open while you use Patrick. Close it to stop him.");

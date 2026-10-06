@@ -15,12 +15,5 @@ if [ ! -d node_modules ]; then
   npm install --no-audit --no-fund || { read -p "Setup failed. Press Enter to close."; exit 1; }
 fi
 
-if [ ! -f .env ]; then
-  echo
-  echo "Paste your Anthropic API key and press Enter."
-  echo "(Get one at console.anthropic.com. Leave it blank to try demo mode.)"
-  read -p "API key: " KEY
-  if [ -n "$KEY" ]; then echo "ANTHROPIC_API_KEY=$KEY" > .env; else : > .env; fi
-fi
-
+# Add your API key on Patrick's Settings page (the gear button).
 PATRICK_OPEN=1 node server.js

@@ -21,14 +21,7 @@ if not exist node_modules (
   )
 )
 
-if exist .env goto run
-echo.
-echo Paste your Anthropic API key and press Enter.
-echo (Get one at console.anthropic.com. Leave it blank to try demo mode.)
-set /p KEY=API key: 
-if "%KEY%"=="" (type nul > .env) else (> .env echo ANTHROPIC_API_KEY=%KEY%)
-
-:run
+rem Add your API key on Patrick's Settings page (the gear button).
 set PATRICK_OPEN=1
 node server.js
 pause
