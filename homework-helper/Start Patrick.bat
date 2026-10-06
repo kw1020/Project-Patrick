@@ -2,6 +2,15 @@
 title Patrick Homework Doer
 cd /d "%~dp0"
 
+if not exist server.js (
+  echo Patrick's files aren't here. You probably opened this from inside the zip.
+  echo.
+  echo Fix: close this, right-click the downloaded zip, choose "Extract All...",
+  echo then open the extracted folder, go into homework-helper, and double-click Start Patrick again.
+  pause
+  exit /b
+)
+
 where node >nul 2>nul
 if errorlevel 1 (
   echo Patrick needs Node.js to run. Opening the download page...

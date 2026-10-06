@@ -11,146 +11,247 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Patrick">
 <style>
-  :root { --bg:#f6f7fb; --card:#fff; --text:#1b1d24; --muted:#6b7080; --accent:#3b5bfd; --me:#e8edff; --border:#dfe2ea; }
+  :root {
+    --bg:#f3f4f8; --card:#fff; --text:#1b1d24; --muted:#6b7080; --border:#e3e5ec;
+    --accent:#3b5bfd; --accent-soft:#e8edff; --red:#e5484d; --red-soft:#fde8e8;
+    --amber:#b7791f; --amber-soft:#fff4d6; --green:#2f9e5b; --green-soft:#e3f5ea;
+  }
   @media (prefers-color-scheme: dark) {
-    :root { --bg:#111318; --card:#1b1e26; --text:#e9ebf1; --muted:#9aa0b0; --accent:#7b93ff; --me:#26304d; --border:#2c303b; }
+    :root {
+      --bg:#0f1116; --card:#191c24; --text:#e9ebf1; --muted:#9aa0b0; --border:#2a2e39;
+      --accent:#7b93ff; --accent-soft:#232c4a; --red:#ff6b6f; --red-soft:#3a1d20;
+      --amber:#f0b54a; --amber-soft:#3a2f17; --green:#4cc27a; --green-soft:#17321f;
+    }
   }
   * { box-sizing:border-box; }
-  body { margin:0; background:var(--bg); color:var(--text); font:16px/1.5 system-ui, -apple-system, sans-serif; }
-  main { max-width:760px; margin:0 auto; padding:16px; min-height:100vh; display:flex; flex-direction:column; }
-  h1 { font-size:1.4rem; margin:8px 0 4px; }
-  .sub { color:var(--muted); margin:0 0 16px; }
-  #chat { flex:1; display:flex; flex-direction:column; gap:12px; padding-bottom:16px; }
-  .msg { padding:12px 14px; border-radius:14px; white-space:pre-wrap; word-wrap:break-word; border:1px solid var(--border); background:var(--card); }
-  .msg.me { background:var(--me); align-self:flex-end; max-width:85%; }
-  .msg img { max-width:100%; border-radius:8px; display:block; margin-bottom:6px; }
-  form { position:sticky; bottom:0; background:var(--bg); padding:8px 0 16px; display:flex; flex-direction:column; gap:8px; }
-  textarea, input[type=password] { width:100%; padding:12px; border-radius:12px; border:1px solid var(--border); background:var(--card); color:var(--text); font:inherit; }
-  textarea { resize:vertical; min-height:70px; }
-  .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-  button, label.btn { padding:10px 16px; border-radius:12px; border:0; font:inherit; cursor:pointer; }
-  button[type=submit] { background:var(--accent); color:#fff; margin-left:auto; }
+  html, body { margin:0; background:var(--bg); color:var(--text); font:15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  button { font:inherit; cursor:pointer; border:0; border-radius:10px; padding:8px 14px; }
   button:disabled { opacity:.5; cursor:default; }
-  label.btn { background:var(--card); border:1px solid var(--border); }
-  #preview { color:var(--muted); font-size:.9rem; }
+  .btn-main { background:var(--accent); color:#fff; font-weight:600; }
+  .btn-soft { background:var(--card); color:var(--text); border:1px solid var(--border); }
+  .btn-ghost { background:transparent; color:var(--muted); }
+  input, textarea { font:inherit; color:var(--text); background:var(--bg); border:1px solid var(--border); border-radius:10px; padding:10px 12px; width:100%; }
+
+  /* Layout: fills the whole window on a PC, stacks on a phone */
+  .app { max-width:1440px; margin:0 auto; padding:16px 20px; height:100vh; display:flex; flex-direction:column; gap:14px; }
+  .card { background:var(--card); border:1px solid var(--border); border-radius:16px; }
+
+  /* Top bar */
+  .topbar { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .brand { font-size:1.35rem; font-weight:800; margin-right:auto; display:flex; align-items:center; gap:10px; }
+  .brand small { font-size:.85rem; font-weight:600; color:var(--muted); background:var(--card); border:1px solid var(--border); border-radius:999px; padding:2px 10px; }
+  .chip { display:inline-flex; align-items:center; gap:6px; border-radius:999px; padding:6px 12px; font-size:.85rem; font-weight:600; background:var(--card); border:1px solid var(--border); color:var(--text); }
+  .chip.ok { background:var(--green-soft); border-color:transparent; color:var(--green); }
+  .chip.warn { background:var(--amber-soft); border-color:transparent; color:var(--amber); }
+  #code { width:160px; padding:6px 12px; border-radius:999px; }
+
+  /* Stat widgets */
+  .stats { display:grid; grid-template-columns:repeat(3, 1fr); gap:14px; }
+  .stat { padding:14px 18px; display:flex; align-items:center; gap:14px; }
+  .stat .icon { font-size:1.6rem; width:46px; height:46px; border-radius:12px; display:grid; place-items:center; }
+  .stat .num { font-size:1.7rem; font-weight:800; line-height:1.1; }
+  .stat .label { color:var(--muted); font-size:.9rem; }
+  .stat.missing .icon { background:var(--red-soft); }
+  .stat.missing .num { color:var(--red); }
+  .stat.week .icon { background:var(--amber-soft); }
+  .stat.done .icon { background:var(--green-soft); }
+
+  /* Main area: assignments widget + Patrick workspace */
+  .main { flex:1; min-height:0; display:grid; grid-template-columns:minmax(300px, 380px) 1fr; gap:14px; }
+  .panel { display:flex; flex-direction:column; min-height:0; overflow:hidden; }
+  .panel-head { display:flex; align-items:center; gap:8px; padding:14px 16px; border-bottom:1px solid var(--border); }
+  .panel-head h2 { font-size:1rem; margin:0; margin-right:auto; }
+  .panel-body { flex:1; overflow:auto; padding:10px 12px; }
+
+  .hw { display:flex; align-items:center; gap:10px; padding:10px; border-radius:12px; }
+  .hw:hover { background:var(--bg); }
+  .hw .info { flex:1; min-width:0; }
+  .hw .name { font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .hw .meta { color:var(--muted); font-size:.82rem; }
+  .tag { display:inline-block; border-radius:6px; font-size:.72rem; font-weight:700; padding:1px 6px; margin-right:6px; }
+  .tag.missing { background:var(--red-soft); color:var(--red); }
+  .tag.soon { background:var(--amber-soft); color:var(--amber); }
+  .empty { text-align:center; color:var(--muted); padding:28px 12px; }
+  .empty .big { font-size:2.2rem; }
+  .mini-form { display:flex; flex-direction:column; gap:8px; padding:6px; }
+  .help { color:var(--muted); font-size:.82rem; margin:0; }
+
+  /* Chat */
+  #chat { display:flex; flex-direction:column; gap:12px; padding:16px; flex:1; }
+  .msg { padding:12px 16px; border-radius:14px; white-space:pre-wrap; word-wrap:break-word; max-width:900px; }
+  .msg.me { background:var(--accent-soft); align-self:flex-end; max-width:75%; }
+  .msg.bot { background:var(--bg); border:1px solid var(--border); font-size:1.02rem; line-height:1.6; }
+  .msg.note { color:var(--amber); background:var(--amber-soft); font-size:.9rem; }
+  .msg img { max-width:100%; max-height:260px; border-radius:8px; display:block; margin-bottom:6px; }
   .actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:-4px; }
-  .actions button { background:var(--card); color:var(--text); border:1px solid var(--border); padding:8px 12px; font-size:.9rem; }
-  details#canvas { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:10px 14px; margin-bottom:12px; }
-  details#canvas summary { cursor:pointer; font-weight:600; }
-  details#canvas input { width:100%; padding:10px; border-radius:10px; border:1px solid var(--border); background:var(--bg); color:var(--text); font:inherit; margin-top:8px; }
-  .help { color:var(--muted); font-size:.85rem; margin:8px 0 0; }
-  #loadHw { background:var(--accent); color:#fff; margin-top:10px; }
-  #hwList { display:flex; flex-direction:column; gap:8px; margin-top:10px; }
-  .hw { display:flex; gap:10px; align-items:center; border-top:1px solid var(--border); padding-top:8px; }
-  .hw div { flex:1; min-width:0; }
-  .hw small { color:var(--muted); display:block; }
-  .hw button { background:var(--accent); color:#fff; padding:8px 14px; }
-  .tag { background:#e5484d; color:#fff; border-radius:6px; font-size:.75rem; padding:1px 6px; margin-left:6px; }
-  .msg.note { background:transparent; color:var(--muted); font-size:.9rem; border-style:dashed; }
-  header { display:flex; align-items:center; gap:8px; }
-  header h1 { flex:1; }
-  #gear { background:var(--card); border:1px solid var(--border); color:var(--text); font-size:1.1rem; padding:8px 12px; }
-  .tool { font-weight:600; margin:0 0 4px; }
-  #settings { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:14px; margin-bottom:12px; }
-  #settings h2 { font-size:1.1rem; margin:0 0 8px; }
-  #settings h3 { font-size:1rem; margin:16px 0 4px; }
-  #settings input { width:100%; padding:10px; border-radius:10px; border:1px solid var(--border); background:var(--bg); color:var(--text); font:inherit; margin-top:6px; }
-  #settings .status { font-size:.9rem; margin:4px 0 0; }
-  .ok { color:#2f9e5b; } .bad { color:#e5484d; }
-  #settings .row { margin-top:12px; }
-  #saveSettings { background:var(--accent); color:#fff; }
-  #closeSettings { background:transparent; color:var(--muted); }
-  #banner { background:#fff4d6; color:#5c4400; border-radius:12px; padding:10px 14px; margin-bottom:12px; }
-  #banner button { background:#5c4400; color:#fff; padding:6px 12px; margin-left:6px; }
-  #newChat { background:transparent; color:var(--muted); padding:10px 4px; }
+  .actions button { background:var(--card); color:var(--text); border:1px solid var(--border); font-size:.88rem; padding:6px 12px; }
+  .welcome { margin:auto; text-align:center; color:var(--muted); max-width:460px; padding:24px; }
+  .welcome .big { font-size:3rem; }
+  .welcome h3 { color:var(--text); margin:6px 0; font-size:1.2rem; }
+  .steps { display:grid; gap:8px; margin-top:16px; text-align:left; }
+  .steps div { background:var(--bg); border-radius:12px; padding:10px 14px; }
+
+  /* Composer */
+  form { border-top:1px solid var(--border); padding:12px; display:flex; flex-direction:column; gap:8px; }
+  textarea { resize:none; height:64px; }
+  .row { display:flex; gap:8px; align-items:center; }
+  #preview { color:var(--green); font-size:.88rem; font-weight:600; }
+  .row .push { margin-left:auto; }
+  .photo-btn { border-radius:10px; padding:8px 14px; cursor:pointer; }
+
+  /* Pop-ups */
+  dialog { border:0; border-radius:18px; padding:0; background:var(--card); color:var(--text); width:min(560px, calc(100vw - 32px)); box-shadow:0 20px 60px rgba(0,0,0,.25); }
+  dialog::backdrop { background:rgba(10,12,20,.45); }
+  dialog.wide { width:min(900px, calc(100vw - 32px)); }
+  .dlg-head { display:flex; align-items:center; padding:16px 20px; border-bottom:1px solid var(--border); }
+  .dlg-head h2 { margin:0; font-size:1.15rem; margin-right:auto; }
+  .dlg-body { padding:16px 20px; max-height:70vh; overflow:auto; }
+  .dlg-foot { display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap; padding:14px 20px; border-top:1px solid var(--border); }
+  .setting { border:1px solid var(--border); border-radius:14px; padding:14px; margin-bottom:12px; }
+  .setting h3 { margin:0 0 8px; font-size:1rem; display:flex; gap:8px; align-items:center; }
+  .setting h3 .chip { margin-left:auto; }
+  .setting input + input { margin-top:8px; }
+  .setting .help { margin-top:8px; }
+  #saveStatus { margin-right:auto; align-self:center; font-size:.9rem; }
+  .ok-text { color:var(--green); } .bad-text { color:var(--red); }
+  #bigAnswer { white-space:pre-wrap; font-size:1.25rem; line-height:1.8; }
+
+  @media (max-width: 900px) {
+    .app { height:auto; min-height:100vh; padding:12px; }
+    .stats { gap:8px; }
+    .stat { padding:10px; flex-direction:column; text-align:center; gap:4px; }
+    .stat .icon { width:36px; height:36px; font-size:1.2rem; }
+    .stat .num { font-size:1.3rem; }
+    .stat .label { font-size:.75rem; }
+    .main { grid-template-columns:1fr; }
+    #assignPanel .panel-body { max-height:300px; }
+    #work { min-height:70vh; }
+    .msg.me { max-width:90%; }
+  }
 </style>
 </head>
 <body>
-<main>
-  <header>
-    <h1>🤖 Patrick</h1>
-    <button type="button" id="gear" title="Settings" hidden>⚙️</button>
+<div class="app">
+
+  <header class="topbar">
+    <div class="brand">🤖 Patrick <small>📐 Math &amp; Homework</small></div>
+    <input id="code" type="password" placeholder="Access code" hidden>
+    <button type="button" class="chip" id="brainChip" title="Patrick's brain (API key)">🧠 Checking…</button>
+    <button type="button" class="chip" id="canvasChip" title="Canvas connection">📚 Canvas</button>
+    <button type="button" class="btn-soft" id="gear" title="Settings" hidden>⚙️ Settings</button>
   </header>
-  <p class="tool">📐 Math &amp; Homework</p>
-  <p class="sub">Snap a photo of your homework or load it from Canvas. Patrick does it and gives you the answers.</p>
 
-  <div id="banner" hidden>Patrick needs your API key to give real answers. <button type="button" id="openSettings">Open Settings</button></div>
-
-  <section id="settings" hidden>
-    <h2>⚙️ Settings</h2>
-    <p class="help">Keys are saved only on this computer. Leave a box empty to keep what's already saved.</p>
-
-    <h3>🧠 Patrick's brain (Anthropic API key)</h3>
-    <input id="setAnthropic" type="password" placeholder="Paste your API key" autocomplete="off">
-    <p class="status" id="anthropicStatus"></p>
-    <p class="help">Get one at <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com/settings/keys</a>. New keys may expire after 30 days, so paste a new one here when that happens.</p>
-
-    <h3>📚 Canvas</h3>
-    <input id="setCanvasUrl" placeholder="Canvas address, like yourschool.instructure.com" autocomplete="off">
-    <input id="setCanvasToken" type="password" placeholder="Canvas access token" autocomplete="off">
-    <p class="status" id="canvasStatus"></p>
-    <p class="help">In Canvas: Account → Settings → Approved Integrations → <b>+ New Access Token</b>.</p>
-
-    <div class="row">
-      <button type="button" id="saveSettings">Save</button>
-      <button type="button" id="closeSettings">Close</button>
-    </div>
-    <p class="status" id="saveStatus"></p>
+  <section class="stats">
+    <div class="card stat missing"><div class="icon">🚨</div><div><div class="num" id="statMissing">–</div><div class="label">Missing</div></div></div>
+    <div class="card stat week"><div class="icon">📅</div><div><div class="num" id="statWeek">–</div><div class="label">Due this week</div></div></div>
+    <div class="card stat done"><div class="icon">✅</div><div><div class="num" id="statDone">0</div><div class="label">Done today</div></div></div>
   </section>
 
-  <div id="codeBox" hidden>
-    <input id="code" type="password" placeholder="Access code">
+  <section class="main">
+    <div class="card panel" id="assignPanel">
+      <div class="panel-head">
+        <h2>📋 Your assignments</h2>
+        <button type="button" class="btn-ghost" id="loadHw" title="Refresh">↻ Refresh</button>
+      </div>
+      <div class="panel-body" id="hwList"></div>
+    </div>
+
+    <div class="card panel" id="work">
+      <div class="panel-head">
+        <h2>✏️ Patrick's answers</h2>
+        <button type="button" class="btn-ghost" id="newChat">＋ New</button>
+      </div>
+      <div class="panel-body" style="padding:0; display:flex; flex-direction:column;">
+        <div id="chat">
+          <div class="welcome" id="welcome">
+            <div class="big">👋</div>
+            <h3>What are we doing first?</h3>
+            <div class="steps">
+              <div>📋 <b>Click "Do it"</b> on an assignment</div>
+              <div>📸 <b>Paste a screenshot</b> with Ctrl+V, or add a photo</div>
+              <div>⌨️ <b>Type a problem</b> below</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <form id="form">
+        <textarea id="text" placeholder="Type a problem, or paste a screenshot (Ctrl+V)…"></textarea>
+        <div class="row">
+          <label class="btn-soft photo-btn">📷 Photo<input id="photo" type="file" accept="image/*" hidden></label>
+          <span id="preview"></span>
+          <button type="submit" id="send" class="btn-main push">Do my homework ➜</button>
+        </div>
+      </form>
+    </div>
+  </section>
+</div>
+
+<!-- Settings pop-up -->
+<dialog id="settingsDlg">
+  <div class="dlg-head"><h2>⚙️ Settings</h2><button type="button" class="btn-ghost" data-close>✕</button></div>
+  <div class="dlg-body">
+    <div class="setting">
+      <h3>🧠 Patrick's brain <span class="chip" id="anthropicStatus"></span></h3>
+      <input id="setAnthropic" type="password" placeholder="Paste your Anthropic API key" autocomplete="off">
+      <p class="help">Get one at <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com/settings/keys</a>. Keys can expire after 30 days. Just paste a new one here.</p>
+    </div>
+    <div class="setting">
+      <h3>📚 Canvas <span class="chip" id="canvasStatus"></span></h3>
+      <input id="setCanvasUrl" placeholder="Canvas address, like yourschool.instructure.com" autocomplete="off">
+      <input id="setCanvasToken" type="password" placeholder="Canvas access token" autocomplete="off">
+      <p class="help">In Canvas: Account → Settings → Approved Integrations → <b>+ New Access Token</b>. No password needed.</p>
+    </div>
+    <p class="help">🔒 Keys are saved only on this computer. Leave a box empty to keep what's saved.</p>
   </div>
+  <div class="dlg-foot">
+    <span id="saveStatus"></span>
+    <button type="button" class="btn-soft" data-close>Close</button>
+    <button type="button" class="btn-main" id="saveSettings">Save</button>
+  </div>
+</dialog>
 
-  <details id="canvas">
-    <summary>📚 Get homework from Canvas</summary>
-    <div id="canvasLogin">
-    <input id="canvasUrl" placeholder="Canvas address, like yourschool.instructure.com" autocomplete="off">
-    <input id="canvasToken" type="password" placeholder="Canvas access token" autocomplete="off">
-    <p class="help">To get a token: in Canvas, go to <b>Account → Settings</b>, scroll to <b>Approved Integrations</b>, tap <b>+ New Access Token</b>, name it "Patrick", and paste the token here. It's saved only on this device, and you never give Patrick your password.</p>
-    </div>
-    <button type="button" id="loadHw">Load my assignments</button>
-    <div id="hwList"></div>
-  </details>
-
-  <div id="chat"></div>
-
-  <form id="form">
-    <textarea id="text" placeholder="Type the homework (or just add a photo)…"></textarea>
-    <div class="row">
-      <label class="btn">📷 Photo<input id="photo" type="file" accept="image/*" hidden></label>
-      <span id="preview"></span>
-      <button type="button" id="newChat">New homework</button>
-      <button type="submit" id="send">Do my homework</button>
-    </div>
-  </form>
-</main>
+<!-- Big answer pop-up -->
+<dialog id="answerDlg" class="wide">
+  <div class="dlg-head"><h2 id="answerTitle">Answers</h2><button type="button" class="btn-ghost" data-close>✕</button></div>
+  <div class="dlg-body"><div id="bigAnswer"></div></div>
+  <div class="dlg-foot" id="answerFoot"></div>
+</dialog>
 
 <script>
-const chat = document.getElementById("chat");
-const form = document.getElementById("form");
-const text = document.getElementById("text");
-const photo = document.getElementById("photo");
-const preview = document.getElementById("preview");
-const send = document.getElementById("send");
-const codeInput = document.getElementById("code");
-const codeBox = document.getElementById("codeBox");
+const $ = (id) => document.getElementById(id);
+const chat = $("chat"), form = $("form"), text = $("text"), photo = $("photo"), preview = $("preview"), send = $("send");
+const codeInput = $("code"), hwList = $("hwList"), loadHw = $("loadHw"), welcome = $("welcome");
 
 let history = [];
 let pendingImage = null; // { media_type, data, url }
+let settings = {};
+let assignments = [];
 
 function store(key, val) { try { val == null ? localStorage.removeItem(key) : localStorage.setItem(key, val); } catch {} }
 function load(key) { try { return localStorage.getItem(key); } catch { return null; } }
 codeInput.value = load("patrick-code") || "";
-codeBox.hidden = true; // shown only if this copy of Patrick uses access codes (see showSettings)
 
-// Shrink photos so uploads are fast and cheap.
+const escapeHtml = (t) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const plain = (txt) => txt.replace(/\*\*(.+?)\*\*/g, "$1").replace(/^\(Demo mode.*\)\n+/, "");
+// Shows Patrick's text safely, turning **this** into bold.
+function render(el, txt) { el.innerHTML = escapeHtml(txt).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>"); }
+
+// ---- Pop-ups ----
+document.querySelectorAll("dialog [data-close]").forEach((b) => (b.onclick = () => b.closest("dialog").close()));
+document.querySelectorAll("dialog").forEach((d) => d.addEventListener("click", (e) => { if (e.target === d) d.close(); }));
+
+// ---- "Done today" widget ----
+function today() { return new Date().toISOString().slice(0, 10); }
+function doneCount() { return load("patrick-done-day") === today() ? Number(load("patrick-done-count") || 0) : 0; }
+function bumpDone() { store("patrick-done-day", today()); store("patrick-done-count", String(doneCount() + 1)); $("statDone").textContent = doneCount(); }
+$("statDone").textContent = doneCount();
+
+// ---- Photos / screenshots ----
 function shrink(file) {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => {
-      const max = 1600;
-      const scale = Math.min(1, max / Math.max(img.width, img.height));
+      const scale = Math.min(1, 1600 / Math.max(img.width, img.height));
       const c = document.createElement("canvas");
       c.width = Math.round(img.width * scale);
       c.height = Math.round(img.height * scale);
@@ -162,28 +263,26 @@ function shrink(file) {
     img.src = URL.createObjectURL(file);
   });
 }
-
-photo.addEventListener("change", async () => {
-  const file = photo.files[0];
-  if (!file) return;
+async function addImage(file) {
   pendingImage = await shrink(file);
-  preview.textContent = "Photo added ✓";
+  preview.textContent = "📎 Picture added";
+}
+photo.addEventListener("change", () => photo.files[0] && addImage(photo.files[0]));
+// Paste a screenshot straight into Patrick (Win+Shift+S, then Ctrl+V).
+document.addEventListener("paste", (e) => {
+  const item = [...(e.clipboardData?.items || [])].find((i) => i.type.startsWith("image/"));
+  if (item) { e.preventDefault(); addImage(item.getAsFile()); text.focus(); }
 });
 
-document.getElementById("newChat").addEventListener("click", () => {
+$("newChat").onclick = () => {
   history = [];
   chat.innerHTML = "";
-  pendingImage = null;
-  preview.textContent = "";
-});
-
-// Shows Patrick's text safely, turning **this** into bold.
-function render(el, txt) {
-  const safe = txt.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  el.innerHTML = safe.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
-}
+  chat.appendChild(welcome);
+  pendingImage = null; preview.textContent = "";
+};
 
 function bubble(cls, content, imgUrl) {
+  welcome.remove();
   const div = document.createElement("div");
   div.className = "msg " + cls;
   if (imgUrl) { const im = document.createElement("img"); im.src = imgUrl; div.appendChild(im); }
@@ -195,23 +294,16 @@ function bubble(cls, content, imgUrl) {
   return span;
 }
 
-const plain = (txt) => txt.replace(/\*\*(.+?)\*\*/g, "$1").replace(/^\(Demo mode.*\)\n+/, "");
-const escapeHtml = (t) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-
-// A clean answer sheet, used for printing and for the Google Docs / Word download.
+// ---- Answer sheet (print + Word/Google Docs) ----
 function sheetHtml(answer) {
   const date = new Date().toLocaleDateString();
-  const body = escapeHtml(plain(answer));
   return `<!doctype html><html><head><meta charset="utf-8"><title>Homework ${date}</title>
-<style>body{font:12pt/1.6 Arial,sans-serif;margin:0.75in;color:#000}p{margin:0 0 12pt}.top{margin-bottom:18pt}pre{font:inherit;white-space:pre-wrap;margin:0}</style>
-</head><body><div class="top">Name: ______________________ &nbsp;&nbsp; Date: ${date}</div><pre>${body}</pre></body></html>`;
+<style>body{font:12pt/1.6 Arial,sans-serif;margin:0.75in;color:#000}.top{margin-bottom:18pt}pre{font:inherit;white-space:pre-wrap;margin:0}</style>
+</head><body><div class="top">Name: ______________________ &nbsp;&nbsp; Date: ${date}</div><pre>${escapeHtml(plain(answer))}</pre></body></html>`;
 }
 
-// Buttons under each finished answer: copy it, print it, or download it as a doc.
-function addActions(afterEl, answer) {
-  const row = document.createElement("div");
-  row.className = "actions";
-  const make = (label, fn) => { const b = document.createElement("button"); b.type = "button"; b.textContent = label; b.onclick = () => fn(b); row.appendChild(b); };
+function answerButtons(container, answer, title) {
+  const make = (label, fn) => { const b = document.createElement("button"); b.type = "button"; b.textContent = label; b.onclick = () => fn(b); container.appendChild(b); return b; };
   make("📋 Copy", async (b) => {
     try { await navigator.clipboard.writeText(plain(answer)); b.textContent = "✓ Copied"; }
     catch { b.textContent = "Couldn't copy"; }
@@ -222,27 +314,60 @@ function addActions(afterEl, answer) {
     if (!w) return;
     w.document.write(sheetHtml(answer));
     w.document.close();
-    w.onload = () => w.print();
     setTimeout(() => w.print(), 400);
   });
-  make("📄 Google Doc / Word", () => {
-    const blob = new Blob([sheetHtml(answer)], { type: "application/msword" });
+  make("📄 Word / Google Doc", () => {
     const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `homework-${new Date().toISOString().slice(0, 10)}.doc`;
+    a.href = URL.createObjectURL(new Blob([sheetHtml(answer)], { type: "application/msword" }));
+    a.download = `${(title || "homework").replace(/[^\w.-]+/g, "-")}-${today()}.doc`;
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   });
+}
+
+// Big, easy-to-read pop-up for copying answers onto paper.
+function openBig(answer, title) {
+  $("answerTitle").textContent = "✏️ " + title;
+  render($("bigAnswer"), answer.replace(/^\(Demo mode.*\)\n+/, ""));
+  const foot = $("answerFoot");
+  foot.innerHTML = "";
+  answerButtons(foot, answer, title);
+  foot.querySelectorAll("button").forEach((b) => (b.className = "btn-soft"));
+  const close = document.createElement("button");
+  close.className = "btn-main"; close.textContent = "Done"; close.onclick = () => $("answerDlg").close();
+  foot.appendChild(close);
+  $("answerDlg").showModal();
+}
+
+function addActions(afterEl, answer, title) {
+  const row = document.createElement("div");
+  row.className = "actions";
+  const big = document.createElement("button");
+  big.type = "button"; big.textContent = "🔍 Big view"; big.onclick = () => openBig(answer, title);
+  row.appendChild(big);
+  answerButtons(row, answer, title);
   afterEl.after(row);
 }
 
+// ---- Asking Patrick ----
+function askForCode() {
+  codeInput.hidden = false; store("patrick-code", null);
+  codeInput.placeholder = codeInput.value ? "Wrong code, try again" : "Enter access code";
+  codeInput.value = "";
+  codeInput.focus();
+}
+function rememberCode() {
+  store("patrick-code", codeInput.value);
+  if (codeInput.value) codeInput.hidden = true;
+}
+
 // Sends one turn to Patrick and streams the answer. onUndo runs if the access code was wrong.
-async function sendTurn(content, label, imgUrl, onUndo) {
+async function sendTurn(content, label, imgUrl, onUndo, title) {
+  title = title || "Answers";
   const mine = bubble("me", label, imgUrl).parentElement;
   history.push({ role: "user", content });
   send.disabled = true;
-
-  const out = bubble("bot", "Patrick is thinking…");
+  const out = bubble("bot", "Patrick is working on it… ✏️");
   let answer = "";
   try {
     const res = await fetch("/api/ask", {
@@ -251,7 +376,6 @@ async function sendTurn(content, label, imgUrl, onUndo) {
       body: JSON.stringify({ code: codeInput.value, messages: history }),
     });
     if (res.status === 401) {
-      // Wrong or missing code: undo the turn so they can fix the code and try again.
       mine.remove(); out.parentElement.remove();
       history.pop();
       if (onUndo) onUndo();
@@ -275,24 +399,13 @@ async function sendTurn(content, label, imgUrl, onUndo) {
       out.parentElement.scrollIntoView({ block: "end" });
     }
     history.push({ role: "assistant", content: answer || "(no answer)" });
-    if (answer) addActions(out.parentElement, answer);
+    if (answer) { addActions(out.parentElement, answer, title); bumpDone(); }
   } catch {
-    out.textContent = "Couldn't reach Patrick. Check your internet and try again.";
+    out.textContent = "Couldn't reach Patrick. Is the black Patrick window still open?";
     history.pop();
   } finally {
     send.disabled = false;
   }
-}
-
-function askForCode() {
-  codeBox.hidden = false; store("patrick-code", null);
-  codeInput.placeholder = codeInput.value ? "Wrong code, try again" : "Enter your access code first";
-  codeInput.value = "";
-  codeInput.focus();
-}
-function rememberCode() {
-  store("patrick-code", codeInput.value);
-  codeBox.hidden = !!codeInput.value;
 }
 
 form.addEventListener("submit", (e) => {
@@ -304,137 +417,162 @@ form.addEventListener("submit", (e) => {
   content.push({ type: "text", text: q || "Do this homework. Give me the answers for every question." });
   const sentImage = pendingImage;
   text.value = ""; pendingImage = null; photo.value = ""; preview.textContent = "";
-  sendTurn(content, q, sentImage && sentImage.url, () => {
+  sendTurn(content, q || "📸 Picture of homework", sentImage && sentImage.url, () => {
     text.value = q;
-    if (sentImage) { pendingImage = sentImage; preview.textContent = "Photo added ✓"; }
+    if (sentImage) { pendingImage = sentImage; preview.textContent = "📎 Picture added"; }
   });
 });
+// Enter sends, Shift+Enter makes a new line.
+text.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); form.requestSubmit(); } });
 
-// ---- Canvas ----
-const canvasBox = document.getElementById("canvas");
-const canvasUrl = document.getElementById("canvasUrl");
-const canvasToken = document.getElementById("canvasToken");
-const hwList = document.getElementById("hwList");
-const loadHw = document.getElementById("loadHw");
-canvasUrl.value = load("patrick-canvas-url") || "";
-canvasToken.value = load("patrick-canvas-token") || "";
+// ---- Canvas assignments widget ----
+function canvasConnected() { return settings.canvasTokenSet || (!!load("patrick-canvas-url") && !!load("patrick-canvas-token")); }
 
 async function canvasCall(path, extra) {
+  // Use Canvas saved in Settings when there is one; otherwise this browser's saved login.
+  const login = settings.canvasTokenSet ? {} : { canvasUrl: load("patrick-canvas-url"), token: load("patrick-canvas-token") };
   const res = await fetch(path, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    // Hidden login boxes mean Canvas is saved in Settings, so let the server use that.
-    body: JSON.stringify(document.getElementById("canvasLogin").hidden
-      ? { code: codeInput.value, ...extra }
-      : { code: codeInput.value, canvasUrl: canvasUrl.value, token: canvasToken.value.trim(), ...extra }),
+    body: JSON.stringify({ code: codeInput.value, ...login, ...extra }),
   });
   const data = await res.json().catch(() => ({}));
-  if (res.status === 401) { askForCode(); throw new Error("Enter your access code first, then try again."); }
+  if (res.status === 401) { askForCode(); throw new Error("Enter your access code at the top first."); }
   if (!res.ok) throw new Error(data.error || "Couldn't reach Canvas.");
   rememberCode();
   return data;
 }
 
+function daysUntil(iso) { return iso ? (new Date(iso) - new Date()) / 86400000 : Infinity; }
 function dueText(iso) {
   if (!iso) return "No due date";
-  const d = new Date(iso);
-  return "Due " + d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+  return "Due " + new Date(iso).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
 }
 
-loadHw.addEventListener("click", async () => {
-  store("patrick-canvas-url", canvasUrl.value.trim());
-  store("patrick-canvas-token", canvasToken.value.trim());
-  hwList.textContent = "Loading your assignments…";
+function showEmpty(icon, msg, btnLabel, onClick) {
+  hwList.innerHTML = `<div class="empty"><div class="big">${icon}</div><p>${msg}</p></div>`;
+  if (btnLabel) {
+    const b = document.createElement("button");
+    b.className = "btn-main"; b.textContent = btnLabel; b.onclick = onClick;
+    hwList.querySelector(".empty").appendChild(b);
+  }
+}
+
+// For hosted copies (no Settings page): a small login form right in the widget.
+function showMiniLogin() {
+  hwList.innerHTML = `<div class="mini-form">
+    <p class="help">Connect Canvas to see your assignments here.</p>
+    <input id="mUrl" placeholder="Canvas address, like yourschool.instructure.com">
+    <input id="mTok" type="password" placeholder="Canvas access token">
+    <p class="help">Canvas → Account → Settings → <b>+ New Access Token</b>. Saved only on this device.</p>
+    <button class="btn-main" id="mGo">Connect</button></div>`;
+  $("mGo").onclick = () => {
+    store("patrick-canvas-url", $("mUrl").value.trim());
+    store("patrick-canvas-token", $("mTok").value.trim());
+    showSettings(settings);
+    loadAssignments();
+  };
+}
+
+function renderAssignments() {
+  $("statMissing").textContent = assignments.filter((a) => a.missing).length;
+  $("statWeek").textContent = assignments.filter((a) => !a.missing && daysUntil(a.dueAt) <= 7).length;
+  if (!assignments.length) return showEmpty("🎉", "You're all caught up!");
+  hwList.innerHTML = "";
+  for (const a of assignments) {
+    const row = document.createElement("div");
+    row.className = "hw";
+    const info = document.createElement("div");
+    info.className = "info";
+    const name = document.createElement("div");
+    name.className = "name";
+    name.textContent = a.name;
+    name.title = a.name;
+    const meta = document.createElement("div");
+    meta.className = "meta";
+    const tag = a.missing ? '<span class="tag missing">MISSING</span>' : daysUntil(a.dueAt) <= 2 ? '<span class="tag soon">SOON</span>' : "";
+    meta.innerHTML = tag + escapeHtml(`${dueText(a.dueAt)} · ${a.course}`);
+    info.append(name, meta);
+    const go = document.createElement("button");
+    go.type = "button"; go.className = "btn-main"; go.textContent = "Do it";
+    go.onclick = () => doAssignment(a, go);
+    row.append(info, go);
+    hwList.appendChild(row);
+  }
+}
+
+async function loadAssignments() {
+  if (!canvasConnected()) {
+    $("statMissing").textContent = "–"; $("statWeek").textContent = "–";
+    return settings.editable ? showEmpty("📚", "Connect Canvas to see all your assignments here.", "Connect Canvas", openSettings) : showMiniLogin();
+  }
+  showEmpty("⏳", "Loading your assignments…");
   loadHw.disabled = true;
   try {
-    const { assignments } = await canvasCall("/api/canvas/assignments");
-    hwList.innerHTML = "";
-    if (!assignments.length) hwList.textContent = "No unfinished assignments found. 🎉";
-    for (const a of assignments) {
-      const row = document.createElement("div");
-      row.className = "hw";
-      const info = document.createElement("div");
-      const name = document.createElement("span");
-      name.textContent = a.name;
-      info.appendChild(name);
-      if (a.missing) { const t = document.createElement("span"); t.className = "tag"; t.textContent = "Missing"; info.appendChild(t); }
-      const sub = document.createElement("small");
-      sub.textContent = `${a.course} · ${dueText(a.dueAt)}`;
-      info.appendChild(sub);
-      const go = document.createElement("button");
-      go.type = "button";
-      go.textContent = "Do it";
-      go.onclick = () => doAssignment(a, go);
-      row.append(info, go);
-      hwList.appendChild(row);
-    }
+    assignments = (await canvasCall("/api/canvas/assignments")).assignments;
+    renderAssignments();
   } catch (err) {
-    hwList.textContent = err.message;
+    showEmpty("⚠️", escapeHtml(err.message), settings.editable ? "Check Settings" : "Try again", settings.editable ? openSettings : showMiniLogin);
   } finally {
     loadHw.disabled = false;
   }
-});
+}
+loadHw.onclick = loadAssignments;
 
 async function doAssignment(a, btn) {
   btn.disabled = true;
   btn.textContent = "Reading…";
   try {
     const got = await canvasCall("/api/canvas/gather", { courseId: a.courseId, assignmentId: a.id });
-    canvasBox.open = false;
     history = []; // each assignment starts fresh
+    chat.innerHTML = "";
     for (const n of got.notes || []) bubble("note", "⚠️ " + n);
-    await sendTurn(got.content, `📚 ${got.title}`);
+    await sendTurn(got.content, `📚 ${got.title}`, null, null, got.title);
   } catch (err) {
-    alert(err.message);
+    bubble("note", "⚠️ " + err.message);
   } finally {
     btn.disabled = false;
     btn.textContent = "Do it";
   }
 }
+
 // ---- Settings ----
-const settingsBox = document.getElementById("settings");
-const gear = document.getElementById("gear");
-const banner = document.getElementById("banner");
-const setAnthropic = document.getElementById("setAnthropic");
-const setCanvasUrl = document.getElementById("setCanvasUrl");
-const setCanvasToken = document.getElementById("setCanvasToken");
-const saveStatus = document.getElementById("saveStatus");
+const setAnthropic = $("setAnthropic"), setCanvasUrl = $("setCanvasUrl"), setCanvasToken = $("setCanvasToken"), saveStatus = $("saveStatus");
+
+function chip(el, ok, okText, warnText) {
+  el.textContent = ok ? okText : warnText;
+  el.className = "chip " + (ok ? "ok" : "warn");
+}
 
 function showSettings(st) {
-  if (st.codesRequired !== undefined) codeBox.hidden = !st.codesRequired || !!codeInput.value;
-  gear.hidden = !st.editable;
-  banner.hidden = !(st.editable && !st.anthropicKeySet);
+  settings = st;
+  $("gear").hidden = !st.editable;
+  if (st.codesRequired !== undefined) codeInput.hidden = !st.codesRequired || !!codeInput.value;
+  chip($("brainChip"), st.anthropicKeySet, "🧠 Brain ready", "🧠 Add API key");
+  chip($("canvasChip"), canvasConnected(), "📚 Canvas connected", "📚 Connect Canvas");
   if (!st.editable) return;
-  const a = document.getElementById("anthropicStatus");
-  a.textContent = st.anthropicKeySet ? `✓ Key saved (${st.anthropicKeyHint})` : "No key yet. Patrick is in demo mode.";
-  a.className = "status " + (st.anthropicKeySet ? "ok" : "bad");
-  const c = document.getElementById("canvasStatus");
-  c.textContent = st.canvasTokenSet ? `✓ Connected to ${st.canvasUrl} (token ${st.canvasTokenHint})` : "Not connected (optional).";
-  c.className = "status " + (st.canvasTokenSet ? "ok" : "");
+  chip($("anthropicStatus"), st.anthropicKeySet, `✓ Saved ${st.anthropicKeyHint}`, "Needed");
+  chip($("canvasStatus"), st.canvasTokenSet, "✓ Connected", "Optional");
   setCanvasUrl.value = st.canvasUrl || "";
-  // With Canvas saved in Settings, the Canvas panel only needs the Load button.
-  document.getElementById("canvasLogin").hidden = st.canvasTokenSet;
 }
 
-async function refreshSettings() {
-  try { showSettings(await (await fetch("/api/settings")).json()); } catch {}
+function openSettings() {
+  if (!settings.editable) return;
+  saveStatus.textContent = "";
+  $("settingsDlg").showModal();
+  (settings.anthropicKeySet ? setCanvasUrl : setAnthropic).focus();
 }
+$("gear").onclick = openSettings;
+$("brainChip").onclick = openSettings;
+$("canvasChip").onclick = () => (settings.editable ? openSettings() : showMiniLogin());
 
-function toggleSettings(open) {
-  settingsBox.hidden = !open;
-  if (open) { saveStatus.textContent = ""; settingsBox.scrollIntoView({ block: "start" }); }
-}
-gear.onclick = () => toggleSettings(settingsBox.hidden);
-document.getElementById("openSettings").onclick = () => toggleSettings(true);
-document.getElementById("closeSettings").onclick = () => toggleSettings(false);
-
-document.getElementById("saveSettings").onclick = async (e) => {
+$("saveSettings").onclick = async (e) => {
   const btn = e.target;
   const body = { canvasUrl: setCanvasUrl.value };
   if (setAnthropic.value.trim()) body.anthropicKey = setAnthropic.value;
   if (setCanvasToken.value.trim()) body.canvasToken = setCanvasToken.value;
   btn.disabled = true;
-  saveStatus.className = "status";
+  saveStatus.className = "";
   saveStatus.textContent = body.anthropicKey ? "Checking your key…" : "Saving…";
   try {
     const res = await fetch("/api/settings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -442,16 +580,24 @@ document.getElementById("saveSettings").onclick = async (e) => {
     if (!res.ok) throw new Error(st.error || "Couldn't save.");
     setAnthropic.value = ""; setCanvasToken.value = "";
     showSettings(st);
-    saveStatus.className = "status ok";
-    saveStatus.textContent = "✓ Saved. You're good to go.";
+    saveStatus.className = "ok-text";
+    saveStatus.textContent = "✓ Saved!";
+    loadAssignments();
+    setTimeout(() => $("settingsDlg").close(), 900);
   } catch (err) {
-    saveStatus.className = "status bad";
+    saveStatus.className = "bad-text";
     saveStatus.textContent = err.message;
   } finally {
     btn.disabled = false;
   }
 };
-refreshSettings();
+
+(async () => {
+  try { showSettings(await (await fetch("/api/settings")).json()); } catch {}
+  loadAssignments();
+  // First time on this PC: open Settings so the key goes in right away.
+  if (settings.editable && !settings.anthropicKeySet) openSettings();
+})();
 
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
 </script>
