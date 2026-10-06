@@ -1,0 +1,452 @@
+<title>Patrick</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+  /* Layout: one-screen dashboard. Top bar, three stat widgets, then assignments (left) + Patrick's answer desk (right). Stacks on phones. */
+  :root {
+    --bg:#eef0f6; --card:#ffffff; --fg:#161a26; --muted:#5f6577; --line:#dfe2ec;
+    --accent:#3346e6; --accent-fg:#ffffff; --accent-soft:#e6e9ff;
+    --red:#d33a3f; --red-soft:#fde7e7; --amber:#a86a0c; --amber-soft:#fff1d1; --green:#1f8a4c; --green-soft:#ddf3e5;
+    --paper:#fbfbf7; --rule:#cfe0ff;
+    --display:"Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+    --body:"Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+    --mono:"JetBrains Mono", ui-monospace, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    --bg:#0e1118; --card:#171b25; --fg:#e8ebf3; --muted:#9aa1b4; --line:#272c39;
+    --accent:#8796ff; --accent-fg:#0e1118; --accent-soft:#222a4d;
+    --red:#ff7a7e; --red-soft:#3a1c1f; --amber:#f2b552; --amber-soft:#3a2e15; --green:#56c985; --green-soft:#16301f;
+    --paper:#141823; --rule:#24304b; color-scheme: dark; } }
+  :root[data-theme="dark"] {
+    --bg:#0e1118; --card:#171b25; --fg:#e8ebf3; --muted:#9aa1b4; --line:#272c39;
+    --accent:#8796ff; --accent-fg:#0e1118; --accent-soft:#222a4d;
+    --red:#ff7a7e; --red-soft:#3a1c1f; --amber:#f2b552; --amber-soft:#3a2e15; --green:#56c985; --green-soft:#16301f;
+    --paper:#141823; --rule:#24304b; color-scheme: dark; }
+
+  html, body { height:100%; }
+  body { background:var(--bg); color:var(--fg); font:15px/1.5 var(--body); }
+  * { box-sizing:border-box; }
+  button { font:inherit; cursor:pointer; border:0; border-radius:10px; padding:8px 14px; }
+  button:focus-visible, input:focus-visible, textarea:focus-visible, label:focus-within { outline:2px solid var(--accent); outline-offset:2px; }
+  button:disabled { opacity:.5; cursor:default; }
+  .btn-main { background:var(--accent); color:var(--accent-fg); font-weight:700; }
+  .btn-soft { background:var(--card); color:var(--fg); border:1px solid var(--line); }
+  .btn-ghost { background:transparent; color:var(--muted); }
+  input, textarea { font:inherit; color:var(--fg); background:var(--bg); border:1px solid var(--line); border-radius:10px; padding:10px 12px; width:100%; }
+
+  .app { max-width:1440px; height:100%; margin:0 auto; padding-inline:20px; padding-block:16px; display:flex; flex-direction:column; gap:14px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:16px; }
+
+  .topbar { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .brand { font-family:var(--display); font-weight:800; font-size:1.6rem; letter-spacing:-.02em; margin-right:auto; display:flex; align-items:center; gap:10px; }
+  .badge { font-family:var(--body); font-size:.8rem; font-weight:700; color:var(--muted); border:1px solid var(--line); background:var(--card); border-radius:999px; padding:3px 10px; letter-spacing:.02em; }
+  .chip { display:inline-flex; align-items:center; gap:6px; border-radius:999px; padding:6px 12px; font-size:.85rem; font-weight:700; background:var(--card); border:1px solid var(--line); color:var(--fg); }
+  .chip.ok { background:var(--green-soft); border-color:transparent; color:var(--green); }
+  .chip.warn { background:var(--amber-soft); border-color:transparent; color:var(--amber); }
+
+  .stats { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:14px; }
+  .stat { padding:14px 18px; display:flex; align-items:center; gap:14px; }
+  .stat .num { font-family:var(--display); font-size:2rem; font-weight:800; line-height:1; font-variant-numeric:tabular-nums; min-width:1.4ch; }
+  .stat .label { color:var(--muted); font-size:.9rem; }
+  .stat .label b { color:var(--fg); display:block; font-size:1rem; }
+  .stat.missing .num { color:var(--red); }
+  .stat.week .num { color:var(--amber); }
+  .stat.done .num { color:var(--green); }
+
+  .main { flex:1; min-height:0; display:grid; grid-template-columns:minmax(280px, 360px) minmax(0,1fr); gap:14px; }
+  .panel { display:flex; flex-direction:column; min-height:0; overflow:hidden; }
+  .panel-head { display:flex; align-items:center; gap:8px; padding:12px 16px; border-bottom:1px solid var(--line); }
+  .panel-head h2 { font-family:var(--display); font-size:1.05rem; font-weight:800; margin:0 auto 0 0; }
+  .panel-body { flex:1; min-height:0; overflow:auto; padding:8px 10px; }
+
+  .hw { display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:10px; padding:10px; border-radius:12px; }
+  .hw:hover { background:var(--bg); }
+  .hw .tick { width:26px; height:26px; padding:0; border-radius:8px; border:2px solid var(--line); background:transparent; color:var(--green); font-weight:800; }
+  .hw.is-done .tick { background:var(--green-soft); border-color:var(--green); }
+  .hw.is-done .name { text-decoration:line-through; color:var(--muted); }
+  .hw .name { font-weight:700; overflow-wrap:anywhere; }
+  .hw .meta { color:var(--muted); font-size:.82rem; overflow-wrap:anywhere; }
+  .tag { display:inline-block; border-radius:6px; font-size:.7rem; font-weight:700; letter-spacing:.06em; padding:1px 6px; margin-right:6px; }
+  .tag.missing { background:var(--red-soft); color:var(--red); }
+  .tag.soon { background:var(--amber-soft); color:var(--amber); }
+  .empty { text-align:center; color:var(--muted); padding:24px 12px; display:grid; gap:10px; justify-items:center; }
+
+  /* The answer desk looks like ruled notebook paper, because the answers get copied onto paper. */
+  .desk { flex:1; min-height:0; overflow:auto; padding:16px; display:flex; flex-direction:column; gap:12px; }
+  .msg { border-radius:14px; padding:12px 16px; white-space:pre-wrap; overflow-wrap:anywhere; max-width:900px; }
+  .msg.me { background:var(--accent-soft); align-self:flex-end; max-width:min(75%, 640px); }
+  .msg.me img { display:block; max-height:160px; max-width:100%; border-radius:8px; margin-bottom:6px; }
+  .msg.bot { background:var(--paper); border:1px solid var(--line); font-size:1.05rem; line-height:28px;
+    background-image:repeating-linear-gradient(to bottom, transparent 0 27px, var(--rule) 27px 28px); background-position:0 12px; }
+  .msg.bot strong { color:var(--accent); }
+  .msg.note { background:var(--amber-soft); color:var(--amber); font-size:.92rem; }
+  .actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:-4px; }
+  .actions button { background:var(--card); color:var(--fg); border:1px solid var(--line); font-size:.88rem; padding:6px 12px; }
+  .welcome { margin:auto; text-align:center; color:var(--muted); max-width:440px; display:grid; gap:10px; }
+  .welcome h3 { font-family:var(--display); color:var(--fg); font-size:1.4rem; margin:0; }
+  .steps { display:grid; gap:8px; text-align:left; }
+  .steps div { background:var(--bg); border-radius:12px; padding:10px 14px; }
+  .steps kbd { font-family:var(--mono); font-size:.8rem; background:var(--card); border:1px solid var(--line); border-radius:6px; padding:1px 6px; }
+
+  form#composer { border-top:1px solid var(--line); padding:12px; display:grid; gap:8px; }
+  #text { resize:none; height:60px; }
+  .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .push { margin-left:auto; }
+  .thumbs { display:flex; gap:6px; flex-wrap:wrap; }
+  .thumb { position:relative; }
+  .thumb img { height:44px; border-radius:6px; border:1px solid var(--line); display:block; }
+  .thumb button { position:absolute; top:-6px; right:-6px; width:20px; height:20px; padding:0; border-radius:50%; background:var(--fg); color:var(--bg); font-size:.7rem; line-height:20px; }
+  .photo-btn { display:inline-flex; align-items:center; border-radius:10px; padding:8px 14px; cursor:pointer; }
+  .drop { outline:3px dashed var(--accent); outline-offset:-8px; }
+
+  dialog { border:0; border-radius:18px; padding:0; background:var(--card); color:var(--fg); width:min(560px, calc(100vw - 32px)); box-shadow:0 20px 60px rgba(0,0,0,.3); }
+  dialog::backdrop { background:rgba(10,12,20,.5); }
+  dialog.wide { width:min(900px, calc(100vw - 32px)); }
+  .dlg-head { display:flex; align-items:center; padding:14px 20px; border-bottom:1px solid var(--line); }
+  .dlg-head h2 { font-family:var(--display); margin:0 auto 0 0; font-size:1.2rem; }
+  .dlg-body { padding:16px 20px; max-height:70vh; overflow:auto; display:grid; gap:12px; }
+  .dlg-foot { display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap; padding:12px 20px; border-top:1px solid var(--line); }
+  .field { display:grid; gap:4px; font-weight:700; font-size:.9rem; }
+  .field small { font-weight:400; color:var(--muted); }
+  .check { display:flex; gap:8px; align-items:center; font-weight:700; }
+  .check input { width:auto; }
+  #bigAnswer { white-space:pre-wrap; font-size:1.3rem; line-height:2; }
+  #bigAnswer strong { color:var(--accent); }
+
+  @media (max-width: 900px) {
+    html, body { height:auto; }
+    .app { height:auto; min-height:100%; padding-inline:16px; }
+    .stats { gap:8px; }
+    .stat { flex-direction:column; align-items:flex-start; gap:4px; padding:10px 12px; }
+    .stat .num { font-size:1.5rem; }
+    .stat .label { font-size:.75rem; }
+    .stat .label b { font-size:.85rem; }
+    .main { grid-template-columns:minmax(0,1fr); }
+    #listPanel .panel-body { max-height:280px; }
+    #deskPanel { min-height:75vh; }
+    .msg.me { max-width:90%; }
+  }
+  @media (prefers-reduced-motion: no-preference) { .msg { animation:rise .18s ease-out; } @keyframes rise { from { transform:translateY(4px); } } }
+</style>
+
+<div class="app">
+  <header class="topbar">
+    <div class="brand">Patrick <span class="badge">MATH &amp; HOMEWORK</span></div>
+    <span class="chip" id="brainChip">Connecting…</span>
+  </header>
+
+  <section class="stats" aria-label="Homework at a glance">
+    <div class="card stat missing"><div class="num" id="statMissing">0</div><div class="label"><b>Missing</b>past due or marked missing</div></div>
+    <div class="card stat week"><div class="num" id="statWeek">0</div><div class="label"><b>Due this week</b>next 7 days</div></div>
+    <div class="card stat done"><div class="num" id="statDone">0</div><div class="label"><b>Done today</b>answers Patrick gave</div></div>
+  </section>
+
+  <section class="main">
+    <div class="card panel" id="listPanel">
+      <div class="panel-head">
+        <h2>Assignments</h2>
+        <button type="button" class="btn-main" id="addBtn">＋ Add</button>
+      </div>
+      <div class="panel-body" id="hwList"></div>
+    </div>
+
+    <div class="card panel" id="deskPanel">
+      <div class="panel-head">
+        <h2 id="deskTitle">Patrick's answers</h2>
+        <button type="button" class="btn-ghost" id="stopBtn" hidden>■ Stop</button>
+        <button type="button" class="btn-ghost" id="newBtn">＋ New</button>
+      </div>
+      <div class="desk" id="desk">
+        <div class="welcome" id="welcome">
+          <h3>What are we catching up on?</h3>
+          <div class="steps">
+            <div>📋 Add an assignment from Canvas (like <b>1.1, #1–20 odd</b>) and click <b>Do it</b></div>
+            <div>📸 Screenshot the problems with <kbd>Win</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd>, then paste here with <kbd>Ctrl</kbd>+<kbd>V</kbd></div>
+            <div>✏️ Patrick writes every answer with the work, ready to copy onto paper</div>
+          </div>
+        </div>
+      </div>
+      <form id="composer">
+        <div class="thumbs" id="thumbs"></div>
+        <textarea id="text" placeholder="Type a problem or what Canvas says to do… then paste screenshots (Ctrl+V)"></textarea>
+        <div class="row">
+          <label class="btn-soft photo-btn" id="photoLabel">📷 Add picture<input id="photo" type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden></label>
+          <span class="badge" id="hint" hidden></span>
+          <button type="submit" class="btn-main push" id="sendBtn">Do my homework ➜</button>
+        </div>
+      </form>
+    </div>
+  </section>
+</div>
+
+<dialog id="addDlg">
+  <form id="addForm" method="dialog">
+    <div class="dlg-head"><h2 id="addTitle">Add assignment</h2><button type="button" class="btn-ghost" data-close aria-label="Close">✕</button></div>
+    <div class="dlg-body">
+      <label class="field">Name <small>What Canvas calls it</small><input id="fName" required placeholder="1.1 Homework"></label>
+      <label class="field">What to do <small>Copy the instructions from Canvas</small><textarea id="fWhat" rows="3" placeholder="Problems 1–20 odd, column A"></textarea></label>
+      <label class="field">Due date<input id="fDue" type="date"></label>
+      <label class="check"><input id="fMissing" type="checkbox"> Canvas says it's missing</label>
+    </div>
+    <div class="dlg-foot">
+      <button type="button" class="btn-ghost" id="deleteBtn" hidden>Delete</button>
+      <button type="button" class="btn-soft" data-close>Cancel</button>
+      <button type="submit" class="btn-main">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="bigDlg" class="wide">
+  <div class="dlg-head"><h2 id="bigTitle">Answers</h2><button type="button" class="btn-ghost" data-close aria-label="Close">✕</button></div>
+  <div class="dlg-body"><div id="bigAnswer"></div></div>
+  <div class="dlg-foot"><button type="button" class="btn-soft" id="bigCopy">📋 Copy</button><button type="button" class="btn-main" data-close>Done</button></div>
+</dialog>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const RULES = `You are Patrick, a homework doer for a middle/high school student who is behind and needs finished answers to copy onto paper.
+- Do EVERY problem the student asks for, following their instructions exactly (for example "odds only" or "column A only"). Number answers to match the assignment.
+- Lead with answers. No lessons, no practice problems, no asking them to try it themselves.
+- Math: show the work in short lines like a student writes on paper, and put each final answer in **bold**.
+- Multiple choice / fill in the blank: just the answer.
+- If a picture is blurry or cut off, answer everything you can read, then list which numbers to retake.
+- Double-check every answer. Use plain-text math (x^2, sqrt(5), 3/4), no LaTeX.`;
+
+function store(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+function load(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } }
+const esc = (t) => String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const plain = (t) => t.replace(/\*\*(.+?)\*\*/g, "$1");
+function render(el, t) { el.innerHTML = esc(t).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>"); }
+const today = () => new Date().toLocaleDateString("en-CA");
+
+let sample = null, maxImages = 0;
+let assignments = load("patrick-assignments", []);
+let turns = [];            // chat with Patrick: {role, content}
+let pics = [];             // pictures waiting to be sent: {blob, url}
+let ctl = null;
+let currentTitle = "Answers";
+let editingId = null;
+
+// ---------- Pop-ups ----------
+document.querySelectorAll("dialog [data-close]").forEach((b) => (b.onclick = () => b.closest("dialog").close()));
+document.querySelectorAll("dialog").forEach((d) => d.addEventListener("click", (e) => { if (e.target === d) d.close(); }));
+
+// ---------- Assignments widget ----------
+function daysUntil(d) { return d ? (new Date(d + "T23:59") - new Date()) / 86400000 : Infinity; }
+function isMissing(a) { return !a.done && (a.missing || daysUntil(a.due) < 0); }
+function dueText(d) { return d ? "Due " + new Date(d + "T12:00").toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" }) : "No due date"; }
+
+function renderList() {
+  const list = $("hwList");
+  const open = assignments.filter((a) => !a.done);
+  $("statMissing").textContent = open.filter(isMissing).length;
+  $("statWeek").textContent = open.filter((a) => !isMissing(a) && daysUntil(a.due) <= 7).length;
+  const doneDay = load("patrick-done", { day: "", n: 0 });
+  $("statDone").textContent = doneDay.day === today() ? doneDay.n : 0;
+
+  if (!assignments.length) {
+    list.innerHTML = `<div class="empty"><div>Nothing here yet. Add each assignment Canvas shows you, and Patrick tracks what's missing.</div></div>`;
+    const b = document.createElement("button"); b.className = "btn-main"; b.textContent = "＋ Add first assignment"; b.onclick = () => openAdd();
+    list.firstChild.appendChild(b);
+    return;
+  }
+  const sorted = [...assignments].sort((x, y) => (x.done - y.done) || (isMissing(y) - isMissing(x)) || (daysUntil(x.due) - daysUntil(y.due)));
+  list.innerHTML = "";
+  for (const a of sorted) {
+    const row = document.createElement("div");
+    row.className = "hw" + (a.done ? " is-done" : "");
+    const tick = document.createElement("button");
+    tick.type = "button"; tick.className = "tick"; tick.textContent = a.done ? "✓" : ""; tick.title = a.done ? "Mark not done" : "Mark done";
+    tick.onclick = () => { a.done = !a.done; save(); };
+    const info = document.createElement("div");
+    const tag = isMissing(a) ? '<span class="tag missing">MISSING</span>' : (!a.done && daysUntil(a.due) <= 2 ? '<span class="tag soon">SOON</span>' : "");
+    info.innerHTML = `<div class="name">${esc(a.name)}</div><div class="meta">${tag}${esc(dueText(a.due))}${a.what ? " · " + esc(a.what) : ""}</div>`;
+    info.style.cursor = "pointer"; info.title = "Edit"; info.onclick = () => openAdd(a);
+    const go = document.createElement("button");
+    go.type = "button"; go.className = a.done ? "btn-soft" : "btn-main"; go.textContent = "Do it";
+    go.onclick = () => startAssignment(a);
+    row.append(tick, info, go);
+    list.appendChild(row);
+  }
+}
+function save() { store("patrick-assignments", assignments); renderList(); }
+
+function openAdd(a) {
+  editingId = a ? a.id : null;
+  $("addTitle").textContent = a ? "Edit assignment" : "Add assignment";
+  $("fName").value = a?.name || "";
+  $("fWhat").value = a?.what || "";
+  $("fDue").value = a?.due || "";
+  $("fMissing").checked = !!a?.missing;
+  $("deleteBtn").hidden = !a;
+  $("addDlg").showModal();
+  $("fName").focus();
+}
+$("addBtn").onclick = () => openAdd();
+$("addForm").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const data = { name: $("fName").value.trim(), what: $("fWhat").value.trim(), due: $("fDue").value, missing: $("fMissing").checked };
+  if (!data.name) return;
+  if (editingId) Object.assign(assignments.find((x) => x.id === editingId), data);
+  else assignments.push({ id: String(Date.now()), done: false, ...data });
+  save();
+  $("addDlg").close();
+});
+$("deleteBtn").onclick = () => { assignments = assignments.filter((x) => x.id !== editingId); save(); $("addDlg").close(); };
+
+function startAssignment(a) {
+  newChat();
+  currentTitle = a.name;
+  $("deskTitle").textContent = a.name;
+  $("text").value = `${a.name}${a.what ? ": " + a.what : ""}`;
+  note(`Now paste screenshots of the ${a.name} problems (Ctrl+V) or click "Add picture", then click Do my homework.`);
+  $("text").focus();
+}
+
+// ---------- Pictures ----------
+function addPics(files) {
+  if (!maxImages) return;
+  for (const f of files) {
+    if (!/^image\/(png|jpeg|webp|gif)$/.test(f.type)) continue;
+    if (pics.length >= maxImages) { flash(`Up to ${maxImages} pictures at a time`); break; }
+    pics.push({ blob: f, url: URL.createObjectURL(f) });
+  }
+  renderThumbs();
+}
+function renderThumbs() {
+  const t = $("thumbs"); t.innerHTML = "";
+  pics.forEach((p, i) => {
+    const d = document.createElement("div"); d.className = "thumb";
+    const im = document.createElement("img"); im.src = p.url; im.alt = "Homework picture " + (i + 1);
+    const x = document.createElement("button"); x.type = "button"; x.textContent = "✕"; x.title = "Remove";
+    x.onclick = () => { pics.splice(i, 1); renderThumbs(); };
+    d.append(im, x); t.appendChild(d);
+  });
+}
+$("photo").addEventListener("change", (e) => { addPics(e.target.files); e.target.value = ""; });
+document.addEventListener("paste", (e) => {
+  const files = [...(e.clipboardData?.items || [])].filter((i) => i.type.startsWith("image/")).map((i) => i.getAsFile());
+  if (files.length) { e.preventDefault(); addPics(files); }
+});
+const deskPanel = $("deskPanel");
+deskPanel.addEventListener("dragover", (e) => { e.preventDefault(); deskPanel.classList.add("drop"); });
+deskPanel.addEventListener("dragleave", () => deskPanel.classList.remove("drop"));
+deskPanel.addEventListener("drop", (e) => { e.preventDefault(); deskPanel.classList.remove("drop"); addPics(e.dataTransfer.files); });
+
+function flash(msg) { const h = $("hint"); h.textContent = msg; h.hidden = false; clearTimeout(flash.t); flash.t = setTimeout(() => (h.hidden = true), 2500); }
+
+// ---------- Answer desk ----------
+const welcome = $("welcome");
+function bubble(cls, text, imgs) {
+  welcome.remove();
+  const div = document.createElement("div");
+  div.className = "msg " + cls;
+  for (const u of imgs || []) { const im = document.createElement("img"); im.src = u; im.alt = "Homework picture"; div.appendChild(im); }
+  const span = document.createElement("span"); span.textContent = text; div.appendChild(span);
+  $("desk").appendChild(div);
+  div.scrollIntoView({ block: "end" });
+  return span;
+}
+function note(t) { bubble("note", t); }
+
+async function copyText(btn, text) {
+  try { await navigator.clipboard.writeText(text); btn.textContent = "✓ Copied"; }
+  catch { btn.textContent = "Select & copy below"; const r = document.createRange(); r.selectNodeContents($("bigDlg").open ? $("bigAnswer") : btn.parentElement.previousElementSibling); getSelection().removeAllRanges(); getSelection().addRange(r); }
+  setTimeout(() => (btn.textContent = "📋 Copy"), 1800);
+}
+function addActions(after, answer, title) {
+  const row = document.createElement("div"); row.className = "actions";
+  const big = document.createElement("button"); big.type = "button"; big.textContent = "🔍 Big view";
+  big.onclick = () => { $("bigTitle").textContent = title; render($("bigAnswer"), answer); $("bigCopy").onclick = (e) => copyText(e.target, plain(answer)); $("bigDlg").showModal(); };
+  const copy = document.createElement("button"); copy.type = "button"; copy.textContent = "📋 Copy";
+  copy.onclick = () => copyText(copy, plain(answer));
+  row.append(big, copy);
+  after.after(row);
+}
+
+function errorText(code) {
+  return ({
+    not_granted: "Patrick needs your OK to use Claude. Reload the page and click Allow.",
+    sampling_disabled: "Claude isn't available on this account.",
+    rate_limited: "You've hit your Claude limit for now. Wait a bit, then try again.",
+    session_expired: "Sign in to Claude again, then try again.",
+    image_rejected: "One of the pictures didn't work. Try a different screenshot (PNG or JPG).",
+    images_unavailable: "Pictures don't work here. Type the problems instead.",
+    refused: "Patrick can't help with that one. Try rewording it.",
+    prompt_too_large: "That's too much at once. Send fewer pages.",
+    empty_completion: "Patrick came back empty. Try again with a clearer picture.",
+  })[code] || "Something went wrong. Click Do my homework to try again.";
+}
+
+function setBusy(b) { $("sendBtn").disabled = b; $("stopBtn").hidden = !b; }
+
+$("composer").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (!sample) return;
+  const q = $("text").value.trim();
+  if (!q && !pics.length) { $("text").focus(); return; }
+  const sending = pics; pics = []; renderThumbs();
+  const ask = (q || "Do this homework. Give me the answers for every problem.") +
+    (sending.length ? `\n\n(${sending.length} picture${sending.length > 1 ? "s" : ""} of the homework attached.)` : "");
+  bubble("me", q || "📸 Homework pictures", sending.map((p) => p.url));
+  $("text").value = "";
+  turns.push({ role: "user", content: ask });
+  const out = bubble("bot", "Patrick is working on it… ✏️ (this can take up to a minute)");
+  setBusy(true);
+  ctl = new AbortController();
+  try {
+    const { text, truncated } = await sample([{ role: "user", content: RULES }, ...turns], {
+      cache: false,
+      signal: ctl.signal,
+      images: sending.length ? sending.map((p) => p.blob) : undefined,
+      onText: ({ text }) => { render(out, text); },
+    });
+    render(out, text);
+    // Pictures aren't re-sent on later turns, so keep a text reminder in the chat.
+    turns[turns.length - 1].content = ask.replace(/\(\d+ pictures? of the homework attached\.\)/, "(Homework pictures were sent earlier; your answer above covers them.)");
+    turns.push({ role: "assistant", content: text });
+    if (truncated) note("That was cut off. Send fewer problems at a time.");
+    addActions(out.parentElement, text, currentTitle);
+    const d = load("patrick-done", { day: "", n: 0 });
+    store("patrick-done", { day: today(), n: (d.day === today() ? d.n : 0) + 1 });
+    renderList();
+  } catch (err) {
+    turns.pop();
+    if (err.code === "cancelled") render(out, (err.text || "") + "\n\n(Stopped.)");
+    else { if (err.text) render(out, err.text); else out.parentElement.remove(); note("⚠️ " + errorText(err.code)); }
+    if (["not_granted", "sampling_disabled"].includes(err.code)) setBrain(false, "Claude not allowed");
+  } finally {
+    setBusy(false);
+    ctl = null;
+    out.parentElement.scrollIntoView({ block: "end" });
+  }
+});
+$("stopBtn").onclick = () => ctl?.abort();
+$("text").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("composer").requestSubmit(); } });
+
+function newChat() {
+  turns = []; pics = []; renderThumbs();
+  $("desk").innerHTML = ""; $("desk").appendChild(welcome);
+  currentTitle = "Answers"; $("deskTitle").textContent = "Patrick's answers";
+}
+$("newBtn").onclick = newChat;
+
+function setBrain(ok, label) { const c = $("brainChip"); c.textContent = label; c.className = "chip " + (ok ? "ok" : "warn"); }
+
+// ---------- Start ----------
+renderList();
+(async () => {
+  sample = window.claude ? await window.claude.use("sample") : null;
+  if (!sample) {
+    setBrain(false, "Open in Claude to use");
+    $("sendBtn").disabled = true;
+    note("Patrick only works when this page is opened from claude.ai or the Claude app.");
+    return;
+  }
+  setBrain(true, "🧠 Ready");
+  const lim = await sample.limits().catch(() => null);
+  maxImages = lim?.images?.maxCount || 0;
+  $("photoLabel").hidden = !maxImages;
+  if (!maxImages) $("text").placeholder = "Type the problems here…";
+})();
+</script>
