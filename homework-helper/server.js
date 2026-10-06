@@ -1,9 +1,16 @@
 import Anthropic from "@anthropic-ai/sdk";
 import express from "express";
+import { spawn } from "node:child_process";
 import { checkAndCount, newDeviceId } from "./licenses.js";
 import { gatherAssignment, listAssignments, UserError } from "./canvas.js";
 
+// The PC launcher saves the API key in a .env file next to this one.
+try {
+  process.loadEnvFile();
+} catch {}
+
 const PORT = process.env.PORT || 3000;
+const URL_HERE = `http://localhost:${PORT}`;
 // Each paying customer gets a code. Comma-separated, e.g. "alex-2026,sam-2026".
 const ACCESS_CODES = (process.env.PATRICK_ACCESS_CODES || "")
   .split(",")
@@ -150,8 +157,33 @@ app.post("/api/ask", async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`Patrick Homework Helper running at http://localhost:${PORT}`);
+// Opens Patrick in the default browser (used by the PC launcher).
+function openBrowser() {
+  const [cmd, args] =
+    process.platform === "win32" ? ["cmd", ["/c", "start", "", URL_HERE]]
+    : process.platform === "darwin" ? ["open", [URL_HERE]]
+    : ["xdg-open", [URL_HERE]];
+  spawn(cmd, args, { detached: true, stdio: "ignore" }).on("error", () => {}).unref();
+}
+
+const server = app.listen(PORT, (err) => {
+  if (err) return; // handled by the "error" listener below
+  console.log(`Patrick is running at ${URL_HERE}`);
   if (DEMO) console.warn("Demo mode: no ANTHROPIC_API_KEY set, sending sample answers.");
-  if (!ACCESS_CODES.length) console.warn("Warning: PATRICK_ACCESS_CODES not set — anyone can use it.");
+  if (!ACCESS_CODES.length && !process.env.PATRICK_OPEN) console.warn("Warning: PATRICK_ACCESS_CODES not set — anyone can use it.");
+  if (process.env.PATRICK_OPEN) {
+    console.log("Keep this window open while you use Patrick. Close it to stop him.");
+    openBrowser();
+  }
+});
+
+server.on("error", (err) => {
+  // Already running (e.g. launcher double-clicked twice): just open it.
+  if (err.code === "EADDRINUSE" && process.env.PATRICK_OPEN) {
+    console.log("Patrick is already running. Opening him now.");
+    openBrowser();
+    setTimeout(() => process.exit(0), 1000);
+  } else {
+    throw err;
+  }
 });

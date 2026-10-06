@@ -2,7 +2,17 @@
 
 Patrick's first paid product. Students type a question or snap a photo of their homework (math, reading, science, anything), and Patrick does it and hands back finished answers, with the work shown.
 
-## Run it
+## Use it on your PC (easiest)
+
+1. Download Patrick: https://github.com/kw1020/Project-Patrick/archive/refs/heads/claude/nifty-bardeen-krms1l.zip and unzip it.
+2. Open the `homework-helper` folder and double-click **Start Patrick.bat** (on a Mac: **Start Patrick.command**).
+   - The first time, it installs Node.js if needed (it opens the download page), sets itself up, and asks for your Anthropic API key once.
+3. Patrick opens in your browser. Keep the black window open while you use him; close it to stop him.
+4. **Make it a real desktop app:** in Chrome or Edge, click the install icon at the right end of the address bar (or ⋮ → "Install Patrick"). He gets his own window and a desktop/Start menu icon. After that, double-click **Start Patrick** first, then open the app.
+
+To change the API key later, delete the `.env` file in the folder and start Patrick again.
+
+## Run it (developers)
 
 1. Get an Anthropic API key at https://console.anthropic.com (add about $10 of credit to start).
 2. Install and start:
