@@ -35,6 +35,18 @@
   #preview { color:var(--muted); font-size:.9rem; }
   .actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:-4px; }
   .actions button { background:var(--card); color:var(--text); border:1px solid var(--border); padding:8px 12px; font-size:.9rem; }
+  details#canvas { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:10px 14px; margin-bottom:12px; }
+  details#canvas summary { cursor:pointer; font-weight:600; }
+  details#canvas input { width:100%; padding:10px; border-radius:10px; border:1px solid var(--border); background:var(--bg); color:var(--text); font:inherit; margin-top:8px; }
+  .help { color:var(--muted); font-size:.85rem; margin:8px 0 0; }
+  #loadHw { background:var(--accent); color:#fff; margin-top:10px; }
+  #hwList { display:flex; flex-direction:column; gap:8px; margin-top:10px; }
+  .hw { display:flex; gap:10px; align-items:center; border-top:1px solid var(--border); padding-top:8px; }
+  .hw div { flex:1; min-width:0; }
+  .hw small { color:var(--muted); display:block; }
+  .hw button { background:var(--accent); color:#fff; padding:8px 14px; }
+  .tag { background:#e5484d; color:#fff; border-radius:6px; font-size:.75rem; padding:1px 6px; margin-left:6px; }
+  .msg.note { background:transparent; color:var(--muted); font-size:.9rem; border-style:dashed; }
   #newChat { background:transparent; color:var(--muted); padding:10px 4px; }
 </style>
 </head>
@@ -46,6 +58,15 @@
   <div id="codeBox" hidden>
     <input id="code" type="password" placeholder="Access code">
   </div>
+
+  <details id="canvas">
+    <summary>📚 Get homework from Canvas</summary>
+    <input id="canvasUrl" placeholder="Canvas address, like yourschool.instructure.com" autocomplete="off">
+    <input id="canvasToken" type="password" placeholder="Canvas access token" autocomplete="off">
+    <p class="help">To get a token: in Canvas, go to <b>Account → Settings</b>, scroll to <b>Approved Integrations</b>, tap <b>+ New Access Token</b>, name it "Patrick", and paste the token here. It's saved only on this device, and you never give Patrick your password.</p>
+    <button type="button" id="loadHw">Load my assignments</button>
+    <div id="hwList"></div>
+  </details>
 
   <div id="chat"></div>
 
@@ -170,19 +191,10 @@ function addActions(afterEl, answer) {
   afterEl.after(row);
 }
 
-form.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const q = text.value.trim();
-  if (!q && !pendingImage) return;
-
-  const content = [];
-  if (pendingImage) content.push({ type: "image", source: { type: "base64", media_type: pendingImage.media_type, data: pendingImage.data } });
-  content.push({ type: "text", text: q || "Do this homework. Give me the answers for every question." });
-
-  const mine = bubble("me", q, pendingImage && pendingImage.url).parentElement;
-  const sentImage = pendingImage;
+// Sends one turn to Patrick and streams the answer. onUndo runs if the access code was wrong.
+async function sendTurn(content, label, imgUrl, onUndo) {
+  const mine = bubble("me", label, imgUrl).parentElement;
   history.push({ role: "user", content });
-  text.value = ""; pendingImage = null; photo.value = ""; preview.textContent = "";
   send.disabled = true;
 
   const out = bubble("bot", "Patrick is thinking…");
@@ -194,15 +206,11 @@ form.addEventListener("submit", async (e) => {
       body: JSON.stringify({ code: codeInput.value, messages: history }),
     });
     if (res.status === 401) {
-      // Wrong or missing code: undo the question so they can just fix the code and hit Ask again.
-      codeBox.hidden = false; store("patrick-code", null);
+      // Wrong or missing code: undo the turn so they can fix the code and try again.
       mine.remove(); out.parentElement.remove();
       history.pop();
-      text.value = q;
-      if (sentImage) { pendingImage = sentImage; preview.textContent = "Photo added ✓"; }
-      codeInput.placeholder = codeInput.value ? "Wrong code, try again" : "Enter your access code first";
-      codeInput.value = "";
-      codeInput.focus();
+      if (onUndo) onUndo();
+      askForCode();
       return;
     }
     if (!res.ok) {
@@ -211,8 +219,7 @@ form.addEventListener("submit", async (e) => {
       history.pop();
       return;
     }
-    store("patrick-code", codeInput.value);
-    codeBox.hidden = !!codeInput.value;
+    rememberCode();
     const reader = res.body.getReader();
     const dec = new TextDecoder();
     while (true) {
@@ -230,7 +237,112 @@ form.addEventListener("submit", async (e) => {
   } finally {
     send.disabled = false;
   }
+}
+
+function askForCode() {
+  codeBox.hidden = false; store("patrick-code", null);
+  codeInput.placeholder = codeInput.value ? "Wrong code, try again" : "Enter your access code first";
+  codeInput.value = "";
+  codeInput.focus();
+}
+function rememberCode() {
+  store("patrick-code", codeInput.value);
+  codeBox.hidden = !!codeInput.value;
+}
+
+form.addEventListener("submit", (e) => {
+  e.preventDefault();
+  const q = text.value.trim();
+  if (!q && !pendingImage) return;
+  const content = [];
+  if (pendingImage) content.push({ type: "image", source: { type: "base64", media_type: pendingImage.media_type, data: pendingImage.data } });
+  content.push({ type: "text", text: q || "Do this homework. Give me the answers for every question." });
+  const sentImage = pendingImage;
+  text.value = ""; pendingImage = null; photo.value = ""; preview.textContent = "";
+  sendTurn(content, q, sentImage && sentImage.url, () => {
+    text.value = q;
+    if (sentImage) { pendingImage = sentImage; preview.textContent = "Photo added ✓"; }
+  });
 });
+
+// ---- Canvas ----
+const canvasBox = document.getElementById("canvas");
+const canvasUrl = document.getElementById("canvasUrl");
+const canvasToken = document.getElementById("canvasToken");
+const hwList = document.getElementById("hwList");
+const loadHw = document.getElementById("loadHw");
+canvasUrl.value = load("patrick-canvas-url") || "";
+canvasToken.value = load("patrick-canvas-token") || "";
+
+async function canvasCall(path, extra) {
+  const res = await fetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ code: codeInput.value, canvasUrl: canvasUrl.value, token: canvasToken.value.trim(), ...extra }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (res.status === 401) { askForCode(); throw new Error("Enter your access code first, then try again."); }
+  if (!res.ok) throw new Error(data.error || "Couldn't reach Canvas.");
+  rememberCode();
+  return data;
+}
+
+function dueText(iso) {
+  if (!iso) return "No due date";
+  const d = new Date(iso);
+  return "Due " + d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+}
+
+loadHw.addEventListener("click", async () => {
+  store("patrick-canvas-url", canvasUrl.value.trim());
+  store("patrick-canvas-token", canvasToken.value.trim());
+  hwList.textContent = "Loading your assignments…";
+  loadHw.disabled = true;
+  try {
+    const { assignments } = await canvasCall("/api/canvas/assignments");
+    hwList.innerHTML = "";
+    if (!assignments.length) hwList.textContent = "No unfinished assignments found. 🎉";
+    for (const a of assignments) {
+      const row = document.createElement("div");
+      row.className = "hw";
+      const info = document.createElement("div");
+      const name = document.createElement("span");
+      name.textContent = a.name;
+      info.appendChild(name);
+      if (a.missing) { const t = document.createElement("span"); t.className = "tag"; t.textContent = "Missing"; info.appendChild(t); }
+      const sub = document.createElement("small");
+      sub.textContent = `${a.course} · ${dueText(a.dueAt)}`;
+      info.appendChild(sub);
+      const go = document.createElement("button");
+      go.type = "button";
+      go.textContent = "Do it";
+      go.onclick = () => doAssignment(a, go);
+      row.append(info, go);
+      hwList.appendChild(row);
+    }
+  } catch (err) {
+    hwList.textContent = err.message;
+  } finally {
+    loadHw.disabled = false;
+  }
+});
+
+async function doAssignment(a, btn) {
+  btn.disabled = true;
+  btn.textContent = "Reading…";
+  try {
+    const got = await canvasCall("/api/canvas/gather", { courseId: a.courseId, assignmentId: a.id });
+    canvasBox.open = false;
+    history = []; // each assignment starts fresh
+    for (const n of got.notes || []) bubble("note", "⚠️ " + n);
+    await sendTurn(got.content, `📚 ${got.title}`);
+  } catch (err) {
+    alert(err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Do it";
+  }
+}
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
 </script>
 </body>

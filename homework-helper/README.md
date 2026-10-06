@@ -21,6 +21,21 @@ No API key yet? Leave out `ANTHROPIC_API_KEY` and Patrick runs in **demo mode**,
 - **Install it as an app:** open the site on a phone. On iPhone, tap Share → "Add to Home Screen". On Android, tap ⋮ → "Install app". Patrick gets his own icon and opens full screen like a normal app.
 - **Turning in the work:** under every answer there's **📋 Copy** (paste anywhere), **🖨️ Print / PDF** (a clean answer sheet with a Name and Date line), and **📄 Google Doc / Word** (downloads a file that opens in Word or uploads to Google Docs).
 
+## Canvas: do assignments straight from Canvas
+
+Tap **📚 Get homework from Canvas**, enter the school's Canvas address and a Canvas access token, then tap **Load my assignments**. Missing work shows first. Tap **Do it** on an assignment and Patrick:
+
+1. Reads the assignment instructions on Canvas (like "1.1: problems 1–20 odd, column A").
+2. Opens everything the assignment links to: Canvas files and pages, the teacher's website (including pictures on it), and Google Docs/Drive links.
+3. Does exactly the problems the instructions list, numbered to match, so you can write them on paper.
+
+**Getting a token (no password needed):** Canvas → Account → Settings → Approved Integrations → **+ New Access Token**. The token stays only in the student's browser and is never stored on the server. You can delete the token in Canvas anytime.
+
+**Limits:**
+- Some schools turn off student tokens. If the button is missing, use photos instead.
+- If the teacher's website needs its own login, Patrick says so. Screenshot that page and add it as a photo.
+- Patrick only reads. It never submits anything to Canvas.
+
 ## Stopping sharing
 
 - **Never send customers the files.** They only get the website link and their code, so there's nothing for them to copy.

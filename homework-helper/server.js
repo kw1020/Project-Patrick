@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import express from "express";
 import { checkAndCount, newDeviceId } from "./licenses.js";
+import { gatherAssignment, listAssignments, UserError } from "./canvas.js";
 
 const PORT = process.env.PORT || 3000;
 // Each paying customer gets a code. Comma-separated, e.g. "alex-2026,sam-2026".
@@ -40,7 +41,7 @@ How you work:
 
 const app = express();
 app.set("trust proxy", 1); // so secure cookies work behind Render/Railway HTTPS
-app.use(express.json({ limit: "20mb" }));
+app.use(express.json({ limit: "60mb" })); // Canvas assignments can include PDFs
 app.use(express.static("public"));
 
 // Each browser gets a secret device ID cookie; codes get locked to the first one that uses them.
@@ -57,18 +58,51 @@ function deviceIdFor(req, res) {
   return id;
 }
 
-app.post("/api/ask", async (req, res) => {
-  const { code, messages } = req.body || {};
-  if (ACCESS_CODES.length && !ACCESS_CODES.includes(code)) {
-    return res.status(401).json({ error: "Wrong access code." });
+// Returns true if the request may continue; otherwise sends the error response.
+function allowed(req, res, { count }) {
+  if (!ACCESS_CODES.length) return true;
+  const { code } = req.body || {};
+  if (!ACCESS_CODES.includes(code)) {
+    res.status(401).json({ error: "Wrong access code." });
+    return false;
   }
+  const check = checkAndCount(code, deviceIdFor(req, res), { count });
+  if (!check.ok) res.status(check.status).json({ error: check.error });
+  return check.ok;
+}
+
+function canvasError(res, err) {
+  if (!(err instanceof UserError)) console.error(err);
+  res.status(400).json({ error: err instanceof UserError ? err.message : "Couldn't reach Canvas. Check the address and try again." });
+}
+
+// The student's Canvas token is only used for this request; it's never saved on the server.
+app.post("/api/canvas/assignments", async (req, res) => {
+  if (!allowed(req, res, { count: false })) return;
+  const { canvasUrl, token } = req.body || {};
+  try {
+    res.json({ assignments: await listAssignments(canvasUrl, token) });
+  } catch (err) {
+    canvasError(res, err);
+  }
+});
+
+app.post("/api/canvas/gather", async (req, res) => {
+  if (!allowed(req, res, { count: false })) return;
+  const { canvasUrl, token, courseId, assignmentId } = req.body || {};
+  try {
+    res.json(await gatherAssignment(canvasUrl, token, courseId, assignmentId));
+  } catch (err) {
+    canvasError(res, err);
+  }
+});
+
+app.post("/api/ask", async (req, res) => {
+  const { messages } = req.body || {};
   if (!Array.isArray(messages) || messages.length === 0) {
     return res.status(400).json({ error: "No question sent." });
   }
-  if (ACCESS_CODES.length) {
-    const check = checkAndCount(code, deviceIdFor(req, res));
-    if (!check.ok) return res.status(check.status).json({ error: check.error });
-  }
+  if (!allowed(req, res, { count: true })) return;
 
   res.setHeader("Content-Type", "text/plain; charset=utf-8");
   res.setHeader("Cache-Control", "no-cache");

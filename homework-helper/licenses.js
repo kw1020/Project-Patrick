@@ -27,7 +27,8 @@ export function newDeviceId() {
 }
 
 // Returns { ok: true } or { ok: false, status, error }.
-export function checkAndCount(code, deviceId) {
+// Pass count: false to only check the device lock (e.g. loading Canvas assignments).
+export function checkAndCount(code, deviceId, { count = true } = {}) {
   const data = load();
   const today = new Date().toISOString().slice(0, 10);
   const lic = data[code] || (data[code] = {});
@@ -43,6 +44,10 @@ export function checkAndCount(code, deviceId) {
     };
   }
 
+  if (!count) {
+    save(data);
+    return { ok: true };
+  }
   if (lic.day !== today) {
     lic.day = today;
     lic.count = 0;
