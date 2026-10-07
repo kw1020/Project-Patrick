@@ -72,6 +72,7 @@
   .tag.missing { background:var(--red-soft); color:var(--red); }
   .tag.soon { background:var(--amber-soft); color:var(--amber); }
   .empty { text-align:center; color:var(--muted); padding:24px 12px; display:grid; gap:10px; justify-items:center; }
+  .empty button { max-width:100%; white-space:normal; }
 
   /* The answer desk looks like ruled notebook paper, because the answers get copied onto paper. */
   .desk { flex:1; min-height:0; overflow:auto; padding:16px; display:flex; flex-direction:column; gap:12px; }
@@ -98,6 +99,13 @@
   .thumb { position:relative; }
   .thumb img { height:44px; border-radius:6px; border:1px solid var(--line); display:block; }
   .thumb button { position:absolute; top:-6px; right:-6px; width:20px; height:20px; padding:0; border-radius:50%; background:var(--fg); color:var(--bg); font-size:.7rem; line-height:20px; }
+  .doc-chip { display:inline-flex; align-items:center; gap:6px; background:var(--accent-soft); border-radius:999px; padding:4px 6px 4px 12px; font-size:.85rem; font-weight:700; }
+  .doc-chip button { background:transparent; color:var(--fg); padding:0 6px; }
+  .file { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:10px; align-items:center; padding:10px; border-radius:12px; }
+  .file:hover { background:var(--bg); }
+  .file .t { font-weight:700; overflow-wrap:anywhere; }
+  .file .m { color:var(--muted); font-size:.8rem; }
+  .search-row { display:flex; gap:8px; }
   .photo-btn { display:inline-flex; align-items:center; border-radius:10px; padding:8px 14px; cursor:pointer; }
   .drop { outline:3px dashed var(--accent); outline-offset:-8px; }
 
@@ -174,9 +182,11 @@
       </div>
       <form id="composer">
         <div class="thumbs" id="thumbs"></div>
+        <div class="thumbs" id="docChips"></div>
         <textarea id="text" placeholder="Type a problem or what Canvas says to do… then paste screenshots (Ctrl+V)"></textarea>
         <div class="row">
           <label class="btn-soft photo-btn" id="photoLabel">📷 Add picture<input id="photo" type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden></label>
+          <button type="button" class="btn-soft" id="driveBtn" hidden>📂 Google Drive</button>
           <span class="badge" id="hint" hidden></span>
           <button type="submit" class="btn-main push" id="sendBtn">Do my homework ➜</button>
         </div>
@@ -206,6 +216,14 @@
   <div class="dlg-head"><h2 id="bigTitle">Answers</h2><button type="button" class="btn-ghost" data-close aria-label="Close">✕</button></div>
   <div class="dlg-body"><div id="bigAnswer"></div></div>
   <div class="dlg-foot"><span id="editHint" class="hint-text" hidden>Click in the answers to change them</span><button type="button" class="btn-soft" id="bigEdit">✏️ Edit</button><button type="button" class="btn-soft" id="bigCopy">📋 Copy</button><button type="button" class="btn-main" data-close>Done</button></div>
+</dialog>
+
+<dialog id="driveDlg" class="wide">
+  <div class="dlg-head"><h2>📂 Pick a worksheet from Google Drive</h2><button type="button" class="btn-ghost" data-close aria-label="Close">✕</button></div>
+  <div class="dlg-body">
+    <form class="search-row" id="driveSearch"><input id="driveQ" placeholder="Search your Drive, like 1.1 or worksheet"><button type="submit" class="btn-main">Search</button></form>
+    <div id="driveList"></div>
+  </div>
 </dialog>
 
 <dialog id="customDlg">
@@ -456,11 +474,13 @@ $("composer").addEventListener("submit", async (e) => {
   e.preventDefault();
   if (!sample) return;
   const q = $("text").value.trim();
-  if (!q && !pics.length) { $("text").focus(); return; }
+  if (!q && !pics.length && !docs.length) { $("text").focus(); return; }
+  const sendingDocs = docs; docs = []; renderDocs();
   const sending = pics; pics = []; renderThumbs();
   const ask = (q || "Do this homework. Give me the answers for every problem.") +
-    (sending.length ? `\n\n(${sending.length} picture${sending.length > 1 ? "s" : ""} of the homework attached.)` : "");
-  bubble("me", q || "📸 Homework pictures", sending.map((p) => p.url));
+    (sending.length ? `\n\n(${sending.length} picture${sending.length > 1 ? "s" : ""} of the homework attached.)` : "") +
+    sendingDocs.map((d) => `\n\n--- Worksheet from Google Drive: ${d.title} ---\n${d.text}`).join("");
+  bubble("me", (q || (sending.length ? "📸 Homework pictures" : "Do this worksheet")) + sendingDocs.map((d) => "\n📄 " + d.title).join(""), sending.map((p) => p.url));
   $("text").value = "";
   turns.push({ role: "user", content: ask });
   const out = bubble("bot", "Working on it… ✏️ (this can take up to a minute)");
@@ -506,6 +526,101 @@ $("newBtn").onclick = newChat;
 
 function setBrain(ok, label) { const c = $("brainChip"); c.textContent = label; c.className = "chip " + (ok ? "ok" : "warn"); }
 
+// ---------- Google Drive ----------
+let mcp = null;
+let docs = []; // worksheets picked from Drive: {title, text}
+const DRIVE = "Google Drive";
+const FOLDER = "application/vnd.google-apps.folder";
+
+function renderDocs() {
+  const box = $("docChips"); box.innerHTML = "";
+  docs.forEach((d, i) => {
+    const c = document.createElement("span"); c.className = "doc-chip"; c.textContent = "📄 " + d.title;
+    const x = document.createElement("button"); x.type = "button"; x.textContent = "✕"; x.title = "Remove";
+    x.onclick = () => { docs.splice(i, 1); renderDocs(); };
+    c.appendChild(x); box.appendChild(c);
+  });
+}
+
+function driveError(e) {
+  return ({
+    server_not_connected: "Google Drive isn't connected. Add it in claude.ai → Settings → Connectors.",
+    needs_reauth: "Google Drive needs you to sign in again: claude.ai → Settings → Connectors.",
+    not_in_manifest: "You turned off Google Drive for this app. Turn it back on from this page's Permissions menu.",
+    blocked_by_policy: "Your account doesn't allow Google Drive here.",
+    selection_required: "Pick which Google Drive account to use in the prompt Claude showed, then try again.",
+  })[e?.code] || "Couldn't reach Google Drive. Try again in a moment.";
+}
+
+function textOf(result) {
+  const p = result?.payload;
+  if (typeof p === "string") return p;
+  if (p && typeof p === "object") {
+    for (const k of ["content", "text", "body", "fileContent"]) if (typeof p[k] === "string") return p[k];
+  }
+  const blocks = (result?.content || []).filter((b) => b.type === "text").map((b) => b.text);
+  return blocks.length ? blocks.join("\n") : JSON.stringify(p ?? "");
+}
+
+function showFiles(files, emptyMsg) {
+  const list = $("driveList"); list.innerHTML = "";
+  const usable = (files || []).filter((f) => f && f.id && f.mimeType !== FOLDER);
+  if (!usable.length) { list.innerHTML = `<div class="empty">${esc(emptyMsg)}</div>`; return; }
+  for (const f of usable) {
+    const row = document.createElement("div"); row.className = "file";
+    const info = document.createElement("div");
+    const when = f.modifiedTime ? new Date(f.modifiedTime).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "";
+    info.innerHTML = `<div class="t">${esc(f.title || "Untitled")}</div><div class="m">${esc([when, f.owner].filter(Boolean).join(" · "))}</div>`;
+    const use = document.createElement("button"); use.type = "button"; use.className = "btn-main"; use.textContent = "Use this";
+    use.onclick = () => useFile(f, use);
+    row.append(info, use); list.appendChild(row);
+  }
+}
+
+async function driveCall(tool, input) {
+  try { return await mcp.callTool(DRIVE, tool, input); }
+  catch (e) { $("driveList").innerHTML = `<div class="empty">${esc(driveError(e))}</div>`; throw e; }
+}
+
+async function loadRecent() {
+  $("driveList").innerHTML = '<div class="empty">Loading your recent files…</div>';
+  try {
+    const r = await driveCall("list_recent_files", { pageSize: 15, excludeContentSnippets: true });
+    showFiles(r.payload?.files, "No recent files found. Try searching.");
+  } catch {}
+}
+
+$("driveSearch").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const q = $("driveQ").value.trim().replace(/\\/g, "").replace(/'/g, "\\'");
+  if (!q) return loadRecent();
+  $("driveList").innerHTML = '<div class="empty">Searching…</div>';
+  try {
+    const r = await driveCall("search_files", { query: `fullText contains '${q}' and mimeType != '${FOLDER}'`, pageSize: 20, excludeContentSnippets: true });
+    showFiles(r.payload?.files, `Nothing found for "${$("driveQ").value.trim()}".`);
+  } catch {}
+});
+
+async function useFile(f, btn) {
+  btn.disabled = true; btn.textContent = "Opening…";
+  try {
+    const r = await driveCall("read_file_content", { fileId: f.id });
+    let text = textOf(r).trim();
+    if (!text) throw { code: "empty" };
+    if (text.length > 60000) text = text.slice(0, 60000) + "\n[…the rest of this file was cut off]";
+    docs.push({ title: f.title || "Worksheet", text });
+    renderDocs();
+    $("driveDlg").close();
+    if (!$("text").value.trim()) $("text").placeholder = "Say which problems to do, like \"odds 1–19\", then click Do my homework";
+    $("text").focus();
+  } catch (e) {
+    if (e?.code === "empty") $("driveList").insertAdjacentHTML("afterbegin", '<div class="msg note">That file had no readable text. Open it and screenshot the problems instead.</div>');
+    btn.disabled = false; btn.textContent = "Use this";
+  }
+}
+
+$("driveBtn").onclick = () => { $("driveQ").value = ""; $("driveDlg").showModal(); loadRecent(); };
+
 // ---------- Customize ----------
 prefs = { ...prefs, ...load("math-prefs", {}) };
 function applyPrefs() { $("classBadge").textContent = (prefs.cls || "Math").toUpperCase(); }
@@ -533,6 +648,8 @@ renderList();
     return;
   }
   setBrain(true, "🧠 Ready");
+  mcp = await window.claude.use("mcp");
+  $("driveBtn").hidden = !mcp;
   const lim = await sample.limits().catch(() => null);
   maxImages = lim?.images?.maxCount || 0;
   $("photoLabel").hidden = !maxImages;
