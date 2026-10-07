@@ -175,6 +175,7 @@
           <h3>What are we catching up on?</h3>
           <div class="steps">
             <div>📋 Add an assignment from Canvas (like <b>1.1, #1–20 odd</b>) and click <b>Do it</b></div>
+            <div>🎥 Or screen record yourself scrolling through the problems and add the video</div>
             <div>📸 Screenshot the problems with <kbd>Win</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd>, then paste here with <kbd>Ctrl</kbd>+<kbd>V</kbd></div>
             <div>✏️ You get every answer with the work, ready to copy onto paper</div>
           </div>
@@ -185,7 +186,7 @@
         <div class="thumbs" id="docChips"></div>
         <textarea id="text" placeholder="Type a problem or what Canvas says to do… then paste screenshots (Ctrl+V)"></textarea>
         <div class="row">
-          <label class="btn-soft photo-btn" id="photoLabel">📷 Add picture<input id="photo" type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden></label>
+          <label class="btn-soft photo-btn" id="photoLabel">📷 Add picture or video<input id="photo" type="file" accept="image/png,image/jpeg,image/webp,image/gif,video/*" multiple hidden></label>
           <button type="button" class="btn-soft" id="driveBtn" hidden>📂 Google Drive</button>
           <span class="badge" id="hint" hidden></span>
           <button type="submit" class="btn-main push" id="sendBtn">Do my homework ➜</button>
@@ -200,7 +201,7 @@
     <div class="dlg-head"><h2 id="addTitle">Add assignment</h2><button type="button" class="btn-ghost" data-close aria-label="Close">✕</button></div>
     <div class="dlg-body">
       <label class="field">Name <small>What Canvas calls it</small><input id="fName" required placeholder="1.1 Homework"></label>
-      <label class="field">What to do <small>Copy the instructions from Canvas</small><textarea id="fWhat" rows="3" placeholder="Problems 1–20 odd, column A"></textarea></label>
+      <label class="field">What to do <small>Copy the whole Details list from Canvas</small><textarea id="fWhat" rows="5" placeholder="Sign Rules: Addition and Subtraction: A, 1-10&#10;Finding Factors: 1-10&#10;GCF: 1-4"></textarea></label>
       <label class="field">Due date<input id="fDue" type="date"></label>
       <label class="check"><input id="fMissing" type="checkbox"> Canvas says it's missing</label>
     </div>
@@ -252,6 +253,8 @@ function rules() {
     `You are a math homework helper for a middle/high school student${prefs.cls ? " in " + prefs.cls : ""} who is behind and needs finished answers to copy onto paper.`,
     `- Do EVERY problem asked for, following the instructions exactly (for example "odds only" or "column A only"). Number answers to match the assignment.`,
     `- Lead with answers. No lessons, no practice problems, no asking them to try it themselves.`,
+    `- The teacher's Canvas posts list worksheets with ranges, like "Addition and Subtraction on the Number Line: 2-22 (2nd Col)" or "Sign Rules: Addition and Subtraction: A, 1-10". "2-22 (2nd Col)" means problems 2 through 22 in the second column only; "A, 1-10" means part/section A, problems 1 through 10; "(Even)" or "(Odd)" means only even or odd numbers in that range; "1st Col" alone means every problem in the first column; several ranges separated by commas (like "1-33 (1st Col), 69-89 (1st Col)") are all assigned; a worksheet with no numbers (like "Times Tables") means fill in the whole sheet. Do only those problems, grouped under each worksheet's name as a heading.`,
+    `- If a listed worksheet is not in the pictures or files sent, say which worksheets are missing so the student can add them. Never make up problems.`,
     prefs.style === "short"
       ? `- Give just the final answer for each problem, in **bold**, with no work.`
       : `- Show the work in short lines like a student writes on paper, and put each final answer in **bold**.`,
@@ -356,14 +359,75 @@ function startAssignment(a) {
 }
 
 // ---------- Pictures ----------
-function addPics(files) {
+async function addPics(files) {
   if (!maxImages) return;
-  for (const f of files) {
+  for (const f of [...files]) {
+    if (f.type.startsWith("video/")) {
+      const room = maxImages - pics.length;
+      if (room <= 0) { flash(`Up to ${maxImages} pictures at a time`); break; }
+      flash("Pulling pictures out of your video…");
+      try {
+        const shots = await framesFromVideo(f, room);
+        for (const b of shots) pics.push({ blob: b, url: URL.createObjectURL(b) });
+        flash(`Got ${shots.length} picture${shots.length === 1 ? "" : "s"} from the video. Remove any blurry ones.`);
+      } catch {
+        flash("Couldn't read that video. Try an MP4, or take screenshots.");
+      }
+      continue;
+    }
     if (!/^image\/(png|jpeg|webp|gif)$/.test(f.type)) continue;
     if (pics.length >= maxImages) { flash(`Up to ${maxImages} pictures at a time`); break; }
     pics.push({ blob: f, url: URL.createObjectURL(f) });
   }
   renderThumbs();
+}
+
+// Turns a screen recording into a few clear pictures: looks at moments across the
+// video and keeps the ones where the screen actually changed (new problems scrolled in).
+async function framesFromVideo(file, max) {
+  const url = URL.createObjectURL(file);
+  const v = document.createElement("video");
+  v.muted = true; v.playsInline = true; v.preload = "auto"; v.src = url;
+  const once = (ev) => new Promise((res, rej) => {
+    const ok = () => { cleanup(); res(); };
+    const bad = () => { cleanup(); rej(new Error("video")); };
+    const cleanup = () => { v.removeEventListener(ev, ok); v.removeEventListener("error", bad); };
+    v.addEventListener(ev, ok); v.addEventListener("error", bad);
+  });
+  try {
+    await once("loadeddata");
+    let dur = v.duration;
+    if (!isFinite(dur)) { v.currentTime = 1e7; await once("seeked"); dur = v.duration; v.currentTime = 0; await once("seeked"); }
+    if (!isFinite(dur) || dur <= 0) dur = 1;
+    const scale = Math.min(1, 1600 / Math.max(v.videoWidth, v.videoHeight));
+    const c = document.createElement("canvas");
+    c.width = Math.round(v.videoWidth * scale); c.height = Math.round(v.videoHeight * scale);
+    const g = c.getContext("2d");
+    const tiny = document.createElement("canvas"); tiny.width = 96; tiny.height = 96;
+    const tg = tiny.getContext("2d", { willReadFrequently: true });
+    const look = () => { tg.drawImage(c, 0, 0, 96, 96); const d = tg.getImageData(0, 0, 96, 96).data; const out = []; for (let i = 0; i < d.length; i += 4) out.push(d[i] + d[i + 1] + d[i + 2]); return out; };
+    // Homework pages are mostly white with thin text, so a small share of changed pixels counts.
+    const differs = (a, b) => { let n = 0; for (let i = 0; i < a.length; i++) if (Math.abs(a[i] - b[i]) > 90) n++; return n > a.length * 0.006; };
+
+    const samples = Math.min(60, Math.max(max * 4, 8));
+    const kept = [];
+    let last = null;
+    for (let i = 0; i < samples; i++) {
+      v.currentTime = Math.min(dur - 0.05, (dur * (i + 0.5)) / samples);
+      await once("seeked");
+      g.drawImage(v, 0, 0, c.width, c.height);
+      const fp = look();
+      if (!last || differs(fp, last)) {
+        kept.push(await new Promise((r) => c.toBlob(r, "image/jpeg", 0.88)));
+        last = fp;
+      }
+    }
+    if (kept.length <= max) return kept;
+    // Too many changes: keep an even spread, always including the last screen.
+    return Array.from({ length: max }, (_, i) => kept[Math.round((i * (kept.length - 1)) / (max - 1 || 1))]);
+  } finally {
+    URL.revokeObjectURL(url);
+  }
 }
 function renderThumbs() {
   const t = $("thumbs"); t.innerHTML = "";
@@ -377,7 +441,7 @@ function renderThumbs() {
 }
 $("photo").addEventListener("change", (e) => { addPics(e.target.files); e.target.value = ""; });
 document.addEventListener("paste", (e) => {
-  const files = [...(e.clipboardData?.items || [])].filter((i) => i.type.startsWith("image/")).map((i) => i.getAsFile());
+  const files = [...(e.clipboardData?.items || [])].filter((i) => i.type.startsWith("image/") || i.type.startsWith("video/")).map((i) => i.getAsFile());
   if (files.length) { e.preventDefault(); addPics(files); }
 });
 const deskPanel = $("deskPanel");
