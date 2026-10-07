@@ -53,6 +53,27 @@
   .stat.week .num { color:var(--amber); }
   .stat.done .num { color:var(--green); }
 
+  .tabs { display:flex; gap:6px; }
+  .tab { background:transparent; color:var(--muted); font-weight:700; border:1px solid transparent; }
+  .tab[aria-selected="true"] { background:var(--card); color:var(--fg); border-color:var(--line); }
+  .tab .count { display:inline-block; min-width:1.6em; margin-left:6px; border-radius:999px; background:var(--red-soft); color:var(--red); font-size:.78rem; padding:0 6px; font-variant-numeric:tabular-nums; }
+  #allView { flex:1; min-height:0; overflow:auto; }
+  .cards { display:grid; grid-template-columns:repeat(auto-fill, minmax(320px, 1fr)); gap:14px; align-items:start; }
+  .acard { padding:0; overflow:hidden; }
+  .acard header { display:flex; align-items:center; gap:10px; padding:12px 14px; border-bottom:1px solid var(--line); }
+  .acard h3 { font-family:var(--display); font-size:1.15rem; margin:0; }
+  .acard .date { color:var(--muted); font-size:.85rem; margin-right:auto; }
+  .acard.all-done h3 { color:var(--green); }
+  .bar { height:4px; background:var(--line); }
+  .bar span { display:block; height:100%; background:var(--green); }
+  .acard ul { list-style:none; margin:0; padding:6px 8px; }
+  .acard li { display:grid; grid-template-columns:auto minmax(0,1fr) auto; gap:8px; align-items:center; padding:5px 6px; border-radius:8px; }
+  .acard li:hover { background:var(--bg); }
+  .acard li input { width:18px; height:18px; accent-color:var(--green); }
+  .acard li.done .what { text-decoration:line-through; color:var(--muted); }
+  .acard .what b { font-weight:700; }
+  .acard .what span { color:var(--muted); }
+  .acard li button { background:transparent; color:var(--accent); font-size:.82rem; font-weight:700; padding:4px 8px; }
   .main { flex:1; min-height:0; display:grid; grid-template-columns:minmax(280px, 360px) minmax(0,1fr); gap:14px; }
   .panel { display:flex; flex-direction:column; min-height:0; overflow:hidden; }
   .panel-head { display:flex; align-items:center; gap:8px; padding:12px 16px; border-bottom:1px solid var(--line); }
@@ -155,7 +176,14 @@
     <div class="card stat done"><div class="num" id="statDone">0</div><div class="label"><b>Done today</b>assignments answered</div></div>
   </section>
 
-  <section class="main">
+  <nav class="tabs" role="tablist" aria-label="Views">
+    <button type="button" class="tab" role="tab" id="tabHome" aria-selected="true">🏠 Home</button>
+    <button type="button" class="tab" role="tab" id="tabAll" aria-selected="false">📋 All assignments<span class="count" id="allCount">0</span></button>
+  </nav>
+
+  <section id="allView" hidden></section>
+
+  <section class="main" id="homeView">
     <div class="card panel" id="listPanel">
       <div class="panel-head">
         <h2>Assignments</h2>
@@ -290,10 +318,88 @@ function daysUntil(d) { return d ? (new Date(d + "T23:59") - new Date()) / 86400
 function isMissing(a) { return !a.done && (a.missing || daysUntil(a.due) < 0); }
 function dueText(d) { return d ? "Due " + new Date(d + "T12:00").toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" }) : "No due date"; }
 
+// ---------- All assignments (from Mr. Herring's Canvas posts) ----------
+const CANVAS = [
+  { id: "1.1", date: "2026-08-21", items: ["Times Tables", "Addition and Subtraction on the Number Line: 2-22 (2nd Col)", "Sign Rules: Addition and Subtraction: A, 1-10", "Finding Factors: 1-10", "GCF: 1-4"] },
+  { id: "1.2", date: "2026-08-25", items: ["Times Tables", "Addition and Subtraction on the Number Line: 27-51 (3rd Col)", "Sign Rules: Addition and Subtraction: A, 11-20", "Sign Rules: Multiply and Divide: A, 1-10", "Finding Factors: 11-20", "GCF: 5-12"] },
+  { id: "1.4", date: "2026-08-31", items: ["Times Tables", "Sign Rules: Addition and Subtraction: A, 41-50", "Sign Rules: Multiply and Divide: A, 41-50", "Finding Factors: 31-40", "GCF: 21-28", "X-Games: 21-40", "Operations with Variables: 2-18 (Even)", "Combine Like Terms: 1st Col", "Multiplications and Factoring: 1-33 (1st Col), 69-89 (1st Col)", "Addition and Subtraction on the Number Line: 25-49 (1st Col)"] },
+  { id: "1.6", date: "2026-09-04", items: ["Times Tables", "Quiz Review", "X-Games: 61-80", "Operations with Variables 2: 2-20 (Even)", "Combine Like Terms: 3rd Col", "Multiplications and Factoring: 3-35 (3rd Col), 71-91 (3rd Col)"] },
+  { id: "1.7", date: "2026-09-09", items: ["Times Tables", "Drawing Fractions: 1", "Operations with Variables: Odd", "Multiplications and Factoring: 4th Col", "X-Games: 81-100"] },
+  { id: "1.10", date: "2026-09-17", items: ["Times Tables", "Order of Operations2: 1-27 (Odd)", "Solving Equations: 1st and 2nd Columns", "X-Games Advanced: 1-16", "Combine Like Terms 2: 2nd Col", "Operations with Variables 2: Even", "Multiplications and Factoring Practice: 2nd Col"] },
+  { id: "1.11", date: "2026-09-21", items: ["Times Tables", "Drawing Fractions: 11-12", "Draw Improper Fractions: 11-15", "Reduce Fractions: 5-8", "X-Games Advanced: 17-24", "Order of Operations 2: 1, 2-26 (Even)", "Solving Equations: 3rd and 4th Columns", "Solving Equations 2: 13-16", "Combine Like Terms 2: 3rd Col", "Multiplications and Factoring Practice: 3rd Col"] },
+  { id: "1.12", date: "2026-09-23", items: ["Reduce Fractions: 5-8", "Operations with Variables 3: Odd", "Multiplications and Factoring Practice: 20-32 (4th Col)", "Solving Equations 2: 17-20", "Solving Equations 7: 3-9 (Odd)", "Solving Equations 10: 5-13 (Odd)", "Order of Operations 3: A, 1-25 (Odd)"] },
+];
+let ticked = load("math-canvas-done", {}); // "1.1|2": true
+const key = (a, i) => `${a.id}|${i}`;
+const doneCount = (a) => a.items.filter((_, i) => ticked[key(a, i)]).length;
+const canvasOpen = () => CANVAS.filter((a) => doneCount(a) < a.items.length);
+
+function splitItem(t) { const i = t.lastIndexOf(": "); return i < 0 ? [t, "whole sheet"] : [t.slice(0, i), t.slice(i + 2)]; }
+
+function renderAll() {
+  const view = $("allView");
+  $("allCount").textContent = canvasOpen().length;
+  view.innerHTML = '<div class="cards"></div>';
+  const grid = view.firstChild;
+  for (const a of CANVAS) {
+    const n = doneCount(a), total = a.items.length;
+    const card = document.createElement("article");
+    card.className = "card acard" + (n === total ? " all-done" : "");
+    const when = new Date(a.date + "T12:00").toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    card.innerHTML = `<header><h3>${esc(a.id)}</h3><span class="date">${esc(when)} · ${n}/${total} done</span></header><div class="bar"><span style="width:${(100 * n) / total}%"></span></div><ul></ul>`;
+    const go = document.createElement("button");
+    go.type = "button"; go.className = n === total ? "btn-soft" : "btn-main"; go.textContent = n === total ? "Redo" : "Do it";
+    go.onclick = () => startCanvas(a, a.items.map((_, i) => i).filter((i) => n === total || !ticked[key(a, i)]));
+    card.querySelector("header").appendChild(go);
+    const ul = card.querySelector("ul");
+    a.items.forEach((t, i) => {
+      const li = document.createElement("li");
+      li.className = ticked[key(a, i)] ? "done" : "";
+      const box = document.createElement("input");
+      box.type = "checkbox"; box.checked = !!ticked[key(a, i)]; box.id = "chk-" + a.id.replace(".", "-") + "-" + i;
+      box.title = "Mark done";
+      box.onchange = () => { if (box.checked) ticked[key(a, i)] = true; else delete ticked[key(a, i)]; store("math-canvas-done", ticked); renderAll(); renderList(); };
+      const [sheet, which] = splitItem(t);
+      const label = document.createElement("label");
+      label.className = "what"; label.htmlFor = box.id;
+      label.innerHTML = `<b>${esc(sheet)}</b> <span>· ${esc(which)}</span>`;
+      const one = document.createElement("button");
+      one.type = "button"; one.textContent = "Do this ▸"; one.title = "Do just this worksheet";
+      one.onclick = () => startCanvas(a, [i]);
+      li.append(box, label, one);
+      ul.appendChild(li);
+    });
+    grid.appendChild(card);
+  }
+}
+
+function startCanvas(a, idx) {
+  showTab("home");
+  newChat();
+  currentTitle = idx.length === 1 ? `${a.id}: ${splitItem(a.items[idx[0]])[0]}` : a.id;
+  $("deskTitle").textContent = currentTitle;
+  $("text").value = `Assignment ${a.id}. Do only these:\n` + idx.map((i) => a.items[i]).join("\n");
+  const sheets = idx.map((i) => splitItem(a.items[i])[0]);
+  note(`Add screenshots or a screen recording of ${sheets.length === 1 ? "the " + sheets[0] + " worksheet" : "these worksheets: " + sheets.join(", ")} from herringmath.edublogs.org, then click Do my homework. Tip: 2–3 worksheets at a time works best.`);
+  $("text").focus();
+}
+
+function showTab(which) {
+  const all = which === "all";
+  $("tabHome").setAttribute("aria-selected", String(!all));
+  $("tabAll").setAttribute("aria-selected", String(all));
+  $("allView").hidden = !all;
+  $("homeView").hidden = all;
+  store("math-tab", which);
+}
+$("tabHome").onclick = () => showTab("home");
+$("tabAll").onclick = () => { renderAll(); showTab("all"); };
+
 function renderList() {
   const list = $("hwList");
   const open = assignments.filter((a) => !a.done);
-  $("statMissing").textContent = open.filter(isMissing).length;
+  // Canvas assignments are all past due, so any with worksheets left count as missing.
+  $("statMissing").textContent = open.filter(isMissing).length + canvasOpen().length;
   $("statWeek").textContent = open.filter((a) => !isMissing(a) && daysUntil(a.due) <= 7).length;
   const doneDay = load("math-done", { day: "", n: 0 });
   $("statDone").textContent = doneDay.day === today() ? doneDay.n : 0;
@@ -704,6 +810,8 @@ applyPrefs();
 
 // ---------- Start ----------
 renderList();
+renderAll();
+if (load("math-tab", "home") === "all") showTab("all");
 (async () => {
   sample = window.claude ? await window.claude.use("sample") : null;
   if (!sample) {
