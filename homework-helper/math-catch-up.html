@@ -83,12 +83,12 @@
   .sheet-hint { color:#a5abbb; font-size:.9rem; margin-right:auto; }
   .sheet-btn { background:#2f3340; color:#fff; border:1px solid #444a5a; }
   .sheet-scroll { height:calc(100% - 58px); overflow:auto; padding-block:24px 56px; padding-inline:16px; }
-  .notebook { --line:32px; --mg:96px; position:relative; width:min(860px, 100%); min-height:calc(min(860px, 100vw - 32px) * 11 / 8.5); margin:0 auto;
-    background-color:#fdfdf8; color:#3b3e46; box-shadow:0 10px 40px rgba(0,0,0,.45); border-radius:2px;
+  .notebook { --zoom:1; --line:calc(36px * var(--zoom)); --mg:96px; position:relative; width:min(860px, 100%); min-height:calc(min(860px, 100vw - 32px) * 11 / 8.5); margin:0 auto;
+    background-color:#fdfdf8; color:#1f2229; box-shadow:0 10px 40px rgba(0,0,0,.45); border-radius:2px;
     background-image:linear-gradient(to right, transparent calc(var(--mg) - 2px), #e49aa1 calc(var(--mg) - 2px), #e49aa1 var(--mg), transparent var(--mg)),
       repeating-linear-gradient(to bottom, transparent 0, transparent calc(var(--line) - 1px), #b6cbe8 calc(var(--line) - 1px), #b6cbe8 var(--line));
     background-position:0 0, 0 calc(var(--line) * 3);
-    font-family:var(--hand); font-size:22px; line-height:var(--line);
+    font-family:var(--hand); font-size:calc(25px * var(--zoom)); line-height:var(--line);
     padding:calc(var(--line) * 1) 36px calc(var(--line) * 2) calc(var(--mg) + 14px); }
   .notebook::before { content:""; position:absolute; left:0; right:0; top:0; height:calc(var(--line) * 3 - 1px); background:linear-gradient(to right, transparent calc(var(--mg) - 2px), #e49aa1 calc(var(--mg) - 2px), #e49aa1 var(--mg), transparent var(--mg)), #fdfdf8; }
   .notebook .hole { position:absolute; left:26px; width:26px; height:26px; margin-top:-13px; border-radius:50%; background:#262932; box-shadow:inset 0 2px 3px rgba(0,0,0,.5); z-index:1; }
@@ -97,13 +97,20 @@
   .notebook .paper-head { line-height:var(--line); margin-bottom:var(--line); }
   .notebook .sheet { margin-bottom:var(--line); }
   .notebook .sheet h4 { font-size:1.5em; line-height:var(--line); margin:0 0 4px; }
-  .notebook .prob { border-color:#5b5f69; padding:0 16px 0 6px; min-width:130px; }
-  .notebook .circ { border-color:#3b3e46; line-height:1.15; }
-  .notebook svg { color:#3b3e46; }
-  .notebook .nl { width:200px; }
-  .notebook .draw { height:46px; }
-  .notebook .paper-note { font-family:var(--hand); background:#fff4d6; color:#8a5a0a; }
-  @media (max-width: 600px) { .notebook { --mg:56px; font-size:18px; padding-right:14px; } .notebook .hole { left:12px; width:18px; height:18px; margin-top:-9px; } }
+  .notebook .probs { display:grid; grid-template-columns:repeat(auto-fill, minmax(calc(210px * var(--zoom)), 1fr)); row-gap:calc(var(--line) / 2); }
+  .notebook .prob { border-right:0; border-left:2px solid #c9ccd3; padding:0 14px 0 10px; min-width:0; cursor:pointer; border-radius:0 8px 8px 0; transition:opacity .15s, background-color .15s; }
+  .notebook .prob:hover { background:rgba(51, 70, 230, .06); }
+  .notebook .prob:focus-visible { outline:3px solid #3346e6; outline-offset:2px; }
+  .notebook .pnum { font-weight:700; color:#3346e6; min-width:1.6em; }
+  .notebook .prob.copied { opacity:.32; }
+  .notebook .prob.copied .pnum::after { content:" ✓"; color:#1f8a4c; }
+  .notebook .circ { border:2.5px solid #1f2229; line-height:1.15; padding:0 10px; }
+  .notebook svg { color:#1f2229; }
+  .notebook .nl { width:calc(220px * var(--zoom)); }
+  .notebook .draw { height:calc(48px * var(--zoom)); }
+  .notebook .xg { width:calc(120px * var(--zoom)); }
+  .notebook .paper-note { font-family:var(--body); font-size:.7em; line-height:1.4; background:#fff4d6; color:#8a5a0a; display:inline-block; margin:2px 0 6px; }
+  @media (max-width: 600px) { .notebook { --mg:56px; font-size:calc(20px * var(--zoom)); padding-right:14px; } .notebook .probs { grid-template-columns:1fr; } .notebook .hole { left:12px; width:18px; height:18px; margin-top:-9px; } }
   .tabs { display:flex; gap:6px; }
   .tab { background:transparent; color:var(--muted); font-weight:700; border:1px solid transparent; }
   .tab[aria-selected="true"] { background:var(--card); color:var(--fg); border-color:var(--line); }
@@ -311,7 +318,9 @@
   <div class="sheet-bar">
     <button type="button" class="sheet-btn" data-close>✕ Close</button>
     <strong id="sheetTitle"></strong>
-    <span class="sheet-hint">Copy it line for line</span>
+    <span class="sheet-hint" id="sheetProgress">Tap each problem after you copy it</span>
+    <button type="button" class="sheet-btn" id="zoomOut" aria-label="Smaller text">A−</button>
+    <button type="button" class="sheet-btn" id="zoomIn" aria-label="Bigger text">A+</button>
     <button type="button" class="sheet-btn" id="sheetEdit">✏️ Edit</button>
     <button type="button" class="sheet-btn" id="sheetCopy">📋 Copy</button>
   </div>
@@ -400,7 +409,11 @@ const plain = (t) => t.replace(/\*\*(.+?)\*\*/g, "$1");
 function render(el, t) { el.innerHTML = esc(t).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>"); }
 
 // ---------- Paper view: draws answers the way they go on Krew's paper ----------
-const circled = (t) => esc(t).replace(/\*\*(.+?)\*\*/g, '<span class="circ">$1</span>');
+// Show math the way it's written by hand: x^2 → x², sqrt(36) → √36, and circle final answers.
+const circled = (t) => esc(t)
+  .replace(/\^\(([^)]+)\)/g, "<sup>$1</sup>").replace(/\^(-?\d+|[a-z])/gi, "<sup>$1</sup>")
+  .replace(/sqrt\(([^)]+)\)/gi, "√$1")
+  .replace(/\*\*(.+?)\*\*/g, '<span class="circ">$1</span>');
 const num = (t) => parseFloat(String(t).replace(/[−–]/g, "-").replace(/[^\d.+-]/g, ""));
 
 function svgNumberLine(spec) {
@@ -614,10 +627,43 @@ function openSheet(text, title, onEdit) {
   $("sheetTitle").textContent = title;
   renderPaper($("sheetContent"), text, title);
   if (!$("sheetContent").querySelector(".paper")) $("sheetContent").innerHTML = `<div class="paper"><div class="paper-head">${esc(prefs.name || "")}<br>${esc(String(title).split(":")[0])} ${esc(prefs.period || "")}</div>${$("sheetContent").innerHTML}</div>`;
+  wireCopied(title);
   $("sheetDlg").showModal();
   $("sheetDlg").querySelector(".sheet-scroll").scrollTop = 0;
 }
 $("sheetCopy").onclick = (e) => copyText(e.target, plain(sheetOpen.text));
+
+// Tap a problem once it's copied onto paper: it fades and gets a check, so you never lose your place.
+function wireCopied(title) {
+  const all = load("math-copied", {});
+  const mine = new Set(all[title] || []);
+  const probs = [...$("sheetContent").querySelectorAll(".prob")];
+  const update = () => {
+    const n = probs.filter((p) => p.classList.contains("copied")).length;
+    $("sheetProgress").textContent = probs.length ? (n === probs.length ? `All ${n} problems copied ✓` : `${n} of ${probs.length} copied · tap each problem after you copy it`) : "Nothing to copy yet";
+  };
+  probs.forEach((p, i) => {
+    p.tabIndex = 0;
+    p.setAttribute("role", "button");
+    p.classList.toggle("copied", mine.has(i));
+    p.setAttribute("aria-pressed", String(mine.has(i)));
+    const toggle = () => {
+      if (mine.has(i)) mine.delete(i); else mine.add(i);
+      p.classList.toggle("copied", mine.has(i));
+      p.setAttribute("aria-pressed", String(mine.has(i)));
+      all[title] = [...mine]; store("math-copied", all); update();
+    };
+    p.onclick = toggle;
+    p.onkeydown = (e) => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); toggle(); } };
+  });
+  update();
+}
+
+let zoom = load("math-zoom", 1);
+function applyZoom() { document.querySelector(".notebook").style.setProperty("--zoom", zoom); store("math-zoom", zoom); }
+$("zoomIn").onclick = () => { zoom = Math.min(1.6, +(zoom + 0.1).toFixed(1)); applyZoom(); };
+$("zoomOut").onclick = () => { zoom = Math.max(0.7, +(zoom - 0.1).toFixed(1)); applyZoom(); };
+applyZoom();
 $("sheetEdit").onclick = () => { const s = sheetOpen; $("sheetDlg").close(); s.onEdit && s.onEdit(); };
 
 function openPaper(a) {
