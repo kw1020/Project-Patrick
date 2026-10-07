@@ -120,6 +120,31 @@
   .frow .t { font-weight:700; overflow-wrap:anywhere; }
   .frow .m { color:var(--muted); font-size:.8rem; }
   .frow .used { color:var(--accent); font-weight:700; }
+  .help { color:var(--muted); font-size:.9rem; margin:0; }
+  .logasg { font-family:var(--display); font-size:1.2rem; margin:18px 0 0; padding-top:10px; border-top:2px solid var(--line); }
+  .logbar { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+  .logbar select { width:auto; }
+  .seg { display:inline-flex; border:1px solid var(--line); border-radius:10px; overflow:hidden; }
+  .seg button { background:transparent; color:var(--muted); border-radius:0; padding:8px 12px; font-weight:700; }
+  .seg button[aria-pressed="true"] { background:var(--accent-soft); color:var(--fg); }
+  .logscore { color:var(--muted); font-size:.88rem; margin-left:auto; }
+  .logsheet { display:flex; align-items:center; gap:8px; margin:16px 0 4px; }
+  .logsheet h3 { font-family:var(--display); font-size:1rem; margin:0 auto 0 0; }
+  .logrow { display:grid; grid-template-columns:44px minmax(0,1fr) minmax(0,1fr) auto; gap:10px; align-items:center; padding:8px 10px; border-radius:10px; border:1px solid var(--line); margin-bottom:6px; }
+  .logrow .n { font-weight:800; color:var(--muted); }
+  .logrow .q, .logrow .a { overflow-wrap:anywhere; }
+  .logrow small { display:block; color:var(--muted); font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; }
+  .logrow .a b { color:var(--accent); }
+  .logrow .q i { color:var(--muted); font-size:.85rem; }
+  .logrow details { grid-column:2 / 4; font-size:.88rem; color:var(--muted); }
+  .logrow details div { white-space:pre-wrap; font-family:var(--mono); font-size:.82rem; }
+  .logrow .marks { display:flex; gap:4px; }
+  .logrow .marks button { width:36px; height:36px; padding:0; border:2px solid var(--line); background:transparent; border-radius:8px; font-weight:800; color:var(--muted); }
+  .logrow .marks button.ok[aria-pressed="true"] { border-color:var(--green); background:var(--green-soft); color:var(--green); }
+  .logrow .marks button.no[aria-pressed="true"] { border-color:var(--red); background:var(--red-soft); color:var(--red); }
+  .logrow.is-right { border-color:var(--green); }
+  .logrow.is-wrong { border-color:var(--red); background:var(--red-soft); }
+  @media (max-width: 640px) { .logrow { grid-template-columns:36px minmax(0,1fr) auto; } .logrow .a { grid-column:2; } .logrow .marks { grid-row:1 / 3; grid-column:3; } .logrow details { grid-column:1 / 4; } }
   .pages { display:grid; gap:12px; }
   .pages canvas { width:100%; height:auto; border:1px solid var(--line); border-radius:6px; background:#fff; }
   .sheetchip { display:inline-block; margin-top:2px; font-size:.78rem; border:0; padding:1px 8px; border-radius:999px; background:var(--accent-soft); color:var(--accent); font-weight:700; cursor:pointer; }
@@ -251,6 +276,7 @@
   <header class="topbar">
     <div class="brand">Math Catch-Up <span class="badge" id="classBadge">MATH</span></div>
     <span class="chip" id="brainChip">Connecting…</span>
+    <button type="button" class="btn-soft" id="logsBtn">🔍 Logs</button>
     <button type="button" class="btn-soft" id="filesBtn">📁 Files</button>
     <button type="button" class="btn-soft" id="customBtn">⚙️ Customize</button>
   </header>
@@ -369,6 +395,23 @@
   </div>
 </dialog>
 
+<dialog id="logsDlg" class="wide">
+  <div class="dlg-head"><h2>🔍 Answer log</h2><button type="button" class="btn-ghost" data-close aria-label="Close">✕</button></div>
+  <div class="dlg-body">
+    <p class="help">Every problem it did: the problem, then its answer. Check them and mark ✓ or ✗ so you know what to trust.</p>
+    <div class="logbar">
+      <select id="logsAsg" aria-label="Assignment"></select>
+      <div class="seg" role="group" aria-label="Show">
+        <button type="button" data-f="all" aria-pressed="true">All</button>
+        <button type="button" data-f="todo" aria-pressed="false">Not checked</button>
+        <button type="button" data-f="wrong" aria-pressed="false">Wrong</button>
+      </div>
+      <span id="logsScore" class="logscore"></span>
+    </div>
+    <div id="logsList"></div>
+  </div>
+</dialog>
+
 <dialog id="viewDlg" class="wide">
   <div class="dlg-head"><h2 id="viewTitle">Worksheet</h2><button type="button" class="btn-ghost" data-close aria-label="Close">✕</button></div>
   <div class="dlg-body"><p class="help" id="viewInfo"></p><div id="viewPages" class="pages"></div></div>
@@ -426,6 +469,7 @@ function rules() {
     `WRITE THE ANSWERS IN THIS EXACT FORMAT (the app draws it like the student's notebook paper):
 ## <worksheet name exactly as written in the assignment list, like "GCF" or "X-Games Advanced">
 ### <problem number>
+Q: <the problem exactly as printed on the worksheet, like "-7 + 3" or "S = 9, P = 18" or "Reduce 6/15">   <- only shown in the answer log so the student can check it; never left out
 <one line per step, written the way it goes on paper>
 **<final answer>**            <- the app circles it
 Special lines the app turns into drawings (use them exactly, nothing else on that line):
@@ -452,7 +496,7 @@ Anything outside a ### problem (like which worksheets are missing) goes at the v
 function store(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
 function load(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } }
 const esc = (t) => String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-const plain = (t) => t.replace(/\*\*(.+?)\*\*/g, "$1");
+const plain = (t) => t.replace(/^\s*Q\s*:.*(\n|$)/gim, "").replace(/\*\*(.+?)\*\*/g, "$1");
 function render(el, t) { el.innerHTML = esc(t).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>"); }
 
 // ---------- Paper view: draws answers the way they go on Krew's paper ----------
@@ -508,6 +552,7 @@ function svgXGame(spec) {
 }
 
 function lineHtml(line) {
+  if (/^\s*Q\s*:/i.test(line)) return ""; // the problem itself only shows in Logs, not on the paper
   const m = line.match(/^\s*(NL|DRAW|X)\s*:\s*(.*)$/i);
   if (m) {
     const kind = m[1].toUpperCase();
@@ -1023,6 +1068,76 @@ function renderPapers() {
     view.firstChild.appendChild(card);
   }
 }
+
+// ---------- Logs: every problem next to the answer it got, so you can check the math ----------
+let checks = load("math-checks", {}); // "1.1|gcf|3": { v: "right"|"wrong", ans }
+let logFilter = "all";
+function problemsOf(text) {
+  const out = []; let cur = null;
+  for (const line of text.split("\n")) {
+    const h = line.match(/^###\s*(.*)$/);
+    if (h) { cur = { num: h[1].trim(), q: "", work: [], ans: "" }; out.push(cur); continue; }
+    if (!cur || !line.trim()) continue;
+    const q = line.match(/^\s*Q\s*:\s*(.*)$/i);
+    if (q) { cur.q = q[1].trim(); continue; }
+    const fin = [...line.matchAll(/\*\*(.+?)\*\*/g)];
+    if (fin.length) cur.ans = fin.map((m) => m[1]).join(", ");
+    cur.work.push(line.replace(/\*\*(.+?)\*\*/g, "$1"));
+  }
+  return out;
+}
+function renderLogs() {
+  const sel = $("logsAsg");
+  const withWork = CANVAS.filter((a) => papers[a.id] && Object.keys(papers[a.id]).length);
+  const pick = sel.value;
+  sel.innerHTML = `<option value="">All assignments</option>` + withWork.map((a) => `<option value="${esc(a.id)}">${esc(a.id)}</option>`).join("");
+  sel.value = withWork.some((a) => a.id === pick) ? pick : "";
+  const list = $("logsList"); list.innerHTML = "";
+  let right = 0, wrong = 0, total = 0;
+  for (const a of withWork) {
+    if (sel.value && a.id !== sel.value) continue;
+    const h = document.createElement("h2"); h.className = "logasg"; h.textContent = a.id;
+    let shown = 0; const frag = document.createDocumentFragment();
+    for (const [k, sec] of Object.entries(papers[a.id])) {
+      const probs = problemsOf(sec.text);
+      if (!probs.length) continue;
+      const head = document.createElement("div"); head.className = "logsheet";
+      head.innerHTML = `<h3>${esc(sec.name)}</h3>`;
+      const ws = catalog ? sheetFor(sec.name, a) : null;
+      if (ws) { const b = document.createElement("button"); b.type = "button"; b.className = "btn-soft"; b.textContent = "📄 Worksheet"; b.onclick = () => viewSheet(ws); head.appendChild(b); }
+      const rows = [];
+      for (const p of probs) {
+        const id = `${a.id}|${k}|${p.num}`;
+        const c = checks[id] && checks[id].ans === p.ans ? checks[id].v : ""; // a redone answer needs a new check
+        total++; if (c === "right") right++; if (c === "wrong") wrong++;
+        if ((logFilter === "todo" && c) || (logFilter === "wrong" && c !== "wrong")) continue;
+        const row = document.createElement("div");
+        row.className = "logrow" + (c ? " is-" + c : "");
+        row.innerHTML = `<span class="n">#${esc(p.num)}</span>
+          <div class="q"><small>Problem</small>${p.q ? circled(p.q) : "<i>Not saved. Press Do it again to see it here, or open the 📄 Worksheet.</i>"}</div>
+          <div class="a"><small>Its answer</small><b>${p.ans ? circled(p.ans) : "(none)"}</b></div>
+          <div class="marks"><button type="button" class="ok" aria-label="Right" aria-pressed="${c === "right"}">✓</button><button type="button" class="no" aria-label="Wrong" aria-pressed="${c === "wrong"}">✗</button></div>
+          ${p.work.length ? `<details><summary>Show work</summary><div>${esc(p.work.join("\n"))}</div></details>` : ""}`;
+        const mark = (v) => { if (c === v) delete checks[id]; else checks[id] = { v, ans: p.ans }; store("math-checks", checks); renderLogs(); };
+        row.querySelector(".ok").onclick = () => mark("right");
+        row.querySelector(".no").onclick = () => mark("wrong");
+        rows.push(row);
+      }
+      if (!rows.length) continue;
+      frag.appendChild(head); rows.forEach((r) => frag.appendChild(r)); shown += rows.length;
+    }
+    if (shown) { list.appendChild(h); list.appendChild(frag); }
+  }
+  $("logsScore").textContent = total ? `${right} right · ${wrong} wrong · ${total - right - wrong} not checked` : "";
+  if (!list.children.length) list.innerHTML = `<div class="empty">${total ? "Nothing here with this filter." : "No answers yet. Press Do it on an assignment and they'll show up here."}</div>`;
+}
+$("logsAsg").onchange = renderLogs;
+document.querySelectorAll("#logsDlg .seg button").forEach((b) => (b.onclick = () => {
+  logFilter = b.dataset.f;
+  document.querySelectorAll("#logsDlg .seg button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+  renderLogs();
+}));
+$("logsBtn").onclick = () => { renderLogs(); $("logsDlg").showModal(); };
 
 function showTab(which) {
   const all = which === "all", pap = which === "papers";
