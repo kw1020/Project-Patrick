@@ -121,7 +121,8 @@
   .frow .m { color:var(--muted); font-size:.8rem; }
   .frow .used { color:var(--accent); font-weight:700; }
   .help { color:var(--muted); font-size:.9rem; margin:0; }
-  .logasg { font-family:var(--display); font-size:1.2rem; margin:18px 0 0; padding-top:10px; border-top:2px solid var(--line); }
+  .logasg { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:18px 0 0; padding-top:10px; border-top:2px solid var(--line); }
+  .logasg h2 { font-family:var(--display); font-size:1.2rem; margin:0 auto 0 0; }
   .logbar { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
   .logbar select { width:auto; }
   .seg { display:inline-flex; border:1px solid var(--line); border-radius:10px; overflow:hidden; }
@@ -1096,7 +1097,12 @@ function renderLogs() {
   let right = 0, wrong = 0, total = 0;
   for (const a of withWork) {
     if (sel.value && a.id !== sel.value) continue;
-    const h = document.createElement("h2"); h.className = "logasg"; h.textContent = a.id;
+    const h = document.createElement("div"); h.className = "logasg"; h.innerHTML = `<h2>${esc(a.id)}</h2>`;
+    const missingQ = Object.values(papers[a.id]).some((sec) => problemsOf(sec.text).some((p) => !p.q));
+    const redo = document.createElement("button"); redo.type = "button"; redo.className = missingQ ? "btn-main" : "btn-soft";
+    redo.textContent = missingQ ? "🔄 Redo to show problems" : "🔄 Redo";
+    redo.onclick = () => { $("logsDlg").close(); startCanvas(a, a.items.map((_, i) => i)); };
+    h.appendChild(redo);
     let shown = 0; const frag = document.createDocumentFragment();
     for (const [k, sec] of Object.entries(papers[a.id])) {
       const probs = problemsOf(sec.text);
