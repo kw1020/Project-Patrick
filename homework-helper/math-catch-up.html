@@ -483,7 +483,7 @@ function rules() {
     `You are a math homework helper for a middle/high school student${prefs.cls ? " in " + prefs.cls : ""} who is behind and needs finished answers to copy onto paper.`,
     `- Do EVERY problem asked for, following the instructions exactly (for example "odds only" or "column A only"). Number answers to match the assignment.`,
     `- Lead with answers. No lessons, no practice problems, no asking them to try it themselves.`,
-    `- The teacher's Canvas posts list worksheets with ranges, like "Addition and Subtraction on the Number Line: 2-22 (2nd Col)" or "Sign Rules: Addition and Subtraction: A, 1-10". "2-22 (2nd Col)" means problems 2 through 22 in the second column only; "A, 1-10" means part/section A, problems 1 through 10; "(Even)" or "(Odd)" means only even or odd numbers in that range, and "Odd" or "Even" alone means every odd or even problem on the sheet; a column with no numbers ("1st Col", "3rd Col", "4th Col") means every problem in that column; a single number ("Drawing Fractions: 1") means just that problem; "1st and 2nd Columns" means every problem in both columns; names ending in "2" or "Advanced" (like "Order of Operations2" or "X-Games Advanced") are different worksheets from the plain ones, so match the worksheet title exactly; several ranges separated by commas (like "1-33 (1st Col), 69-89 (1st Col)") are all assigned; a worksheet with no numbers (like "Times Tables") means fill in the whole sheet. Do only those problems, grouped under each worksheet's name as a heading.`,
+    `- The teacher's Canvas posts list worksheets with ranges, like "Addition and Subtraction on the Number Line: 2-22 (2nd Col)" or "Sign Rules: Addition and Subtraction: A, 1-10". "2-22 (2nd Col)" means problems 2 through 22 in the second column only; "A, 1-10" means part/section A, problems 1 through 10; "(Even)" or "(Odd)" means only even or odd numbers in that range, and "Odd" or "Even" alone means every odd or even problem on the sheet; a column with no numbers ("1st Col", "3rd Col", "4th Col") means every problem in that column; a single number ("Drawing Fractions: 1") means just that problem; "1st and 2nd Columns" means every problem in both columns; names ending in "2" or "Advanced" (like "Order of Operations2" or "X-Games Advanced") are different worksheets from the plain ones, so match the worksheet title exactly; several ranges separated by commas (like "1-33 (1st Col), 69-89 (1st Col)") are all assigned; a worksheet with no numbers means do the whole sheet, except Times Tables, which the student does in class: always skip it. Do only those problems, grouped under each worksheet's name as a heading.`,
     `- When the assignment says a column (like "2nd Col"), use the worksheet's "Columns" note to know exactly which problem numbers that is.
 - If a listed worksheet is not in the pictures or files sent, say which worksheets are missing so the student can add them. Never make up problems.`,
     `WRITE THE ANSWERS IN THIS EXACT FORMAT (the app draws it like the student's notebook paper):
@@ -658,14 +658,22 @@ const BUILTIN = [
   { id: "1.12", date: "2026-09-23", items: ["Reduce Fractions: 5-8", "Operations with Variables 3: Odd", "Multiplications and Factoring Practice: 20-32 (4th Col)", "Solving Equations 2: 17-20", "Solving Equations 7: 3-9 (Odd)", "Solving Equations 10: 5-13 (Odd)", "Order of Operations 3: A, 1-25 (Odd)"] },
 ];
 let CANVAS = [];
+const isTimes = (t) => /^\s*times\s*tables?\b/i.test(t);
 function loadCanvas() {
   const custom = load("math-canvas-custom", []);
   const byId = new Map(BUILTIN.map((a) => [a.id, a]));
   for (const c of custom) byId.set(c.id, { ...c, custom: true });
-  CANVAS = [...byId.values()].sort((x, y) => x.date.localeCompare(y.date) || x.id.localeCompare(y.id, undefined, { numeric: true }));
+  // Krew does times tables in class, so they're left off every assignment.
+  CANVAS = [...byId.values()].map((a) => ({ ...a, raw: a.items, items: a.items.filter((t) => !isTimes(t)) })).sort((x, y) => x.date.localeCompare(y.date) || x.id.localeCompare(y.id, undefined, { numeric: true }));
 }
 loadCanvas();
 let ticked = load("math-canvas-done", {}); // "1.1|2": true
+if (!load("math-no-tt", false)) { // checkmarks are stored by position, so shift them now that Times Tables is gone
+  const moved = {};
+  for (const a of CANVAS) a.raw.forEach((t, i) => { if (!isTimes(t) && ticked[`${a.id}|${i}`]) moved[`${a.id}|${a.items.indexOf(t)}`] = true; });
+  for (const k of Object.keys(ticked)) if (!CANVAS.some((a) => k.startsWith(a.id + "|"))) moved[k] = ticked[k];
+  ticked = moved; store("math-canvas-done", ticked); store("math-no-tt", true);
+}
 const key = (a, i) => `${a.id}|${i}`;
 const doneCount = (a) => a.items.filter((_, i) => ticked[key(a, i)]).length;
 const canvasOpen = () => CANVAS.filter((a) => doneCount(a) < a.items.length);
@@ -1030,6 +1038,8 @@ async function autoFind(id, sheets) {
 
 // ---------- Papers: finished work for each assignment, laid out like the real paper ----------
 let papers = load("math-papers", {}); // { "1.1": { normName: { name, text } } }
+for (const p of Object.values(papers)) for (const k of Object.keys(p)) if (isTimes(k.replace("table", " table"))) delete p[k];
+store("math-papers", papers);
 let currentCanvas = null;              // which Canvas assignment the answer desk is working on
 const norm = (t) => String(t).toLowerCase().replace(/[^a-z0-9]/g, "");
 
