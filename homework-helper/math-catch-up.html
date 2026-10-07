@@ -199,6 +199,17 @@
   .hw.is-done .name { text-decoration:line-through; color:var(--muted); }
   .hw .name { font-weight:700; overflow-wrap:anywhere; }
   .hw .meta { color:var(--muted); font-size:.82rem; overflow-wrap:anywhere; }
+  .dobar { display:flex; gap:8px; margin-bottom:6px; }
+  .donext { flex:1; padding:12px; font-size:1rem; }
+  .donext small { font-weight:600; opacity:.8; }
+  .doing { text-align:center; font-weight:700; color:var(--accent); background:var(--accent-soft); border-radius:12px; padding:10px; margin-bottom:6px; }
+  .alldone { text-align:center; color:var(--green); font-weight:700; padding:10px; }
+  .hw.cv { grid-template-columns:auto minmax(0,1fr) auto auto; }
+  .hw.is-next { background:var(--accent-soft); }
+  .ring { width:38px; height:38px; border-radius:50%; border:2px solid var(--line); display:grid; place-items:center; font-size:.72rem; font-weight:800; color:var(--muted); }
+  .ring.full { border-color:var(--green); background:var(--green-soft); color:var(--green); font-size:1rem; }
+  .hw-sub { font-family:var(--display); font-size:.95rem; margin:14px 6px 4px; color:var(--muted); }
+  .nextbox { display:flex; align-items:center; gap:12px; flex-wrap:wrap; justify-content:space-between; color:var(--fg); }
   .tag { display:inline-block; border-radius:6px; font-size:.7rem; font-weight:700; letter-spacing:.06em; padding:1px 6px; margin-right:6px; }
   .tag.missing { background:var(--red-soft); color:var(--red); }
   .tag.soon { background:var(--amber-soft); color:var(--amber); }
@@ -301,7 +312,7 @@
     <div class="card panel" id="listPanel">
       <div class="panel-head">
         <h2>Assignments</h2>
-        <button type="button" class="btn-main" id="addBtn">＋ Add</button>
+        <button type="button" class="btn-soft" id="addBtn">＋ New</button>
       </div>
       <div class="panel-body" id="hwList"></div>
     </div>
@@ -645,7 +656,7 @@ function renderAll() {
     card.innerHTML = `<header><h3>${esc(a.id)}</h3><span class="date">${esc(when)} · ${n}/${total} done</span></header><div class="bar"><span style="width:${(100 * n) / total}%"></span></div><ul></ul>`;
     const go = document.createElement("button");
     go.type = "button"; go.className = n === total ? "btn-soft" : "btn-main"; go.textContent = n === total ? "Redo" : "Do it";
-    go.onclick = () => startCanvas(a, a.items.map((_, i) => i).filter((i) => n === total || !ticked[key(a, i)]));
+    go.onclick = () => doCanvas(a);
     if (a.custom) {
       const ed = document.createElement("button");
       ed.type = "button"; ed.className = "btn-ghost"; ed.textContent = "✏️"; ed.title = "Edit " + a.id;
@@ -869,9 +880,26 @@ async function runFromLibrary(a, idx) {
     $("text").value = `Assignment ${a.id}. Do only these:\n` + group.map((g) => g.line).join("\n");
     renderThumbs(); renderDocs();
     const ok = await sendNow();
-    if (!ok) break;
+    if (!ok) { stopRounds = true; break; }
+    if (r === rounds.length - 1 && !doAllQueue) offerNext(a);
   }
   return true;
+}
+
+// Do whatever's left on an assignment (or all of it again if it's finished).
+function doCanvas(a) {
+  const n = doneCount(a), total = a.items.length;
+  return startCanvas(a, a.items.map((_, i) => i).filter((i) => n === total || !ticked[key(a, i)]));
+}
+// When an assignment finishes, offer the next one right there.
+function offerNext(a) {
+  const next = canvasOpen().find((x) => x !== a);
+  const div = document.createElement("div"); div.className = "msg note nextbox";
+  if (!next) { div.textContent = "🎉 That was the last one. Everything is done!"; $("desk").appendChild(div); return; }
+  div.innerHTML = `<span>${doneCount(a) === a.items.length ? `✓ ${esc(a.id)} is done.` : `${esc(a.id)} still has sheets left.`} Next up: <b>${esc(next.id)}</b></span>`;
+  const b = document.createElement("button"); b.type = "button"; b.className = "btn-main"; b.textContent = `▶ Do ${next.id}`;
+  b.onclick = () => doCanvas(next);
+  div.appendChild(b); $("desk").appendChild(div); div.scrollIntoView({ block: "end" });
 }
 
 function startCanvas(a, idx) {
@@ -883,10 +911,33 @@ function startCanvas(a, idx) {
   $("text").value = `Assignment ${a.id}. Do only these:\n` + idx.map((i) => a.items[i]).join("\n");
   const sheets = idx.map((i) => splitItem(a.items[i])[0]);
   if (catalog && sample && prefs.autoLibrary !== false) {
-    runFromLibrary(a, idx).then((handled) => { if (!handled) fallbackFind(a, sheets); });
-    return;
+    return runFromLibrary(a, idx).then((handled) => { if (!handled) { fallbackFind(a, sheets); return false; } return !stopRounds; });
   }
   fallbackFind(a, sheets);
+  return Promise.resolve(false);
+}
+
+// Do all: every unfinished assignment, one after another, until they're all done (or you press Stop).
+let doAllQueue = null;
+async function doAll() {
+  doAllQueue = canvasOpen().map((a) => a.id);
+  const total = doAllQueue.length;
+  renderList();
+  while (doAllQueue && doAllQueue.length) {
+    const id = doAllQueue.shift();
+    const a = CANVAS.find((x) => x.id === id);
+    if (!a) continue;
+    renderList();
+    const ok = await doCanvas(a);
+    if (!ok || !doAllQueue) { doAllQueue = null; renderList(); note(`Stopped at ${a.id}. Press ▶ Do all to keep going.`); return; }
+  }
+  doAllQueue = null; renderList();
+  const left = canvasOpen();
+  const div = document.createElement("div"); div.className = "msg note nextbox";
+  div.innerHTML = left.length
+    ? `<span>Went through all ${total}. ${left.map((x) => esc(x.id)).join(", ")} still ${left.length === 1 ? "has" : "have"} sheets it couldn't find (like Quiz Review). Add pictures of those, or check them off in 📋 All assignments.</span>`
+    : `<span>🎉 All ${total} assignments are done. Check them in 🔍 Logs, then copy them from 📝 Papers.</span>`;
+  $("desk").appendChild(div); div.scrollIntoView({ block: "end" });
 }
 function fallbackFind(a, sheets) {
   if (mcp && prefs.autoDrive !== false) { autoFind(a.id, sheets); return; }
@@ -1168,14 +1219,38 @@ function renderList() {
   const doneDay = load("math-done", { day: "", n: 0 });
   $("statDone").textContent = doneDay.day === today() ? doneDay.n : 0;
 
-  if (!assignments.length) {
-    list.innerHTML = `<div class="empty"><div>Nothing here yet. Add each assignment Canvas shows you, and this tracks what's missing.</div></div>`;
-    const b = document.createElement("button"); b.className = "btn-main"; b.textContent = "＋ Add first assignment"; b.onclick = () => openAdd();
-    list.firstChild.appendChild(b);
-    return;
-  }
-  const sorted = [...assignments].sort((x, y) => (x.done - y.done) || (isMissing(y) - isMissing(x)) || (daysUntil(x.due) - daysUntil(y.due)));
   list.innerHTML = "";
+  // Every Canvas assignment, in order, with "Do next" on top so you can just keep clicking.
+  const next = canvasOpen()[0];
+  if (doAllQueue) {
+    list.insertAdjacentHTML("beforeend", `<div class="doing">⏳ Doing all… ${doAllQueue.length} more after this one. Press ■ Stop to pause.</div>`);
+  } else if (next) {
+    const bar = document.createElement("div"); bar.className = "dobar";
+    const all = document.createElement("button"); all.type = "button"; all.className = "btn-main donext";
+    all.innerHTML = `▶ Do all <small>(${canvasOpen().length} left)</small>`; all.onclick = () => doAll();
+    const one = document.createElement("button"); one.type = "button"; one.className = "btn-soft";
+    one.textContent = `Just ${next.id}`; one.onclick = () => doCanvas(next);
+    bar.append(all, one); list.appendChild(bar);
+  } else if (CANVAS.length) list.insertAdjacentHTML("beforeend", '<div class="alldone">🎉 Every assignment is done.</div>');
+  for (const a of CANVAS) {
+    const n = doneCount(a), total = a.items.length, done = n === total;
+    const row = document.createElement("div");
+    row.className = "hw cv" + (done ? " is-done" : "") + (a === next ? " is-next" : "");
+    const when = new Date(a.date + "T12:00").toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    row.innerHTML = `<span class="ring${done ? " full" : ""}">${done ? "✓" : `${n}/${total}`}</span>
+      <div><div class="name">${esc(a.id)}</div><div class="meta">${done ? "" : '<span class="tag missing">MISSING</span>'}${esc(when)} · ${done ? "done" : n ? `${total - n} sheet${total - n === 1 ? "" : "s"} left` : `${total} sheets`}</div></div>`;
+    const view = document.createElement("button");
+    view.type = "button"; view.className = "edit"; view.textContent = "📝"; view.title = "View the " + a.id + " paper";
+    view.onclick = () => openSheet(paperText(a), a.id, () => { openPaper(a); setEditing(true); });
+    const go = document.createElement("button");
+    go.type = "button"; go.className = done ? "btn-soft" : "btn-main"; go.textContent = done ? "Redo" : "Do it";
+    go.onclick = () => doCanvas(a);
+    row.append(view, go);
+    list.appendChild(row);
+  }
+  if (!assignments.length) return;
+  list.insertAdjacentHTML("beforeend", '<h3 class="hw-sub">Other homework</h3>');
+  const sorted = [...assignments].sort((x, y) => (x.done - y.done) || (isMissing(y) - isMissing(x)) || (daysUntil(x.due) - daysUntil(y.due)));
   for (const a of sorted) {
     const row = document.createElement("div");
     row.className = "hw" + (a.done ? " is-done" : "");
@@ -1208,7 +1283,7 @@ function openAdd(a) {
   $("addDlg").showModal();
   $("fName").focus();
 }
-$("addBtn").onclick = () => openAdd();
+$("addBtn").onclick = () => openNew();
 $("addForm").addEventListener("submit", (e) => {
   e.preventDefault();
   const data = { name: $("fName").value.trim(), what: $("fWhat").value.trim(), due: $("fDue").value, missing: $("fMissing").checked };
@@ -1464,7 +1539,7 @@ async function sendNow() {
     out.parentElement.scrollIntoView({ block: "end" });
   }
 }
-$("stopBtn").onclick = () => { stopRounds = true; ctl?.abort(); };
+$("stopBtn").onclick = () => { stopRounds = true; doAllQueue = null; ctl?.abort(); renderList(); };
 $("text").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("composer").requestSubmit(); } });
 
 function newChat() {
