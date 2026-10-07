@@ -77,6 +77,33 @@
   .msg.bot:has(.paper) { background:var(--paper); background-image:none; padding:10px; }
   #bigAnswer .paper { font-size:1.4rem; }
   #bigAnswer textarea { width:100%; min-height:55vh; font:1rem/1.5 var(--mono); }
+  dialog.sheet-dlg { width:100vw; height:100vh; max-width:none; max-height:none; margin:0; border-radius:0; padding:0; background:#262932; color:#fff; box-shadow:none; }
+  .sheet-bar { display:flex; align-items:center; gap:10px; padding:10px 16px; background:#1b1d24; color:#fff; flex-wrap:wrap; }
+  .sheet-bar strong { font-family:var(--display); font-size:1.15rem; }
+  .sheet-hint { color:#a5abbb; font-size:.9rem; margin-right:auto; }
+  .sheet-btn { background:#2f3340; color:#fff; border:1px solid #444a5a; }
+  .sheet-scroll { height:calc(100% - 58px); overflow:auto; padding-block:24px 56px; padding-inline:16px; }
+  .notebook { --line:32px; --mg:96px; position:relative; width:min(860px, 100%); min-height:calc(min(860px, 100vw - 32px) * 11 / 8.5); margin:0 auto;
+    background-color:#fdfdf8; color:#3b3e46; box-shadow:0 10px 40px rgba(0,0,0,.45); border-radius:2px;
+    background-image:linear-gradient(to right, transparent calc(var(--mg) - 2px), #e49aa1 calc(var(--mg) - 2px), #e49aa1 var(--mg), transparent var(--mg)),
+      repeating-linear-gradient(to bottom, transparent 0, transparent calc(var(--line) - 1px), #b6cbe8 calc(var(--line) - 1px), #b6cbe8 var(--line));
+    background-position:0 0, 0 calc(var(--line) * 3);
+    font-family:var(--hand); font-size:22px; line-height:var(--line);
+    padding:calc(var(--line) * 1) 36px calc(var(--line) * 2) calc(var(--mg) + 14px); }
+  .notebook::before { content:""; position:absolute; left:0; right:0; top:0; height:calc(var(--line) * 3 - 1px); background:linear-gradient(to right, transparent calc(var(--mg) - 2px), #e49aa1 calc(var(--mg) - 2px), #e49aa1 var(--mg), transparent var(--mg)), #fdfdf8; }
+  .notebook .hole { position:absolute; left:26px; width:26px; height:26px; margin-top:-13px; border-radius:50%; background:#262932; box-shadow:inset 0 2px 3px rgba(0,0,0,.5); z-index:1; }
+  #sheetContent { position:relative; }
+  .notebook .paper { background:none; padding:0; font-size:inherit; line-height:var(--line); color:inherit; }
+  .notebook .paper-head { line-height:var(--line); margin-bottom:var(--line); }
+  .notebook .sheet { margin-bottom:var(--line); }
+  .notebook .sheet h4 { font-size:1.5em; line-height:var(--line); margin:0 0 4px; }
+  .notebook .prob { border-color:#5b5f69; padding:0 16px 0 6px; min-width:130px; }
+  .notebook .circ { border-color:#3b3e46; line-height:1.15; }
+  .notebook svg { color:#3b3e46; }
+  .notebook .nl { width:200px; }
+  .notebook .draw { height:46px; }
+  .notebook .paper-note { font-family:var(--hand); background:#fff4d6; color:#8a5a0a; }
+  @media (max-width: 600px) { .notebook { --mg:56px; font-size:18px; padding-right:14px; } .notebook .hole { left:12px; width:18px; height:18px; margin-top:-9px; } }
   .tabs { display:flex; gap:6px; }
   .tab { background:transparent; color:var(--muted); font-weight:700; border:1px solid transparent; }
   .tab[aria-selected="true"] { background:var(--card); color:var(--fg); border-color:var(--line); }
@@ -277,6 +304,23 @@
       <button type="submit" class="btn-main">Save</button>
     </div>
   </form>
+</dialog>
+
+<!-- View paper: full screen, looks like a real sheet of notebook paper -->
+<dialog id="sheetDlg" class="sheet-dlg" aria-label="Paper view">
+  <div class="sheet-bar">
+    <button type="button" class="sheet-btn" data-close>✕ Close</button>
+    <strong id="sheetTitle"></strong>
+    <span class="sheet-hint">Copy it line for line</span>
+    <button type="button" class="sheet-btn" id="sheetEdit">✏️ Edit</button>
+    <button type="button" class="sheet-btn" id="sheetCopy">📋 Copy</button>
+  </div>
+  <div class="sheet-scroll">
+    <div class="notebook">
+      <span class="hole" style="top:9%"></span><span class="hole" style="top:50%"></span><span class="hole" style="top:91%"></span>
+      <div id="sheetContent"></div>
+    </div>
+  </div>
 </dialog>
 
 <dialog id="bigDlg" class="wide">
@@ -564,6 +608,18 @@ function paperText(a) {
   return parts.join("\n\n");
 }
 
+let sheetOpen = null; // { text, title, edit() }
+function openSheet(text, title, onEdit) {
+  sheetOpen = { text, title, onEdit };
+  $("sheetTitle").textContent = title;
+  renderPaper($("sheetContent"), text, title);
+  if (!$("sheetContent").querySelector(".paper")) $("sheetContent").innerHTML = `<div class="paper"><div class="paper-head">${esc(prefs.name || "")}<br>${esc(String(title).split(":")[0])} ${esc(prefs.period || "")}</div>${$("sheetContent").innerHTML}</div>`;
+  $("sheetDlg").showModal();
+  $("sheetDlg").querySelector(".sheet-scroll").scrollTop = 0;
+}
+$("sheetCopy").onclick = (e) => copyText(e.target, plain(sheetOpen.text));
+$("sheetEdit").onclick = () => { const s = sheetOpen; $("sheetDlg").close(); s.onEdit && s.onEdit(); };
+
 function openPaper(a) {
   openBig({
     text: paperText(a), title: a.id, el: null, turnIndex: -1,
@@ -583,9 +639,9 @@ function renderPapers() {
     card.className = "pcard" + (have === total ? " is-done" : have ? " part" : "");
     const when = new Date(a.date + "T12:00").toLocaleDateString(undefined, { month: "short", day: "numeric" });
     card.innerHTML = `<div class="top"><h3>${esc(a.id)}</h3><span class="check">${have === total ? "✓" : have ? `${have}/${total}` : ""}</span></div>
-      <div class="sub">${esc(when)} · ${have === total ? "Finished. Click to see the paper and copy it." : have ? `${have} of ${total} worksheets done. Click to see them.` : "Not started. Click to see what the paper needs."}</div>
+      <div class="sub">${esc(when)} · ${have === total ? "Finished. Click to view the paper and copy it." : have ? `${have} of ${total} worksheets done. Click to see them.` : "Not started. Click to see what the paper will need."}</div>
       <div class="sheets">${a.items.map((t, i) => `<span class="${sheetDone(a, i) ? "ok" : ""}">${sheetDone(a, i) ? "✓ " : ""}${esc(splitItem(t)[0])}</span>`).join("")}</div>`;
-    card.onclick = () => openPaper(a);
+    card.onclick = () => openSheet(paperText(a), a.id, () => { openPaper(a); setEditing(true); });
     view.firstChild.appendChild(card);
   }
 }
@@ -791,13 +847,15 @@ let openAnswer = null;
 function addActions(after, text, title, turnIndex) {
   const ans = { text, title, el: after.querySelector("span"), turnIndex };
   const row = document.createElement("div"); row.className = "actions";
+  const view = document.createElement("button"); view.type = "button"; view.textContent = "📄 View paper";
+  view.onclick = () => openSheet(ans.text, ans.title, () => openBig(ans, true));
   const big = document.createElement("button"); big.type = "button"; big.textContent = "🔍 Big view";
   big.onclick = () => openBig(ans, false);
   const edit = document.createElement("button"); edit.type = "button"; edit.textContent = "✏️ Edit";
   edit.onclick = () => openBig(ans, true);
   const copy = document.createElement("button"); copy.type = "button"; copy.textContent = "📋 Copy";
   copy.onclick = () => copyText(copy, plain(ans.text));
-  row.append(big, edit, copy);
+  row.append(view, big, edit, copy);
   after.after(row);
 }
 
