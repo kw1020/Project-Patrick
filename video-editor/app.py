@@ -85,10 +85,14 @@ def create_app(password: str, data_dir: Path | None = None, music_dir: Path | No
 
     @app.before_request
     def require_login():
-        if request.endpoint not in ("login", "static") and not authed():
+        if request.endpoint not in ("login", "static", "healthz") and not authed():
             if request.path.startswith("/api/") or request.path.startswith("/jobs/"):
                 return jsonify(error="login required"), 401
             return redirect(url_for("login"))
+
+    @app.get("/healthz")
+    def healthz():
+        return "ok"  # for the host's health check and uptime pingers; reveals nothing
 
     @app.route("/login", methods=["GET", "POST"])
     def login():

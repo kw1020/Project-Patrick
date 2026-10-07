@@ -14,6 +14,7 @@ import logging
 import os
 import smtplib
 import tempfile
+import threading
 import time
 from email.message import EmailMessage
 from email.policy import default as default_policy
@@ -133,9 +134,11 @@ def check_inbox(cfg: dict) -> int:
     return handled
 
 
-def main() -> None:
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
-    cfg = _settings()
+def email_configured() -> bool:
+    return all(os.environ.get(k) for k in ("EMAIL_ADDRESS", "EMAIL_APP_PASSWORD", "ALLOWED_SENDERS"))
+
+
+def run_forever(cfg: dict) -> None:
     log.info("Watching %s for videos from %s", cfg["EMAIL_ADDRESS"], ", ".join(sorted(cfg["allowed"])))
     while True:
         try:
@@ -145,6 +148,21 @@ def main() -> None:
         except Exception:
             log.exception("Inbox check failed; will retry")
         time.sleep(cfg["poll"])
+
+
+def start_background() -> threading.Thread | None:
+    """Start the watcher as a daemon thread (used by the web service). No-op if email isn't set up."""
+    if not email_configured():
+        log.info("Email settings not set; email watcher not started")
+        return None
+    thread = threading.Thread(target=run_forever, args=(_settings(),), name="email-watcher", daemon=True)
+    thread.start()
+    return thread
+
+
+def main() -> None:
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
+    run_forever(_settings())
 
 
 if __name__ == "__main__":

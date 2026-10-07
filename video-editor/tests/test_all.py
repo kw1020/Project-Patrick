@@ -162,6 +162,11 @@ class WebAppTests(Base):
         self.assertEqual(self.client.post("/api/jobs").status_code, 401)
         self.assertEqual(self.client.get("/api/jobs/" + "a" * 32).status_code, 401)
 
+    def test_healthz_is_public_but_nothing_else_is(self):
+        r = self.client.get("/healthz")
+        self.assertEqual((r.status_code, r.data), (200, b"ok"))
+        self.assertEqual(self.client.get("/").status_code, 302)
+
     def test_refuses_to_start_without_password(self):
         with self.assertRaises(SystemExit):
             create_app("")
@@ -255,6 +260,13 @@ class EmailTests(Base):
 
     def test_forged_sender_without_dkim_or_spf_is_ignored(self):
         self.assertIsNone(self.handle(self.make_email(auth=False)))
+
+    def test_background_watcher_stays_off_without_email_settings(self):
+        import os
+        from unittest import mock
+        with mock.patch.dict(os.environ, {}, clear=True):
+            self.assertFalse(email_worker.email_configured())
+            self.assertIsNone(email_worker.start_background())
 
     def test_missing_attachment_gets_helpful_reply(self):
         reply = self.handle(self.make_email(attach_video=False))

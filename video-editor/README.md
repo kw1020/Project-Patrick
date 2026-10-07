@@ -55,6 +55,33 @@ Emails max out around 25 MB, so use the web app for long or high-res clips.
 Forged "From" addresses are rejected: the receiving server must report DKIM or SPF pass
 (`REQUIRE_AUTH_RESULTS=0` disables this, don't).
 
+## Put it online (so it works from school, phone, any computer)
+
+The app has to run on a server with a public address. One service runs both the website and the email watcher.
+The repo includes a Dockerfile and a `render.yaml` blueprint for [Render](https://render.com):
+
+1. Make a Render account (sign in with GitHub) and let it see the `kw1020/Project-Patrick` repo.
+2. **New + → Blueprint →** pick the repo and the branch with this code → **Apply**.
+3. When it asks for values, fill in:
+   - `PATRICK_PASSWORD`: what you'll type to log in. Make it long.
+   - `EMAIL_ADDRESS`, `EMAIL_APP_PASSWORD`, `ALLOWED_SENDERS`: the email setup above. Leave them blank for web-only.
+4. Wait a few minutes for the build. Render gives you an address like `https://patrick-video-editor.onrender.com`.
+   Open it on your phone, add it to your home screen, done.
+
+**Free plan caveats** (Render's terms as of Oct 2026, check [render.com/docs/free](https://render.com/docs/free)):
+- It **sleeps after 15 idle minutes** and takes about a minute to wake on the next visit. While asleep the email
+  watcher is off too, so emails sit unread until it wakes.
+- To keep it awake for email, either upgrade to the paid **Starter** instance (always on; change `plan: free` to
+  `plan: starter` in `render.yaml`), or point a free uptime pinger (e.g. UptimeRobot) at `/healthz` every 5 minutes.
+  Free instances get 750 hours/month, which is enough for one always-on service.
+- Free instances have little CPU, so a 30-second clip can take a few minutes to edit. Starter is faster.
+- Files are deleted when it restarts. Download your edit when it finishes; there's no permanent storage.
+- Music you want available by name (`music: chill`) must be committed to `music/` (remove the `music/*` line from `.gitignore`).
+  Uploading a track with each video always works.
+
+**From school:** school Wi-Fi sometimes blocks sites it doesn't recognise, and email attachments are capped near 25 MB.
+If the site is blocked, use your phone's data or try email. If a clip is too big for email, use the website.
+
 ## Tests
 ```bash
 .venv/bin/python -m unittest discover -s tests -v

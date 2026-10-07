@@ -7,6 +7,7 @@ from __future__ import annotations
 import json
 import re
 import subprocess
+import threading
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -16,6 +17,7 @@ AUDIO_EXTS = {".mp3", ".m4a", ".aac", ".wav", ".ogg", ".flac"}
 AUDIO_MODES = ("keep", "denoise", "mute")
 REFRAME_MODES = ("fit", "crop", "none")
 FFMPEG_TIMEOUT = 900  # seconds
+_ENCODE_LOCK = threading.Lock()
 
 
 class EditError(Exception):
@@ -153,7 +155,8 @@ def process(src: Path, dst: Path, opts: EditOptions) -> dict:
     info = probe(src)
     cmd, out_len = build_command(src, dst, opts, info)
     try:
-        run = subprocess.run(cmd, capture_output=True, text=True, timeout=FFMPEG_TIMEOUT)
+        with _ENCODE_LOCK:  # web jobs and email jobs share one small server: one encode at a time
+            run = subprocess.run(cmd, capture_output=True, text=True, timeout=FFMPEG_TIMEOUT)
     except subprocess.TimeoutExpired:
         raise EditError("Editing took too long and was stopped. Try a shorter clip.") from None
     if run.returncode != 0 or not dst.exists():

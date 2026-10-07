@@ -1,0 +1,20 @@
+# Render "Blueprint": New + → Blueprint → pick this repo. It builds the Dockerfile and asks for the secrets below.
+services:
+  - type: web
+    name: patrick-video-editor
+    runtime: docker
+    dockerContext: ./video-editor
+    dockerfilePath: ./video-editor/Dockerfile
+    plan: free            # free sleeps after 15 min idle; upgrade to "starter" for always-on (see README)
+    healthCheckPath: /healthz
+    envVars:
+      - key: PATRICK_PASSWORD     # the password you type to log in to the site
+        sync: false
+      - key: PATRICK_SECRET       # keeps you logged in across restarts
+        generateValue: true
+      - key: EMAIL_ADDRESS        # Patrick's dedicated Gmail (optional: leave blank for web-only)
+        sync: false
+      - key: EMAIL_APP_PASSWORD   # that Gmail's 16-letter app password
+        sync: false
+      - key: ALLOWED_SENDERS      # who may email videos in, e.g. krew252@gmail.com
+        sync: false

@@ -23,32 +23,36 @@
   </select>
   <label for="music_file">…or upload your own track</label>
   <input id="music_file" name="music_file" type="file" accept="audio/*">
-  <label for="music_volume">Music volume: <span id="vol">35</span>%</label>
-  <input id="music_volume" name="music_volume" type="range" min="5" max="100" value="35">
   <div class="hint">Use royalty-free music you have the rights to. Copyrighted songs can block monetization.</div>
 
   <div class="row">
     <div><label for="trim_start">Start at (sec)</label><input id="trim_start" name="trim_start" type="number" min="0" step="0.1" placeholder="0"></div>
     <div><label for="trim_end">End at (sec)</label><input id="trim_end" name="trim_end" type="number" min="0" step="0.1" placeholder="end"></div>
   </div>
-  <div class="row">
-    <div>
-      <label for="reframe">Screen shape</label>
-      <select id="reframe" name="reframe">
-        <option value="fit">Vertical (keep all)</option>
-        <option value="crop">Vertical (fill)</option>
-        <option value="none">Leave as is</option>
-      </select>
+
+  <details>
+    <summary>More options</summary>
+    <label for="music_volume">Music volume: <span id="vol">35</span>%</label>
+    <input id="music_volume" name="music_volume" type="range" min="5" max="100" value="35">
+    <div class="row">
+      <div>
+        <label for="reframe">Screen shape</label>
+        <select id="reframe" name="reframe">
+          <option value="fit">Vertical (keep all)</option>
+          <option value="crop">Vertical (fill)</option>
+          <option value="none">Leave as is</option>
+        </select>
+      </div>
+      <div>
+        <label for="speed">Speed</label>
+        <select id="speed" name="speed">
+          <option value="0.5">0.5x</option><option value="0.75">0.75x</option>
+          <option value="1" selected>1x</option><option value="1.25">1.25x</option>
+          <option value="1.5">1.5x</option><option value="2">2x</option>
+        </select>
+      </div>
     </div>
-    <div>
-      <label for="speed">Speed</label>
-      <select id="speed" name="speed">
-        <option value="0.5">0.5x</option><option value="0.75">0.75x</option>
-        <option value="1" selected>1x</option><option value="1.25">1.25x</option>
-        <option value="1.5">1.5x</option><option value="2">2x</option>
-      </select>
-    </div>
-  </div>
+  </details>
   <button id="go" type="submit">Edit my video</button>
   <div class="bar" id="barwrap" hidden><div id="bar"></div></div>
   <p id="status" class="hint" role="status"></p>
