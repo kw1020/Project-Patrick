@@ -1,0 +1,34 @@
+Operations with Variables 2 (Algebra 2)
+Simplify the following expressions.
+1) z + z + z + z
+2) (-a) + (-a) + (-a) + (-a) + (-a) + (-a)
+3) d + d + e + e
+4) k + j + k - j - k + j + k
+5) c + d - e + c - d - e - d + c - e
+6) p + q + p - q - p + q - p - q - t
+7) g · g · g
+8) v · v · v · v · v · v
+9) a · a
+10) -a · a
+11) a(-a)
+12) -a(-a)
+13) b · c
+14) -b · c
+15) b(-c)
+16) -b(-c)
+17) m(-m)(m)(-m)(-m)
+18) v · w · w · w · v(-v)
+19) x · y · x(-y)(-y)
+20) (-d)(g)(-f)(-g)(f)(-d)(-f)(-f)(-f)(g)(-f)(d)
+21) k / k
+22) -b / b
+23) c / (-c)
+24) -d / (-d)
+25) (-c - c) / (d + d)
+26) (-f - f - f) / (-g - g)
+27) (r + r - r + r + r) / (r + r)
+28) (-t + t - t - t) / (v - v + v + v)
+29) (p + p - p + p - p + p + p) / (q - q + q - q)
+30) (a + a + a + a) / (b + b)
+31) (-y - y - y - y - y) / (-y - y - y)
+32) (-p + p + p - p + p + p) / (p - p - p + p + p + p)

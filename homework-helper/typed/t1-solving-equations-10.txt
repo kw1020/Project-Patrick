@@ -1,0 +1,16 @@
+Solving Equations 10 (Geometry)
+Solve, check, and graph the following equations.
+1) 17 - t/5 = 23
+2) 7v^2 - 15 = 13
+3) 4d^3 + 47 = -61
+4) -51 = 20q - 3q
+5) 19 = -9w + 8w
+6) 27 = -7y + 4y
+7) 2d - 24 = 8d
+8) 32 + z = 5z
+9) 7b - 18 = b
+10) 12k - 2 = 9k + 4
+11) 11 + 5a = 3a + 41
+12) 41 = 9c + 10 - 2c + 17
+13) -97 = -15 - 11j + 3j - 18
+Columns (3 across): 1st col = 1, 4, 7, 10, 12; 2nd col = 2, 5, 8, 11, 13; 3rd col = 3, 6, 9.

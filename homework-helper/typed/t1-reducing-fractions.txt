@@ -1,0 +1,19 @@
+Reducing Fractions
+Reduce the following fractions. Give the GCF and show work as described in class.
+1) 4/8
+2) 7/21
+3) 24/32
+4) 52/65
+5) 6/15
+6) 25/40
+7) 35/42
+8) 45/75
+9) 12/22
+10) 18/30
+11) 44/77
+12) 54/72
+13) 20/28
+14) 36/54
+15) 45/63
+16) 56/126
+Columns (4 across): 1st col = 1, 5, 9, 13; 2nd col = 2, 6, 10, 14; 3rd col = 3, 7, 11, 15; 4th col = 4, 8, 12, 16.

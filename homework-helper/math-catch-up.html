@@ -421,7 +421,8 @@ function rules() {
     `- Do EVERY problem asked for, following the instructions exactly (for example "odds only" or "column A only"). Number answers to match the assignment.`,
     `- Lead with answers. No lessons, no practice problems, no asking them to try it themselves.`,
     `- The teacher's Canvas posts list worksheets with ranges, like "Addition and Subtraction on the Number Line: 2-22 (2nd Col)" or "Sign Rules: Addition and Subtraction: A, 1-10". "2-22 (2nd Col)" means problems 2 through 22 in the second column only; "A, 1-10" means part/section A, problems 1 through 10; "(Even)" or "(Odd)" means only even or odd numbers in that range, and "Odd" or "Even" alone means every odd or even problem on the sheet; a column with no numbers ("1st Col", "3rd Col", "4th Col") means every problem in that column; a single number ("Drawing Fractions: 1") means just that problem; "1st and 2nd Columns" means every problem in both columns; names ending in "2" or "Advanced" (like "Order of Operations2" or "X-Games Advanced") are different worksheets from the plain ones, so match the worksheet title exactly; several ranges separated by commas (like "1-33 (1st Col), 69-89 (1st Col)") are all assigned; a worksheet with no numbers (like "Times Tables") means fill in the whole sheet. Do only those problems, grouped under each worksheet's name as a heading.`,
-    `- If a listed worksheet is not in the pictures or files sent, say which worksheets are missing so the student can add them. Never make up problems.`,
+    `- When the assignment says a column (like "2nd Col"), use the worksheet's "Columns" note to know exactly which problem numbers that is.
+- If a listed worksheet is not in the pictures or files sent, say which worksheets are missing so the student can add them. Never make up problems.`,
     `WRITE THE ANSWERS IN THIS EXACT FORMAT (the app draws it like the student's notebook paper):
 ## <worksheet name exactly as written in the assignment list, like "GCF" or "X-Games Advanced">
 ### <problem number>
@@ -430,16 +431,16 @@ function rules() {
 Special lines the app turns into drawings (use them exactly, nothing else on that line):
 NL: <tick labels, comma separated> | <dot values, comma separated>     e.g. "NL: 0, 9 | 9" or "NL: -6, 0, 6 | -6, 6"
 DRAW: <whole number> <numerator>/<denominator>                          e.g. "DRAW: 3 6/7" (3 whole circles + a circle cut in 7 with 6 shaded)
-X: <top> | <left> | <right> | <bottom>                                   an X-Games X with the four numbers where they go on the worksheet
+X: <top> | <left> | <right> | <bottom>                                   an X-Games X: left = S (the sum), right = P (the product), top and bottom = the two numbers you found
 Anything outside a ### problem (like which worksheets are missing) goes at the very end with no heading.`,
     `HOW THIS TEACHER WANTS EACH KIND OF PROBLEM (copied from the student's graded papers):
 - Reduce Fractions: the fraction, then "GCF = n", then both parts factored like "(3·2)/(3·5)", then the reduced fraction as the final answer.
 - Solving Equations (all versions): the equation; under it the step done to both sides on its own line (like "+7  +7" or "÷4  ÷4" or "√ both sides"); the next equation; the answer like "w = 9" as the final answer (square roots give "c = ±8"); then an NL line with 0 and the answer as ticks and a dot on the answer (both dots for ±).
 - Drawing Fractions / Draw Improper Fractions: write the fraction, turn improper fractions into a mixed number on a line ("21/5 = 4 1/5"), then a DRAW line, then the mixed number as the final answer.
-- X-Games (and Advanced): an X line, then a line listing the factor pairs you checked like "2·9, 1·18, 3·6", then the two numbers that work as the final answer.
+- X-Games (and Advanced): each X gives S (sum, left side) and P (product, right side). Find the two numbers that add to S and multiply to P. Write an X line as "X: <first number> | <S> | <P> | <second number>", then a line listing the factor pairs of P you checked like "1·18, 2·9, 3·6", then the two numbers as the final answer like "**3 and 6**".
 - Order of Operations: rewrite the expression doing ONE operation per line (parentheses, powers/roots, multiply/divide left to right, add/subtract left to right), final value as the final answer.
 - Combine Like Terms, Operations with Variables, Multiplications and Factoring, Sign Rules, Finding Factors, GCF, Number Line: the problem, short work if any, then the final answer.
-- Times Tables: one ### per row ("1" to "12") listing that row's products, no final answer needed.`,
+- Times Tables: the sheet is a 10 by 10 chart. One ### per row ("1" to "10") listing that row's ten products, no final answer needed.`,
     prefs.style === "short" ? `- Answers only: skip the step lines, keep the title, problem numbers, special drawing lines and final answers.` : "",
     `- Multiple choice / fill in the blank: just the answer.`,
     `- If a picture is blurry or cut off, answer everything you can read, then list which numbers to retake.`,
@@ -681,7 +682,7 @@ function fuzzySheet(name, term) {
 }
 
 // ---------- Worksheet library (every file from Mr. Herring's site, built into the app) ----------
-let catalog = null, libText = null;
+let catalog = null, libText = null, libTyped = null;
 const termOf = (a) => Math.max(1, Math.min(4, parseInt(a?.id, 10) || 1));
 function sheetFor(name, a) { return catalog ? (matchSheet(name, catalog, termOf(a)) || fuzzySheet(name, termOf(a))) : null; }
 async function loadLibrary() {
@@ -692,6 +693,8 @@ async function loadLibrary() {
   } catch { catalog = null; }
 }
 async function sheetText(ws) {
+  if (!libTyped) { try { libTyped = await (await fetch("lib/typed.json")).json(); } catch { libTyped = {}; } }
+  if (libTyped[ws.id]) return libTyped[ws.id];
   if (!libText) { try { libText = await (await fetch("lib/text.json")).json(); } catch { libText = {}; } }
   return libText[ws.id] || "";
 }
@@ -790,11 +793,12 @@ async function runFromLibrary(a, idx) {
   const found = [], missing = [];
   for (const line of lines) { const ws = sheetFor(splitItem(line)[0], a); if (ws) found.push({ line, ws }); else missing.push(line); }
   if (!found.length) return false;
-  const per = Math.max(1, maxImages || 1);
+  // With pictures: pack pages up to the per-question limit. Without: send the text copies, 3 sheets at a time.
+  const per = maxImages || 0;
   const rounds = []; let cur = [], used = 0;
   for (const f of found) {
-    const need = Math.min(f.ws.pages, per);
-    if (cur.length && (used + need > per || cur.length >= 3)) { rounds.push(cur); cur = []; used = 0; }
+    const need = per ? Math.min(f.ws.pages, per) : 0;
+    if (cur.length && ((per && used + need > per) || cur.length >= 3)) { rounds.push(cur); cur = []; used = 0; }
     cur.push(f); used += need;
   }
   if (cur.length) rounds.push(cur);
@@ -805,9 +809,11 @@ async function runFromLibrary(a, idx) {
     const status = bubble("note", `📄 Opening ${group.map((g) => g.ws.title).join(", ")}…${rounds.length > 1 ? ` (part ${r + 1} of ${rounds.length})` : ""}`);
     try {
       for (const g of group) {
-        const pictures = await pagePictures(g.ws, per);
-        for (const b of pictures) pics.push({ blob: b, url: URL.createObjectURL(b) });
-        docs.push({ title: g.ws.title, text: await sheetText(g.ws) });
+        if (per) {
+          const pictures = await pagePictures(g.ws, per);
+          for (const b of pictures) pics.push({ blob: b, url: URL.createObjectURL(b) });
+        }
+        docs.push({ title: g.ws.title, text: (await sheetText(g.ws)) || "(This sheet has no text, like a blank chart. Fill it in completely.)" });
       }
     } catch {
       status.textContent = "⚠️ Couldn't open the worksheet files. Add pictures instead.";
@@ -1268,7 +1274,7 @@ function errorText(code) {
     rate_limited: "You've hit your Claude limit for now. Wait a bit, then try again.",
     session_expired: "Sign in to Claude again, then try again.",
     image_rejected: "One of the pictures didn't work. Try a different screenshot (PNG or JPG).",
-    images_unavailable: "Pictures don't work here. Type the problems instead.",
+    images_unavailable: "Pictures aren't allowed in this Claude app. Use Do it (built-in worksheets) or type the problems.",
     refused: "Claude can't help with that one. Try rewording it.",
     prompt_too_large: "That's too much at once. Send fewer pages.",
     empty_completion: "No answer came back. Try again with a clearer picture.",
@@ -1287,7 +1293,7 @@ async function sendNow() {
   const sending = pics; pics = []; renderThumbs();
   const ask = (q || "Do this homework. Give me the answers for every problem.") +
     (sending.length ? `\n\n(${sending.length} picture${sending.length > 1 ? "s" : ""} of the homework attached.)` : "") +
-    sendingDocs.map((d) => `\n\n--- Worksheet: ${d.title} (text copy; the pictures show the layout) ---\n${d.text}`).join("");
+    sendingDocs.map((d) => `\n\n--- Worksheet: ${d.title} (typed copy of the worksheet; any pictures show the same pages) ---\n${d.text}`).join("");
   bubble("me", (q || (sending.length ? "📸 Homework pictures" : "Do this worksheet")) + sendingDocs.map((d) => "\n📄 " + d.title).join(""), sending.map((p) => p.url));
   $("text").value = "";
   turns.push({ role: "user", content: ask });
@@ -1315,6 +1321,18 @@ async function sendNow() {
     return true;
   } catch (err) {
     turns.pop();
+    if (err.code === "images_unavailable" && sending.length) {
+      maxImages = 0; $("photoLabel").hidden = true; pics = []; renderThumbs();
+      out.parentElement.remove();
+      if (sendingDocs.length) {
+        docs = sendingDocs; renderDocs(); $("text").value = q;
+        note("Pictures aren't allowed here, so I'm using the worksheet's text instead.");
+        setBusy(false); ctl = null;
+        return await sendNow();
+      }
+      note("⚠️ Pictures aren't allowed in this Claude app. Type the problems, or use Do it so the built-in worksheets are used.");
+      return false;
+    }
     if (err.code === "cancelled") render(out, (err.text || "") + "\n\n(Stopped.)");
     else { if (err.text) render(out, err.text); else out.parentElement.remove(); note("⚠️ " + errorText(err.code)); }
     if (["not_granted", "sampling_disabled"].includes(err.code)) setBrain(false, "Claude not allowed");

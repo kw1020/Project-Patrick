@@ -1,0 +1,13 @@
+Solving Equations 7 (Geometry)
+Evaluate the following expressions.
+1) 48 ÷ (5x - 6)^2 · y - 12;  x = 2, y = 14
+2) p^2 ÷ (2 + q)^2 + r^3 - 10;  p = 12, q = 4, r = 3
+Solve, check, and graph the following equations.
+3) p/7 - 11 = -3
+4) -6g^2 + 13 = 163
+5) 70 = 7x + 3x
+6) -63 = 2x + 5x
+7) 33 = 9x - 6x
+8) 50 = x + 12x - 15
+9) -32 = 5x + 4x + 13
+10) 27 = -21 + 16x - 8x

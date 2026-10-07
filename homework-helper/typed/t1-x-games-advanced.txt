@@ -1,0 +1,43 @@
+X Games Advanced!
+Each X has S (the sum) on the left and P (the product) on the right. Find the two numbers that ADD to S and MULTIPLY to P, and write them in the top and bottom spaces of the X.
+4 X's per row (page 1: 1-24, page 2: 25-40). Columns: 1st col = 1, 5, 9, ...; 2nd col = 2, 6, 10, ...; 3rd col = 3, 7, 11, ...; 4th col = 4, 8, 12, ...
+1) S = 5, P = 6
+2) S = 13, P = 30
+3) S = -8, P = 16
+4) S = -1, P = -20
+5) S = 16, P = 15
+6) S = 0, P = -25
+7) S = 4, P = -32
+8) S = -16, P = 28
+9) S = 8, P = 15
+10) S = -9, P = -20
+11) S = -2, P = -24
+12) S = -14, P = 40
+13) S = -8, P = 15
+14) S = 0, P = -16
+15) S = 3, P = -28
+16) S = 20, P = 36
+17) S = 9, P = 18
+18) S = -22, P = 21
+19) S = 0, P = -49
+20) S = -5, P = -36
+21) S = -2, P = -15
+22) S = 16, P = 28
+23) S = -15, P = 36
+24) S = 13, P = 40
+25) S = 11, P = 28
+26) S = 0, P = -81
+27) S = 6, P = -40
+28) S = -1, P = -42
+29) S = -11, P = 24
+30) S = 7, P = -30
+31) S = 17, P = 42
+32) S = 16, P = 48
+33) S = -8, P = -20
+34) S = -2, P = -35
+35) S = -13, P = 40
+36) S = 26, P = 48
+37) S = 12, P = 35
+38) S = 49, P = 48
+39) S = -15, P = 50
+40) S = 20, P = 100

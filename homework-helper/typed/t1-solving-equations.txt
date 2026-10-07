@@ -1,0 +1,21 @@
+Solving Equations (Geometry)
+Solve, check, and graph the following equations.
+1) x + 9 = 16
+2) t - 12 = 11
+3) 4w = 36
+4) d/6 = 8
+5) a^2 = 16
+6) sqrt(b) = 9
+7) 22 = k + 14
+8) 26 = v - 7
+9) 72 = 9m
+10) 39 = x/3
+11) c^2 = 64
+12) sqrt(d) = 11
+13) 7 + c = -11
+14) -5 + t = -16
+15) -6p = -30
+16) k/(-4) = 11
+17) 25 = h^2
+18) 5 = sqrt(k)
+Columns (4 across): 1st col = 1, 5, 9, 13, 17; 2nd col = 2, 6, 10, 14, 18; 3rd col = 3, 7, 11, 15; 4th col = 4, 8, 12, 16.

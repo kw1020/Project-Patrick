@@ -1,0 +1,48 @@
+Finding a Greatest Common Factor
+
+List the factors for each number and find the greatest common factor for the set of
+numbers.
+A couple of tips: The GCF can’t be larger than the smaller number.
+   Remember the Difference Rule* and Euclidean Algorithm**.
+
+1) 4, 6   2) 10, 15   3) 5, 30   4) 12, 20
+
+5) 6, 8   6) 4, 12   7) 20, 30   8) 16, 24
+
+9) 3, 12   10) 12, 22   11) 11, 22   12) 15, 18, 21
+
+13) 6, 10   14) 25, 75   15) 39, 52   16) 15, 30, 40
+List the factors for each number and find the greatest common factor for the set of
+numbers.
+A couple of tips: The GCF can’t be larger than the smaller number.
+   Remember the Difference Rule* and Euclidean Algorithm**.
+
+17) 8, 12   18) 33, 77   19) 14, 35   20) 10, 12
+
+21) 18, 30   22) 27, 36   23) 28, 42   24) 24, 30, 36
+
+25) 9, 15   26) 7, 42   27) 55, 66   28) 27, 72
+
+29) 8, 32   30) 21, 35   31) 9, 30   32) 18, 24, 39
+
+33) 6, 21   34) 28, 35   35) 12, 39   36) 45, 63
+List the factors for each number and find the greatest common factor for the set of
+numbers.
+A couple of tips: The GCF can’t be larger than the smaller number.
+   Remember the Difference Rule* and Euclidean Algorithm**.
+
+37) 14, 21   38) 44, 99   39) 13, 65   40) 20, 32, 44
+
+41) 16, 40   42) 32, 44   43) 22, 34   44) 42, 70
+
+45) 60, 84   46) 56, 84   47) 54, 72   48) 21, 27, 42
+
+49) 24, 96   50) 45, 105   51) 48, 80   52) 12, 48, 60
+
+53) 36, 54   54) 48, 72   55) 20, 36, 40   56) 28, 42, 56
+* The GCF of a pair of numbers is never larger than the difference between those
+numbers.
+
+** If the difference of the two numbers is not the GCF, then a factor of that difference
+will be the GCF!!
+Columns (4 across): 1st col = 1, 5, 9, 13, ...; 2nd col = 2, 6, 10, ...; 3rd col = 3, 7, 11, ...; 4th col = 4, 8, 12, ...

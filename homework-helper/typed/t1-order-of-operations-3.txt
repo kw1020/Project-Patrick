@@ -1,0 +1,43 @@
+Order of Operations 3
+A. On the back, give the order of operations in detail.
+Simplify the following expressions.
+1) 21 + 9 · 6 - 14
+2) 36 ÷ 3 + 4 · 7
+3) 21 - 6 · 8 ÷ 3
+4) 15 + 40 ÷ 8 · 7
+5) 16 + (-81) ÷ 3 + (-12)
+6) 4 · 6 - 28 ÷ (-4)
+7) 11 + 5^2
+8) 8^2 - 24
+9) 22 - 8^2 ÷ 4
+10) 4 · 8 + 7^2
+11) (12 - 7)^2
+12) 8^2 ÷ (5 + 3)
+13) (5^2 + 17) ÷ 7
+14) 5^2 - (2 · 6)
+15) [8(11 - 2)] - 7^2
+16) 12 + [2(7^2 - 5^2)]
+17) 5·sqrt(81) ÷ (-3) - sqrt(8^2 - 6^2 - 3) + 8
+Simplify the following powers and roots. (The worksheet numbers this section starting at 17 again; the powers are the second "17" onward.)
+17) 15^2
+18) 7^2
+19) 9^2
+20) 4^3
+21) 5^3
+22) 4^4
+23) 6^7
+24) sqrt(225)
+25) sqrt(100)
+26) sqrt(90)
+27) sqrt(108)
+28) sqrt(324)
+29) cube root of 27
+30) cube root of 125
+31) cube root of 343
+32) cube root of 56
+33) cube root of 135
+34) 4th root of 81
+35) 4th root of 1296
+36) 4th root of 112
+37) 5th root of 1024
+38) 5th root of 729

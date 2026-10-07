@@ -1,0 +1,42 @@
+Order of Operations 2
+1) Give the order of operations in detail.
+Simplify the following expressions.
+2) 14 + 7 · 4 - 21
+3) 30 ÷ 6 + 4 · 7
+4) 12 - 9 · 8 ÷ 18
+5) 12 + 36 ÷ 4 · 3
+6) 11 + (-65) ÷ 5 + (-8)
+7) 8 · 2 - 60 ÷ (-5)
+8) 28 - 6^2 ÷ 9
+9) 9 · 7 + 3^2
+10) 8 + 6^2
+11) 4^2 - 7
+12) (3 + 6)^2
+13) 5^2 ÷ (3 + 2)
+14) (6^2 - 4) ÷ 4
+15) 8^2 - (4 · 7)
+16) [5(9 - 5)] + 6^2
+17) 87 - [4(6^2 - 5^2)]
+18) 12 + [(9^2 - 7^2) ÷ sqrt(64)]^3 ÷ 8 - 3·sqrt(121)
+Simplify the following powers and roots.
+19) 13^2
+20) 4^3
+21) 6^3
+22) 7^3
+23) 4^4
+24) 8^4
+25) 3^5
+26) sqrt(169)
+27) sqrt(64)
+28) sqrt(27)
+29) sqrt(28)
+30) sqrt(48)
+31) cube root of 64
+32) cube root of 216
+33) cube root of 40
+34) cube root of 108
+35) cube root of 128
+36) 4th root of 256
+37) 5th root of 243
+38) 4th root of 1250
+39) 5th root of 224

@@ -1,0 +1,2 @@
+Times Table
+A blank 10 by 10 multiplication chart: rows 1-10 down the left side, columns 1-10 across the top. Fill in every box with row × column (1×1 through 10×10).

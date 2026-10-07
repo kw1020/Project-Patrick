@@ -1,0 +1,23 @@
+Solving Equations 2 (Geometry)
+Solve, check, and graph the following equations.
+1) d + 17 = 33
+2) z - 29 = 42
+3) -3v = 45
+4) k/5 = 9
+5) x^2 = 9
+6) sqrt(m) = 8
+7) p^2 = 49
+8) sqrt(a) = 5
+9) -18 = t - 12
+10) -42 = 7h
+11) t/(-7) = -4
+12) 14 = -11 + k
+13) 3v + 7 = 19
+14) x/2 - 7 = 3
+15) 7a - 5 = 30
+16) c^2 + 6 = 42
+17) 36 = 4d - 8
+18) 4u^2 = 144
+19) z^2/4 = 25
+20) r/3 + 13 = 3
+Columns (4 across): 1st col = 1, 5, 9, 13, 17; 2nd col = 2, 6, 10, 14, 18; 3rd col = 3, 7, 11, 15, 19; 4th col = 4, 8, 12, 16, 20.

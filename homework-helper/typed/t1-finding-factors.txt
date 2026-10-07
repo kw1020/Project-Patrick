@@ -1,0 +1,54 @@
+Finding Factors
+List the factor pairs for each number. If the number is prime or a
+perfect square, state that.
+
+Pro tip: A factor can’t be bigger than half of the number.
+
+1) 4   2) 10   3) 11   4) 28   5) 40
+
+6) 6   7) 7   8) 9   9) 22   10) 50
+
+11) 12   12) 16   13) 24   14) 33   15) 45
+
+List the factor pairs for each number. If the number is prime or a
+perfect square, state that.
+
+Pro tip: A factor can’t be bigger than half of the number.
+
+16) 8   17) 21   18) 25   19) 36   20) 44
+
+21) 15   22) 18   23) 29   24) 49   25) 55
+26) 14   27) 20   28) 34   29) 37   30) 60
+
+List the factor pairs for each number. If the number is prime or a
+perfect square, state that.
+
+Pro tip: A factor can’t be bigger than half of the number.
+
+31) 19   32) 32   33) 42   34) 48   35) 64
+
+36) 26   37) 31   38) 46   39) 54   40) 66
+
+41) 23   42) 35   43) 39   44) 77   45) 81
+
+List the factor pairs for each number. If the number is prime or a
+perfect square, state that.
+
+Pro tip: A factor can’t be bigger than half of the number.
+
+46) 38   47) 52   48) 56   49) 72   50) 100
+51) 5   52) 15   53) 30   54) 45   55) 75
+
+56) 4   57) 8   58) 16   59) 32   60) 64
+
+List the factor pairs for each number. If the number is prime or a
+perfect square, state that.
+
+Pro tip: A factor can’t be bigger than half of the number.
+
+61) 6   62) 12   63) 24   64) 36   65) 72
+
+66) 10   67) 20   68) 40   69) 60   70) 80
+
+71) 9   72) 27   73) 54   74) 90   75) 108
+Columns (5 across, numbers go left to right): 1st col = 1, 6, 11, 16, ...; 2nd col = 2, 7, 12, ...; 3rd col = 3, 8, 13, ...; 4th col = 4, 9, 14, ...; 5th col = 5, 10, 15, ...

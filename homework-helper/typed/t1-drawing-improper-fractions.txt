@@ -1,0 +1,28 @@
+Improper Fractions (Drawing Improper Fractions)
+Draw the improper fractions, and write them as mixed numbers. Reduce if necessary.
+1) 5/3
+2) 7/2
+3) 9/4
+4) 17/5
+5) 13/6
+6) 21/4
+7) 17/3
+8) 19/5
+9) 19/8
+10) 15/6
+11) 21/5
+12) 25/6
+13) 17/7
+14) 24/9
+15) 12/8
+16) 24/8
+17) 13/3
+18) 22/6
+19) 23/7
+20) 21/9
+21) 19/4
+22) 33/7
+23) 20/8
+24) 23/5
+25) 16/6
+Columns (5 across): 1st col = 1, 6, 11, 16, 21; 2nd col = 2, 7, 12, 17, 22; 3rd col = 3, 8, 13, 18, 23; 4th col = 4, 9, 14, 19, 24; 5th col = 5, 10, 15, 20, 25.
