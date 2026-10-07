@@ -1,6 +1,7 @@
 <title>Math Catch-Up</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@500&family=Patrick+Hand&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
   /* Layout: one-screen dashboard. Top bar, three stat widgets, then assignments (left) + the answer desk (right). Stacks on phones. */
   :root {
@@ -112,6 +113,19 @@
   .notebook .paper-note { font-family:var(--body); font-size:.7em; line-height:1.4; background:#fff4d6; color:#8a5a0a; display:inline-block; margin:2px 0 6px; }
   @media (max-width: 600px) { .notebook { --mg:56px; font-size:calc(20px * var(--zoom)); padding-right:14px; } .notebook .probs { grid-template-columns:1fr; } .notebook .hole { left:12px; width:18px; height:18px; margin-top:-9px; } }
   .tabs { display:flex; gap:6px; }
+  .filelist { display:grid; gap:2px; margin-top:10px; }
+  .filelist h3 { font-family:var(--display); font-size:1rem; margin:12px 0 4px; }
+  .frow { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:10px; align-items:center; padding:8px 10px; border-radius:10px; }
+  .frow:hover { background:var(--bg); }
+  .frow .t { font-weight:700; overflow-wrap:anywhere; }
+  .frow .m { color:var(--muted); font-size:.8rem; }
+  .frow .used { color:var(--accent); font-weight:700; }
+  .pages { display:grid; gap:12px; }
+  .pages canvas { width:100%; height:auto; border:1px solid var(--line); border-radius:6px; background:#fff; }
+  .sheetchip { display:inline-block; margin-top:2px; font-size:.78rem; border:0; padding:1px 8px; border-radius:999px; background:var(--accent-soft); color:var(--accent); font-weight:700; cursor:pointer; }
+  .sheetchip.miss { background:var(--amber-soft); color:var(--amber); cursor:default; }
+  .allbar { display:flex; gap:10px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
+  .allbar p { margin:0; color:var(--muted); }
   .tab { background:transparent; color:var(--muted); font-weight:700; border:1px solid transparent; }
   .tab[aria-selected="true"] { background:var(--card); color:var(--fg); border-color:var(--line); }
   .tab .count { display:inline-block; min-width:1.6em; margin-left:6px; border-radius:999px; background:var(--red-soft); color:var(--red); font-size:.78rem; padding:0 6px; font-variant-numeric:tabular-nums; }
@@ -237,6 +251,7 @@
   <header class="topbar">
     <div class="brand">Math Catch-Up <span class="badge" id="classBadge">MATH</span></div>
     <span class="chip" id="brainChip">Connecting…</span>
+    <button type="button" class="btn-soft" id="filesBtn">📁 Files</button>
     <button type="button" class="btn-soft" id="customBtn">⚙️ Customize</button>
   </header>
 
@@ -346,6 +361,36 @@
   </div>
 </dialog>
 
+<dialog id="filesDlg" class="wide">
+  <div class="dlg-head"><h2>📁 Mr. Herring's worksheets</h2><button type="button" class="btn-ghost" data-close aria-label="Close">✕</button></div>
+  <div class="dlg-body">
+    <input id="filesQ" placeholder="Search worksheets, like GCF or Solving Equations 7" autocomplete="off">
+    <div id="filesList"></div>
+  </div>
+</dialog>
+
+<dialog id="viewDlg" class="wide">
+  <div class="dlg-head"><h2 id="viewTitle">Worksheet</h2><button type="button" class="btn-ghost" data-close aria-label="Close">✕</button></div>
+  <div class="dlg-body"><p class="help" id="viewInfo"></p><div id="viewPages" class="pages"></div></div>
+</dialog>
+
+<dialog id="newDlg">
+  <form id="newForm" method="dialog">
+    <div class="dlg-head"><h2 id="newTitle">New assignment from Canvas</h2><button type="button" class="btn-ghost" data-close aria-label="Close">✕</button></div>
+    <div class="dlg-body">
+      <label class="field">Number <small>Like 1.13</small><input id="nId" required placeholder="1.13"></label>
+      <label class="field">Due date<input id="nDate" type="date" required></label>
+      <label class="field">Details <small>Copy the whole Details list from Canvas, one worksheet per line</small><textarea id="nItems" rows="7" required placeholder="Times Tables&#10;Solving Equations 2: 1-12&#10;X-Games Advanced: 25-32"></textarea></label>
+      <div id="nPreview" class="help"></div>
+    </div>
+    <div class="dlg-foot">
+      <button type="button" class="btn-ghost" id="nDelete" hidden>Delete</button>
+      <button type="button" class="btn-soft" data-close>Cancel</button>
+      <button type="submit" class="btn-main">Save</button>
+    </div>
+  </form>
+</dialog>
+
 <dialog id="customDlg">
   <form id="customForm" method="dialog">
     <div class="dlg-head"><h2>⚙️ Customize</h2><button type="button" class="btn-ghost" data-close aria-label="Close">✕</button></div>
@@ -378,7 +423,7 @@ function rules() {
     `- The teacher's Canvas posts list worksheets with ranges, like "Addition and Subtraction on the Number Line: 2-22 (2nd Col)" or "Sign Rules: Addition and Subtraction: A, 1-10". "2-22 (2nd Col)" means problems 2 through 22 in the second column only; "A, 1-10" means part/section A, problems 1 through 10; "(Even)" or "(Odd)" means only even or odd numbers in that range, and "Odd" or "Even" alone means every odd or even problem on the sheet; a column with no numbers ("1st Col", "3rd Col", "4th Col") means every problem in that column; a single number ("Drawing Fractions: 1") means just that problem; "1st and 2nd Columns" means every problem in both columns; names ending in "2" or "Advanced" (like "Order of Operations2" or "X-Games Advanced") are different worksheets from the plain ones, so match the worksheet title exactly; several ranges separated by commas (like "1-33 (1st Col), 69-89 (1st Col)") are all assigned; a worksheet with no numbers (like "Times Tables") means fill in the whole sheet. Do only those problems, grouped under each worksheet's name as a heading.`,
     `- If a listed worksheet is not in the pictures or files sent, say which worksheets are missing so the student can add them. Never make up problems.`,
     `WRITE THE ANSWERS IN THIS EXACT FORMAT (the app draws it like the student's notebook paper):
-## <worksheet title, exactly as on the worksheet>
+## <worksheet name exactly as written in the assignment list, like "GCF" or "X-Games Advanced">
 ### <problem number>
 <one line per step, written the way it goes on paper>
 **<final answer>**            <- the app circles it
@@ -514,7 +559,7 @@ function isMissing(a) { return !a.done && (a.missing || daysUntil(a.due) < 0); }
 function dueText(d) { return d ? "Due " + new Date(d + "T12:00").toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" }) : "No due date"; }
 
 // ---------- All assignments (from Mr. Herring's Canvas posts) ----------
-const CANVAS = [
+const BUILTIN = [
   { id: "1.1", date: "2026-08-21", items: ["Times Tables", "Addition and Subtraction on the Number Line: 2-22 (2nd Col)", "Sign Rules: Addition and Subtraction: A, 1-10", "Finding Factors: 1-10", "GCF: 1-4"] },
   { id: "1.2", date: "2026-08-25", items: ["Times Tables", "Addition and Subtraction on the Number Line: 27-51 (3rd Col)", "Sign Rules: Addition and Subtraction: A, 11-20", "Sign Rules: Multiply and Divide: A, 1-10", "Finding Factors: 11-20", "GCF: 5-12"] },
   { id: "1.4", date: "2026-08-31", items: ["Times Tables", "Sign Rules: Addition and Subtraction: A, 41-50", "Sign Rules: Multiply and Divide: A, 41-50", "Finding Factors: 31-40", "GCF: 21-28", "X-Games: 21-40", "Operations with Variables: 2-18 (Even)", "Combine Like Terms: 1st Col", "Multiplications and Factoring: 1-33 (1st Col), 69-89 (1st Col)", "Addition and Subtraction on the Number Line: 25-49 (1st Col)"] },
@@ -524,6 +569,14 @@ const CANVAS = [
   { id: "1.11", date: "2026-09-21", items: ["Times Tables", "Drawing Fractions: 11-12", "Draw Improper Fractions: 11-15", "Reduce Fractions: 5-8", "X-Games Advanced: 17-24", "Order of Operations 2: 1, 2-26 (Even)", "Solving Equations: 3rd and 4th Columns", "Solving Equations 2: 13-16", "Combine Like Terms 2: 3rd Col", "Multiplications and Factoring Practice: 3rd Col"] },
   { id: "1.12", date: "2026-09-23", items: ["Reduce Fractions: 5-8", "Operations with Variables 3: Odd", "Multiplications and Factoring Practice: 20-32 (4th Col)", "Solving Equations 2: 17-20", "Solving Equations 7: 3-9 (Odd)", "Solving Equations 10: 5-13 (Odd)", "Order of Operations 3: A, 1-25 (Odd)"] },
 ];
+let CANVAS = [];
+function loadCanvas() {
+  const custom = load("math-canvas-custom", []);
+  const byId = new Map(BUILTIN.map((a) => [a.id, a]));
+  for (const c of custom) byId.set(c.id, { ...c, custom: true });
+  CANVAS = [...byId.values()].sort((x, y) => x.date.localeCompare(y.date) || x.id.localeCompare(y.id, undefined, { numeric: true }));
+}
+loadCanvas();
 let ticked = load("math-canvas-done", {}); // "1.1|2": true
 const key = (a, i) => `${a.id}|${i}`;
 const doneCount = (a) => a.items.filter((_, i) => ticked[key(a, i)]).length;
@@ -534,8 +587,9 @@ function splitItem(t) { const i = t.lastIndexOf(": "); return i < 0 ? [t, "whole
 function renderAll() {
   const view = $("allView");
   $("allCount").textContent = canvasOpen().length;
-  view.innerHTML = '<div class="cards"></div>';
-  const grid = view.firstChild;
+  view.innerHTML = `<div class="allbar"><button type="button" class="btn-main" id="newAsg">＋ New assignment</button><p>Paste a new Canvas list and the worksheets get matched automatically.</p></div><div class="cards"></div>`;
+  $("newAsg").onclick = () => openNew();
+  const grid = view.querySelector(".cards");
   for (const a of CANVAS) {
     const n = doneCount(a), total = a.items.length;
     const card = document.createElement("article");
@@ -545,6 +599,12 @@ function renderAll() {
     const go = document.createElement("button");
     go.type = "button"; go.className = n === total ? "btn-soft" : "btn-main"; go.textContent = n === total ? "Redo" : "Do it";
     go.onclick = () => startCanvas(a, a.items.map((_, i) => i).filter((i) => n === total || !ticked[key(a, i)]));
+    if (a.custom) {
+      const ed = document.createElement("button");
+      ed.type = "button"; ed.className = "btn-ghost"; ed.textContent = "✏️"; ed.title = "Edit " + a.id;
+      ed.onclick = () => openNew(a);
+      card.querySelector("header").appendChild(ed);
+    }
     card.querySelector("header").appendChild(go);
     const ul = card.querySelector("ul");
     a.items.forEach((t, i) => {
@@ -558,6 +618,15 @@ function renderAll() {
       const label = document.createElement("label");
       label.className = "what"; label.htmlFor = box.id;
       label.innerHTML = `<b>${esc(sheet)}</b> <span>· ${esc(which)}</span>`;
+      if (catalog) {
+        const ws = sheetFor(sheet, a);
+        const chip = document.createElement(ws ? "button" : "span");
+        chip.className = "sheetchip" + (ws ? "" : " miss");
+        chip.textContent = ws ? `📄 ${ws.title} · ${ws.pages} page${ws.pages > 1 ? "s" : ""}` : "⚠ Not on the site. Add a picture";
+        if (ws) { chip.type = "button"; chip.onclick = (e) => { e.preventDefault(); viewSheet(ws); }; }
+        label.appendChild(document.createElement("br"));
+        label.appendChild(chip);
+      }
       const one = document.createElement("button");
       one.type = "button"; one.textContent = "Do this ▸"; one.title = "Do just this worksheet";
       one.onclick = () => startCanvas(a, [i]);
@@ -568,6 +637,191 @@ function renderAll() {
   }
 }
 
+// ---- Worksheet matcher (copied into the page) ----
+const WORD_FIX = { multiplications: "multiplication", multiply: "multiplication", multiplying: "multiplication",
+  divide: "division", dividing: "division", combine: "combining", reduce: "reducing", draw: "drawing",
+  tables: "table", games: "game", equation: "equations", operation: "operations", rule: "rules", fraction: "fractions",
+  term: "terms", factor: "factors", variable: "variables", root: "roots", "&": "and" };
+const DROP = new Set(["the", "a", "an", "finding", "worksheet", "ws", "practice"]);
+function canon(name) {
+  return String(name).toLowerCase().replace(/×/g, "x").replace(/([a-z])(\d)/g, "$1 $2").replace(/(\d)([a-z])/g, "$1 $2")
+    .split(/[^a-z0-9&]+/).filter(Boolean).map((w) => WORD_FIX[w] || w).filter((w) => !DROP.has(w)).join(" ");
+}
+// Finds the worksheet for a Canvas name. Numbers must match exactly, so "Solving Equations" never
+// picks "Solving Equations 2". "Practice" is ignored only when no exact match exists.
+function matchSheet(name, catalog, term) {
+  const plain = (t) => String(t).toLowerCase().replace(/[^a-z0-9]/g, "");
+  const usable = catalog.filter((c) => !c.key);
+  const rank = (list) => list.sort((x, y) => (Math.abs(x.term - term) - Math.abs(y.term - term)) || (x.title.length - y.title.length))[0] || null;
+  const exact = usable.filter((c) => plain(c.title) === plain(name));
+  if (exact.length) return rank(exact);
+  const strict = (s) => canon(s.replace(/practice/gi, " PRACTICEKEEP "));
+  let hits = usable.filter((c) => strict(c.title) === strict(name));
+  if (hits.length) return rank(hits);
+  hits = usable.filter((c) => canon(c.title) === canon(name));
+  return rank(hits);
+}
+
+// One-letter typos ("Mulptiply") still match when everything else lines up.
+function near(a, b) {
+  if (a === b) return true;
+  if (Math.abs(a.length - b.length) > 1 || a.length < 5 || /\d/.test(a + b)) return false;
+  let i = 0, j = 0, edits = 0;
+  while (i < a.length && j < b.length) {
+    if (a[i] === b[j]) { i++; j++; continue; }
+    if (++edits > 1) return false;
+    if (a.length > b.length) i++; else if (b.length > a.length) j++; else { i++; j++; }
+  }
+  return edits + (a.length - i) + (b.length - j) <= 1;
+}
+function fuzzySheet(name, term) {
+  const want = canon(name).split(" ");
+  const hits = catalog.filter((c) => !c.key).filter((c) => { const got = canon(c.title).split(" "); return got.length === want.length && got.every((w, i) => near(w, want[i])); });
+  return hits.sort((x, y) => Math.abs(x.term - term) - Math.abs(y.term - term))[0] || null;
+}
+
+// ---------- Worksheet library (every file from Mr. Herring's site, built into the app) ----------
+let catalog = null, libText = null;
+const termOf = (a) => Math.max(1, Math.min(4, parseInt(a?.id, 10) || 1));
+function sheetFor(name, a) { return catalog ? (matchSheet(name, catalog, termOf(a)) || fuzzySheet(name, termOf(a))) : null; }
+async function loadLibrary() {
+  try {
+    catalog = await (await fetch("lib/catalog.json")).json();
+    if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = "pdf.worker.min.js";
+    renderAll(); renderFiles();
+  } catch { catalog = null; }
+}
+async function sheetText(ws) {
+  if (!libText) { try { libText = await (await fetch("lib/text.json")).json(); } catch { libText = {}; } }
+  return libText[ws.id] || "";
+}
+const pdfCache = new Map();
+function openPdf(ws) {
+  if (!pdfCache.has(ws.id)) pdfCache.set(ws.id, pdfjsLib.getDocument({ url: ws.file }).promise);
+  return pdfCache.get(ws.id);
+}
+async function pageCanvas(ws, n, scale) {
+  const doc = await openPdf(ws);
+  const page = await doc.getPage(n);
+  const vp = page.getViewport({ scale });
+  const c = document.createElement("canvas");
+  c.width = Math.round(vp.width); c.height = Math.round(vp.height);
+  const g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height);
+  await page.render({ canvasContext: g, viewport: vp }).promise;
+  return c;
+}
+async function pagePictures(ws, max) {
+  const out = [];
+  for (let n = 1; n <= Math.min(ws.pages, max); n++) {
+    const c = await pageCanvas(ws, n, 1.5);
+    out.push(await new Promise((r) => c.toBlob(r, "image/jpeg", 0.9)));
+  }
+  return out;
+}
+
+async function viewSheet(ws) {
+  $("viewTitle").textContent = "📄 " + ws.title;
+  $("viewInfo").textContent = `Term ${ws.term} · ${ws.pages} page${ws.pages > 1 ? "s" : ""}` + (usedIn(ws).length ? ` · Used in ${usedIn(ws).join(", ")}` : "");
+  const box = $("viewPages"); box.innerHTML = '<div class="empty">Opening…</div>';
+  $("viewDlg").showModal();
+  try {
+    box.innerHTML = "";
+    for (let n = 1; n <= ws.pages; n++) { const c = await pageCanvas(ws, n, 1.6); c.setAttribute("aria-label", `${ws.title}, page ${n}`); box.appendChild(c); }
+  } catch { box.innerHTML = '<div class="empty">Couldn\'t open this file.</div>'; }
+}
+
+function usedIn(ws) {
+  return CANVAS.filter((a) => a.items.some((t) => sheetFor(splitItem(t)[0], a)?.id === ws.id)).map((a) => a.id);
+}
+function renderFiles() {
+  if (!catalog) return;
+  const q = norm($("filesQ").value);
+  const list = $("filesList"); list.className = "filelist"; list.innerHTML = "";
+  for (const term of [1, 2, 3, 4]) {
+    const items = catalog.filter((c) => c.term === term && (!q || norm(c.title).includes(q)));
+    if (!items.length) continue;
+    const h = document.createElement("h3"); h.textContent = `Term ${term} · ${items.length} files`; list.appendChild(h);
+    for (const ws of items) {
+      const used = usedIn(ws);
+      const row = document.createElement("div"); row.className = "frow";
+      row.innerHTML = `<div><div class="t">${esc(ws.title)}</div><div class="m">${ws.pages} page${ws.pages > 1 ? "s" : ""}${ws.key ? " · answer key" : ""}${used.length ? ` · <span class="used">Used in ${esc(used.join(", "))}</span>` : ""}</div></div>`;
+      const b = document.createElement("button"); b.type = "button"; b.className = "btn-soft"; b.textContent = "View";
+      b.onclick = () => viewSheet(ws);
+      row.appendChild(b); list.appendChild(row);
+    }
+  }
+  if (!list.children.length) list.innerHTML = '<div class="empty">No worksheets match that.</div>';
+}
+$("filesBtn").onclick = () => { $("filesQ").value = ""; renderFiles(); $("filesDlg").showModal(); };
+$("filesQ").addEventListener("input", renderFiles);
+
+// ---------- New assignment (auto-matched to worksheets) ----------
+let editingCanvas = null;
+const parseItems = (t) => t.split("\n").map((l) => l.replace(/^[\s•\-*]+/, "").trim()).filter(Boolean);
+function previewNew() {
+  const items = parseItems($("nItems").value);
+  $("nPreview").innerHTML = items.map((t) => { const ws = sheetFor(splitItem(t)[0], { id: $("nId").value }); return ws ? `✓ ${esc(splitItem(t)[0])} → <b>${esc(ws.title)}</b>` : `⚠ ${esc(splitItem(t)[0])}: not on the site (you'll add a picture)`; }).join("<br>");
+}
+function openNew(a) {
+  editingCanvas = a ? a.id : null;
+  $("newTitle").textContent = a ? `Edit ${a.id}` : "New assignment from Canvas";
+  $("nId").value = a?.id || ""; $("nDate").value = a?.date || new Date().toLocaleDateString("en-CA");
+  $("nItems").value = a ? a.items.join("\n") : ""; $("nDelete").hidden = !a;
+  previewNew(); $("newDlg").showModal(); $(a ? "nItems" : "nId").focus();
+}
+$("nItems").addEventListener("input", previewNew);
+$("newForm").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const item = { id: $("nId").value.trim(), date: $("nDate").value, items: parseItems($("nItems").value) };
+  if (!item.id || !item.date || !item.items.length) return;
+  const custom = load("math-canvas-custom", []).filter((c) => c.id !== editingCanvas && c.id !== item.id);
+  custom.push(item); store("math-canvas-custom", custom);
+  loadCanvas(); renderAll(); renderPapers(); renderList(); $("newDlg").close();
+});
+$("nDelete").onclick = () => {
+  store("math-canvas-custom", load("math-canvas-custom", []).filter((c) => c.id !== editingCanvas));
+  loadCanvas(); renderAll(); renderPapers(); renderList(); $("newDlg").close();
+};
+
+// ---------- Do it: send the right worksheet pages, a few at a time ----------
+let stopRounds = false;
+async function runFromLibrary(a, idx) {
+  const lines = idx.map((i) => a.items[i]);
+  const found = [], missing = [];
+  for (const line of lines) { const ws = sheetFor(splitItem(line)[0], a); if (ws) found.push({ line, ws }); else missing.push(line); }
+  if (!found.length) return false;
+  const per = Math.max(1, maxImages || 1);
+  const rounds = []; let cur = [], used = 0;
+  for (const f of found) {
+    const need = Math.min(f.ws.pages, per);
+    if (cur.length && (used + need > per || cur.length >= 3)) { rounds.push(cur); cur = []; used = 0; }
+    cur.push(f); used += need;
+  }
+  if (cur.length) rounds.push(cur);
+  if (missing.length) note(`⚠ Not on Mr. Herring's site: ${missing.map((l) => splitItem(l)[0]).join(", ")}. Add a picture of ${missing.length > 1 ? "those" : "it"} after this finishes.`);
+  stopRounds = false;
+  for (let r = 0; r < rounds.length && !stopRounds; r++) {
+    const group = rounds[r];
+    const status = bubble("note", `📄 Opening ${group.map((g) => g.ws.title).join(", ")}…${rounds.length > 1 ? ` (part ${r + 1} of ${rounds.length})` : ""}`);
+    try {
+      for (const g of group) {
+        const pictures = await pagePictures(g.ws, per);
+        for (const b of pictures) pics.push({ blob: b, url: URL.createObjectURL(b) });
+        docs.push({ title: g.ws.title, text: await sheetText(g.ws) });
+      }
+    } catch {
+      status.textContent = "⚠️ Couldn't open the worksheet files. Add pictures instead.";
+      return true;
+    }
+    status.textContent = `📄 ${group.map((g) => g.ws.title).join(", ")}${rounds.length > 1 ? ` (part ${r + 1} of ${rounds.length})` : ""}`;
+    $("text").value = `Assignment ${a.id}. Do only these:\n` + group.map((g) => g.line).join("\n");
+    renderThumbs(); renderDocs();
+    const ok = await sendNow();
+    if (!ok) break;
+  }
+  return true;
+}
+
 function startCanvas(a, idx) {
   showTab("home");
   newChat();
@@ -576,6 +830,13 @@ function startCanvas(a, idx) {
   $("deskTitle").textContent = currentTitle;
   $("text").value = `Assignment ${a.id}. Do only these:\n` + idx.map((i) => a.items[i]).join("\n");
   const sheets = idx.map((i) => splitItem(a.items[i])[0]);
+  if (catalog && sample && prefs.autoLibrary !== false) {
+    runFromLibrary(a, idx).then((handled) => { if (!handled) fallbackFind(a, sheets); });
+    return;
+  }
+  fallbackFind(a, sheets);
+}
+function fallbackFind(a, sheets) {
   if (mcp && prefs.autoDrive !== false) { autoFind(a.id, sheets); return; }
   note(`Add screenshots or a screen recording of ${sheets.length === 1 ? "the " + sheets[0] + " worksheet" : "these worksheets: " + sheets.join(", ")} from herringmath.edublogs.org, then click Do my homework. Tip: 2–3 worksheets at a time works best.`);
   $("text").focus();
@@ -656,7 +917,17 @@ function savePaper(id, text) {
   if (!secs.length) return;
   const a = CANVAS.find((x) => x.id === id);
   papers[id] = papers[id] || {};
-  for (const sec of secs) papers[id][norm(sec.name)] = sec;
+  // File it under the Canvas line it answers, even if the heading used the worksheet's own title
+  // ("Finding a GCF" is the answer to Canvas's "GCF").
+  const itemFor = (name) => {
+    if (!a) return null;
+    const names = a.items.map((t) => splitItem(t)[0]);
+    const ws = catalog ? sheetFor(name, a) : null;
+    return names.find((n) => norm(n) === norm(name))
+      || (ws && names.find((n) => sheetFor(n, a)?.id === ws.id))
+      || names.find((n) => canon(n) === canon(name)) || null;
+  };
+  for (const sec of secs) papers[id][norm(itemFor(sec.name) || sec.name)] = sec;
   store("math-papers", papers);
   // Tick the worksheets that now have answers.
   if (a) a.items.forEach((t, i) => { if (sheetDone(a, i)) ticked[key(a, i)] = true; });
@@ -1006,16 +1277,17 @@ function errorText(code) {
 
 function setBusy(b) { $("sendBtn").disabled = b; $("stopBtn").hidden = !b; }
 
-$("composer").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  if (!sample) return;
+$("composer").addEventListener("submit", (e) => { e.preventDefault(); sendNow(); });
+// Sends what's in the box (text, pictures, worksheets). Resolves true when an answer came back.
+async function sendNow() {
+  if (!sample) return false;
   const q = $("text").value.trim();
-  if (!q && !pics.length && !docs.length) { $("text").focus(); return; }
+  if (!q && !pics.length && !docs.length) { $("text").focus(); return false; }
   const sendingDocs = docs; docs = []; renderDocs();
   const sending = pics; pics = []; renderThumbs();
   const ask = (q || "Do this homework. Give me the answers for every problem.") +
     (sending.length ? `\n\n(${sending.length} picture${sending.length > 1 ? "s" : ""} of the homework attached.)` : "") +
-    sendingDocs.map((d) => `\n\n--- Worksheet from Google Drive: ${d.title} ---\n${d.text}`).join("");
+    sendingDocs.map((d) => `\n\n--- Worksheet: ${d.title} (text copy; the pictures show the layout) ---\n${d.text}`).join("");
   bubble("me", (q || (sending.length ? "📸 Homework pictures" : "Do this worksheet")) + sendingDocs.map((d) => "\n📄 " + d.title).join(""), sending.map((p) => p.url));
   $("text").value = "";
   turns.push({ role: "user", content: ask });
@@ -1040,18 +1312,20 @@ $("composer").addEventListener("submit", async (e) => {
     const d = load("math-done", { day: "", n: 0 });
     store("math-done", { day: today(), n: (d.day === today() ? d.n : 0) + 1 });
     renderList();
+    return true;
   } catch (err) {
     turns.pop();
     if (err.code === "cancelled") render(out, (err.text || "") + "\n\n(Stopped.)");
     else { if (err.text) render(out, err.text); else out.parentElement.remove(); note("⚠️ " + errorText(err.code)); }
     if (["not_granted", "sampling_disabled"].includes(err.code)) setBrain(false, "Claude not allowed");
+    return false;
   } finally {
     setBusy(false);
     ctl = null;
     out.parentElement.scrollIntoView({ block: "end" });
   }
-});
-$("stopBtn").onclick = () => ctl?.abort();
+}
+$("stopBtn").onclick = () => { stopRounds = true; ctl?.abort(); };
 $("text").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("composer").requestSubmit(); } });
 
 function newChat() {
@@ -1180,6 +1454,7 @@ applyPrefs();
 renderList();
 renderAll();
 renderPapers();
+loadLibrary();
 if (["all", "papers"].includes(load("math-tab", "home"))) showTab(load("math-tab", "home"));
 (async () => {
   sample = window.claude ? await window.claude.use("sample") : null;
