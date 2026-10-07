@@ -84,34 +84,45 @@
   .sheet-hint { color:#a5abbb; font-size:.9rem; margin-right:auto; }
   .sheet-btn { background:#2f3340; color:#fff; border:1px solid #444a5a; }
   .sheet-scroll { height:calc(100% - 58px); overflow:auto; padding-block:24px 56px; padding-inline:16px; }
-  .notebook { --zoom:1; --line:calc(36px * var(--zoom)); --mg:96px; position:relative; width:min(860px, 100%); min-height:calc(min(860px, 100vw - 32px) * 11 / 8.5); margin:0 auto;
+  #sheetContent { --zoom:1; display:grid; gap:28px; justify-items:center; }
+  .page-wrap { width:816px; }
+  .page-label { color:#a5abbb; font:700 .8rem var(--body); letter-spacing:.06em; text-transform:uppercase; margin:0 0 6px 4px; }
+  /* One real sheet of notebook paper: 8.5 × 11, nothing spills off the bottom. */
+  .notebook { --line:calc(30px * var(--zoom)); --mg:84px; position:relative; width:816px; height:1056px; overflow:hidden;
     background-color:#fdfdf8; color:#1f2229; box-shadow:0 10px 40px rgba(0,0,0,.45); border-radius:2px;
     background-image:linear-gradient(to right, transparent calc(var(--mg) - 2px), #e49aa1 calc(var(--mg) - 2px), #e49aa1 var(--mg), transparent var(--mg)),
       repeating-linear-gradient(to bottom, transparent 0, transparent calc(var(--line) - 1px), #b6cbe8 calc(var(--line) - 1px), #b6cbe8 var(--line));
-    background-position:0 0, 0 calc(var(--line) * 3);
-    font-family:var(--hand); font-size:calc(25px * var(--zoom)); line-height:var(--line);
-    padding:calc(var(--line) * 1) 36px calc(var(--line) * 2) calc(var(--mg) + 14px); }
-  .notebook::before { content:""; position:absolute; left:0; right:0; top:0; height:calc(var(--line) * 3 - 1px); background:linear-gradient(to right, transparent calc(var(--mg) - 2px), #e49aa1 calc(var(--mg) - 2px), #e49aa1 var(--mg), transparent var(--mg)), #fdfdf8; }
-  .notebook .hole { position:absolute; left:26px; width:26px; height:26px; margin-top:-13px; border-radius:50%; background:#262932; box-shadow:inset 0 2px 3px rgba(0,0,0,.5); z-index:1; }
-  #sheetContent { position:relative; }
+    background-position:0 0, 0 calc(var(--line) * 2);
+    font-family:var(--hand); font-size:calc(19px * var(--zoom)); line-height:var(--line);
+    padding:calc(var(--line) * .5) 28px var(--line) calc(var(--mg) + 12px); }
+  .notebook .hole { position:absolute; left:22px; width:22px; height:22px; margin-top:-11px; border-radius:50%; background:#262932; box-shadow:inset 0 2px 3px rgba(0,0,0,.5); z-index:1; }
   .notebook .paper { background:none; padding:0; font-size:inherit; line-height:var(--line); color:inherit; }
-  .notebook .paper-head { line-height:var(--line); margin-bottom:var(--line); }
-  .notebook .sheet { margin-bottom:var(--line); }
-  .notebook .sheet h4 { font-size:1.5em; line-height:var(--line); margin:0 0 4px; }
-  .notebook .probs { display:grid; grid-template-columns:repeat(auto-fill, minmax(calc(210px * var(--zoom)), 1fr)); row-gap:calc(var(--line) / 2); }
-  .notebook .prob { border-right:0; border-left:2px solid #c9ccd3; padding:0 14px 0 10px; min-width:0; cursor:pointer; border-radius:0 8px 8px 0; transition:opacity .15s, background-color .15s; }
+  .notebook .paper-head { line-height:var(--line); min-height:calc(var(--line) * 1.5); font-size:.9em; }
+  .notebook .sheet { margin-bottom:calc(var(--line) / 2); }
+  .notebook .sheet h4 { font-size:1.3em; line-height:var(--line); margin:0 0 2px; text-decoration:underline; text-underline-offset:4px; }
+  .notebook .sheet h4 .cont { font-size:.6em; text-decoration:none; color:#6b7080; }
+  .notebook .probs { display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); border-top:1.5px solid #c9ccd3; }
+  .notebook .prob { border-right:1.5px solid #c9ccd3; border-bottom:1.5px solid #c9ccd3; padding:2px 8px 4px 6px; min-width:0; column-gap:6px; cursor:pointer; transition:opacity .15s, background-color .15s; overflow-wrap:anywhere; }
+  .notebook .prob:nth-child(4n) { border-right:0; }
+  .notebook .prob.wide { grid-column:1 / -1; border-right:0; display:block; }
   .notebook .prob:hover { background:rgba(51, 70, 230, .06); }
-  .notebook .prob:focus-visible { outline:3px solid #3346e6; outline-offset:2px; }
-  .notebook .pnum { font-weight:700; color:#3346e6; min-width:1.6em; }
+  .notebook .prob:focus-visible { outline:3px solid #3346e6; outline-offset:-3px; }
+  .notebook .pnum { font-weight:700; color:#3346e6; min-width:1.4em; }
+  .notebook .pnum::after { content:")"; }
+  .notebook .wide .pnum::after { content:""; }
   .notebook .prob.copied { opacity:.32; }
-  .notebook .prob.copied .pnum::after { content:" ✓"; color:#1f8a4c; }
-  .notebook .circ { border:2.5px solid #1f2229; line-height:1.15; padding:0 10px; }
+  .notebook .prob.copied .pnum::after { content:") ✓"; color:#1f8a4c; }
+  .notebook .circ { border:2px solid #1f2229; border-radius:999px; line-height:1.15; padding:1px 9px; }
+  .notebook .circ.long { border-radius:14px; }
+  .notebook .prob { display:grid; grid-template-columns:auto minmax(0, 1fr); }
   .notebook svg { color:#1f2229; }
-  .notebook .nl { width:calc(220px * var(--zoom)); }
-  .notebook .draw { height:calc(48px * var(--zoom)); }
-  .notebook .xg { width:calc(120px * var(--zoom)); }
+  .notebook .nl { width:100%; max-width:calc(170px * var(--zoom)); }
+  .notebook .draw { height:calc(38px * var(--zoom)); max-width:100%; }
+  .notebook .xg { width:calc(96px * var(--zoom)); }
   .notebook .paper-note { font-family:var(--body); font-size:.7em; line-height:1.4; background:#fff4d6; color:#8a5a0a; display:inline-block; margin:2px 0 6px; }
-  @media (max-width: 600px) { .notebook { --mg:56px; font-size:calc(20px * var(--zoom)); padding-right:14px; } .notebook .probs { grid-template-columns:1fr; } .notebook .hole { left:12px; width:18px; height:18px; margin-top:-9px; } }
+  .tt { border-collapse:collapse; margin:4px auto; font-size:.95em; line-height:1.15; }
+  .tt th, .tt td { border:1.5px solid #8d93a0; width:2.3em; height:1.45em; text-align:center; padding:0; }
+  .tt th { color:#3346e6; font-weight:700; }
   .tabs { display:flex; gap:6px; }
   .filelist { display:grid; gap:2px; margin-top:10px; }
   .filelist h3 { font-family:var(--display); font-size:1rem; margin:12px 0 4px; }
@@ -378,10 +389,7 @@
     <button type="button" class="sheet-btn" id="sheetCopy">📋 Copy</button>
   </div>
   <div class="sheet-scroll">
-    <div class="notebook">
-      <span class="hole" style="top:9%"></span><span class="hole" style="top:50%"></span><span class="hole" style="top:91%"></span>
-      <div id="sheetContent"></div>
-    </div>
+    <div id="sheetContent"></div>
   </div>
 </dialog>
 
@@ -516,7 +524,7 @@ function render(el, t) { el.innerHTML = esc(t).replace(/\*\*(.+?)\*\*/g, "<stron
 const circled = (t) => esc(t)
   .replace(/\^\(([^)]+)\)/g, "<sup>$1</sup>").replace(/\^(-?\d+|[a-z])/gi, "<sup>$1</sup>")
   .replace(/sqrt\(([^)]+)\)/gi, "√$1")
-  .replace(/\*\*(.+?)\*\*/g, '<span class="circ">$1</span>');
+  .replace(/\*\*(.+?)\*\*/g, (_, x) => `<span class="circ${x.replace(/<[^>]+>/g, "").length > 9 ? " long" : ""}">${x}</span>`);
 const num = (t) => parseFloat(String(t).replace(/[−–]/g, "-").replace(/[^\d.+-]/g, ""));
 
 function svgNumberLine(spec) {
@@ -565,6 +573,8 @@ function svgXGame(spec) {
 
 function lineHtml(line) {
   if (/^\s*Q\s*:/i.test(line)) return ""; // the problem itself only shows in Logs, not on the paper
+  const t = line.match(/^\s*TT\s*:\s*(.*)$/);
+  if (t) return svgTimes(t[1]);
   const m = line.match(/^\s*(NL|DRAW|X)\s*:\s*(.*)$/i);
   if (m) {
     const kind = m[1].toUpperCase();
@@ -574,8 +584,27 @@ function lineHtml(line) {
   return `<div>${circled(line)}</div>`;
 }
 
+// A times table comes back as rows of numbers; draw it as the 10×10 chart instead of a pile of rows.
+function timesChart(text) {
+  return text.replace(/^##[ \t]+(Times Tables?)[^\n]*\n([\s\S]*?)(?=\n##[ \t]|(?![\s\S]))/im, (all, name, body) => {
+    const rows = [];
+    for (const blk of body.split(/^###\s*/m).slice(1)) {
+      const lines = blk.split("\n"), label = (lines[0].match(/\d+/) || [])[0];
+      const nums = lines.slice(1).filter((l) => !/^\s*Q\s*:/i.test(l)).join(" ").replace(/\*\*/g, "").match(/-?\d+/g) || [];
+      if (nums.length >= 10) rows.push({ r: +label || rows.length + 1, nums: nums.slice(-10) });
+    }
+    if (rows.length < 3) return all;
+    return `## ${name}\n### ✓\nTT: ${rows.map((x) => x.r + "=" + x.nums.join(",")).join(";")}\n`;
+  });
+}
+function svgTimes(spec) {
+  const rows = spec.split(";").map((r) => { const [k, v] = r.split("="); return { k, v: (v || "").split(",") }; });
+  const cols = rows[0].v.map((_, i) => i + 1);
+  return `<table class="tt"><tr><th>×</th>${cols.map((c) => `<th>${c}</th>`).join("")}</tr>${rows.map((r) => `<tr><th>${esc(r.k)}</th>${r.v.map((x) => `<td>${esc(x)}</td>`).join("")}</tr>`).join("")}</table>`;
+}
+
 function renderPaper(el, text, title) {
-  text = text.replace(/^\(Demo mode.*\)\n+/, "");
+  text = timesChart(text.replace(/^\(Demo mode.*\)\n+/, ""));
   if (!/^##\s/m.test(text)) { render(el, text); return; }
   const id = String(title || "").split(":")[0].trim();
   let html = `<div class="paper"><div class="paper-head">${esc(prefs.name || "")}<br>${esc(id)} ${esc(prefs.period || "")}</div>`;
@@ -588,7 +617,8 @@ function renderPaper(el, text, title) {
     if (/^###\s/.test(line)) {
       closeProb();
       if (!sheet) { html += '<section class="sheet"><div class="probs">'; sheet = true; }
-      html += `<div class="prob"><span class="pnum">${esc(line.replace(/^###\s*/, ""))}</span><div class="pbody">`; prob = true; continue;
+      const pn = line.replace(/^###\s*/, "");
+      html += `<div class="prob${pn === "✓" ? " wide" : ""}"><span class="pnum">${pn === "✓" ? "" : esc(pn)}</span><div class="pbody">`; prob = true; continue;
     }
     if (!line.trim()) { if (!prob) closeSheet(); continue; }
     if (prob) html += lineHtml(line);
@@ -1054,11 +1084,77 @@ let sheetOpen = null; // { text, title, edit() }
 function openSheet(text, title, onEdit) {
   sheetOpen = { text, title, onEdit };
   $("sheetTitle").textContent = title;
-  renderPaper($("sheetContent"), text, title);
-  if (!$("sheetContent").querySelector(".paper")) $("sheetContent").innerHTML = `<div class="paper"><div class="paper-head">${esc(prefs.name || "")}<br>${esc(String(title).split(":")[0])} ${esc(prefs.period || "")}</div>${$("sheetContent").innerHTML}</div>`;
-  wireCopied(title);
-  $("sheetDlg").showModal();
+  $("sheetDlg").showModal(); // pages are measured, so the dialog has to be open first
+  drawSheet();
   $("sheetDlg").querySelector(".sheet-scroll").scrollTop = 0;
+}
+function drawSheet() {
+  const { text, title } = sheetOpen;
+  const tmp = document.createElement("div");
+  renderPaper(tmp, text, title);
+  if (!tmp.querySelector(".paper")) tmp.innerHTML = `<div class="paper"><div class="paper-head">${esc(prefs.name || "")}<br>${esc(String(title).split(":")[0])} ${esc(prefs.period || "")}</div>${tmp.innerHTML}</div>`;
+  paginate($("sheetContent"), tmp.querySelector(".paper"));
+  wireCopied(title);
+}
+
+// Pages are always laid out at real-paper size, then shrunk to fit the screen, so a phone shows the same papers as a PC.
+function fitPages() {
+  const w = $("sheetContent").clientWidth;
+  const k = Math.min(1, (w || 816) / 816);
+  $("sheetContent").querySelectorAll(".page-wrap").forEach((p) => (p.style.zoom = k));
+}
+addEventListener("resize", () => { if ($("sheetDlg").open) fitPages(); });
+
+// Splits the answers onto real 8.5×11 sheets: Paper 1 front, Paper 1 back, Paper 2 front…
+// A worksheet that doesn't fit carries on to the next side under the same title.
+function paginate(box, paper) {
+  box.innerHTML = "";
+  const head = paper.querySelector(".paper-head");
+  let page = null, inner = null, n = 0;
+  const full = () => page.scrollHeight > page.clientHeight + 1;
+  const empty = () => !inner.querySelector(".sheet, .paper-note");
+  const newPage = () => {
+    const side = n % 2 ? "Back" : "Front", num = Math.floor(n / 2) + 1; n++;
+    const wrap = document.createElement("div"); wrap.className = "page-wrap";
+    wrap.innerHTML = `<div class="page-label">Paper ${num} · ${side}</div>`;
+    page = document.createElement("div"); page.className = "notebook" + (side === "Back" ? " back" : "");
+    page.innerHTML = '<span class="hole" style="top:9%"></span><span class="hole" style="top:50%"></span><span class="hole" style="top:91%"></span>';
+    inner = document.createElement("div"); inner.className = "paper";
+    if (side === "Front" && head) inner.appendChild(head.cloneNode(true));
+    else inner.insertAdjacentHTML("beforeend", '<div class="paper-head"></div>');
+    page.appendChild(inner); wrap.appendChild(page); box.appendChild(wrap);
+  };
+  newPage();
+  for (const block of [...paper.children]) {
+    if (block === head) continue;
+    if (!block.classList.contains("sheet")) {
+      inner.appendChild(block);
+      if (full() && !empty()) { block.remove(); newPage(); inner.appendChild(block); }
+      continue;
+    }
+    const title = block.querySelector("h4");
+    const probs = [...block.querySelectorAll(".prob")];
+    const startSec = (cont) => {
+      const sec = document.createElement("section"); sec.className = "sheet";
+      if (title) { const h = title.cloneNode(true); if (cont) h.insertAdjacentHTML("beforeend", ' <span class="cont">(continued)</span>'); sec.appendChild(h); }
+      const grid = document.createElement("div"); grid.className = "probs"; sec.appendChild(grid);
+      inner.appendChild(sec); return grid;
+    };
+    let grid = startSec(false);
+    if (full() && !empty() && inner.querySelectorAll(".sheet").length > 1) { grid.parentElement.remove(); newPage(); grid = startSec(false); }
+    for (const pr of probs) {
+      grid.appendChild(pr);
+      if (!full()) continue;
+      if (grid.children.length === 1) { // not even one problem fits under the title: move the title too
+        if (inner.querySelectorAll(".sheet").length > 1 || inner.querySelector(".paper-note")) { grid.parentElement.remove(); newPage(); grid = startSec(false); grid.appendChild(pr); }
+        continue;
+      }
+      pr.remove(); newPage(); grid = startSec(true); grid.appendChild(pr);
+    }
+  }
+  fitPages();
+  const total = Math.ceil(n / 2);
+  $("sheetProgress").dataset.pages = `${total} paper${total > 1 ? "s" : ""}${n > 1 ? " (front and back)" : ""}`;
 }
 $("sheetCopy").onclick = (e) => copyText(e.target, plain(sheetOpen.text));
 
@@ -1069,7 +1165,7 @@ function wireCopied(title) {
   const probs = [...$("sheetContent").querySelectorAll(".prob")];
   const update = () => {
     const n = probs.filter((p) => p.classList.contains("copied")).length;
-    $("sheetProgress").textContent = probs.length ? (n === probs.length ? `All ${n} problems copied ✓` : `${n} of ${probs.length} copied · tap each problem after you copy it`) : "Nothing to copy yet";
+    $("sheetProgress").textContent = ($("sheetProgress").dataset.pages ? $("sheetProgress").dataset.pages + " · " : "") + (probs.length ? (n === probs.length ? `All ${n} problems copied ✓` : `${n} of ${probs.length} copied · tap each problem after you copy it`) : "Nothing to copy yet");
   };
   probs.forEach((p, i) => {
     p.tabIndex = 0;
@@ -1089,7 +1185,7 @@ function wireCopied(title) {
 }
 
 let zoom = load("math-zoom", 1);
-function applyZoom() { document.querySelector(".notebook").style.setProperty("--zoom", zoom); store("math-zoom", zoom); }
+function applyZoom() { $("sheetContent").style.setProperty("--zoom", zoom); store("math-zoom", zoom); if (sheetOpen && $("sheetDlg").open) drawSheet(); }
 $("zoomIn").onclick = () => { zoom = Math.min(1.6, +(zoom + 0.1).toFixed(1)); applyZoom(); };
 $("zoomOut").onclick = () => { zoom = Math.max(0.7, +(zoom - 0.1).toFixed(1)); applyZoom(); };
 applyZoom();
