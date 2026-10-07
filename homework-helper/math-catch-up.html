@@ -3,6 +3,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@500&family=Patrick+Hand&display=swap">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
+  [hidden] { display:none !important; }
   /* Layout: one-screen dashboard. Top bar, three stat widgets, then assignments (left) + the answer desk (right). Stacks on phones. */
   :root {
     --bg:#eef0f6; --card:#ffffff; --fg:#161a26; --muted:#5f6577; --line:#dfe2ec;
@@ -214,6 +215,11 @@
   .donext { flex:1; padding:12px; font-size:1rem; }
   .donext small { font-weight:600; opacity:.8; }
   .doing { text-align:center; font-weight:700; color:var(--accent); background:var(--accent-soft); border-radius:12px; padding:10px; margin-bottom:6px; }
+  .doing small { display:block; font-weight:400; color:var(--muted); font-size:.8rem; margin-top:2px; }
+  .bgpill { background:var(--accent-soft); color:var(--accent); border:1px solid var(--accent); border-radius:999px; padding:6px 14px; font-weight:700; font-size:.88rem; animation:pulse 1.6s ease-in-out infinite; }
+  .bgpill.done { background:var(--green-soft); color:var(--green); border-color:var(--green); animation:none; }
+  @keyframes pulse { 50% { opacity:.6; } }
+  @media (prefers-reduced-motion: reduce) { .bgpill { animation:none; } }
   .alldone { text-align:center; color:var(--green); font-weight:700; padding:10px; }
   .hw.cv { grid-template-columns:auto minmax(0,1fr) auto auto; }
   .hw.is-next { background:var(--accent-soft); }
@@ -299,6 +305,7 @@
   <header class="topbar">
     <div class="brand">Math Catch-Up <span class="badge" id="classBadge">MATH</span></div>
     <span class="chip" id="brainChip">Connecting…</span>
+    <button type="button" class="bgpill" id="bgPill" hidden></button>
     <button type="button" class="btn-soft" id="logsBtn">🔍 Logs</button>
     <button type="button" class="btn-soft" id="filesBtn">📁 Files</button>
     <button type="button" class="btn-soft" id="customBtn">⚙️ Customize</button>
@@ -694,7 +701,7 @@ function renderAll() {
     card.innerHTML = `<header><h3>${esc(a.id)}</h3><span class="date">${esc(when)} · ${n}/${total} done</span></header><div class="bar"><span style="width:${(100 * n) / total}%"></span></div><ul></ul>`;
     const go = document.createElement("button");
     go.type = "button"; go.className = n === total ? "btn-soft" : "btn-main"; go.textContent = n === total ? "Redo" : "Do it";
-    go.onclick = () => doCanvas(a);
+    go.onclick = () => queueDo([a.id]);
     if (a.custom) {
       const ed = document.createElement("button");
       ed.type = "button"; ed.className = "btn-ghost"; ed.textContent = "✏️"; ed.title = "Edit " + a.id;
@@ -725,7 +732,7 @@ function renderAll() {
       }
       const one = document.createElement("button");
       one.type = "button"; one.textContent = "Do this ▸"; one.title = "Do just this worksheet";
-      one.onclick = () => startCanvas(a, [i]);
+      one.onclick = () => doAllQueue ? flash("Busy with other homework. Try again when it's done.") : startCanvas(a, [i]);
       li.append(box, label, one);
       ul.appendChild(li);
     });
@@ -919,7 +926,6 @@ async function runFromLibrary(a, idx) {
     renderThumbs(); renderDocs();
     const ok = await sendNow();
     if (!ok) { stopRounds = true; break; }
-    if (r === rounds.length - 1 && !doAllQueue) offerNext(a);
   }
   return true;
 }
@@ -936,12 +942,12 @@ function offerNext(a) {
   if (!next) { div.textContent = "🎉 That was the last one. Everything is done!"; $("desk").appendChild(div); return; }
   div.innerHTML = `<span>${doneCount(a) === a.items.length ? `✓ ${esc(a.id)} is done.` : `${esc(a.id)} still has sheets left.`} Next up: <b>${esc(next.id)}</b></span>`;
   const b = document.createElement("button"); b.type = "button"; b.className = "btn-main"; b.textContent = `▶ Do ${next.id}`;
-  b.onclick = () => doCanvas(next);
+  b.onclick = () => queueDo([next.id]);
   div.appendChild(b); $("desk").appendChild(div); div.scrollIntoView({ block: "end" });
 }
 
 function startCanvas(a, idx) {
-  showTab("home");
+  if (!doAllQueue) showTab("home"); // in the line-up it works in the background, wherever you are in the app
   newChat();
   currentCanvas = a.id;
   currentTitle = idx.length === 1 ? `${a.id}: ${splitItem(a.items[idx[0]])[0]}` : a.id;
@@ -955,29 +961,57 @@ function startCanvas(a, idx) {
   return Promise.resolve(false);
 }
 
-// Do all: every unfinished assignment, one after another, until they're all done (or you press Stop).
-let doAllQueue = null;
-async function doAll() {
-  doAllQueue = canvasOpen().map((a) => a.id);
-  const total = doAllQueue.length;
-  renderList();
-  while (doAllQueue && doAllQueue.length) {
-    const id = doAllQueue.shift();
-    const a = CANVAS.find((x) => x.id === id);
-    if (!a) continue;
-    renderList();
-    const ok = await doCanvas(a);
-    if (!ok || !doAllQueue) { doAllQueue = null; renderList(); note(`Stopped at ${a.id}. Press ▶ Do all to keep going.`); return; }
+// Homework runs as a line-up in the background: keep using Papers, Logs or All assignments while it works.
+// Clicking Do it on something else while it's busy just adds it to the line.
+let doAllQueue = null, doAllCurrent = null;
+function doAll() { queueDo(canvasOpen().map((a) => a.id)); }
+function queueDo(ids) {
+  if (doAllQueue) {
+    const add = ids.filter((id) => id !== doAllCurrent && !doAllQueue.includes(id));
+    doAllQueue.push(...add);
+    flash(add.length ? `Added ${add.join(", ")} to the line` : "Already in the line");
+    renderList(); return;
   }
-  doAllQueue = null; renderList();
+  doAllQueue = [...ids]; runQueue();
+}
+async function runQueue() {
+  const done = []; let last = null;
+  while (doAllQueue && doAllQueue.length) {
+    const a = CANVAS.find((x) => x.id === doAllQueue[0]);
+    doAllQueue.shift();
+    if (!a) continue;
+    doAllCurrent = a.id; last = a; stopRounds = false; renderList();
+    const ok = await doCanvas(a);
+    if (!ok || !doAllQueue) {
+      doAllQueue = null; doAllCurrent = null; renderList();
+      if (ok === false && !stopRounds) return; // waiting on pictures from you
+      note(`Stopped at ${a.id}. Press ▶ Do all to keep going.`); return;
+    }
+    done.push(a.id);
+  }
+  doAllQueue = null; doAllCurrent = null; renderList();
+  if (!done.length) return;
+  showPill(`✓ Done: ${done.join(", ")} · see 📝 Papers`, () => { renderPapers(); showTab("papers"); }, true);
+  if (done.length === 1) { offerNext(last); return; }
   const left = canvasOpen();
   const div = document.createElement("div"); div.className = "msg note nextbox";
   div.innerHTML = left.length
-    ? `<span>Went through all ${total}. ${left.map((x) => esc(x.id)).join(", ")} still ${left.length === 1 ? "has" : "have"} sheets it couldn't find (like Quiz Review). Add pictures of those, or check them off in 📋 All assignments.</span>`
-    : `<span>🎉 All ${total} assignments are done. Check them in 🔍 Logs, then copy them from 📝 Papers.</span>`;
-  $("desk").appendChild(div); div.scrollIntoView({ block: "end" });
+    ? `<span>Went through all ${done.length}. ${left.map((x) => esc(x.id)).join(", ")} still ${left.length === 1 ? "has" : "have"} sheets it couldn't find (like Quiz Review). Add pictures of those, or check them off in 📋 All assignments.</span>`
+    : `<span>🎉 All ${done.length} assignments are done. Check them in 🔍 Logs, then copy them from 📝 Papers.</span>`;
+  $("desk").appendChild(div);
+}
+// The little status button at the top: shows what's being worked on from any tab.
+function showPill(text, onClick, fade) {
+  const p = $("bgPill"); p.hidden = false; p.textContent = text; p.onclick = onClick;
+  p.classList.toggle("done", !!fade);
+  clearTimeout(showPill.t); if (fade) showPill.t = setTimeout(() => (p.hidden = true), 10000);
+}
+function updatePill() {
+  if (!doAllCurrent) { if (!$("bgPill").classList.contains("done")) $("bgPill").hidden = true; return; }
+  showPill(`⏳ Doing ${doAllCurrent}${doAllQueue && doAllQueue.length ? ` · ${doAllQueue.length} more in line` : ""}`, () => showTab("home"));
 }
 function fallbackFind(a, sheets) {
+  showTab("home"); // this one needs you, so bring the answer screen up
   if (mcp && prefs.autoDrive !== false) { autoFind(a.id, sheets); return; }
   note(`Add screenshots or a screen recording of ${sheets.length === 1 ? "the " + sheets[0] + " worksheet" : "these worksheets: " + sheets.join(", ")} from herringmath.edublogs.org, then click Do my homework. Tip: 2–3 worksheets at a time works best.`);
   $("text").focus();
@@ -1328,14 +1362,15 @@ function renderList() {
   list.innerHTML = "";
   // Every Canvas assignment, in order, with "Do next" on top so you can just keep clicking.
   const next = canvasOpen()[0];
+  updatePill();
   if (doAllQueue) {
-    list.insertAdjacentHTML("beforeend", `<div class="doing">⏳ Doing all… ${doAllQueue.length} more after this one. Press ■ Stop to pause.</div>`);
+    list.insertAdjacentHTML("beforeend", `<div class="doing">⏳ Working on ${esc(doAllCurrent || "")}${doAllQueue.length ? ` · ${doAllQueue.length} more in line` : ""}<small>Keep using the app. It works in the background while this page is open.</small></div>`);
   } else if (next) {
     const bar = document.createElement("div"); bar.className = "dobar";
     const all = document.createElement("button"); all.type = "button"; all.className = "btn-main donext";
     all.innerHTML = `▶ Do all <small>(${canvasOpen().length} left)</small>`; all.onclick = () => doAll();
     const one = document.createElement("button"); one.type = "button"; one.className = "btn-soft";
-    one.textContent = `Just ${next.id}`; one.onclick = () => doCanvas(next);
+    one.textContent = `Just ${next.id}`; one.onclick = () => queueDo([next.id]);
     bar.append(all, one); list.appendChild(bar);
   } else if (CANVAS.length) list.insertAdjacentHTML("beforeend", '<div class="alldone">🎉 Every assignment is done.</div>');
   for (const a of CANVAS) {
@@ -1350,7 +1385,7 @@ function renderList() {
     view.onclick = () => openSheet(paperText(a), a.id, () => { openPaper(a); setEditing(true); });
     const go = document.createElement("button");
     go.type = "button"; go.className = done ? "btn-soft" : "btn-main"; go.textContent = done ? "Redo" : "Do it";
-    go.onclick = () => doCanvas(a);
+    go.onclick = () => queueDo([a.id]);
     row.append(view, go);
     list.appendChild(row);
   }
@@ -1645,7 +1680,7 @@ async function sendNow() {
     out.parentElement.scrollIntoView({ block: "end" });
   }
 }
-$("stopBtn").onclick = () => { stopRounds = true; doAllQueue = null; ctl?.abort(); renderList(); };
+$("stopBtn").onclick = () => { stopRounds = true; doAllQueue = null; doAllCurrent = null; ctl?.abort(); renderList(); };
 $("text").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("composer").requestSubmit(); } });
 
 function newChat() {
