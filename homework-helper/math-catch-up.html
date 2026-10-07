@@ -108,6 +108,10 @@
   .notebook .prob.wide { grid-column:1 / -1; border-right:0; display:block; }
   .notebook .prob:hover { background:rgba(51, 70, 230, .06); }
   .notebook .prob:focus-visible { outline:3px solid #3346e6; outline-offset:-3px; }
+  .qline { display:none; }
+  .show-q .qline { display:block; font-family:var(--body); font-size:.62em; line-height:1.3; color:#2a7a4f; background:#e9f6ee; border-radius:6px; padding:2px 6px; margin:2px 0; }
+  .show-q .qline::before { content:"Q: "; font-weight:700; }
+  .sheet-btn[aria-pressed="true"] { background:#3346e6; border-color:#3346e6; }
   .notebook .pnum { font-weight:700; color:#3346e6; min-width:1.4em; }
   .notebook .pnum::after { content:")"; }
   .notebook .wide .pnum::after { content:""; }
@@ -390,6 +394,7 @@
     <button type="button" class="sheet-btn" data-close>✕ Close</button>
     <strong id="sheetTitle"></strong>
     <span class="sheet-hint" id="sheetProgress">Tap each problem after you copy it</span>
+    <button type="button" class="sheet-btn" id="showQ" aria-pressed="false">❓ Show questions</button>
     <button type="button" class="sheet-btn" id="zoomOut" aria-label="Smaller text">A−</button>
     <button type="button" class="sheet-btn" id="zoomIn" aria-label="Bigger text">A+</button>
     <button type="button" class="sheet-btn" id="sheetEdit">✏️ Edit</button>
@@ -579,7 +584,8 @@ function svgXGame(spec) {
 }
 
 function lineHtml(line) {
-  if (/^\s*Q\s*:/i.test(line)) return ""; // the problem itself only shows in Logs, not on the paper
+  const q = line.match(/^\s*Q\s*:\s*(.*)$/i); // the problem itself: hidden on the paper unless "Show questions" is on
+  if (q) return `<div class="qline">${circled(q[1])}</div>`;
   const t = line.match(/^\s*TT\s*:\s*(.*)$/);
   if (t) return svgTimes(t[1]);
   const m = line.match(/^\s*(NL|DRAW|X)\s*:\s*(.*)$/i);
@@ -1132,7 +1138,11 @@ function openSheet(text, title, onEdit) {
   drawSheet();
   $("sheetDlg").querySelector(".sheet-scroll").scrollTop = 0;
 }
+let showQ = load("math-showq", false);
+function paintQ() { $("showQ").setAttribute("aria-pressed", String(showQ)); $("showQ").textContent = showQ ? "❓ Hide questions" : "❓ Show questions"; $("sheetContent").classList.toggle("show-q", showQ); }
+$("showQ").onclick = () => { showQ = !showQ; store("math-showq", showQ); paintQ(); drawSheet(); };
 function drawSheet() {
+  paintQ();
   const { text, title } = sheetOpen;
   const tmp = document.createElement("div");
   renderPaper(tmp, text, title);
