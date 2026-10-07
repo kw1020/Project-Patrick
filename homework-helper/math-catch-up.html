@@ -360,6 +360,7 @@
         </select>
       </label>
       <label class="check"><input id="cCareful" type="checkbox"> Extra careful (slower, best for hard problems)</label>
+      <label class="check"><input id="cDrive" type="checkbox"> Find worksheets in my Google Drive automatically</label>
       <label class="field">Anything else to always follow <small>Like "round to the nearest tenth" or "use fractions, not decimals"</small><textarea id="cExtra" rows="2"></textarea></label>
     </div>
     <div class="dlg-foot"><button type="button" class="btn-soft" data-close>Cancel</button><button type="submit" class="btn-main">Save</button></div>
@@ -575,8 +576,62 @@ function startCanvas(a, idx) {
   $("deskTitle").textContent = currentTitle;
   $("text").value = `Assignment ${a.id}. Do only these:\n` + idx.map((i) => a.items[i]).join("\n");
   const sheets = idx.map((i) => splitItem(a.items[i])[0]);
+  if (mcp && prefs.autoDrive !== false) { autoFind(a.id, sheets); return; }
   note(`Add screenshots or a screen recording of ${sheets.length === 1 ? "the " + sheets[0] + " worksheet" : "these worksheets: " + sheets.join(", ")} from herringmath.edublogs.org, then click Do my homework. Tip: 2–3 worksheets at a time works best.`);
   $("text").focus();
+}
+
+// Finds each worksheet in Google Drive by its name, reads it, and does the homework.
+// Names must match exactly (ignoring spaces, case and file type), so "Solving Equations"
+// never grabs "Solving Equations 2", and "X-Games" never grabs "X-Games Advanced".
+const SKIP_TYPES = ["application/vnd.google-apps.folder", "application/vnd.google-apps.shortcut", "application/zip"];
+const bare = (title) => norm(String(title).replace(/\.[a-z0-9]{2,5}$/i, "").replace(/\b(worksheet|ws)\b/gi, ""));
+
+async function findSheet(name) {
+  const words = name.replace(/([A-Za-z])(\d)/g, "$1 $2").split(/[^A-Za-z0-9]+/).filter((w) => w.length >= 3).sort((x, y) => y.length - x.length);
+  const word = (words[0] || name).replace(/'/g, "\\'");
+  const r = await mcp.callTool(DRIVE, "search_files", { query: `title contains '${word}'`, pageSize: 50, excludeContentSnippets: true });
+  const files = (r.payload?.files || []).filter((f) => f && f.id && !SKIP_TYPES.includes(f.mimeType) && !/\b(key|answers?)\b/i.test(f.title || ""));
+  const want = norm(name);
+  const exact = files.filter((f) => bare(f.title) === want);
+  exact.sort((x, y) => String(y.modifiedTime || "").localeCompare(String(x.modifiedTime || "")));
+  return exact[0] || null;
+}
+
+async function autoFind(id, sheets) {
+  $("sendBtn").disabled = true;
+  const status = bubble("note", `🔎 Looking in your Google Drive for ${sheets.join(", ")}…`);
+  const found = [], missing = [];
+  for (const name of sheets) {
+    status.textContent = `🔎 Finding "${name}" in your Google Drive… (${found.length + missing.length + 1} of ${sheets.length})`;
+    try {
+      const f = await findSheet(name);
+      if (!f) { missing.push(name); continue; }
+      const r = await mcp.callTool(DRIVE, "read_file_content", { fileId: f.id });
+      let text = textOf(r).trim();
+      if (!text) { missing.push(name); continue; }
+      if (text.length > 40000) text = text.slice(0, 40000) + "\n[…the rest of this file was cut off]";
+      found.push({ title: name, text });
+    } catch (e) {
+      status.textContent = "⚠️ " + driveError(e);
+      $("sendBtn").disabled = false;
+      return;
+    }
+  }
+  status.textContent = found.length
+    ? `✓ Found in Drive: ${found.map((d) => d.title).join(", ")}` + (missing.length ? `. Not found: ${missing.join(", ")}.` : "")
+    : `Couldn't find ${missing.join(", ")} in your Google Drive.`;
+  $("sendBtn").disabled = false;
+  docs.push(...found); renderDocs();
+  if (!found.length) {
+    note(`Add screenshots of ${missing.join(", ")} (Ctrl+V) or click Google Drive to pick them, then click Do my homework.`);
+    return;
+  }
+  if (missing.length) {
+    note(`Add screenshots of ${missing.join(", ")} too (Ctrl+V), or click Do my homework to do the ones that were found.`);
+    return;
+  }
+  $("composer").requestSubmit(); // everything found: just do it
 }
 
 // ---------- Papers: finished work for each assignment, laid out like the real paper ----------
@@ -1108,12 +1163,13 @@ prefs = { ...prefs, ...load("math-prefs", {}) };
 function applyPrefs() { $("classBadge").textContent = (prefs.cls || "Math").toUpperCase(); }
 $("customBtn").onclick = () => {
   $("cName").value = prefs.name; $("cPeriod").value = prefs.period;
+  $("cDrive").checked = prefs.autoDrive !== false;
   $("cClass").value = prefs.cls; $("cStyle").value = prefs.style; $("cCareful").checked = prefs.careful; $("cExtra").value = prefs.extra;
   $("customDlg").showModal();
 };
 $("customForm").addEventListener("submit", (e) => {
   e.preventDefault();
-  prefs = { name: $("cName").value.trim(), period: $("cPeriod").value.trim(), cls: $("cClass").value.trim(), style: $("cStyle").value, careful: $("cCareful").checked, extra: $("cExtra").value.trim() };
+  prefs = { name: $("cName").value.trim(), period: $("cPeriod").value.trim(), cls: $("cClass").value.trim(), style: $("cStyle").value, careful: $("cCareful").checked, autoDrive: $("cDrive").checked, extra: $("cExtra").value.trim() };
   store("math-prefs", prefs);
   applyPrefs();
   $("customDlg").close();
