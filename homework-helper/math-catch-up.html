@@ -1,6 +1,6 @@
 <title>Math Catch-Up</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@500&family=Patrick+Hand&display=swap">
 <style>
   /* Layout: one-screen dashboard. Top bar, three stat widgets, then assignments (left) + the answer desk (right). Stacks on phones. */
   :root {
@@ -11,17 +11,19 @@
     --display:"Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
     --body:"Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
     --mono:"JetBrains Mono", ui-monospace, Consolas, monospace;
+    --hand:"Patrick Hand", "Segoe Print", "Comic Sans MS", cursive;
+    --pencil:#2b2f3a; --margin:#e8a0a6;
   }
   @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
     --bg:#0e1118; --card:#171b25; --fg:#e8ebf3; --muted:#9aa1b4; --line:#272c39;
     --accent:#8796ff; --accent-fg:#0e1118; --accent-soft:#222a4d;
     --red:#ff7a7e; --red-soft:#3a1c1f; --amber:#f2b552; --amber-soft:#3a2e15; --green:#56c985; --green-soft:#16301f;
-    --paper:#141823; --rule:#24304b; color-scheme: dark; } }
+    --paper:#141823; --rule:#24304b; --pencil:#e3e6ee; --margin:#7a3c42; color-scheme: dark; } }
   :root[data-theme="dark"] {
     --bg:#0e1118; --card:#171b25; --fg:#e8ebf3; --muted:#9aa1b4; --line:#272c39;
     --accent:#8796ff; --accent-fg:#0e1118; --accent-soft:#222a4d;
     --red:#ff7a7e; --red-soft:#3a1c1f; --amber:#f2b552; --amber-soft:#3a2e15; --green:#56c985; --green-soft:#16301f;
-    --paper:#141823; --rule:#24304b; color-scheme: dark; }
+    --paper:#141823; --rule:#24304b; --pencil:#e3e6ee; --margin:#7a3c42; color-scheme: dark; }
 
   html, body { height:100%; }
   body { background:var(--bg); color:var(--fg); font:15px/1.5 var(--body); }
@@ -53,11 +55,45 @@
   .stat.week .num { color:var(--amber); }
   .stat.done .num { color:var(--green); }
 
+  /* Paper view: laid out like Krew's notebook paper for Mr. Herring */
+  .paper { position:relative; white-space:normal; font-family:var(--hand); color:var(--pencil); font-size:1.15rem; line-height:1.35;
+    padding:8px 6px 8px 44px; background:var(--paper);
+    background-image:linear-gradient(to right, transparent 34px, var(--margin) 34px, var(--margin) 35px, transparent 35px); }
+  .paper-head { text-align:right; font-size:1.1rem; line-height:1.2; margin-bottom:2px; }
+  .sheet { margin-bottom:14px; }
+  .sheet h4 { font-family:var(--hand); font-weight:400; font-size:1.45rem; text-align:center; margin:2px 0 6px; letter-spacing:.02em; }
+  .probs { display:flex; flex-wrap:wrap; align-items:flex-start; }
+  .prob { padding:4px 14px 8px 8px; border-right:1.5px solid var(--pencil); min-width:120px; display:grid; grid-template-columns:auto auto; column-gap:10px; align-items:start; }
+  .prob:last-child { border-right:0; }
+  .pnum { grid-row:1 / span 99; }
+  .pbody { display:grid; gap:2px; justify-items:start; }
+  .circ { display:inline-block; border:2px solid var(--pencil); border-radius:50%; padding:0 9px; margin:2px 0; }
+  .paper svg { color:var(--pencil); display:block; max-width:100%; height:auto; }
+  .paper .nl { width:180px; }
+  .paper .draw { height:40px; width:auto; }
+  .paper .xg { width:110px; }
+  .paper .loose { padding:2px 0; }
+  .paper-note { font-family:var(--body); font-size:.9rem; color:var(--amber); background:var(--amber-soft); border-radius:8px; padding:6px 10px; margin:6px 0; }
+  .msg.bot:has(.paper) { background:var(--paper); background-image:none; padding:10px; }
+  #bigAnswer .paper { font-size:1.4rem; }
+  #bigAnswer textarea { width:100%; min-height:55vh; font:1rem/1.5 var(--mono); }
   .tabs { display:flex; gap:6px; }
   .tab { background:transparent; color:var(--muted); font-weight:700; border:1px solid transparent; }
   .tab[aria-selected="true"] { background:var(--card); color:var(--fg); border-color:var(--line); }
   .tab .count { display:inline-block; min-width:1.6em; margin-left:6px; border-radius:999px; background:var(--red-soft); color:var(--red); font-size:.78rem; padding:0 6px; font-variant-numeric:tabular-nums; }
-  #allView { flex:1; min-height:0; overflow:auto; }
+  #allView, #papersView { flex:1; min-height:0; overflow:auto; }
+  .tab .done-count { background:var(--green-soft); color:var(--green); }
+  .pcard { text-align:left; padding:14px; display:grid; gap:8px; cursor:pointer; background:var(--card); color:var(--fg); border:1px solid var(--line); border-radius:16px; font:inherit; }
+  .pcard:hover { border-color:var(--accent); }
+  .pcard .top { display:flex; align-items:center; gap:10px; }
+  .pcard h3 { font-family:var(--display); font-size:1.3rem; margin:0; margin-right:auto; }
+  .pcard .check { min-width:30px; height:30px; padding:0 6px; border-radius:999px; display:grid; place-items:center; font-weight:800; border:2px solid var(--line); color:transparent; }
+  .pcard.is-done .check { background:var(--green); border-color:var(--green); color:#fff; }
+  .pcard.part .check { border-color:var(--amber); color:var(--amber); font-size:.8rem; }
+  .pcard .sub { color:var(--muted); font-size:.88rem; }
+  .pcard .sheets { display:flex; flex-wrap:wrap; gap:6px; }
+  .pcard .sheets span { font-size:.78rem; border-radius:999px; padding:2px 8px; background:var(--bg); color:var(--muted); }
+  .pcard .sheets span.ok { background:var(--green-soft); color:var(--green); font-weight:700; }
   .cards { display:grid; grid-template-columns:repeat(auto-fill, minmax(320px, 1fr)); gap:14px; align-items:start; }
   .acard { padding:0; overflow:hidden; }
   .acard header { display:flex; align-items:center; gap:10px; padding:12px 14px; border-bottom:1px solid var(--line); }
@@ -179,9 +215,11 @@
   <nav class="tabs" role="tablist" aria-label="Views">
     <button type="button" class="tab" role="tab" id="tabHome" aria-selected="true">🏠 Home</button>
     <button type="button" class="tab" role="tab" id="tabAll" aria-selected="false">📋 All assignments<span class="count" id="allCount">0</span></button>
+    <button type="button" class="tab" role="tab" id="tabPapers" aria-selected="false">📝 Papers<span class="count done-count" id="papersCount">0</span></button>
   </nav>
 
   <section id="allView" hidden></section>
+  <section id="papersView" hidden></section>
 
   <section class="main" id="homeView">
     <div class="card panel" id="listPanel">
@@ -244,7 +282,7 @@
 <dialog id="bigDlg" class="wide">
   <div class="dlg-head"><h2 id="bigTitle">Answers</h2><button type="button" class="btn-ghost" data-close aria-label="Close">✕</button></div>
   <div class="dlg-body"><div id="bigAnswer"></div></div>
-  <div class="dlg-foot"><span id="editHint" class="hint-text" hidden>Click in the answers to change them</span><button type="button" class="btn-soft" id="bigEdit">✏️ Edit</button><button type="button" class="btn-soft" id="bigCopy">📋 Copy</button><button type="button" class="btn-main" data-close>Done</button></div>
+  <div class="dlg-foot"><span id="editHint" class="hint-text" hidden>Change the text, then click Save changes</span><button type="button" class="btn-soft" id="bigEdit">✏️ Edit</button><button type="button" class="btn-soft" id="bigCopy">📋 Copy</button><button type="button" class="btn-main" data-close>Done</button></div>
 </dialog>
 
 <dialog id="driveDlg" class="wide">
@@ -259,6 +297,8 @@
   <form id="customForm" method="dialog">
     <div class="dlg-head"><h2>⚙️ Customize</h2><button type="button" class="btn-ghost" data-close aria-label="Close">✕</button></div>
     <div class="dlg-body">
+      <label class="field">Name for the top of the paper<input id="cName" placeholder="Krew S"></label>
+      <label class="field">Period<input id="cPeriod" placeholder="A3"></label>
       <label class="field">Class <small>Shows at the top and helps with the right methods</small><input id="cClass" placeholder="Algebra 1"></label>
       <label class="field">How answers look
         <select id="cStyle">
@@ -275,18 +315,33 @@
 
 <script>
 const $ = (id) => document.getElementById(id);
-let prefs = { cls: "", style: "work", careful: false, extra: "" };
+let prefs = { cls: "", style: "work", careful: false, extra: "", name: "Krew S", period: "A3" };
 function rules() {
   return [
     `You are a math homework helper for a middle/high school student${prefs.cls ? " in " + prefs.cls : ""} who is behind and needs finished answers to copy onto paper.`,
     `- Do EVERY problem asked for, following the instructions exactly (for example "odds only" or "column A only"). Number answers to match the assignment.`,
     `- Lead with answers. No lessons, no practice problems, no asking them to try it themselves.`,
     `- The teacher's Canvas posts list worksheets with ranges, like "Addition and Subtraction on the Number Line: 2-22 (2nd Col)" or "Sign Rules: Addition and Subtraction: A, 1-10". "2-22 (2nd Col)" means problems 2 through 22 in the second column only; "A, 1-10" means part/section A, problems 1 through 10; "(Even)" or "(Odd)" means only even or odd numbers in that range, and "Odd" or "Even" alone means every odd or even problem on the sheet; a column with no numbers ("1st Col", "3rd Col", "4th Col") means every problem in that column; a single number ("Drawing Fractions: 1") means just that problem; "1st and 2nd Columns" means every problem in both columns; names ending in "2" or "Advanced" (like "Order of Operations2" or "X-Games Advanced") are different worksheets from the plain ones, so match the worksheet title exactly; several ranges separated by commas (like "1-33 (1st Col), 69-89 (1st Col)") are all assigned; a worksheet with no numbers (like "Times Tables") means fill in the whole sheet. Do only those problems, grouped under each worksheet's name as a heading.`,
-    `- For problems that need a drawing (fractions, number lines, graphs, shapes), say exactly what to draw in plain words, like "Draw a rectangle split into 4 equal parts and shade 3", plus the answer.`,
     `- If a listed worksheet is not in the pictures or files sent, say which worksheets are missing so the student can add them. Never make up problems.`,
-    prefs.style === "short"
-      ? `- Give just the final answer for each problem, in **bold**, with no work.`
-      : `- Show the work in short lines like a student writes on paper, and put each final answer in **bold**.`,
+    `WRITE THE ANSWERS IN THIS EXACT FORMAT (the app draws it like the student's notebook paper):
+## <worksheet title, exactly as on the worksheet>
+### <problem number>
+<one line per step, written the way it goes on paper>
+**<final answer>**            <- the app circles it
+Special lines the app turns into drawings (use them exactly, nothing else on that line):
+NL: <tick labels, comma separated> | <dot values, comma separated>     e.g. "NL: 0, 9 | 9" or "NL: -6, 0, 6 | -6, 6"
+DRAW: <whole number> <numerator>/<denominator>                          e.g. "DRAW: 3 6/7" (3 whole circles + a circle cut in 7 with 6 shaded)
+X: <top> | <left> | <right> | <bottom>                                   an X-Games X with the four numbers where they go on the worksheet
+Anything outside a ### problem (like which worksheets are missing) goes at the very end with no heading.`,
+    `HOW THIS TEACHER WANTS EACH KIND OF PROBLEM (copied from the student's graded papers):
+- Reduce Fractions: the fraction, then "GCF = n", then both parts factored like "(3·2)/(3·5)", then the reduced fraction as the final answer.
+- Solving Equations (all versions): the equation; under it the step done to both sides on its own line (like "+7  +7" or "÷4  ÷4" or "√ both sides"); the next equation; the answer like "w = 9" as the final answer (square roots give "c = ±8"); then an NL line with 0 and the answer as ticks and a dot on the answer (both dots for ±).
+- Drawing Fractions / Draw Improper Fractions: write the fraction, turn improper fractions into a mixed number on a line ("21/5 = 4 1/5"), then a DRAW line, then the mixed number as the final answer.
+- X-Games (and Advanced): an X line, then a line listing the factor pairs you checked like "2·9, 1·18, 3·6", then the two numbers that work as the final answer.
+- Order of Operations: rewrite the expression doing ONE operation per line (parentheses, powers/roots, multiply/divide left to right, add/subtract left to right), final value as the final answer.
+- Combine Like Terms, Operations with Variables, Multiplications and Factoring, Sign Rules, Finding Factors, GCF, Number Line: the problem, short work if any, then the final answer.
+- Times Tables: one ### per row ("1" to "12") listing that row's products, no final answer needed.`,
+    prefs.style === "short" ? `- Answers only: skip the step lines, keep the title, problem numbers, special drawing lines and final answers.` : "",
     `- Multiple choice / fill in the blank: just the answer.`,
     `- If a picture is blurry or cut off, answer everything you can read, then list which numbers to retake.`,
     `- Double-check every answer. Use plain-text math (x^2, sqrt(5), 3/4), no LaTeX.`,
@@ -299,6 +354,88 @@ function load(k, d) { try { const v = localStorage.getItem(k); return v == null 
 const esc = (t) => String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 const plain = (t) => t.replace(/\*\*(.+?)\*\*/g, "$1");
 function render(el, t) { el.innerHTML = esc(t).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>"); }
+
+// ---------- Paper view: draws answers the way they go on Krew's paper ----------
+const circled = (t) => esc(t).replace(/\*\*(.+?)\*\*/g, '<span class="circ">$1</span>');
+const num = (t) => parseFloat(String(t).replace(/[−–]/g, "-").replace(/[^\d.+-]/g, ""));
+
+function svgNumberLine(spec) {
+  const [a, b = ""] = spec.split("|");
+  const list = (s) => s.split(",").map((x) => x.trim()).filter(Boolean).map((label) => ({ label, v: num(label) })).filter((o) => !isNaN(o.v));
+  const ticks = list(a), dots = list(b);
+  for (const d of dots) if (!ticks.some((t) => t.v === d.v)) ticks.push(d);
+  if (!ticks.length) return null;
+  let lo = Math.min(...ticks.map((t) => t.v)), hi = Math.max(...ticks.map((t) => t.v));
+  if (lo === hi) { lo -= 1; hi += 1; }
+  const W = 200, pad = 22, x = (v) => pad + ((v - lo) / (hi - lo)) * (W - 2 * pad);
+  let s = `<svg class="nl" viewBox="0 0 ${W} 44" role="img" aria-label="Number line with dots at ${esc(dots.map((d) => d.label).join(", "))}">
+    <line x1="6" y1="16" x2="${W - 6}" y2="16" stroke="currentColor" stroke-width="1.6"/>
+    <path d="M4 16 l8 -4.5 v9 z M${W - 4} 16 l-8 -4.5 v9 z" fill="currentColor"/>`;
+  for (const t of ticks) s += `<line x1="${x(t.v)}" y1="10" x2="${x(t.v)}" y2="22" stroke="currentColor" stroke-width="1.4"/><text x="${x(t.v)}" y="38" text-anchor="middle" font-size="12" fill="currentColor" font-family="Patrick Hand, cursive">${esc(t.label)}</text>`;
+  for (const d of dots) s += `<circle cx="${x(d.v)}" cy="16" r="5" fill="currentColor"/>`;
+  return s + "</svg>";
+}
+
+function svgFractionCircles(spec) {
+  const m = spec.trim().match(/^(\d+)?\s*(?:(\d+)\s*\/\s*(\d+))?$/);
+  if (!m || (!m[1] && !m[2])) return null;
+  const whole = +(m[1] || 0), n = +(m[2] || 0), d = +(m[3] || 0);
+  if (whole > 12 || d > 30 || (d && n > d)) return null;
+  const r = 17, step = 2 * r + 8, count = whole + (n ? 1 : 0);
+  let s = `<svg class="draw" viewBox="0 0 ${Math.max(1, count) * step} ${2 * r + 4}" role="img" aria-label="${whole} whole circles${n ? ` and ${n}/${d} of a circle shaded` : ""}">`;
+  for (let i = 0; i < whole; i++) s += `<circle cx="${i * step + r + 2}" cy="${r + 2}" r="${r}" fill="none" stroke="currentColor" stroke-width="1.6"/>`;
+  if (n && d) {
+    const cx = whole * step + r + 2, cy = r + 2;
+    for (let k = 0; k < d; k++) {
+      const a0 = (-90 + (k * 360) / d) * Math.PI / 180, a1 = (-90 + ((k + 1) * 360) / d) * Math.PI / 180;
+      const p = `M${cx} ${cy} L${cx + r * Math.cos(a0)} ${cy + r * Math.sin(a0)} A${r} ${r} 0 ${360 / d > 180 ? 1 : 0} 1 ${cx + r * Math.cos(a1)} ${cy + r * Math.sin(a1)} Z`;
+      s += `<path d="${p}" fill="${k < n ? "currentColor" : "none"}" fill-opacity="${k < n ? 0.55 : 0}" stroke="currentColor" stroke-width="1.2"/>`;
+    }
+  }
+  return s + "</svg>";
+}
+
+function svgXGame(spec) {
+  const [t = "", l = "", r = "", b = ""] = spec.split("|").map((v) => v.trim());
+  const txt = (x, y, v) => `<text x="${x}" y="${y}" text-anchor="middle" font-size="15" fill="currentColor" font-family="Patrick Hand, cursive">${esc(v)}</text>`;
+  return `<svg class="xg" viewBox="0 0 120 92" role="img" aria-label="X-Games: top ${esc(t)}, left ${esc(l)}, right ${esc(r)}, bottom ${esc(b)}">
+    <line x1="22" y1="8" x2="98" y2="84" stroke="currentColor" stroke-width="1.8"/><line x1="98" y1="8" x2="22" y2="84" stroke="currentColor" stroke-width="1.8"/>
+    ${txt(60, 22, t)}${txt(24, 51, l)}${txt(96, 51, r)}${txt(60, 88, b)}</svg>`;
+}
+
+function lineHtml(line) {
+  const m = line.match(/^\s*(NL|DRAW|X)\s*:\s*(.*)$/i);
+  if (m) {
+    const kind = m[1].toUpperCase();
+    const svg = kind === "NL" ? svgNumberLine(m[2]) : kind === "DRAW" ? svgFractionCircles(m[2]) : svgXGame(m[2]);
+    if (svg) return svg;
+  }
+  return `<div>${circled(line)}</div>`;
+}
+
+function renderPaper(el, text, title) {
+  text = text.replace(/^\(Demo mode.*\)\n+/, "");
+  if (!/^##\s/m.test(text)) { render(el, text); return; }
+  const id = String(title || "").split(":")[0].trim();
+  let html = `<div class="paper"><div class="paper-head">${esc(prefs.name || "")}<br>${esc(id)} ${esc(prefs.period || "")}</div>`;
+  let sheet = false, prob = false;
+  const closeProb = () => { if (prob) { html += "</div></div>"; prob = false; } };
+  const closeSheet = () => { closeProb(); if (sheet) { html += "</div></section>"; sheet = false; } };
+  for (const raw of text.split("\n")) {
+    const line = raw.trimEnd();
+    if (/^##\s/.test(line) && !/^###/.test(line)) { closeSheet(); html += `<section class="sheet"><h4>${esc(line.replace(/^##\s*/, ""))}</h4><div class="probs">`; sheet = true; continue; }
+    if (/^###\s/.test(line)) {
+      closeProb();
+      if (!sheet) { html += '<section class="sheet"><div class="probs">'; sheet = true; }
+      html += `<div class="prob"><span class="pnum">${esc(line.replace(/^###\s*/, ""))}</span><div class="pbody">`; prob = true; continue;
+    }
+    if (!line.trim()) { if (!prob) closeSheet(); continue; }
+    if (prob) html += lineHtml(line);
+    else { closeSheet(); html += `<div class="paper-note">${circled(line)}</div>`; }
+  }
+  closeSheet();
+  el.innerHTML = html + "</div>";
+}
 const today = () => new Date().toLocaleDateString("en-CA");
 
 let sample = null, maxImages = 0;
@@ -376,6 +513,7 @@ function renderAll() {
 function startCanvas(a, idx) {
   showTab("home");
   newChat();
+  currentCanvas = a.id;
   currentTitle = idx.length === 1 ? `${a.id}: ${splitItem(a.items[idx[0]])[0]}` : a.id;
   $("deskTitle").textContent = currentTitle;
   $("text").value = `Assignment ${a.id}. Do only these:\n` + idx.map((i) => a.items[i]).join("\n");
@@ -384,16 +522,87 @@ function startCanvas(a, idx) {
   $("text").focus();
 }
 
+// ---------- Papers: finished work for each assignment, laid out like the real paper ----------
+let papers = load("math-papers", {}); // { "1.1": { normName: { name, text } } }
+let currentCanvas = null;              // which Canvas assignment the answer desk is working on
+const norm = (t) => String(t).toLowerCase().replace(/[^a-z0-9]/g, "");
+
+function sectionsOf(text) {
+  const out = []; let cur = null;
+  for (const line of text.replace(/^\(Demo mode.*\)\n+/, "").split("\n")) {
+    if (/^##\s/.test(line) && !/^###/.test(line)) { cur = { name: line.replace(/^##\s*/, "").trim(), lines: [line] }; out.push(cur); }
+    else if (cur) cur.lines.push(line);
+  }
+  // Drop trailing notes (lines after the last problem that aren't part of a problem).
+  return out.map((c) => ({ name: c.name, text: c.lines.join("\n").replace(/\n\n(?!###)[^#][\s\S]*$/, "").trim() }));
+}
+
+function sheetDone(a, i) { return !!(papers[a.id] && papers[a.id][norm(splitItem(a.items[i])[0])]); }
+
+function savePaper(id, text) {
+  const secs = sectionsOf(text);
+  if (!secs.length) return;
+  const a = CANVAS.find((x) => x.id === id);
+  papers[id] = papers[id] || {};
+  for (const sec of secs) papers[id][norm(sec.name)] = sec;
+  store("math-papers", papers);
+  // Tick the worksheets that now have answers.
+  if (a) a.items.forEach((t, i) => { if (sheetDone(a, i)) ticked[key(a, i)] = true; });
+  store("math-canvas-done", ticked);
+  renderAll(); renderPapers(); renderList();
+}
+
+function paperText(a) {
+  const saved = papers[a.id] || {};
+  const used = new Set();
+  const parts = a.items.map((t) => {
+    const k = norm(splitItem(t)[0]);
+    if (saved[k]) { used.add(k); return saved[k].text; }
+    return `## ${splitItem(t)[0]}\nNot done yet: ${splitItem(t)[1]}`;
+  });
+  for (const [k, v] of Object.entries(saved)) if (!used.has(k)) parts.push(v.text);
+  return parts.join("\n\n");
+}
+
+function openPaper(a) {
+  openBig({
+    text: paperText(a), title: a.id, el: null, turnIndex: -1,
+    onSave: (t) => { papers[a.id] = {}; for (const sec of sectionsOf(t)) if (!/^Not done yet/m.test(sec.text)) papers[a.id][norm(sec.name)] = sec; store("math-papers", papers); renderPapers(); renderAll(); },
+  }, false);
+}
+
+function renderPapers() {
+  const view = $("papersView");
+  const done = CANVAS.filter((a) => a.items.every((_, i) => sheetDone(a, i))).length;
+  $("papersCount").textContent = `${done}/${CANVAS.length}`;
+  view.innerHTML = '<div class="cards"></div>';
+  for (const a of CANVAS) {
+    const have = a.items.filter((_, i) => sheetDone(a, i)).length, total = a.items.length;
+    const card = document.createElement("button");
+    card.type = "button";
+    card.className = "pcard" + (have === total ? " is-done" : have ? " part" : "");
+    const when = new Date(a.date + "T12:00").toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    card.innerHTML = `<div class="top"><h3>${esc(a.id)}</h3><span class="check">${have === total ? "✓" : have ? `${have}/${total}` : ""}</span></div>
+      <div class="sub">${esc(when)} · ${have === total ? "Finished. Click to see the paper and copy it." : have ? `${have} of ${total} worksheets done. Click to see them.` : "Not started. Click to see what the paper needs."}</div>
+      <div class="sheets">${a.items.map((t, i) => `<span class="${sheetDone(a, i) ? "ok" : ""}">${sheetDone(a, i) ? "✓ " : ""}${esc(splitItem(t)[0])}</span>`).join("")}</div>`;
+    card.onclick = () => openPaper(a);
+    view.firstChild.appendChild(card);
+  }
+}
+
 function showTab(which) {
-  const all = which === "all";
-  $("tabHome").setAttribute("aria-selected", String(!all));
+  const all = which === "all", pap = which === "papers";
+  $("tabHome").setAttribute("aria-selected", String(!all && !pap));
   $("tabAll").setAttribute("aria-selected", String(all));
+  $("tabPapers").setAttribute("aria-selected", String(pap));
   $("allView").hidden = !all;
-  $("homeView").hidden = all;
+  $("papersView").hidden = !pap;
+  $("homeView").hidden = all || pap;
   store("math-tab", which);
 }
 $("tabHome").onclick = () => showTab("home");
 $("tabAll").onclick = () => { renderAll(); showTab("all"); };
+$("tabPapers").onclick = () => { renderPapers(); showTab("papers"); };
 
 function renderList() {
   const list = $("hwList");
@@ -596,34 +805,31 @@ function openBig(ans, editing) {
   openAnswer = ans;
   $("bigTitle").textContent = ans.title;
   setEditing(false);
-  render($("bigAnswer"), ans.text);
+  renderPaper($("bigAnswer"), ans.text, ans.title);
   $("bigCopy").onclick = (e) => copyText(e.target, plain(ans.text));
   $("bigDlg").showModal();
   if (editing) setEditing(true);
 }
 function setEditing(on) {
   const box = $("bigAnswer");
-  if (on) {
-    // Edit the answer as it looks (bold stays bold); typing adds plain text.
-    try { box.contentEditable = "plaintext-only"; } catch { box.contentEditable = "true"; }
-    if (!box.isContentEditable) box.contentEditable = "true";
-    box.focus();
-  } else if (box.isContentEditable) {
-    const copy = box.cloneNode(true);
-    copy.querySelectorAll("strong, b").forEach((n) => n.replaceWith("**" + n.textContent + "**"));
-    copy.querySelectorAll("br").forEach((n) => n.replaceWith("\n"));
-    copy.querySelectorAll("div, p").forEach((n) => n.replaceWith("\n" + n.textContent));
-    openAnswer.text = copy.textContent.replace(/\*\*\*\*/g, "").replace(/\n{3,}/g, "\n\n").trim();
-    box.contentEditable = "false";
-    render(box, openAnswer.text);
-    render(openAnswer.el, openAnswer.text);
+  const editor = box.querySelector("textarea");
+  if (on && !editor) {
+    box.innerHTML = "";
+    const ta = document.createElement("textarea");
+    ta.id = "answerEditor"; ta.value = openAnswer.text; ta.setAttribute("aria-label", "Edit answers");
+    box.appendChild(ta); ta.focus();
+  } else if (!on && editor) {
+    openAnswer.text = editor.value.replace(/\n{3,}/g, "\n\n").trim();
+    renderPaper(box, openAnswer.text, openAnswer.title);
+    if (openAnswer.el) renderPaper(openAnswer.el, openAnswer.text, openAnswer.title);
     if (turns[openAnswer.turnIndex]) turns[openAnswer.turnIndex].content = openAnswer.text;
+    if (openAnswer.onSave) openAnswer.onSave(openAnswer.text);
   }
   $("bigEdit").textContent = on ? "✓ Save changes" : "✏️ Edit";
   $("editHint").hidden = !on;
 }
-$("bigEdit").onclick = () => setEditing(!$("bigAnswer").isContentEditable);
-$("bigDlg").addEventListener("close", () => { if ($("bigAnswer").isContentEditable) setEditing(false); });
+$("bigEdit").onclick = () => setEditing(!$("bigAnswer").querySelector("textarea"));
+$("bigDlg").addEventListener("close", () => { if ($("bigAnswer").querySelector("textarea")) setEditing(false); });
 
 function errorText(code) {
   return ({
@@ -663,14 +869,15 @@ $("composer").addEventListener("submit", async (e) => {
       cache: false,
       signal: ctl.signal,
       images: sending.length ? sending.map((p) => p.blob) : undefined,
-      onText: ({ text }) => { render(out, text); },
+      onText: ({ text }) => { renderPaper(out, text, currentTitle); },
     });
-    render(out, text);
+    renderPaper(out, text, currentTitle);
     // Pictures aren't re-sent on later turns, so keep a text reminder in the chat.
     turns[turns.length - 1].content = ask.replace(/\(\d+ pictures? of the homework attached\.\)/, "(Homework pictures were sent earlier; your answer above covers them.)");
     turns.push({ role: "assistant", content: text });
     if (truncated) note("That was cut off. Send fewer problems at a time.");
     addActions(out.parentElement, text, currentTitle, turns.length - 1);
+    if (currentCanvas) { savePaper(currentCanvas, text); note(`✓ Saved to 📝 Papers → ${currentCanvas}. Open it there any time to copy it.`); }
     const d = load("math-done", { day: "", n: 0 });
     store("math-done", { day: today(), n: (d.day === today() ? d.n : 0) + 1 });
     renderList();
@@ -691,7 +898,7 @@ $("text").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shift
 function newChat() {
   turns = []; pics = []; renderThumbs();
   $("desk").innerHTML = ""; $("desk").appendChild(welcome);
-  currentTitle = "Answers"; $("deskTitle").textContent = "Answers";
+  currentTitle = "Answers"; $("deskTitle").textContent = "Answers"; currentCanvas = null;
 }
 $("newBtn").onclick = newChat;
 
@@ -796,12 +1003,13 @@ $("driveBtn").onclick = () => { $("driveQ").value = ""; $("driveDlg").showModal(
 prefs = { ...prefs, ...load("math-prefs", {}) };
 function applyPrefs() { $("classBadge").textContent = (prefs.cls || "Math").toUpperCase(); }
 $("customBtn").onclick = () => {
+  $("cName").value = prefs.name; $("cPeriod").value = prefs.period;
   $("cClass").value = prefs.cls; $("cStyle").value = prefs.style; $("cCareful").checked = prefs.careful; $("cExtra").value = prefs.extra;
   $("customDlg").showModal();
 };
 $("customForm").addEventListener("submit", (e) => {
   e.preventDefault();
-  prefs = { cls: $("cClass").value.trim(), style: $("cStyle").value, careful: $("cCareful").checked, extra: $("cExtra").value.trim() };
+  prefs = { name: $("cName").value.trim(), period: $("cPeriod").value.trim(), cls: $("cClass").value.trim(), style: $("cStyle").value, careful: $("cCareful").checked, extra: $("cExtra").value.trim() };
   store("math-prefs", prefs);
   applyPrefs();
   $("customDlg").close();
@@ -811,7 +1019,8 @@ applyPrefs();
 // ---------- Start ----------
 renderList();
 renderAll();
-if (load("math-tab", "home") === "all") showTab("all");
+renderPapers();
+if (["all", "papers"].includes(load("math-tab", "home"))) showTab(load("math-tab", "home"));
 (async () => {
   sample = window.claude ? await window.claude.use("sample") : null;
   if (!sample) {
