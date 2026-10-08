@@ -278,5 +278,91 @@ class EmailTests(Base):
         self.assertIn("couldn't edit", self.handle(m).get_body().get_content())
 
 
+class FakeDrive:
+    """In-memory stand-in for GoogleDrive with the same three methods."""
+
+    def __init__(self):
+        self.files = []  # dicts: id, name, mimeType, size, modifiedTime, data
+
+    def add(self, name, data, mime="video/mp4", modified="2026-01-01T00:00:00Z"):
+        self.files.append({"id": f"id{len(self.files)}", "name": name, "mimeType": mime,
+                           "size": str(len(data)), "modifiedTime": modified, "data": data})
+
+    def list_children(self, folder_id):
+        return [{k: v for k, v in f.items() if k != "data"} for f in self.files]
+
+    def download(self, file_id, dest):
+        dest.write_bytes(next(f["data"] for f in self.files if f["id"] == file_id))
+
+    def upload(self, folder_id, path, name, mimetype):
+        self.add(name, path.read_bytes(), mimetype)
+
+    def names(self):
+        return [f["name"] for f in self.files]
+
+
+class DriveTests(Base):
+    def setUp(self):
+        import drive_worker
+        self.dw = drive_worker
+        self.drive = FakeDrive()
+
+    def poll(self, **kw):
+        return self.dw.poll_once(self.drive, "folder", self.music_dir, **kw)
+
+    def test_edits_new_video_using_instructions_in_filename(self):
+        self.drive.add("zoomies mute trim 1-4.mp4", self.video.read_bytes())
+        self.assertEqual(self.poll(), 1)
+        self.assertEqual(self.drive.names()[-1], "zoomies mute trim 1-4 [edited].mp4")
+        out = self.tmp / "from-drive.mp4"
+        out.write_bytes(self.drive.files[-1]["data"])
+        s = streams(out)
+        self.assertEqual(s["video"]["height"], 1920)
+        self.assertNotIn("audio", s)  # "mute" in the name removed the audio
+        self.assertAlmostEqual(float(s["video"]["duration"]), 3, delta=0.2)
+
+    def test_music_by_name_from_filename(self):
+        self.drive.add("dog music: chill.mp4", self.video.read_bytes())
+        self.poll()
+        out = self.tmp / "music-drive.mp4"
+        out.write_bytes(self.drive.files[-1]["data"])
+        self.assertIn("audio", streams(out))
+
+    def test_does_not_redo_finished_work(self):
+        self.drive.add("a.mp4", self.video.read_bytes())
+        self.assertEqual(self.poll(), 1)
+        count = len(self.drive.files)
+        self.assertEqual(self.poll(), 0)
+        self.assertEqual(len(self.drive.files), count)
+
+    def test_ignores_outputs_non_videos_and_files_still_uploading(self):
+        self.drive.add("old [edited].mp4", b"x")
+        self.drive.add("notes.txt", b"hi", mime="text/plain")
+        self.drive.add("fresh.mp4", self.video.read_bytes(), modified="2026-10-08T12:00:10Z")
+        now = self.dw.datetime(2026, 10, 8, 12, 0, 20, tzinfo=self.dw.timezone.utc)  # only 10s after upload
+        self.assertEqual(self.poll(now=now), 0)
+        self.assertEqual(len(self.drive.files), 3)
+
+    def test_bad_video_gets_error_note_and_is_not_retried(self):
+        self.drive.add("broken.mp4", b"not a video")
+        self.assertEqual(self.poll(), 1)
+        self.assertEqual(self.drive.names()[-1], "broken [error].txt")
+        self.assertIn("Couldn't read that video", self.drive.files[-1]["data"].decode())
+        self.assertEqual(self.poll(), 0)
+
+    def test_oversized_video_rejected_without_downloading(self):
+        self.drive.add("huge.mp4", b"x" * 2_000_000)
+        self.drive.download = lambda *a: self.fail("should not download")
+        self.poll(max_mb=1)
+        self.assertEqual(self.drive.names()[-1], "huge [error].txt")
+
+    def test_watcher_stays_off_without_drive_settings(self):
+        import os
+        from unittest import mock
+        with mock.patch.dict(os.environ, {}, clear=True):
+            self.assertFalse(self.dw.drive_configured())
+            self.assertIsNone(self.dw.start_background())
+
+
 if __name__ == "__main__":
     unittest.main()

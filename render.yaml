@@ -18,3 +18,12 @@ services:
         sync: false
       - key: ALLOWED_SENDERS      # who may email videos in, e.g. krew252@gmail.com
         sync: false
+      # Google Drive folder watching (optional, see video-editor/DRIVE_SETUP.md; leave blank to skip)
+      - key: GDRIVE_CLIENT_ID
+        sync: false
+      - key: GDRIVE_CLIENT_SECRET
+        sync: false
+      - key: GDRIVE_REFRESH_TOKEN
+        sync: false
+      - key: GDRIVE_FOLDER_ID
+        sync: false

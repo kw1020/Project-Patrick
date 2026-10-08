@@ -7,9 +7,11 @@ Keep it at ONE worker process: the edit queue and the email watcher live in memo
 import logging
 import os
 
+import drive_worker
 import email_worker
 from app import create_app
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
 app = create_app(os.environ.get("PATRICK_PASSWORD", ""))
 email_worker.start_background()
+drive_worker.start_background()

@@ -1,9 +1,11 @@
 # Patrick Video Editor
 
-Send a video in, get a Reel-ready video back. Two ways in:
+Send a video in, get a Reel-ready video back. Three ways in:
 
 - **Web app**: open it on your phone, upload, pick edits, download.
 - **Email**: send a clip to the Patrick inbox with plain-English instructions; the edited video comes back by email.
+- **Google Drive**: drop a video in a shared folder (instructions in the file name); the edit appears next to it.
+  Best for big files and school computers. Setup: [DRIVE_SETUP.md](DRIVE_SETUP.md).
 
 Every edit outputs a 1080×1920 (9:16) H.264/AAC MP4 with loudness set for Instagram.
 
