@@ -917,7 +917,8 @@ async function ocr(blob) {
   if (!ocrWorker) {
     if (!window.Tesseract) await new Promise((ok, bad) => { const sc = document.createElement("script"); sc.src = "ocr/tesseract.min.js"; sc.onload = ok; sc.onerror = bad; document.head.appendChild(sc); });
     const base = new URL("ocr/", location.href).href;
-    ocrWorker = await Tesseract.createWorker("eng", 1, { workerPath: base + "worker.min.js", corePath: base, langPath: base, workerBlobURL: false, gzip: true, cacheMethod: "none" });
+    // worker-wrap.js serves the English reading data from a base64 text file (artifacts can't serve .gz files).
+    ocrWorker = await Tesseract.createWorker("eng", 1, { workerPath: base + "worker-wrap.js", corePath: base, langPath: base, gzip: true, workerBlobURL: false, cacheMethod: "none" });
   }
   const { data } = await ocrWorker.recognize(blob);
   return data.text;
