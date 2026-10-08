@@ -1,0 +1,37 @@
+Order of Operations 1
+Columns: problems 2-16 are in 3 columns (1st: 2, 5, 8, 11, 14; 2nd: 3, 6, 9, 12, 15; 3rd: 4, 7, 10, 13, 16).
+1) Give the order of operations in detail.
+Simplify the following expressions.
+2) 8 - 4 + 6 · 3
+3) 35 ÷ 5 - 16 · 4
+4) (15 + 6) ÷ 3 - 18
+5) 11 + 6 · 8 ÷ 12 - 7
+6) 13 + (-17) - (-32) ÷ 4
+7) 10 · 6 - 15 ÷ (-3)
+8) 18 + 6^2 ÷ 4
+9) 5[(3 + 3^2)^2 ÷ 8]
+10) 10 + 4^2
+11) 7 + 2 · 5^2 ÷ 2
+12) (3 + 8)^2
+13) 8^2 ÷ 4 + 12
+14) (2^3 + 28) ÷ 12
+15) 4·sqrt(25) + 12^2 ÷ (6 · 3)
+16) 6{[(4^2 - 6)^2 - 19] ÷ 3^3} + 14
+Simplify the following powers and roots.
+17) 6^2
+18) 5^3
+19) 8^3
+20) 3^4
+21) 4^5
+22) sqrt(36)
+23) sqrt(121)
+24) sqrt(12)
+25) sqrt(45)
+26) cube root of 27
+27) cube root of 64
+28) cube root of 24
+29) cube root of 54
+30) 4th root of 81
+31) 4th root of 625
+32) 4th root of 48
+33) sqrt(147)

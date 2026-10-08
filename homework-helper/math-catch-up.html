@@ -215,6 +215,24 @@
   .hw.is-done .name { text-decoration:line-through; color:var(--muted); }
   .hw .name { font-weight:700; overflow-wrap:anywhere; }
   .hw .meta { color:var(--muted); font-size:.82rem; overflow-wrap:anywhere; }
+  .shotdrop { display:grid; gap:2px; text-align:center; border:2px dashed var(--line); border-radius:12px; padding:14px; cursor:pointer; color:var(--fg); }
+  .shotdrop small { color:var(--muted); }
+  .shotdrop.over, .shotdrop:hover { border-color:var(--accent); background:var(--accent-soft); }
+  .allbar.over { outline:3px dashed var(--accent); outline-offset:4px; border-radius:12px; }
+  .sky { border:1px solid var(--line); border-left:4px solid var(--red); border-radius:12px; padding:10px 12px; margin-bottom:10px; display:grid; gap:6px; }
+  .sky-head { display:flex; flex-wrap:wrap; gap:4px 10px; align-items:baseline; }
+  .sky-head span { color:var(--red); font-weight:700; font-size:.85rem; }
+  .sky-row { display:grid; grid-template-columns:minmax(0,1fr) auto auto; gap:8px; align-items:center; }
+  .sky-row .btn-main, .sky-row .btn-soft { padding:6px 12px; }
+  .sky-why { font-size:.72rem; font-weight:700; border-radius:6px; padding:1px 6px; background:var(--amber-soft); color:var(--amber); }
+  .sky-why.miss { background:var(--red-soft); color:var(--red); }
+  .sky-m { color:var(--muted); font-size:.8rem; }
+  .sky-x { background:transparent; color:var(--muted); padding:4px 6px; }
+  .sky-ok { color:var(--green); font-weight:700; }
+  .sky-more { font-size:.82rem; color:var(--muted); }
+  .sky-more summary { cursor:pointer; font-weight:700; }
+  .sky-more p { margin:4px 0; }
+  .linkish { background:none; color:var(--accent); padding:0; font-weight:700; }
   .dobar { display:flex; gap:8px; margin-bottom:6px; }
   .donext { flex:1; padding:12px; font-size:1rem; }
   .donext small { font-weight:600; opacity:.8; }
@@ -316,7 +334,7 @@
   </header>
 
   <section class="stats" aria-label="Homework at a glance">
-    <div class="card stat missing"><div class="num" id="statMissing">0</div><div class="label"><b>Missing</b>past due or marked missing</div></div>
+    <div class="card stat missing"><div class="num" id="statMissing">0</div><div class="label"><b>Missing</b>in Skyward, Q1</div></div>
     <div class="card stat week"><div class="num" id="statWeek">0</div><div class="label"><b>Due this week</b>next 7 days</div></div>
     <div class="card stat done"><div class="num" id="statDone">0</div><div class="label"><b>Done today</b>assignments answered</div></div>
   </section>
@@ -453,6 +471,7 @@
   <form id="newForm" method="dialog">
     <div class="dlg-head"><h2 id="newTitle">New assignment from Canvas</h2><button type="button" class="btn-ghost" data-close aria-label="Close">✕</button></div>
     <div class="dlg-body">
+      <label class="shotdrop" id="shotDrop">📸 <b>Drop or paste a Canvas screenshot</b> (Ctrl+V) and it fills this in<small id="shotStatus">Or click to pick one. You can drop several at once.</small><input id="shotFile" type="file" accept="image/*" multiple hidden></label>
       <label class="field">Number <small>Like 1.13</small><input id="nId" required placeholder="1.13"></label>
       <label class="field">Due date<input id="nDate" type="date" required></label>
       <label class="field">Details <small>Copy the whole Details list from Canvas, one worksheet per line</small><textarea id="nItems" rows="7" required placeholder="Times Tables&#10;Solving Equations 2: 1-12&#10;X-Games Advanced: 25-32"></textarea></label>
@@ -666,6 +685,7 @@ const BUILTIN = [
   { id: "1.4", date: "2026-08-31", items: ["Times Tables", "Sign Rules: Addition and Subtraction: A, 41-50", "Sign Rules: Multiply and Divide: A, 41-50", "Finding Factors: 31-40", "GCF: 21-28", "X-Games: 21-40", "Operations with Variables: 2-18 (Even)", "Combine Like Terms: 1st Col", "Multiplications and Factoring: 1-33 (1st Col), 69-89 (1st Col)", "Addition and Subtraction on the Number Line: 25-49 (1st Col)"] },
   { id: "1.6", date: "2026-09-04", items: ["Times Tables", "Quiz Review", "X-Games: 61-80", "Operations with Variables 2: 2-20 (Even)", "Combine Like Terms: 3rd Col", "Multiplications and Factoring: 3-35 (3rd Col), 71-91 (3rd Col)"] },
   { id: "1.7", date: "2026-09-09", items: ["Times Tables", "Drawing Fractions: 1", "Operations with Variables: Odd", "Multiplications and Factoring: 4th Col", "X-Games: 81-100"] },
+  { id: "1.9", date: "2026-09-15", items: ["Times Tables", "Drawing Fractions: 8-10", "Draw Improper Fractions: 6-10", "Reduce Fractions: 1-4", "Multiplications and Factoring Practice: 1st Col", "Operations with Variables 2: Odd", "Order of Operations: 1-23 (Odd)"] },
   { id: "1.10", date: "2026-09-17", items: ["Times Tables", "Order of Operations2: 1-27 (Odd)", "Solving Equations: 1st and 2nd Columns", "X-Games Advanced: 1-16", "Combine Like Terms 2: 2nd Col", "Operations with Variables 2: Even", "Multiplications and Factoring Practice: 2nd Col"] },
   { id: "1.11", date: "2026-09-21", items: ["Times Tables", "Drawing Fractions: 11-12", "Draw Improper Fractions: 11-15", "Reduce Fractions: 5-8", "X-Games Advanced: 17-24", "Order of Operations 2: 1, 2-26 (Even)", "Solving Equations: 3rd and 4th Columns", "Solving Equations 2: 13-16", "Combine Like Terms 2: 3rd Col", "Multiplications and Factoring Practice: 3rd Col"] },
   { id: "1.12", date: "2026-09-23", items: ["Reduce Fractions: 5-8", "Operations with Variables 3: Odd", "Multiplications and Factoring Practice: 20-32 (4th Col)", "Solving Equations 2: 17-20", "Solving Equations 7: 3-9 (Odd)", "Solving Equations 10: 5-13 (Odd)", "Order of Operations 3: A, 1-25 (Odd)"] },
@@ -696,7 +716,7 @@ function splitItem(t) { const i = t.lastIndexOf(": "); return i < 0 ? [t, "whole
 function renderAll() {
   const view = $("allView");
   $("allCount").textContent = canvasOpen().length;
-  view.innerHTML = `<div class="allbar"><button type="button" class="btn-main" id="newAsg">＋ New assignment</button><p>Paste a new Canvas list and the worksheets get matched automatically.</p></div><div class="cards"></div>`;
+  view.innerHTML = `<div class="allbar"><button type="button" class="btn-main" id="newAsg">＋ New assignment</button><p>Drop or paste Canvas screenshots here (Ctrl+V) and they turn into assignments. The worksheets get matched automatically.</p></div><div class="cards"></div>`;
   $("newAsg").onclick = () => openNew();
   const grid = view.querySelector(".cards");
   for (const a of CANVAS) {
@@ -878,6 +898,7 @@ function openNew(a) {
   $("newTitle").textContent = a ? `Edit ${a.id}` : "New assignment from Canvas";
   $("nId").value = a?.id || ""; $("nDate").value = a?.date || new Date().toLocaleDateString("en-CA");
   $("nItems").value = a ? a.items.join("\n") : ""; $("nDelete").hidden = !a;
+  $("shotStatus").textContent = "Or click to pick one. You can drop several at once.";
   previewNew(); $("newDlg").showModal(); $(a ? "nItems" : "nId").focus();
 }
 $("nItems").addEventListener("input", previewNew);
@@ -889,6 +910,80 @@ $("newForm").addEventListener("submit", (e) => {
   custom.push(item); store("math-canvas-custom", custom);
   loadCanvas(); renderAll(); renderPapers(); renderList(); $("newDlg").close();
 });
+// ---------- Canvas screenshots → assignments ----------
+// Reads the screenshot right here in the browser (no pictures sent anywhere), finds "1.9, Sep 15" and the Details list.
+let ocrWorker = null;
+async function ocr(blob) {
+  if (!ocrWorker) {
+    if (!window.Tesseract) await new Promise((ok, bad) => { const sc = document.createElement("script"); sc.src = "ocr/tesseract.min.js"; sc.onload = ok; sc.onerror = bad; document.head.appendChild(sc); });
+    const base = new URL("ocr/", location.href).href;
+    ocrWorker = await Tesseract.createWorker("eng", 1, { workerPath: base + "worker.min.js", corePath: base, langPath: base, workerBlobURL: false, gzip: true, cacheMethod: "none" });
+  }
+  const { data } = await ocrWorker.recognize(blob);
+  return data.text;
+}
+const MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+function parseShot(text) {
+  const lines = text.split("\n").map((l) => l.replace(/[—–]/g, "-").replace(/\(\(+/g, "(").replace(/\)\)+/g, ")").replace(/\s+/g, " ").trim()).filter(Boolean);
+  let id = "", date = "";
+  for (const l of lines) {
+    const m = l.match(/(\d{1,2}\.\d{1,2})\s*,?\s*(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s*(\d{1,2})/i);
+    if (m) {
+      id = m[1]; const mo = MONTHS.indexOf(m[2].toLowerCase()), now = new Date();
+      const start = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1; // school year starts in the summer
+      date = `${mo >= 6 ? start : start + 1}-${String(mo + 1).padStart(2, "0")}-${m[3].padStart(2, "0")}`; break;
+    }
+  }
+  const at = lines.findIndex((l) => /^\W*details\b/i.test(l));
+  let items = (at >= 0 ? lines.slice(at + 1) : lines)
+    .filter((l) => /[a-z]{3}/i.test(l) && !/^(submission|points|due|available|submitting|attempts|allowed|details)\b/i.test(l) && !/\d{1,2}\.\d{1,2}\s*,?\s*(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)/i.test(l))
+    .map((l) => l.replace(/^[^a-z0-9]+/i, "").replace(/\s*[.,;]*\s*:\s*/, ": ").replace(/[.,;]+$/, ""));
+  if (at < 0) items = items.filter((l) => l.includes(":") || (catalog && sheetFor(l, { items: [] })));
+  return { id, date, items };
+}
+async function readShots(files) {
+  const imgs = [...files].filter((f) => f.type.startsWith("image/"));
+  if (!imgs.length) return;
+  const status = $("shotStatus");
+  if (!$("newDlg").open) openNew();
+  const added = []; let skipped = 0;
+  for (let i = 0; i < imgs.length; i++) {
+    status.textContent = `Reading screenshot${imgs.length > 1 ? ` ${i + 1} of ${imgs.length}` : ""}… (the first one takes a few seconds)`;
+    let r;
+    try { r = parseShot(await ocr(imgs[i])); }
+    catch { status.textContent = "Couldn't read that screenshot here. Type the Details list in instead."; return; }
+    if (imgs.length > 1 && r.id && r.items.length) { // several at once: save each one straight away
+      const custom = load("math-canvas-custom", []).filter((c) => c.id !== r.id);
+      custom.push({ id: r.id, date: r.date || new Date().toLocaleDateString("en-CA"), items: r.items }); store("math-canvas-custom", custom);
+      added.push(r.id); continue;
+    }
+    if (imgs.length > 1) { skipped++; continue; }
+    if (r.id) $("nId").value = r.id;
+    if (r.date) $("nDate").value = r.date;
+    if (r.items.length) $("nItems").value = r.items.join("\n");
+    previewNew();
+    status.textContent = r.id && r.items.length ? `Got ${r.id} with ${r.items.length} worksheets. Check it, then press Save.` : "Couldn't find everything. Fill in what's missing.";
+  }
+  if (added.length) {
+    loadCanvas(); renderAll(); renderPapers(); renderList(); $("newDlg").close();
+    flash(`Added ${added.join(", ")}${skipped ? ` · ${skipped} couldn't be read` : ""}`); showPill(`✓ Added ${added.join(", ")} from screenshots${skipped ? ` · ${skipped} skipped` : ""}`, () => { renderAll(); showTab("all"); }, true);
+  }
+}
+$("shotFile").onchange = (e) => { readShots(e.target.files); e.target.value = ""; };
+const shotDrop = $("shotDrop");
+shotDrop.addEventListener("dragover", (e) => { e.preventDefault(); shotDrop.classList.add("over"); });
+shotDrop.addEventListener("dragleave", () => shotDrop.classList.remove("over"));
+shotDrop.addEventListener("drop", (e) => { e.preventDefault(); shotDrop.classList.remove("over"); readShots(e.dataTransfer.files); });
+// Paste or drop anywhere on the All assignments tab (or while the New box is open) also works.
+document.addEventListener("paste", (e) => {
+  if (!$("newDlg").open && $("allView").hidden) return;
+  const files = [...(e.clipboardData?.files || [])].filter((f) => f.type.startsWith("image/"));
+  if (files.length) { e.preventDefault(); readShots(files); }
+});
+$("allView").addEventListener("dragover", (e) => { e.preventDefault(); $("allView").querySelector(".allbar")?.classList.add("over"); });
+$("allView").addEventListener("dragleave", (e) => { if (!$("allView").contains(e.relatedTarget)) $("allView").querySelector(".allbar")?.classList.remove("over"); });
+$("allView").addEventListener("drop", (e) => { e.preventDefault(); $("allView").querySelector(".allbar")?.classList.remove("over"); readShots(e.dataTransfer.files); });
+
 $("nDelete").onclick = () => {
   store("math-canvas-custom", load("math-canvas-custom", []).filter((c) => c.id !== editingCanvas));
   loadCanvas(); renderAll(); renderPapers(); renderList(); $("newDlg").close();
@@ -1360,16 +1455,53 @@ $("tabHome").onclick = () => showTab("home");
 $("tabAll").onclick = () => { renderAll(); showTab("all"); };
 $("tabPapers").onclick = () => { renderPapers(); showTab("papers"); };
 
+// ---------- Skyward reminders (from Krew's Skyward screenshot; send Claude a new one to update) ----------
+const SKY = {
+  asOf: "2026-10-08", termEnd: "2026-10-14", grade: "F · 38.27%",
+  todo: [ // homework he can do with this app
+    { id: "1.5", cat: "Assignment", pts: 35, got: 0, why: "Missing" },
+    { id: "1.3", cat: "Homework", pts: 20, got: 0, why: "Missing" },
+    { id: "1.4", cat: "Homework", pts: 20, got: 0, why: "Missing" },
+    { id: "1.11", cat: "Homework", pts: 20, got: 0, why: "Missing" },
+    { id: "1.10", cat: "Assignment", pts: 35, got: 16, why: "Low score (46%)" },
+  ],
+  inClass: "Factoring quiz 1/10 · Number Line skill 0.5/9 · Operations with Variables skill 0.5/15 · Combining Like Terms skill 7.5/16.5",
+};
+let skyHidden = load("math-sky-hidden", []);
+const skyTodo = () => SKY.todo.filter((t) => !skyHidden.includes(t.id) && !(CANVAS.find((a) => a.id === t.id) && doneCount(CANVAS.find((a) => a.id === t.id)) === CANVAS.find((a) => a.id === t.id).items.length && t.why === "Missing"));
+function renderSky(list) {
+  const todo = skyTodo();
+  const days = Math.floor(daysUntil(SKY.termEnd));
+  const box = document.createElement("div"); box.className = "sky";
+  box.innerHTML = `<div class="sky-head"><b>🔔 Skyward</b><span>${esc(SKY.grade)} · Q1 ends Oct 14${days > 0 ? ` (${days} day${days === 1 ? "" : "s"})` : " (today)"}</span></div>`;
+  if (!todo.length) box.insertAdjacentHTML("beforeend", '<div class="sky-ok">Nothing missing left. Nice.</div>');
+  for (const t of todo) {
+    const a = CANVAS.find((x) => x.id === t.id);
+    const row = document.createElement("div"); row.className = "sky-row";
+    row.innerHTML = `<div><b>${esc(t.id)}</b> <span class="sky-why${t.why === "Missing" ? " miss" : ""}">${esc(t.why)}</span><div class="sky-m">${esc(t.cat)} · worth ${t.pts} pts</div></div>`;
+    const go = document.createElement("button"); go.type = "button";
+    if (a) { go.className = "btn-main"; go.textContent = "Do it"; go.onclick = () => queueDo([a.id]); }
+    else { go.className = "btn-soft"; go.textContent = "＋ Add"; go.title = "Paste the Canvas list for " + t.id; go.onclick = () => { openNew(); $("nId").value = t.id; }; }
+    const x = document.createElement("button"); x.type = "button"; x.className = "sky-x"; x.textContent = "✕"; x.title = "I don't need to do " + t.id;
+    x.onclick = () => { skyHidden.push(t.id); store("math-sky-hidden", skyHidden); renderList(); };
+    row.append(go, x); box.appendChild(row);
+  }
+  box.insertAdjacentHTML("beforeend", `<details class="sky-more"><summary>Done in class (can't do here)</summary><p>${esc(SKY.inClass)}. Ask Mr. Herring about retakes.</p>${skyHidden.length ? `<button type="button" class="linkish" id="skyShow">Show hidden (${skyHidden.length})</button>` : ""}</details>`);
+  list.appendChild(box);
+  const show = box.querySelector("#skyShow"); if (show) show.onclick = () => { skyHidden = []; store("math-sky-hidden", skyHidden); renderList(); };
+}
+
 function renderList() {
   const list = $("hwList");
   const open = assignments.filter((a) => !a.done);
   // Canvas assignments are all past due, so any with worksheets left count as missing.
-  $("statMissing").textContent = open.filter(isMissing).length + canvasOpen().length;
+  $("statMissing").textContent = skyTodo().length;
   $("statWeek").textContent = open.filter((a) => !isMissing(a) && daysUntil(a.due) <= 7).length;
   const doneDay = load("math-done", { day: "", n: 0 });
   $("statDone").textContent = doneDay.day === today() ? doneDay.n : 0;
 
   list.innerHTML = "";
+  renderSky(list);
   // Every Canvas assignment, in order, with "Do next" on top so you can just keep clicking.
   const next = canvasOpen()[0];
   updatePill();
@@ -1389,7 +1521,7 @@ function renderList() {
     row.className = "hw cv" + (done ? " is-done" : "") + (a === next ? " is-next" : "");
     const when = new Date(a.date + "T12:00").toLocaleDateString(undefined, { month: "short", day: "numeric" });
     row.innerHTML = `<span class="ring${done ? " full" : ""}">${done ? "✓" : `${n}/${total}`}</span>
-      <div><div class="name">${esc(a.id)}</div><div class="meta">${done ? "" : '<span class="tag missing">MISSING</span>'}${esc(when)} · ${done ? "done" : n ? `${total - n} sheet${total - n === 1 ? "" : "s"} left` : `${total} sheets`}</div></div>`;
+      <div><div class="name">${esc(a.id)}</div><div class="meta">${!done && skyTodo().some((t) => t.id === a.id) ? '<span class="tag missing">SKYWARD</span>' : ""}${esc(when)} · ${done ? "done" : n ? `${total - n} sheet${total - n === 1 ? "" : "s"} left` : `${total} sheets`}</div></div>`;
     const view = document.createElement("button");
     view.type = "button"; view.className = "edit"; view.textContent = "📝"; view.title = "View the " + a.id + " paper";
     view.onclick = () => openSheet(paperText(a), a.id, () => { openPaper(a); setEditing(true); });
@@ -1538,6 +1670,7 @@ function renderThumbs() {
 }
 $("photo").addEventListener("change", (e) => { addPics(e.target.files); e.target.value = ""; });
 document.addEventListener("paste", (e) => {
+  if ($("newDlg").open || !$("allView").hidden) return; // screenshots there become assignments instead
   const files = [...(e.clipboardData?.items || [])].filter((i) => i.type.startsWith("image/") || i.type.startsWith("video/")).map((i) => i.getAsFile());
   if (files.length) { e.preventDefault(); addPics(files); }
 });
