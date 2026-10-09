@@ -34,6 +34,18 @@ whining, etc.). That's `dogaudio.py`, the default audio mode everywhere.
 - Lesson from this build: a unit test passed while bridging was broken (padding hid it). Check numbers, not just "OK".
 - Work is on branch `claude/confident-cannon-9805ak`; no PR opened (only open one when Krew asks).
 
+## Krew's deployment checklist (update the current step when he reports progress)
+**Current step: 1** (he has not confirmed anything yet; Claude can't see his screen, only what he tells it).
+1. Make a Render account (render.com, sign in with GitHub, let it see `kw1020/Project-Patrick`).
+2. New+ > Blueprint > pick the repo and branch `claude/confident-cannon-9805ak`.
+3. Set `PATRICK_PASSWORD` (long); leave `EMAIL_*` and `GDRIVE_*` blank for now.
+4. Wait for the build; copy the `.onrender.com` address. Dockerfile has never been built: if it fails, get the error text and fix it.
+5. Open it on his phone, log in, upload a short clip.
+6. Try "dog sounds only" on a real clip; he reports what he hears (voices left -> strict, dog cut -> gentle).
+Later, optional: email setup (dedicated Gmail + App Password), Drive setup (`video-editor/DRIVE_SETUP.md`).
+He asked Claude to control his screen. The session he used had no computer-use tools and the account has only the one
+cloud environment. To get screen control he needs the Claude desktop app (Computer use on) or claude.ai with a Device picked.
+
 ## Next ideas (ask Krew which first)
 1. Help him deploy and test from his phone.
 2. Auto-captions (speech-to-text, burned in): biggest watch-time win.
