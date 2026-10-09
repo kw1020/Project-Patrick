@@ -78,7 +78,7 @@ def handle_message(msg: EmailMessage, workdir: Path, music_dir: Path,
         opts.music = music
         notes.append("Added the music file you attached")
     if not notes:
-        notes.append("Made it vertical 9:16 and evened out the volume (no other edits requested)")
+        notes.append("Made it vertical 9:16 (no other edits requested)")
 
     try:
         out = workdir / "output.mp4"
@@ -87,6 +87,8 @@ def handle_message(msg: EmailMessage, workdir: Path, music_dir: Path,
         reply.set_content(f"I couldn't edit that video: {e}")
         return reply
 
+    if result.get("audio_note"):
+        notes.append(result["audio_note"])
     summary = "\n".join(f"• {n}" for n in notes)
     if result["size_bytes"] > MAX_REPLY_BYTES:
         reply.set_content(f"Your video is edited, but it's too big to email back "

@@ -2,3 +2,5 @@ flask>=3.0
 gunicorn>=22.0
 google-api-python-client>=2.100
 google-auth>=2.23
+numpy>=1.26
+pysilero-vad>=3.0

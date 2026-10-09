@@ -13,11 +13,28 @@ Every edit outputs a 1080×1920 (9:16) H.264/AAC MP4 with loudness set for Insta
 
 | Edit | Notes |
 |---|---|
-| Remove original audio | The reliable way to get rid of people talking in the background. Pair it with music. |
+| **Dog sounds only** (default) | Silences the moments when people are talking and keeps everything else: breathing, whining, panting. See below. |
+| Remove original audio | Mutes everything. Pair it with music. |
 | Clean up noise | High-pass + FFT denoise. Fixes hiss, wind, hum. **It cannot reliably remove speech.** |
 | Add music | Pick from `music/`, upload your own, or attach it to the email. Loops to fit, fades out, and ducks under the original audio when both are kept. |
 | Trim, speed (0.5–2×) | |
 | Vertical reframe | "Keep all" puts the full frame over a blurred background; "fill" crops to 9:16. |
+
+## Dog sounds only: what it really does
+
+A small speech detector listens for human talking. Those moments are faded out; the rest of the audio is untouched.
+In email or a Drive file name add `gentle` or `strict` to tune it; on the website it's under "More options".
+
+- **It removes moments, not voices.** If your dog whines *while* someone is talking, that whine is removed with the talking.
+- **It can mistake a voice-like whine for speech** and cut it. `gentle` removes less and fixes most of this.
+- **Voices still audible?** Use `strict`. Quiet, far-away talking is the hardest to catch.
+- Every edit reports what it did ("Removed 12.4s of talking in 3 spots"), so you can sanity-check it. Check this the first few times.
+- Gaps where talking was removed are silent. Add music (`music: name`) if that sounds odd.
+- Tested only on synthetic stand-ins (computer speech plus made-up breathing/whining), **never on real dog recordings**.
+  The test numbers: talking was removed completely and dog-like sounds kept; `normal` also clipped about half a second of a
+  voice-like synthetic whine, `strict` clipped two harmless spots, `gentle` was clean. Real footage will differ. Tell me what you hear.
+- Needs `numpy` and `pysilero-vad` (in `requirements.txt`). Uses roughly 100 MB of memory and under a second per clip.
+- Loudness normalization is skipped in this mode; it would boost quiet breathing into loud hiss.
 
 ## Setup
 
@@ -76,7 +93,8 @@ The repo includes a Dockerfile and a `render.yaml` blueprint for [Render](https:
 - To keep it awake for email, either upgrade to the paid **Starter** instance (always on; change `plan: free` to
   `plan: starter` in `render.yaml`), or point a free uptime pinger (e.g. UptimeRobot) at `/healthz` every 5 minutes.
   Free instances get 750 hours/month, which is enough for one always-on service.
-- Free instances have little CPU, so a 30-second clip can take a few minutes to edit. Starter is faster.
+- Free instances have very little CPU. On a 4-core test machine a 20-second clip takes about 10 seconds to edit, and
+  the video encode is the slow part, so expect several times longer on a free instance. Starter is faster. Measure it before relying on it.
 - Files are deleted when it restarts. Download your edit when it finishes; there's no permanent storage.
 - Music you want available by name (`music: chill`) must be committed to `music/` (remove the `music/*` line from `.gitignore`).
   Uploading a track with each video always works.
@@ -91,5 +109,6 @@ If the site is blocked, use your phone's data or try email. If a clip is too big
 
 ## Not built yet (good next steps)
 - Auto-captions (speech-to-text, burned in): big for watch time since most people watch muted.
-- Real speech separation (e.g. Demucs) to pull out background voices while keeping the dog or main sound.
+- True source separation, to keep the dog's noises even while people are talking over them. This needs a large AI model
+  (hundreds of MB, too heavy for a small free server), so it's a separate, later project.
 - Auto-posting to Instagram via Meta's Graph API (needs a Business/Creator account linked to a Facebook Page).

@@ -8,13 +8,14 @@ import json
 import re
 import subprocess
 import threading
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 WIDTH, HEIGHT = 1080, 1920  # Instagram Reels, 9:16
 VIDEO_EXTS = {".mp4", ".mov", ".m4v", ".webm", ".mkv", ".avi", ".3gp"}
 AUDIO_EXTS = {".mp3", ".m4a", ".aac", ".wav", ".ogg", ".flac"}
-AUDIO_MODES = ("keep", "denoise", "mute")
+AUDIO_MODES = ("dog", "keep", "denoise", "mute")
+TALKING_LEVELS = ("gentle", "normal", "strict")
 REFRAME_MODES = ("fit", "crop", "none")
 FFMPEG_TIMEOUT = 900  # seconds
 _ENCODE_LOCK = threading.Lock()
@@ -29,7 +30,9 @@ class EditOptions:
     trim_start: float = 0.0
     trim_end: float | None = None  # None = until the end
     reframe: str = "fit"  # fit = whole frame on blurred background, crop = fill 9:16, none = leave as is
-    audio_mode: str = "keep"  # keep | denoise | mute
+    audio_mode: str = "dog"  # dog = remove people talking, keep everything else | keep | denoise | mute
+    talking_detection: str = "normal"  # dog mode only: gentle removes less, strict removes more
+    audio_override: Path | None = None  # set by process() in dog mode: the audio with talking removed
     music: Path | None = None
     music_volume: float = 0.35  # 0..1, relative to the original audio when both are present
     speed: float = 1.0
@@ -38,6 +41,8 @@ class EditOptions:
     def validate(self) -> None:
         if self.audio_mode not in AUDIO_MODES:
             raise EditError(f"audio_mode must be one of {AUDIO_MODES}")
+        if self.talking_detection not in TALKING_LEVELS:
+            raise EditError(f"talking_detection must be one of {TALKING_LEVELS}")
         if self.reframe not in REFRAME_MODES:
             raise EditError(f"reframe must be one of {REFRAME_MODES}")
         if not 0.5 <= self.speed <= 2.0:
@@ -77,7 +82,9 @@ def _video_chain(opts: EditOptions) -> str:
         # whole frame centred over a blurred, zoomed copy of itself, so nothing is cut off
         parts = [
             "[0:v]split=2[bg][fg]",
-            f"[bg]scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=increase,crop={WIDTH}:{HEIGHT},boxblur=20:2[b]",
+            # blur a quarter-size copy, then scale it up: looks the same (it's blurred anyway) and encodes far faster
+            f"[bg]scale={WIDTH // 4}:{HEIGHT // 4}:force_original_aspect_ratio=increase,crop={WIDTH // 4}:{HEIGHT // 4},"
+            f"boxblur=6:2,scale={WIDTH}:{HEIGHT}[b]",
             f"[fg]scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=decrease[f]",
             "[b][f]overlay=(W-w)/2:(H-h)/2,setsar=1",
         ]
@@ -93,7 +100,8 @@ def _video_chain(opts: EditOptions) -> str:
     return chain + "[v]"
 
 
-def _audio_chain(opts: EditOptions, has_audio: bool, out_len: float) -> tuple[str, bool]:
+def _audio_chain(opts: EditOptions, has_audio: bool, out_len: float,
+                 orig_in: str = "[0:a]", music_in: str = "[1:a]") -> tuple[str, bool]:
     """Returns (filtergraph fragment ending in [a], whether there is any audio)."""
     use_orig = has_audio and opts.audio_mode != "mute"
     use_music = opts.music is not None
@@ -102,17 +110,16 @@ def _audio_chain(opts: EditOptions, has_audio: bool, out_len: float) -> tuple[st
 
     parts: list[str] = []
     if use_orig:
-        f = ["[0:a]"]
         steps = []
         if opts.audio_mode == "denoise":
             steps += ["highpass=f=80", "afftdn=nr=18:nf=-30"]
         if opts.speed != 1.0:
             steps.append(f"atempo={_num(opts.speed)}")
-        parts.append(f[0] + (",".join(steps) if steps else "anull") + "[orig]")
+        parts.append(orig_in + (",".join(steps) if steps else "anull") + "[orig]")
     if use_music:
         # music input is looped forever (-stream_loop); the output -t cuts it to the video length
         fade_at = max(out_len - 1.0, 0.0)
-        parts.append(f"[1:a]volume={_num(opts.music_volume)},afade=t=out:st={_num(fade_at)}:d=1[mus]")
+        parts.append(f"{music_in}volume={_num(opts.music_volume)},afade=t=out:st={_num(fade_at)}:d=1[mus]")
 
     if use_orig and use_music:
         parts.append("[orig]asplit=2[o1][o2]")
@@ -123,7 +130,8 @@ def _audio_chain(opts: EditOptions, has_audio: bool, out_len: float) -> tuple[st
     else:
         last = "orig" if use_orig else "mus"
 
-    tail = "loudnorm=I=-14:TP=-1.5:LRA=11" if opts.normalize else "anull"
+    # not in dog mode: loudness-normalising mostly-quiet breathing would boost it into loud hiss
+    tail = "loudnorm=I=-14:TP=-1.5:LRA=11" if opts.normalize and opts.audio_mode != "dog" else "anull"
     parts.append(f"[{last}]{tail}[a]")
     return ";".join(parts), True
 
@@ -139,10 +147,15 @@ def build_command(src: Path, dst: Path, opts: EditOptions, info: MediaInfo) -> t
 
     cmd = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
            "-ss", _num(opts.trim_start), "-t", _num(clip_len), "-i", str(src)]
+    next_input, orig_in, music_in = 1, "[0:a]", "[1:a]"
+    if opts.audio_override is not None:  # already trimmed to the clip, so no -ss/-t here
+        cmd += ["-i", str(opts.audio_override)]
+        orig_in, next_input = f"[{next_input}:a]", next_input + 1
     if opts.music is not None:
         cmd += ["-stream_loop", "-1", "-i", str(opts.music)]
+        music_in = f"[{next_input}:a]"
 
-    audio_graph, has_out_audio = _audio_chain(opts, info.has_audio, out_len)
+    audio_graph, has_out_audio = _audio_chain(opts, info.has_audio, out_len, orig_in, music_in)
     graph = _video_chain(opts) + (";" + audio_graph if audio_graph else "")
     cmd += ["-filter_complex", graph, "-map", "[v]"]
     cmd += ["-map", "[a]", "-c:a", "aac", "-b:a", "192k", "-ar", "44100"] if has_out_audio else ["-an"]
@@ -152,7 +165,26 @@ def build_command(src: Path, dst: Path, opts: EditOptions, info: MediaInfo) -> t
 
 
 def process(src: Path, dst: Path, opts: EditOptions) -> dict:
+    opts.validate()
     info = probe(src)
+    audio_note = None
+    cleaned = dst.with_suffix(".dog.wav")
+    try:
+        if opts.audio_mode == "dog" and info.has_audio:
+            import dogaudio  # imported here so the rest of the editor works without numpy/onnx installed
+            end = min(opts.trim_end, info.duration) if opts.trim_end is not None else info.duration
+            if end <= opts.trim_start:
+                raise EditError(f"Trim start is past the end of the video ({info.duration:.1f}s long).")
+            with _ENCODE_LOCK:
+                report = dogaudio.isolate(src, cleaned, opts.trim_start, end - opts.trim_start, opts.talking_detection)
+            audio_note = dogaudio.describe(report)
+            opts = replace(opts, audio_override=cleaned)
+        return _encode(src, dst, opts, info, audio_note)
+    finally:
+        cleaned.unlink(missing_ok=True)
+
+
+def _encode(src: Path, dst: Path, opts: EditOptions, info: MediaInfo, audio_note: str | None) -> dict:
     cmd, out_len = build_command(src, dst, opts, info)
     try:
         with _ENCODE_LOCK:  # web jobs and email jobs share one small server: one encode at a time
@@ -162,8 +194,10 @@ def process(src: Path, dst: Path, opts: EditOptions) -> dict:
     if run.returncode != 0 or not dst.exists():
         detail = run.stderr.strip().splitlines()[-1] if run.stderr.strip() else "unknown error"
         raise EditError(f"ffmpeg failed: {detail}")
-    return {"duration": round(out_len, 2), "size_bytes": dst.stat().st_size,
-            "had_audio": info.has_audio}
+    result = {"duration": round(out_len, 2), "size_bytes": dst.stat().st_size, "had_audio": info.has_audio}
+    if audio_note:
+        result["audio_note"] = audio_note
+    return result
 
 
 # ---------------------------------------------------------------- music library + text commands
@@ -198,8 +232,9 @@ def _seconds(text: str) -> float:
 def parse_commands(text: str, music_dir: Path) -> tuple[EditOptions, list[str]]:
     """Understand plain-English edit requests, e.g. from an email.
 
-    Recognised (any order, any line):  mute | denoise | trim 0:03-0:15 | music: name |
-    speed 1.5 | crop | no reframe
+    Recognised (any order, any line):  dog only | gentle | strict | keep audio | mute | denoise |
+    trim 0:03-0:15 | music: name | speed 1.5 | crop | no reframe
+    With no audio instruction the default is "dog only": people talking are removed, everything else stays.
     Returns the options and a list of human-readable notes about what was understood.
     """
     opts, notes = EditOptions(), []
@@ -211,6 +246,19 @@ def parse_commands(text: str, music_dir: Path) -> tuple[EditOptions, list[str]]:
     elif re.search(r"\b(denoise|clean (up )?(the )?audio|remove (the )?noise|reduce noise)\b", low):
         opts.audio_mode = "denoise"
         notes.append("Cleaned up background noise")
+    elif re.search(r"\bkeep (the )?(original |all )?audio\b|\boriginal audio\b", low):
+        opts.audio_mode = "keep"
+        notes.append("Kept the original audio untouched")
+    else:
+        if re.search(r"\b(dog[ -]?only|only (the )?dog|dog sounds?|keep (the )?dog|"
+                     r"(remove|cut|get rid of|no) (the )?(background )?(talking|voices?|people|speech|conversation))\b", low):
+            notes.append("Removing people talking, keeping your dog's sounds")
+        if re.search(r"\bgentle\b", low):
+            opts.talking_detection = "gentle"
+            notes.append("Gentle talking detection (removes less)")
+        elif re.search(r"\bstrict\b", low):
+            opts.talking_detection = "strict"
+            notes.append("Strict talking detection (removes more)")
 
     m = re.search(r"\btrim\s+([\d:.]+)\s*(?:-|to)\s*([\d:.]+)", low)
     if m:

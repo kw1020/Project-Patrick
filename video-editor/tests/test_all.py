@@ -10,6 +10,7 @@ from email.message import EmailMessage
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import editor
 import email_worker
@@ -124,7 +125,7 @@ class CommandParsingTests(Base):
 
     def test_nothing_requested_gives_defaults(self):
         o, notes = editor.parse_commands("here's my video lol", self.music_dir)
-        self.assertEqual((o.audio_mode, o.music, o.trim_end), ("keep", None, None))
+        self.assertEqual((o.audio_mode, o.music, o.trim_end), ("dog", None, None))
         self.assertEqual(notes, [])
 
     def test_unknown_music_is_reported_not_crashed(self):
@@ -278,6 +279,185 @@ class EmailTests(Base):
         self.assertIn("couldn't edit", self.handle(m).get_body().get_content())
 
 
+try:
+    from synth import breathing, resample, speech, whine
+    HAVE_SYNTH = True
+except Exception:  # espeakng-loader not installed
+    HAVE_SYNTH = False
+
+import numpy as np
+import dogaudio
+
+
+class DogAudioLogicTests(unittest.TestCase):
+    """Pure logic: turning speech probabilities into "which moments get silenced"."""
+
+    def mask(self, pattern, threshold=0.5, min_talk=5):
+        probs = np.array([0.9 if c == "T" else 0.1 for c in pattern])
+        return dogaudio.talking_mask(probs, threshold, min_talk)
+
+    def test_short_pause_inside_sentence_is_bridged(self):
+        # An 11-frame pause is wider than the padding alone can fill (2 x PAD = 8), so this only passes
+        # if bridging really runs. The first version of this test used 6 frames and passed with bridging broken.
+        m = self.mask("." * 20 + "T" * 10 + "." * 11 + "T" * 10 + "." * 20)
+        self.assertTrue(m[30:41].all())
+        self.assertEqual(len(dogaudio._runs(m, True)), 1)
+
+    def test_pause_just_over_the_limit_is_not_bridged(self):
+        m = self.mask("." * 20 + "T" * 10 + "." * 13 + "T" * 10 + "." * 20)
+        self.assertEqual(len(dogaudio._runs(m, True)), 2)
+
+    def test_runs_finds_both_kinds_of_run_including_at_the_edges(self):
+        m = np.array([True, True, False, False, False, True, False])
+        self.assertEqual([(int(a), int(b)) for a, b in dogaudio._runs(m, True)], [(0, 2), (5, 6)])
+        self.assertEqual([(int(a), int(b)) for a, b in dogaudio._runs(m, False)], [(2, 5), (6, 7)])
+
+    def test_long_gap_between_talking_is_kept(self):
+        m = self.mask("." * 20 + "T" * 10 + "." * 40 + "T" * 10 + "." * 20)
+        self.assertFalse(m[44:56].any())
+
+    def test_one_frame_blip_is_not_talking(self):
+        self.assertFalse(self.mask("." * 30 + "T" + "." * 30).any())
+
+    def test_talking_is_padded_on_both_sides(self):
+        m = self.mask("." * 30 + "T" * 10 + "." * 30)
+        self.assertTrue(m[30 - dogaudio.PAD:40 + dogaudio.PAD].all())
+        self.assertFalse(m[:30 - dogaudio.PAD].any())
+
+    def test_talking_at_very_start_and_end_does_not_crash(self):
+        m = self.mask("T" * 10 + "." * 30 + "T" * 10)
+        self.assertTrue(m[0] and m[-1])
+
+    def test_no_talking_gives_all_clear(self):
+        self.assertFalse(self.mask("." * 50).any())
+
+    def test_sensitivity_levels_order(self):
+        probs = np.array([0.1] * 20 + [0.4] * 12 + [0.1] * 20 + [0.6] * 12 + [0.1] * 20)
+        counts = {k: dogaudio.talking_mask(probs, *lv).sum() for k, lv in dogaudio.LEVELS.items()}
+        self.assertLessEqual(counts["gentle"], counts["normal"])
+        self.assertLessEqual(counts["normal"], counts["strict"])
+        self.assertLess(counts["gentle"], counts["strict"])
+
+    def test_gain_is_smooth_and_bounded(self):
+        mask = np.array([False] * 20 + [True] * 20 + [False] * 20)
+        g = dogaudio.gain_curve(mask, 60 * dogaudio.FRAME * 44100 // dogaudio.SR, 44100)
+        self.assertTrue(((g >= 0) & (g <= 1)).all())
+        self.assertAlmostEqual(float(g[0]), 1.0, places=2)
+        self.assertLess(float(g[len(g) // 2]), 0.01)
+        self.assertLess(float(np.abs(np.diff(g)).max()), 0.001)  # no clicks: gain never jumps
+
+
+class BuildCommandTests(Base):
+    def test_cleaned_audio_and_music_get_the_right_input_numbers(self):
+        info = editor.MediaInfo(6.0, True)
+        opts = EditOptions(audio_override=Path("clean.wav"), music=Path("song.mp3"))
+        cmd, _ = editor.build_command(Path("v.mp4"), Path("o.mp4"), opts, info)
+        inputs = [cmd[i + 1] for i, c in enumerate(cmd) if c == "-i"]
+        self.assertEqual(inputs, ["v.mp4", "clean.wav", "song.mp3"])
+        graph = cmd[cmd.index("-filter_complex") + 1]
+        self.assertIn("[1:a]anull[orig]", graph)   # original-audio slot reads the cleaned wav
+        self.assertIn("[2:a]volume=", graph)       # music is the third input
+        self.assertNotIn("loudnorm", graph)        # dog mode doesn't boost quiet breathing
+
+    def test_other_modes_still_normalize_loudness(self):
+        graph = editor.build_command(Path("v.mp4"), Path("o.mp4"), EditOptions(audio_mode="keep"),
+                                     editor.MediaInfo(6.0, True))[0]
+        self.assertIn("loudnorm", graph[graph.index("-filter_complex") + 1])
+
+
+@unittest.skipUnless(HAVE_SYNTH, "needs: pip install espeakng-loader (test fixtures only)")
+class DogAudioEndToEndTests(Base):
+    """Synthetic stand-ins for the real thing: whine, talking, breathing, talking, whine."""
+
+    SR = 44100
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        sp, rate = speech("Hey, can you pass me the remote? I think the game is about to start, did you see that?")
+        talk = resample(sp, rate, cls.SR)
+        talk = talk / np.abs(talk).max() * 0.5
+        parts = [("dog", whine(cls.SR, 2.5)), ("talk", talk), ("dog", breathing(cls.SR, 3.0)),
+                 ("talk", talk), ("dog", whine(cls.SR, 2.5))]
+        cls.spans, t, chunks = [], 0.0, []
+        for kind, x in parts:
+            cls.spans.append((kind, t, t + len(x) / cls.SR))
+            chunks.append(x)
+            t += len(x) / cls.SR
+        cls.audio_wav = cls.tmp / "mix.wav"
+        dogaudio._write_wav(cls.audio_wav, np.concatenate(chunks), cls.SR)
+        cls.mixed = cls.tmp / "mixed.mp4"
+        ffmpeg("-f", "lavfi", "-i", f"testsrc=size=640x360:rate=30:duration={t:.2f}", "-i", str(cls.audio_wav),
+               "-c:v", "libx264", "-c:a", "aac", "-shortest", str(cls.mixed))
+        cls.total = t
+
+    def rms(self, path, a, b):
+        x = dogaudio._decode(path, a, b - a, 16000, 1)
+        return float(np.sqrt(np.mean(x ** 2))) if len(x) else 0.0
+
+    def run_mode(self, **kw):
+        out = self.tmp / f"dog-{time.time_ns()}.mp4"
+        return out, editor.process(self.mixed, out, EditOptions(reframe="none", **kw))
+
+    def test_talking_removed_dog_sounds_kept(self):
+        out, result = self.run_mode()
+        for kind, a, b in self.spans:
+            a, b = a + 0.4, b - 0.4  # skip the fade at each edge
+            before, after = self.rms(self.mixed, a, b), self.rms(out, a, b)
+            if kind == "talk":
+                self.assertLess(after, before * 0.05, f"talking at {a:.1f}-{b:.1f}s still audible")
+            else:
+                self.assertGreater(after, before * 0.7, f"dog sound at {a:.1f}-{b:.1f}s was cut")
+        self.assertIn("Removed", result["audio_note"])
+
+    def test_video_with_no_talking_is_left_alone(self):
+        calm = self.tmp / "calm.mp4"
+        wav = self.tmp / "calm.wav"
+        dogaudio._write_wav(wav, np.concatenate([whine(self.SR, 2), breathing(self.SR, 2)]), self.SR)
+        ffmpeg("-f", "lavfi", "-i", "testsrc=size=320x240:rate=30:duration=4", "-i", str(wav),
+               "-c:v", "libx264", "-c:a", "aac", "-shortest", str(calm))
+        out = self.tmp / "calm-out.mp4"
+        result = editor.process(calm, out, EditOptions(reframe="none"))
+        self.assertIn("No talking found", result["audio_note"])
+        self.assertGreater(self.rms(out, 0.2, 3.8), self.rms(calm, 0.2, 3.8) * 0.7)
+
+    def test_trim_only_looks_at_the_trimmed_part(self):
+        # keep only the first whine (0-2.5s): there is no talking in that window
+        _, result = self.run_mode(trim_start=0, trim_end=2.0)
+        self.assertIn("No talking found", result["audio_note"])
+
+    def test_strict_removes_at_least_as_much_as_gentle(self):
+        talk = {}
+        for level in ("gentle", "normal", "strict"):
+            wav = self.tmp / f"{level}.wav"
+            talk[level] = dogaudio.isolate(self.mixed, wav, 0, self.total, level)["talking_seconds"]
+        self.assertLessEqual(talk["gentle"], talk["normal"])
+        self.assertLessEqual(talk["normal"], talk["strict"])
+        self.assertGreater(talk["normal"], 3)  # actually found the talking
+
+    def test_keep_mode_does_not_touch_audio(self):
+        out, result = self.run_mode(audio_mode="keep")
+        self.assertNotIn("audio_note", result)
+        a, b = self.spans[1][1] + 0.4, self.spans[1][2] - 0.4
+        self.assertGreater(self.rms(out, a, b), self.rms(self.mixed, a, b) * 0.5)
+
+    def test_video_without_audio_track_still_works_in_dog_mode(self):
+        out = self.tmp / "silent-dog.mp4"
+        result = editor.process(self.silent, out, EditOptions())
+        self.assertNotIn("audio", streams(out))
+        self.assertNotIn("audio_note", result)
+
+    def test_music_fills_the_silence_in_dog_mode(self):
+        out, _ = self.run_mode(music=self.song, music_volume=0.5)
+        a, b = self.spans[1][1] + 0.4, self.spans[1][2] - 0.4  # during talking: only music should be left
+        self.assertGreater(self.rms(out, a, b), 0.005)
+
+    def test_cleanup_files_are_removed(self):
+        out, _ = self.run_mode()
+        self.assertFalse(out.with_suffix(".dog.wav").exists())
+
+
+
 class FakeDrive:
     """In-memory stand-in for GoogleDrive with the same three methods."""
 
@@ -300,6 +480,10 @@ class FakeDrive:
     def names(self):
         return [f["name"] for f in self.files]
 
+    def get(self, suffix):
+        """The uploaded file whose name ends with `suffix`."""
+        return next(f for f in self.files if f["name"].endswith(suffix))
+
 
 class DriveTests(Base):
     def setUp(self):
@@ -313,9 +497,9 @@ class DriveTests(Base):
     def test_edits_new_video_using_instructions_in_filename(self):
         self.drive.add("zoomies mute trim 1-4.mp4", self.video.read_bytes())
         self.assertEqual(self.poll(), 1)
-        self.assertEqual(self.drive.names()[-1], "zoomies mute trim 1-4 [edited].mp4")
+        self.assertIn("zoomies mute trim 1-4 [edited].mp4", self.drive.names())
         out = self.tmp / "from-drive.mp4"
-        out.write_bytes(self.drive.files[-1]["data"])
+        out.write_bytes(self.drive.get("[edited].mp4")["data"])
         s = streams(out)
         self.assertEqual(s["video"]["height"], 1920)
         self.assertNotIn("audio", s)  # "mute" in the name removed the audio
@@ -325,8 +509,11 @@ class DriveTests(Base):
         self.drive.add("dog music: chill.mp4", self.video.read_bytes())
         self.poll()
         out = self.tmp / "music-drive.mp4"
-        out.write_bytes(self.drive.files[-1]["data"])
+        out.write_bytes(self.drive.get("[edited].mp4")["data"])
         self.assertIn("audio", streams(out))
+        notes = self.drive.get("[notes].txt")["data"].decode()  # a note explaining what was done sits beside the video
+        self.assertIn("Added music: chill", notes)
+        self.assertIn("talking", notes)
 
     def test_does_not_redo_finished_work(self):
         self.drive.add("a.mp4", self.video.read_bytes())

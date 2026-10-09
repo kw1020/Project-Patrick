@@ -10,11 +10,12 @@
 
   <label for="audio_mode">Original audio</label>
   <select id="audio_mode" name="audio_mode">
+    <option value="dog" selected>Dog sounds only (remove people talking)</option>
     <option value="keep">Keep as is</option>
     <option value="denoise">Clean up background noise</option>
     <option value="mute">Remove it completely</option>
   </select>
-  <div class="hint">Noise cleanup handles hiss, wind and hum. It can't reliably pull out people talking, so for background chatter choose "Remove it completely" and add music instead.</div>
+  <div class="hint">"Dog sounds only" silences the moments when people are talking and keeps everything else (breathing, whining, panting). If your dog makes a noise while someone talks, that noise goes too.</div>
 
   <label for="music_choice">Music</label>
   <select id="music_choice" name="music_choice">
@@ -32,6 +33,12 @@
 
   <details>
     <summary>More options</summary>
+    <label for="talking_detection">Talking detection (dog sounds only)</label>
+    <select id="talking_detection" name="talking_detection">
+      <option value="normal" selected>Normal</option>
+      <option value="gentle">Gentle: removes less, use if dog sounds get cut</option>
+      <option value="strict">Strict: removes more, use if voices are still audible</option>
+    </select>
     <label for="music_volume">Music volume: <span id="vol">35</span>%</label>
     <input id="music_volume" name="music_volume" type="range" min="5" max="100" value="35">
     <div class="row">
@@ -93,7 +100,7 @@ async function poll(id) {
   try {
     const s = await (await fetch('/api/jobs/' + id)).json();
     if (s.status === 'done') {
-      $('go').disabled = false; $('barwrap').hidden = true; say('Done!', 'ok');
+      $('go').disabled = false; $('barwrap').hidden = true; say('Done! ' + (s.audio_note || ''), 'ok');
       $('player').src = '/jobs/' + id + '/video'; $('result').hidden = false;
       $('dl').onclick = () => location.href = '/jobs/' + id + '/video?download=1';
       return;

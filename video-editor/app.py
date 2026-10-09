@@ -131,7 +131,8 @@ def create_app(password: str, data_dir: Path | None = None, music_dir: Path | No
                 trim_start=float(form.get("trim_start") or 0),
                 trim_end=float(form["trim_end"]) if form.get("trim_end") else None,
                 reframe=form.get("reframe", "fit"),
-                audio_mode=form.get("audio_mode", "keep"),
+                audio_mode=form.get("audio_mode", "dog"),
+                talking_detection=form.get("talking_detection", "normal"),
                 music_volume=float(form.get("music_volume", 35)) / 100,
                 speed=float(form.get("speed") or 1),
             )

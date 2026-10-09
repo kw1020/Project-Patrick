@@ -108,6 +108,10 @@ def poll_once(drive, folder_id: str, music_dir: Path, max_mb: int = 500, now: da
                 opts, notes = editor.parse_commands(stem, music_dir)
                 result = editor.process(src, tmp / "out.mp4", opts)
                 drive.upload(folder_id, tmp / "out.mp4", f"{stem}{EDITED}.mp4", "video/mp4")
+                summary = "\n".join([f"• {n}" for n in notes] + ([f"• {result['audio_note']}"] if result.get("audio_note") else []))
+                if summary:  # a short "what I did" note next to the video, so you can check Patrick's work
+                    (tmp / "notes.txt").write_text(f"What Patrick did to {name}:\n{summary}\n")
+                    drive.upload(folder_id, tmp / "notes.txt", f"{stem} [notes].txt", "text/plain")
                 log.info("Done %s (%ss): %s", name, result["duration"], "; ".join(notes) or "default edit")
             except Exception as e:  # tell the user in Drive instead of failing silently
                 reason = str(e) if isinstance(e, EditError) else "Something went wrong while editing."

@@ -6,8 +6,10 @@ The finished video appears in the same folder as `<name> [edited].mp4`. Put inst
 ```
 zoomies mute music: chill trim 0:03-0:15.mp4
 ```
-(`mute`, `denoise`, `music: name`, `trim a-b`, `speed 1.5`, `crop`. Same words as the email version.)
-No instructions = just made vertical with the volume evened out. If something fails you get `<name> [error].txt`.
+(`dog only`, `gentle`, `strict`, `keep audio`, `mute`, `denoise`, `music: name`, `trim a-b`, `speed 1.5`, `crop`.
+Same words as the email version.) No instructions = people talking are removed and your dog's sounds kept.
+Beside the video you also get `<name> [notes].txt` saying what was done (e.g. how many seconds of talking were removed).
+If something fails you get `<name> [error].txt`.
 It checks the folder every 30 seconds and never deletes or overwrites anything.
 
 > Not tested against real Google Drive yet (only against a fake Drive). Expect to fix a snag or two on first run.
