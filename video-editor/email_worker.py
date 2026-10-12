@@ -137,7 +137,7 @@ def check_inbox(cfg: dict) -> int:
 
 
 def email_configured() -> bool:
-    return all(os.environ.get(k) for k in ("EMAIL_ADDRESS", "EMAIL_APP_PASSWORD", "ALLOWED_SENDERS"))
+    return all(editor.env_is_set(k) for k in ("EMAIL_ADDRESS", "EMAIL_APP_PASSWORD", "ALLOWED_SENDERS"))
 
 
 def run_forever(cfg: dict) -> None:

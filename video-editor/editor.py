@@ -5,6 +5,7 @@ Both the web app and the email worker call `process()`. Nothing here touches the
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
 import threading
@@ -19,6 +20,11 @@ TALKING_LEVELS = ("gentle", "normal", "strict")
 REFRAME_MODES = ("fit", "crop", "none")
 FFMPEG_TIMEOUT = 900  # seconds
 _ENCODE_LOCK = threading.Lock()
+
+
+def env_is_set(name: str) -> bool:
+    """True if an environment variable has a real value. Hosts that won't accept blank boxes get "skip" typed in."""
+    return os.environ.get(name, "").strip().lower() not in ("", "skip", "none", "n/a")
 
 
 class EditError(Exception):

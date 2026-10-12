@@ -125,7 +125,7 @@ def poll_once(drive, folder_id: str, music_dir: Path, max_mb: int = 500, now: da
 
 
 def drive_configured() -> bool:
-    return all(os.environ.get(k) for k in
+    return all(editor.env_is_set(k) for k in
                ("GDRIVE_CLIENT_ID", "GDRIVE_CLIENT_SECRET", "GDRIVE_REFRESH_TOKEN", "GDRIVE_FOLDER_ID"))
 
 

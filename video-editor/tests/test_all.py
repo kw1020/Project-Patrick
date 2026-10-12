@@ -269,6 +269,17 @@ class EmailTests(Base):
             self.assertFalse(email_worker.email_configured())
             self.assertIsNone(email_worker.start_background())
 
+    def test_skip_typed_into_settings_counts_as_not_set(self):
+        import os
+        from unittest import mock
+        skipped = {"EMAIL_ADDRESS": "skip", "EMAIL_APP_PASSWORD": " SKIP ", "ALLOWED_SENDERS": "none"}
+        with mock.patch.dict(os.environ, skipped, clear=True):
+            self.assertFalse(email_worker.email_configured())
+            self.assertIsNone(email_worker.start_background())
+        real = {"EMAIL_ADDRESS": "a@b.com", "EMAIL_APP_PASSWORD": "pw", "ALLOWED_SENDERS": "c@d.com"}
+        with mock.patch.dict(os.environ, real, clear=True):
+            self.assertTrue(email_worker.email_configured())
+
     def test_missing_attachment_gets_helpful_reply(self):
         reply = self.handle(self.make_email(attach_video=False))
         self.assertIn("didn't find a video", reply.get_body().get_content())
@@ -542,6 +553,14 @@ class DriveTests(Base):
         self.drive.download = lambda *a: self.fail("should not download")
         self.poll(max_mb=1)
         self.assertEqual(self.drive.names()[-1], "huge [error].txt")
+
+    def test_skip_typed_into_drive_settings_counts_as_not_set(self):
+        import os
+        from unittest import mock
+        skipped = {k: "skip" for k in ("GDRIVE_CLIENT_ID", "GDRIVE_CLIENT_SECRET", "GDRIVE_REFRESH_TOKEN", "GDRIVE_FOLDER_ID")}
+        with mock.patch.dict(os.environ, skipped, clear=True):
+            self.assertFalse(self.dw.drive_configured())
+            self.assertIsNone(self.dw.start_background())
 
     def test_watcher_stays_off_without_drive_settings(self):
         import os

@@ -12,6 +12,7 @@ services:
         sync: false
       - key: PATRICK_SECRET       # keeps you logged in across restarts
         generateValue: true
+      # Email and Drive are optional. If Render won't let you leave a box blank, type the word skip.
       - key: EMAIL_ADDRESS        # Patrick's dedicated Gmail (optional: leave blank for web-only)
         sync: false
       - key: EMAIL_APP_PASSWORD   # that Gmail's 16-letter app password
