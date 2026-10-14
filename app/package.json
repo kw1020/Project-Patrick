@@ -1,0 +1,18 @@
+{
+  "name": "patrick-flip-scanner",
+  "version": "0.1.0",
+  "description": "Patrick v1: thrift-store scan-and-flip assistant",
+  "scripts": {
+    "start": "node server.js",
+    "start:mock": "PATRICK_MOCK=1 node server.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.133.0"
+  },
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  }
+}
