@@ -1,0 +1,26 @@
+{
+  "_note": "Fictional demo business. Copy this file for each real client and replace every value.",
+  "name": "Greenline Lawn Care",
+  "type": "Lawn care",
+  "city": "Springfield",
+  "phone": "(555) 010-0199",
+  "email": "hello@example.com",
+  "accent": "#2e7d32",
+  "headline": "A yard you're proud of, without lifting a finger",
+  "subhead": "Weekly mowing, cleanups and mulch in Springfield. Free quotes, usually same day.",
+  "points": ["Free quotes", "No contracts", "Locally owned", "Fully insured"],
+  "services": [
+    { "name": "Weekly mowing", "desc": "Mow, edge, trim and blow off every visit.", "price": "From $35/visit" },
+    { "name": "Spring & fall cleanup", "desc": "Leaves, sticks and beds cleared and hauled away.", "price": "From $150" },
+    { "name": "Mulch & beds", "desc": "Weeded beds, fresh edges and new mulch installed.", "price": "Quoted per yard" },
+    { "name": "Hedge trimming", "desc": "Shrubs and hedges shaped and cleaned up.", "price": "From $60" }
+  ],
+  "about": "Greenline is a local, owner-run crew. You get the same people every week, a text the day before we come, and a fair price up front.",
+  "areas": ["Springfield", "Shelbyville", "Ogdenville", "North Haverbrook"],
+  "faq": [
+    { "q": "Do I need to sign a contract?", "a": "No. Pay per visit and cancel any time." },
+    { "q": "Do I have to be home?", "a": "No. Just leave the gate unlocked and we'll text you when we're done." },
+    { "q": "How do I pay?", "a": "Card, Venmo, Zelle or cash after each visit." }
+  ],
+  "hours": [["Mon-Fri", "7am-6pm"], ["Sat", "8am-2pm"], ["Sun", "Closed"]]
+}

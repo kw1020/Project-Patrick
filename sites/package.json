@@ -1,0 +1,14 @@
+{
+  "name": "patrick-site-builder",
+  "version": "0.1.0",
+  "description": "Patrick: one-page websites for local businesses",
+  "scripts": {
+    "build": "node build.js",
+    "test": "node --test"
+  },
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  }
+}
