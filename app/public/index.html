@@ -14,6 +14,7 @@
     <h1>Patrick</h1>
     <nav>
       <button id="tab-scan" class="tab active" type="button">Scan</button>
+      <button id="tab-deals" class="tab" type="button">Deals</button>
       <button id="tab-log" class="tab" type="button">Log</button>
     </nav>
   </header>
@@ -42,6 +43,65 @@
     </section>
 
     <section id="result" hidden></section>
+  </main>
+
+  <main id="view-deals" hidden>
+    <section class="card">
+      <label for="dq">What are you hunting?</label>
+      <input id="dq" type="text" maxlength="100" placeholder="e.g. DeWalt drill, Nintendo Switch, KitchenAid" enterkeyhint="search">
+      <div class="row" style="margin-top:10px">
+        <div class="field">
+          <label for="dmax">Max price ($)</label>
+          <input id="dmax" type="number" inputmode="decimal" min="0" placeholder="any">
+        </div>
+        <div class="field grow">
+          <label for="dwhere">Where</label>
+          <select id="dwhere">
+            <option value="local">Local pickup near me</option>
+            <option value="ship">Ships to me (all US)</option>
+          </select>
+        </div>
+      </div>
+      <div class="row">
+        <div class="field grow">
+          <label for="dsort">Sort</label>
+          <select id="dsort">
+            <option value="newest">Newest first</option>
+            <option value="cheapest">Lowest price</option>
+            <option value="nearest">Closest (local only)</option>
+            <option value="ending">Auctions ending soon (shipped)</option>
+          </select>
+        </div>
+      </div>
+      <button id="dgo" class="scan" type="button">Find deals</button>
+      <p class="hint" id="dstatus" role="status" aria-live="polite"></p>
+      <div class="chips" id="watch"></div>
+    </section>
+
+    <section class="card">
+      <input id="shot" type="file" accept="image/*" hidden>
+      <button id="dshot" class="btn wide" type="button">Check a Facebook / OfferUp listing (screenshot)</button>
+      <p class="hint">Screenshot a listing, pick it here, and Patrick rates the deal and writes your offer.</p>
+    </section>
+
+    <section id="dresult"></section>
+
+    <details class="card" id="dsettings">
+      <summary>My location</summary>
+      <div class="row" style="margin-top:10px">
+        <div class="field">
+          <label for="dzip">ZIP code</label>
+          <input id="dzip" type="text" inputmode="numeric" maxlength="5" placeholder="12345">
+        </div>
+        <div class="field">
+          <label for="dradius">Miles</label>
+          <input id="dradius" type="number" inputmode="numeric" min="1" max="200" placeholder="25">
+        </div>
+      </div>
+      <label for="dcl">Craigslist city (optional)</label>
+      <input id="dcl" type="text" maxlength="40" placeholder="e.g. philadelphia">
+      <p class="hint">Craigslist city is the first part of your local site, like <b>philadelphia</b>.craigslist.org. Saved on this phone.</p>
+    </details>
   </main>
 
   <main id="view-log" hidden>

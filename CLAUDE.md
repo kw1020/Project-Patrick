@@ -9,7 +9,8 @@ Patrick is Krew Sutherland's personal AI (think Jarvis), built to make Krew mone
 
 ## Current plan
 See `MONEY_PLAN.md`. Two active lanes:
-1. **Thrift flipping:** `app/` is the flip scanner (Node, Anthropic SDK, deploys to Render via `render.yaml`). Tests: `cd app && npm install && npm test`.
+1. **Flipping:** `app/` is the flip scanner (Node, Anthropic SDK, deploys to Render via `render.yaml`). Tabs: Scan (in-store photo), Deals (live eBay search near Krew's ZIP with AI-rated profit, plus links to Facebook Marketplace, OfferUp and Craigslist, and screenshot-a-listing offer writer), Log. Tests: `cd app && npm install && npm test`.
+   - Krew asked for a deal finder across Facebook Marketplace, eBay, Etsy and the like. Only eBay has a public API. Facebook, OfferUp and Craigslist get search links plus screenshot analysis (no scraping). Etsy was skipped because it sells at retail, not deals.
 2. **Local business websites:** `sites/` is the site builder (no dependencies). When Krew says "new site: <business details>", write `sites/clients/<slug>.json` (copy the shape of `sample-lawn-care.json`), then run `node build.js <slug>` and give him the output path and deploy steps. Tests: `cd sites && npm test`.
 
 ## Rules

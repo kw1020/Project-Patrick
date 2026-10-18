@@ -5,12 +5,14 @@ import { fileURLToPath } from "node:url";
 import { timingSafeEqual } from "node:crypto";
 import Anthropic from "@anthropic-ai/sdk";
 import { analyze, mockAnalyze, ScanError, MODEL } from "./analyze.js";
+import { findDeals, mockDeals, parseDealRequest, ebayConfigured } from "./deals.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC = path.join(here, "public");
 const PORT = Number(process.env.PORT) || 3000;
 const MOCK = process.env.PATRICK_MOCK === "1";
 const PASSCODE = process.env.PATRICK_PASSCODE || "";
+// One daily cap for every AI call (scans and deal searches) so spending can't run away.
 const MAX_SCANS_PER_DAY = Number(process.env.PATRICK_MAX_SCANS_PER_DAY) || 200;
 const MAX_BODY = 8 * 1024 * 1024;
 
@@ -59,17 +61,22 @@ async function readJson(req) {
   }
 }
 
-async function handleScan(req, res) {
-  if (!passcodeOk(req)) return send(res, 401, { error: "Wrong passcode." });
-
+/** Count one AI call against today's cap. Returns a refund function for failed calls. */
+function takeQuota() {
   const today = new Date().toDateString();
   if (today !== scanDay) {
     scanDay = today;
     scansToday = 0;
   }
   if (scansToday >= MAX_SCANS_PER_DAY) {
-    return send(res, 429, { error: `Daily scan limit (${MAX_SCANS_PER_DAY}) reached.` });
+    throw new ScanError(`Daily limit (${MAX_SCANS_PER_DAY} AI calls) reached.`, 429);
   }
+  scansToday++;
+  return () => scansToday--;
+}
+
+async function handleScan(req, res) {
+  if (!passcodeOk(req)) return send(res, 401, { error: "Wrong passcode." });
 
   const body = await readJson(req);
   const match = /^data:(image\/(?:jpeg|png|webp|gif));base64,([A-Za-z0-9+/=]+)$/.exec(body.image || "");
@@ -77,14 +84,27 @@ async function handleScan(req, res) {
 
   const tagPrice = body.tagPrice === "" || body.tagPrice == null ? NaN : Number(body.tagPrice);
   const note = typeof body.note === "string" ? body.note.slice(0, 300) : "";
-  const input = { mediaType: match[1], imageB64: match[2], tagPrice, note };
+  const input = { mediaType: match[1], imageB64: match[2], tagPrice, note, listing: body.mode === "listing" };
 
-  scansToday++;
+  const refund = takeQuota();
   try {
     const result = MOCK ? mockAnalyze(input) : await analyze(input);
     send(res, 200, result);
   } catch (err) {
-    scansToday--; // don't count failed scans against the cap
+    refund(); // don't count failed scans against the cap
+    throw err;
+  }
+}
+
+async function handleDeals(req, res) {
+  if (!passcodeOk(req)) return send(res, 401, { error: "Wrong passcode." });
+  const opts = parseDealRequest(await readJson(req));
+  if (MOCK) return send(res, 200, mockDeals(opts));
+  const refund = ebayConfigured() ? takeQuota() : () => {};
+  try {
+    send(res, 200, await findDeals(opts));
+  } catch (err) {
+    refund();
     throw err;
   }
 }
@@ -106,9 +126,10 @@ async function handleStatic(req, res) {
 const server = http.createServer(async (req, res) => {
   try {
     if (req.method === "GET" && req.url === "/api/config") {
-      return send(res, 200, { needsPasscode: Boolean(PASSCODE), mock: MOCK });
+      return send(res, 200, { needsPasscode: Boolean(PASSCODE), mock: MOCK, ebay: MOCK || ebayConfigured() });
     }
     if (req.method === "POST" && req.url === "/api/scan") return await handleScan(req, res);
+    if (req.method === "POST" && req.url === "/api/deals") return await handleDeals(req, res);
     if (req.method === "GET") return await handleStatic(req, res);
     send(res, 405, "Method not allowed");
   } catch (err) {
@@ -133,5 +154,6 @@ server.listen(PORT, "0.0.0.0", () => {
   console.log(`Patrick flip scanner on http://localhost:${PORT}`);
   console.log(MOCK ? "MOCK mode: no AI calls are made." : `Model: ${MODEL}`);
   if (!MOCK && !process.env.ANTHROPIC_API_KEY) console.warn("Warning: ANTHROPIC_API_KEY is not set.");
+  if (!MOCK && !ebayConfigured()) console.warn("Note: EBAY_CLIENT_ID / EBAY_CLIENT_SECRET not set. Deals tab will show search links only.");
   if (!PASSCODE) console.warn("Warning: PATRICK_PASSCODE is not set. Set one before putting this on the internet.");
 });

@@ -10,9 +10,11 @@ Tool: `app/` (Patrick Flip Scanner). Already built.
 
 1. **Deploy it (one time, about 15 min).** Render → New → Blueprint → pick this repo. Set `ANTHROPIC_API_KEY` (from console.anthropic.com) and `PATRICK_PASSCODE`. Add the page to your phone's home screen.
    - The API is billed separately from the Claude subscription. Put $10 of credit on it. Each scan costs roughly 5-10 cents, so $10 covers 100+ scans.
-2. **Hit 2-3 thrift stores a week.** Scan anything that looks branded, vintage, tech or tools. Only buy on BUY, and check the "eBay sold" button first.
-3. **List the same day.** Paste the listing Patrick writes, shoot photos in daylight and log it.
-4. **Target:** 10 items a week at about $15 profit each = **about $600/month.**
+2. **Hunt online deals daily (Deals tab).** Save 5-10 searches for things you know resell (tools, game consoles, kitchen gear, Lego). Run them every morning, check the BUYs, and screenshot good Facebook and OfferUp finds for an offer message.
+   - Turn on live eBay deals with free keys from developer.ebay.com (steps in `app/README.md`).
+3. **Hit 2-3 thrift stores a week.** Scan anything that looks branded, vintage, tech or tools. Only buy on BUY, and check the "eBay sold" button first.
+4. **List the same day.** Paste the listing Patrick writes, shoot photos in daylight and log it.
+5. **Target:** 10 items a week at about $15 profit each = **about $600/month.**
 
 ## Lane 2: Websites for local businesses (bigger checks)
 
@@ -36,6 +38,7 @@ Tool: `sites/` (Patrick Site Builder). Full playbook in `sites/README.md`.
 ## Week 1
 
 - [ ] Deploy the flip scanner and load $10 of API credit
+- [ ] Get free eBay API keys, set your ZIP in the Deals tab and save 5 searches
 - [ ] One thrift run: buy 3-5 BUY items and list them all
 - [ ] List 20 local businesses with no or bad websites
 - [ ] Build 5 demo sites with Patrick

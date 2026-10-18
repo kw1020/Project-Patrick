@@ -36,6 +36,9 @@ export const SCHEMA = {
     "listing_description",
     "ebay_search",
     "facebook_search",
+    "asking_price",
+    "offer_price",
+    "offer_message",
   ],
   properties: {
     item_name: str,
@@ -60,6 +63,9 @@ export const SCHEMA = {
     listing_description: str,
     ebay_search: str,
     facebook_search: str,
+    asking_price: num,
+    offer_price: num,
+    offer_message: str,
   },
 };
 
@@ -81,6 +87,8 @@ How to think:
 - listing_title: an eBay-style title (max 80 characters) packed with the searchable keywords a buyer would use.
 - listing_description: 3-6 short sentences, honest about condition, ready to paste.
 - ebay_search and facebook_search: the short search phrases Krew should use to check sold prices and local competition (brand + model + key descriptor).
+- asking_price: for an online-listing screenshot, the price shown in the listing (0 if you can't read one, or for in-store scans).
+- offer_price and offer_message: only when the photo is a screenshot of an online listing (Facebook Marketplace, OfferUp, Craigslist and so on). offer_price is a fair opening offer that still leaves Krew a healthy profit, and offer_message is a short, friendly message to the seller making that offer (mention pickup timing, no pressure tactics). If the asking price is already a great deal, offer the asking price and say Krew can pick up soon. For in-store scans, use 0 and "".
 
 Be brief and plain-spoken. Krew reads this on a phone while standing in an aisle.`;
 
@@ -130,10 +138,11 @@ export function applyGuardrails(result, profit) {
   return result;
 }
 
-export async function analyze({ imageB64, mediaType, tagPrice, note }) {
+export async function analyze({ imageB64, mediaType, tagPrice, note, listing }) {
+  const priceLabel = listing ? "Asking price" : "Price on the tag";
   const userText = [
-    "Scan this item.",
-    Number.isFinite(tagPrice) ? `Price on the tag: $${tagPrice.toFixed(2)}.` : "No tag price given.",
+    listing ? "This is a screenshot of an online listing near Krew. Judge the deal and write an offer." : "Scan this item.",
+    Number.isFinite(tagPrice) ? `${priceLabel}: $${tagPrice.toFixed(2)}.` : listing ? "Read the asking price from the screenshot." : "No tag price given.",
     note ? `Note from Krew: ${note}` : "",
   ]
     .filter(Boolean)
@@ -174,7 +183,9 @@ export async function analyze({ imageB64, mediaType, tagPrice, note }) {
     throw new ScanError("Got a garbled answer. Try again.", 502);
   }
 
-  const profit = computeProfit(result, tagPrice);
+  // For a listing screenshot with no price typed in, judge against the price read from the listing.
+  const cost = Number.isFinite(tagPrice) ? tagPrice : listing && result.asking_price > 0 ? result.asking_price : NaN;
+  const profit = computeProfit(result, cost);
   const adjusted = applyGuardrails(result, profit);
   return { ...adjusted, profit };
 }
@@ -187,7 +198,7 @@ export class ScanError extends Error {
 }
 
 /** Canned answer so the UI can be developed and tested without an API key. */
-export function mockAnalyze({ tagPrice }) {
+export function mockAnalyze({ tagPrice, listing }) {
   const result = {
     item_name: "Pyrex Butterprint 443 Mixing Bowl (Turquoise)",
     brand: "Pyrex",
@@ -211,7 +222,14 @@ export function mockAnalyze({ tagPrice }) {
     listing_description: "Vintage Pyrex Butterprint mixing bowl in turquoise. Pattern is bright with only light use wear. No chips or cracks. Ships well padded.",
     ebay_search: "Pyrex Butterprint 443 turquoise bowl",
     facebook_search: "vintage Pyrex butterprint bowl",
+    asking_price: 0,
+    offer_price: 0,
+    offer_message: "",
   };
+  if (listing) {
+    result.offer_price = 6;
+    result.offer_message = "Hi! Is the Pyrex bowl still available? Would you take $6? I can pick up today or tomorrow.";
+  }
   const profit = computeProfit(result, tagPrice);
   return { ...applyGuardrails(result, profit), profit };
 }
