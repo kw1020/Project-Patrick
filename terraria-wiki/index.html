@@ -1,0 +1,959 @@
+<title>Krew's Terraria Wiki</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@600;700&display=swap">
+<style>
+/* Layout: classic wiki frame. Fixed-width sidebar on the left, tab bar + search on top, one article panel. Sidebar folds into a menu on phones. Dark earth tones only. */
+:root {
+  color-scheme: dark;
+  --frame: #17120f;        /* outer frame, like packed dirt */
+  --panel: #241c17;        /* article background */
+  --box: #2e241e;          /* infobox, tables, TOC */
+  --box-head: #3b2e25;
+  --line: #4d3d32;
+  --fg: #eee4d4;
+  --muted: #b3a38e;
+  --link: #8fd16a;         /* grass green */
+  --link-visited: #b9cf6e;
+  --link-hover: #c4f29a;
+  --new: #e8806e;
+  --gold: #e9b949;
+  --pre: #8fd16a;
+  --hm: #e89ad0;
+  --end: #6fd6cb;
+  --serif: Georgia, "Linux Libertine", "Times New Roman", serif;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --pixel: "Pixelify Sans", "Courier New", monospace;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--frame); color: var(--fg); font: 15px/1.6 var(--sans); }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--frame); }
+a { color: var(--link); text-decoration: none; }
+a:hover { color: var(--link-hover); text-decoration: underline; }
+a:focus-visible, button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+.layout {
+  display: grid; grid-template-columns: 196px minmax(0, 1fr); gap: 0 18px;
+  max-width: 1400px; margin: 0 auto; min-height: 100%;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 12px 24px;
+}
+
+/* Sidebar */
+aside.side { font-size: 13.5px; }
+.logo { display: block; padding: 10px 6px 18px; text-decoration: none !important; }
+.logo .mark {
+  display: grid; place-items: center; width: 64px; height: 64px; margin-bottom: 8px;
+  background: linear-gradient(#5b8f3a 0 28%, #7a5232 28% 100%);
+  border: 3px solid #2a1d14; box-shadow: inset -4px -4px 0 rgba(0,0,0,.25), inset 4px 4px 0 rgba(255,255,255,.12);
+  font: 700 26px/1 var(--pixel); color: #f6eedd; text-shadow: 2px 2px 0 #2a1d14;
+}
+.logo .name { display: block; font: 700 19px/1.1 var(--pixel); color: var(--fg); letter-spacing: .3px; }
+.logo .name span { color: var(--gold); }
+.portal { margin-bottom: 16px; }
+.portal h3 { margin: 0 0 4px; padding: 0 6px 4px; font: 700 11px var(--sans); text-transform: uppercase; letter-spacing: .1em; color: var(--muted); border-bottom: 1px solid var(--line); }
+.portal ul { list-style: none; margin: 0; padding: 0; }
+.portal li a { display: block; padding: 3px 6px; border-radius: 4px; }
+.portal li a:hover { background: var(--box); text-decoration: none; }
+
+/* Top bar */
+.topbar { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding-top: 12px; }
+.tabs { display: flex; gap: 2px; align-items: flex-end; }
+.tabs a, .tabs button {
+  display: block; padding: 7px 14px 6px; font: 13.5px var(--sans); color: var(--link);
+  background: var(--box); border: 1px solid var(--line); border-bottom: 0; border-radius: 6px 6px 0 0; cursor: pointer;
+}
+.tabs .on { background: var(--panel); color: var(--fg); position: relative; top: 1px; }
+.tabs .menu-btn { display: none; color: var(--fg); }
+.search { position: relative; flex: 0 1 340px; margin-bottom: 6px; }
+.search input {
+  width: 100%; padding: 7px 12px; font: 15px var(--sans); color: var(--fg);
+  background: var(--box); border: 1px solid var(--line); border-radius: 4px;
+}
+.search input::placeholder { color: var(--muted); }
+.suggest {
+  position: absolute; left: 0; right: 0; top: calc(100% + 2px); z-index: 20;
+  background: var(--box); border: 1px solid var(--line); border-radius: 4px; overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0,0,0,.5);
+}
+.suggest a { display: block; padding: 6px 12px; color: var(--fg); }
+.suggest a small { color: var(--muted); margin-left: 6px; }
+.suggest a.active, .suggest a:hover { background: var(--box-head); text-decoration: none; }
+
+/* Article */
+article.content {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 0 6px 6px 6px;
+  padding: 18px 28px 28px; min-width: 0; min-height: 70vh;
+}
+h1.title { font: 400 30px/1.25 var(--serif); margin: 0 0 2px; padding-bottom: 4px; border-bottom: 1px solid var(--line); text-wrap: balance; }
+.sub { color: var(--muted); font-size: 12.5px; margin-bottom: 16px; }
+.body { overflow-wrap: anywhere; }
+.body h2 { font: 400 23px/1.3 var(--serif); margin: 1.4em 0 .5em; padding-bottom: 3px; border-bottom: 1px solid var(--line); }
+.body h3 { font: 700 16px var(--sans); margin: 1.2em 0 .3em; }
+.body p { margin: .5em 0 .8em; max-width: 80ch; }
+.body ul, .body ol { margin: .3em 0 .9em; padding-left: 1.6em; max-width: 80ch; }
+.body li { margin: .15em 0; }
+.body b { color: #fff8ec; }
+
+/* Infobox */
+.infobox {
+  float: right; clear: right; width: 290px; margin: 0 0 16px 22px;
+  background: var(--box); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; font-size: 13.5px;
+}
+.infobox .ib-title { background: var(--box-head); text-align: center; font: 700 15px var(--sans); padding: 8px 10px; }
+.infobox .ib-art { display: grid; place-items: center; padding: 16px 0; border-bottom: 1px solid var(--line); }
+.tile {
+  width: 72px; height: 72px; display: grid; place-items: center;
+  font: 700 28px/1 var(--pixel); color: #1b1410;
+  background: var(--c); border: 3px solid #1b1410;
+  box-shadow: inset -5px -5px 0 rgba(0,0,0,.28), inset 5px 5px 0 rgba(255,255,255,.25);
+  image-rendering: pixelated;
+}
+.infobox table { width: 100%; border-collapse: collapse; }
+.infobox th, .infobox td { padding: 6px 10px; border-top: 1px solid var(--line); vertical-align: top; text-align: left; }
+.infobox th { width: 40%; color: var(--muted); font-weight: 700; }
+.infobox tr:first-child th, .infobox tr:first-child td { border-top: 0; }
+.ib-section { background: var(--box-head); text-align: center; font-weight: 700; padding: 4px; font-size: 12.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+
+.stage { font-weight: 700; color: var(--c); }
+.stage.pre { --c: var(--pre); } .stage.hm { --c: var(--hm); } .stage.end { --c: var(--end); }
+
+/* TOC */
+.toc { display: inline-block; background: var(--box); border: 1px solid var(--line); border-radius: 6px; padding: 8px 18px 10px 14px; margin: 4px 0 12px; font-size: 14px; }
+.toc b { display: block; text-align: center; margin-bottom: 4px; color: var(--fg); }
+.toc ol { margin: 0; padding-left: 1.2em; }
+.toc .n { color: var(--muted); margin-right: 6px; font-variant-numeric: tabular-nums; }
+.toc ol { list-style: none; padding-left: 0; }
+
+/* Tables */
+.table-wrap { overflow-x: auto; margin: .6em 0 1em; }
+table.wikitable { border-collapse: collapse; background: var(--box); border: 1px solid var(--line); min-width: 360px; }
+table.wikitable th, table.wikitable td { border: 1px solid var(--line); padding: 6px 12px; text-align: left; vertical-align: top; }
+table.wikitable th { background: var(--box-head); }
+table.wikitable td.num { font-variant-numeric: tabular-nums; text-align: right; color: var(--gold); white-space: nowrap; }
+
+/* Navbox */
+.navbox { clear: both; margin-top: 28px; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; background: var(--box); font-size: 13.5px; }
+.navbox .nb-title { background: var(--box-head); text-align: center; font-weight: 700; padding: 6px; }
+.navbox .row { display: grid; grid-template-columns: 140px 1fr; border-top: 1px solid var(--line); }
+.navbox .row > div:first-child { padding: 6px 10px; font-weight: 700; color: var(--muted); background: rgba(0,0,0,.12); }
+.navbox .row > div:last-child { padding: 6px 10px; }
+.navbox .row a::after { content: " · "; color: var(--muted); }
+.navbox .row a:last-child::after { content: ""; }
+.navbox .row a.self { color: var(--fg); font-weight: 700; }
+
+/* Categories footer */
+.catlinks { clear: both; margin-top: 22px; padding: 7px 12px; background: var(--box); border: 1px solid var(--line); border-radius: 6px; font-size: 13.5px; }
+.catlinks a::after { content: " | "; color: var(--muted); }
+.catlinks a:last-child::after { content: ""; }
+
+/* Main page */
+.welcome { text-align: center; padding: 18px 12px 22px; border-bottom: 1px solid var(--line); margin-bottom: 18px; }
+.welcome h1 { font: 700 clamp(24px, 4vw, 34px)/1.15 var(--pixel); margin: 0 0 6px; letter-spacing: .4px; }
+.welcome h1 span { color: var(--gold); }
+.welcome p { margin: 0 auto; color: var(--muted); max-width: 60ch; }
+.welcome .count { font-variant-numeric: tabular-nums; color: var(--fg); font-weight: 700; }
+.portals { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); }
+.pbox { background: var(--box); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.pbox h2 { margin: 0; padding: 7px 12px; background: var(--box-head); font: 700 15px var(--sans); border: 0; }
+.pbox .pb-body { padding: 8px 12px 10px; font-size: 14px; }
+.pbox .pb-body h4 { margin: 6px 0 2px; font-size: 11.5px; text-transform: uppercase; letter-spacing: .09em; color: var(--muted); }
+.pbox .pb-body p { margin: 0 0 4px; }
+.pbox .pb-body a::after { content: " · "; color: var(--muted); }
+.pbox .pb-body a:last-child::after { content: ""; }
+
+/* Category listing */
+.catlist { columns: 3 220px; column-gap: 24px; }
+.catlist section { break-inside: avoid; margin-bottom: 10px; }
+.catlist h3 { margin: 0 0 2px; font: 700 15px var(--sans); }
+.catlist ul { margin: 0; padding-left: 1.2em; }
+
+.results li { margin-bottom: 8px; }
+.results small { display: block; color: var(--muted); }
+
+footer.foot { grid-column: 2; color: var(--muted); font-size: 12.5px; padding: 14px 4px 0; }
+footer.foot p { margin: 0 0 4px; }
+
+@media (max-width: 820px) {
+  .layout { grid-template-columns: minmax(0, 1fr); }
+  aside.side { display: none; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; margin-bottom: 10px; }
+  aside.side.open { display: block; }
+  aside.side .logo { display: none; }
+  .tabs .menu-btn { display: block; }
+  .search { flex: 1 1 100%; order: -1; margin-bottom: 8px; }
+  article.content { padding: 14px 16px 22px; border-radius: 0 0 6px 6px; }
+  .infobox { float: none; width: 100%; margin: 0 0 14px; }
+  .navbox .row { grid-template-columns: 1fr; }
+  footer.foot { grid-column: 1; }
+  .mobile-brand { display: block !important; }
+}
+.mobile-brand { display: none; font: 700 20px var(--pixel); color: var(--fg); padding: 6px 0 2px; }
+.mobile-brand span { color: var(--gold); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; scroll-behavior: auto !important; } }
+</style>
+
+<div class="layout">
+  <aside class="side" id="side">
+    <a class="logo" href="#Main_Page" aria-label="Krew's Terraria Wiki, Main Page">
+      <span class="mark">KT</span>
+      <span class="name">Krew's <span>Terraria</span> Wiki</span>
+    </a>
+    <nav id="sidenav"></nav>
+  </aside>
+
+  <div class="main">
+    <a class="mobile-brand" href="#Main_Page">Krew's <span>Terraria</span> Wiki</a>
+    <div class="topbar">
+      <div class="tabs" id="tabs"></div>
+      <div class="search">
+        <input id="q" type="search" placeholder="Search Krew's Terraria Wiki" autocomplete="off" aria-label="Search the wiki" aria-controls="suggest" aria-autocomplete="list">
+        <div class="suggest" id="suggest" role="listbox" hidden></div>
+      </div>
+    </div>
+    <article class="content" id="page" aria-live="polite"></article>
+  </div>
+
+  <footer class="foot">
+    <p>Krew's Terraria Wiki is a personal fan wiki. Pages are written in plain language from game facts (v1.4.5). Each article links to the official Terraria Wiki for exact numbers.</p>
+    <p>Not affiliated with Re-Logic or the official Terraria Wiki. Terraria is a trademark of Re-Logic.</p>
+  </footer>
+</div>
+
+<script>
+/* =========================================================
+   DATA
+   ========================================================= */
+const STAGE = { pre: "Pre-Hardmode", hm: "Hardmode", end: "Endgame" };
+
+const BOSSES = [
+  { n: "King Slime", stage: "pre", item: "Slime Crown", area: "Anywhere", via: "summoned with a Slime Crown",
+    summon: "Craft a Slime Crown from 20 Gel and a Gold or Platinum Crown at a Demon or Crimson Altar. He also shows up on his own during a Slime Rain once enough slimes die.",
+    where: "Anywhere, day or night.",
+    drops: "Slime Saddle (a mount), Slime Hook, Ninja armor pieces, Solidifier.",
+    expert: "Royal Gel: most slimes stop attacking you.",
+    unlocks: "Nothing is locked behind him. He is an easy warm-up.",
+    tip: "He teleports to you. Fight on flat ground with room to run." },
+  { n: "Eye of Cthulhu", stage: "pre", item: "Suspicious Looking Eye", area: "Night", via: "summoned at night with a Suspicious Looking Eye",
+    summon: "Craft a Suspicious Looking Eye from 6 Lens at a Demon or Crimson Altar. Lenses drop from Demon Eyes at night.",
+    where: "Night only. It can also arrive on its own once you have 200+ life and 10+ defense.",
+    drops: "Demonite Ore or Crimtane Ore, seeds of your world's evil biome, arrows.",
+    expert: "Shield of Cthulhu: a dash move.",
+    unlocks: "Counts as a boss kill for the Dryad.",
+    tip: "Its second phase charges in straight lines. Side-step with platforms or a Grappling Hook." },
+  { n: "Eater of Worlds", stage: "pre", item: "Worm Food", area: "Corruption", via: "found only in Corruption worlds",
+    summon: "Craft Worm Food from 15 Rotten Chunk and 30 Vile Powder at a Demon Altar, or smash 3 Shadow Orbs with a hammer.",
+    where: "You must be standing in the Corruption.",
+    drops: "Shadow Scale and Demonite Ore, used for the Nightmare Pickaxe and Shadow armor.",
+    expert: "Worm Scarf: take less damage.",
+    unlocks: "The Nightmare Pickaxe can mine Hellstone. The Tavernkeep shows up.",
+    tip: "It splits into smaller worms. Weapons that pierce or explode hit many segments at once." },
+  { n: "Brain of Cthulhu", stage: "pre", item: "Bloody Spine", area: "Crimson", via: "found only in Crimson worlds",
+    summon: "Craft a Bloody Spine from 15 Vertebra and 30 Vicious Powder at a Crimson Altar, or smash 3 Crimson Hearts.",
+    where: "You must be standing in the Crimson.",
+    drops: "Tissue Sample and Crimtane Ore, used for the Deathbringer Pickaxe and Crimson armor.",
+    expert: "Brain of Confusion: confuses enemies when you get hit.",
+    unlocks: "The Deathbringer Pickaxe can mine Hellstone. The Tavernkeep shows up.",
+    tip: "Kill the floating Creepers first. In phase two, ignore the faded copies and hit the solid brain." },
+  { n: "Queen Bee", stage: "pre", item: "Abeemination", area: "Jungle", via: "who lives in the Jungle's Bee Hives",
+    summon: "Craft an Abeemination by hand from 5 Honey Block, 5 Hive, 1 Stinger and 1 Bottled Honey. You can also break the larva inside a Bee Hive.",
+    where: "Jungle or Underground Jungle.",
+    drops: "Bee Gun, Bee Keeper, Bees Knees, Bee Wax (for Bee armor), Hive Wand.",
+    expert: "Hive Pack: stronger bees.",
+    unlocks: "The Witch Doctor moves in.",
+    tip: "Standing in honey heals you slowly. Fight near a honey pool." },
+  { n: "Deerclops", stage: "pre", opt: true, item: "Deer Thing", area: "Snow", via: "found in the Snow biome",
+    summon: "Craft a Deer Thing from 3 Flinx Fur, 1 Lens and 5 Demonite Ore or Crimtane Ore at a Demon or Crimson Altar.",
+    where: "Snow biome.",
+    drops: "Lucy the Axe, Pew-matic Horn, Weather Pain, Houndius Shootius.",
+    expert: "Bone Helm: summons an eye that fights for you.",
+    unlocks: "Nothing depends on it.",
+    tip: "Shadow hands appear when it gets dark. Keep a light source and keep moving." },
+  { n: "Skeletron", stage: "pre", item: null, area: "Dungeon", via: "who guards the Dungeon",
+    summon: "Talk to the Old Man at the Dungeon entrance at night and choose to curse him.",
+    where: "Dungeon entrance, night only. It becomes unbeatable at dawn.",
+    drops: "Skeletron Hand, Book of Skulls.",
+    expert: "Bone Glove: throws bones at enemies.",
+    unlocks: "Opens the Dungeon. The Clothier moves in, and the Mechanic can be found tied up inside the Dungeon.",
+    tip: "Start right after dusk so you have the whole night. Focus the head." },
+  { n: "Wall of Flesh", stage: "pre", item: "Guide Voodoo Doll", area: "Underworld", via: "who guards the Underworld. Beating it starts Hardmode",
+    summon: "Throw a Guide Voodoo Doll into lava in the Underworld while the Guide is alive. Voodoo Demons there drop the doll.",
+    where: "Underworld. You can't run away from this fight.",
+    drops: "Pwnhammer, a class emblem, and one of: Breaker Blade, Clockwork Assault Rifle, Laser Rifle, Firecracker.",
+    expert: "Demon Heart: one extra accessory slot.",
+    unlocks: "Hardmode begins and the world changes for good.",
+    tip: "Build a long flat bridge across the Underworld before you start. It moves sideways and you need room to back up." },
+  { n: "Queen Slime", stage: "hm", opt: true, item: "Gelatin Crystal", area: "Underground Hallow", via: "summoned with a Gelatin Crystal",
+    summon: "Mine a Gelatin Crystal in the Underground Hallow.",
+    where: "Anywhere once summoned.",
+    drops: "Blade Staff, Hook of Dissonance, Gelatinous Pillion (a mount), Crystal Assassin armor pieces.",
+    expert: "Volatile Gelatin: drops damaging gel when you're hit.",
+    unlocks: "Nothing depends on her. Good loot for early Hardmode.",
+    tip: "In phase two she flies. Ranged weapons and a mount help." },
+  { n: "The Twins", stage: "hm", item: "Mechanical Eye", area: "Night", via: "and one of the three Mechanical bosses",
+    summon: "Craft a Mechanical Eye from 3 Lens, 5 Iron Bar or Lead Bar and 6 Soul of Light at a Mythril Anvil.",
+    where: "Night only.",
+    drops: "Soul of Sight, Hallowed Bar.",
+    expert: "Mechanical Wheel Piece, part of a minecart upgrade.",
+    unlocks: "Counts toward the three Mechanical bosses. The Steampunker moves in after any of them.",
+    tip: "Kill one eye at a time. Many players take out Spazmatism, the green one, first." },
+  { n: "The Destroyer", stage: "hm", item: "Mechanical Worm", area: "Night", via: "and one of the three Mechanical bosses",
+    summon: "Craft a Mechanical Worm from 6 Rotten Chunk or Vertebra, 5 Iron Bar or Lead Bar and 6 Soul of Night at a Mythril Anvil.",
+    where: "Night only.",
+    drops: "Soul of Might, Hallowed Bar.",
+    expert: "Mechanical Wagon Piece, part of a minecart upgrade.",
+    unlocks: "Counts toward the three Mechanical bosses.",
+    tip: "It is huge, so weapons that pierce or hit many segments melt it." },
+  { n: "Skeletron Prime", stage: "hm", item: "Mechanical Skull", area: "Night", via: "and one of the three Mechanical bosses",
+    summon: "Craft a Mechanical Skull from 30 Bone, 5 Iron Bar or Lead Bar, 3 Soul of Light and 3 Soul of Night at a Mythril Anvil.",
+    where: "Night only.",
+    drops: "Soul of Fright, Hallowed Bar.",
+    expert: "Mechanical Battery Piece, part of a minecart upgrade.",
+    unlocks: "Counts toward the three Mechanical bosses.",
+    tip: "Focus the head. When it starts spinning, back off and wait it out." },
+  { n: "Plantera", stage: "hm", item: "Plantera's Bulb", area: "Underground Jungle", via: "who grows deep in the Underground Jungle",
+    summon: "Break a pink Plantera's Bulb. Bulbs only grow after all three Mechanical bosses are dead.",
+    where: "Underground Jungle. Leaving the Jungle makes her enrage.",
+    drops: "Temple Key (always), plus one of: Grenade Launcher, Venus Magnum, Nettle Burst, Leaf Blower, Flower Pow, Wasp Gun, Seedler. Sometimes the Pygmy Staff.",
+    expert: "Spore Sac: floating spores damage enemies.",
+    unlocks: "The Jungle Temple, the harder Dungeon with Ectoplasm, the Cyborg, the Empress of Light, and the Pumpkin Moon and Frost Moon.",
+    tip: "Clear a big open arena in the Underground Jungle first." },
+  { n: "Empress of Light", stage: "hm", opt: true, item: "Prismatic Lacewing", area: "Hallow", via: "who appears in the Hallow at night",
+    summon: "Kill a Prismatic Lacewing, a glowing butterfly that flutters through the surface Hallow at night after Plantera.",
+    where: "Hallow. If day comes mid-fight, her attacks become instantly lethal.",
+    drops: "One of: Nightglow, Starlight, Eventide, Kaleidoscope. Rare: Empress Wings, Stellar Tune. Terraprisma only if you beat her during the day.",
+    expert: "A Treasure Bag with extra loot.",
+    unlocks: "Nothing depends on her, but her weapons are some of the best in the game.",
+    tip: "Start as early in the night as you can." },
+  { n: "Duke Fishron", stage: "hm", opt: true, item: "Truffle Worm", area: "Ocean", via: "who is fished up from the Ocean",
+    summon: "Go fishing in the Ocean with a Truffle Worm as bait.",
+    where: "Ocean. Leaving the Ocean makes him enrage.",
+    drops: "Fishron Wings, Flairon, Tsunami, Razorblade Typhoon, Tempest Staff, Bubble Gun.",
+    expert: "Shrimpy Truffle: breathe and move fast in water.",
+    unlocks: "Nothing depends on him.",
+    tip: "Build sky platforms over the ocean so you have room to dodge." },
+  { n: "Golem", stage: "hm", item: "Lihzahrd Power Cell", area: "Jungle Temple", via: "who sits at the heart of the Jungle Temple",
+    summon: "Place a Lihzahrd Power Cell on the Lihzahrd Altar deep inside the Jungle Temple.",
+    where: "Jungle Temple. Open the door with the Temple Key.",
+    drops: "Picksaw, Beetle Husk, Sun Stone, and one of: Stynger, Possessed Hatchet, Eye of the Golem, Heat Ray, Staff of Earth, Golem Fist.",
+    expert: "Shiny Stone: big life regeneration while standing still.",
+    unlocks: "The Lunatic Cultist and Martian Madness. The Picksaw mines Lihzahrd Bricks.",
+    tip: "Kill the fists, then the head. In the last phase the head flies loose, so stay mobile." },
+  { n: "Lunatic Cultist", stage: "end", item: null, area: "Dungeon", via: "who leads a cult at the Dungeon entrance",
+    summon: "After Golem, a group of cultists chants at the Dungeon entrance. Attack them.",
+    where: "Dungeon entrance.",
+    drops: "Ancient Manipulator, the crafting station for endgame gear.",
+    expert: "A Treasure Bag with extra loot.",
+    unlocks: "The Lunar Events start right away.",
+    tip: "When it splits into copies, find the real one and hit it fast." },
+  { n: "Moon Lord", stage: "end", item: "Celestial Sigil", area: "Anywhere", via: "and the final boss of the game",
+    summon: "Appears about a minute after all four Celestial Pillars are destroyed. Later, a Celestial Sigil (20 of each Lunar Fragment at the Ancient Manipulator) summons him.",
+    where: "Anywhere. Give yourself a big flat arena.",
+    drops: "Luminite, Portal Gun, and one of: Meowmere, Terrarian, Star Wrath, S.D.M.G., Celebration Mk2, Last Prism, Lunar Flare, Rainbow Crystal Staff, Lunar Portal Staff.",
+    expert: "Gravity Globe: flip gravity whenever you want.",
+    unlocks: "Luminite armor and tools.",
+    tip: "Destroy both hand eyes and the head eye, then the heart in his chest." },
+];
+
+const ITEMS = [
+  { n: "Life Crystal", cat: "Consumable", stage: "pre", how: "Glowing red hearts lying in the Caverns. Smash one with a pickaxe or hammer. Each gives +20 max life, up to 400." },
+  { n: "Life Fruit", cat: "Consumable", stage: "hm", how: "Grows in the Underground Jungle after you beat any Mechanical boss. Each gives +5 max life, up to 500." },
+  { n: "Mana Crystal", cat: "Consumable", stage: "pre", how: "Craft by hand from 5 Fallen Star. Stars fall from the sky at night. Each gives +20 mana, up to 200." },
+  { n: "Fallen Star", cat: "Material", stage: "pre", how: "Falls from the sky at night. Pick it up before sunrise or it disappears." },
+  { n: "Hermes Boots", cat: "Accessory", stage: "pre", how: "Chests in the Caverns. Lets you sprint." },
+  { n: "Cloud in a Bottle", cat: "Accessory", stage: "pre", how: "Chests in the Caverns. Gives a double jump." },
+  { n: "Magic Mirror", cat: "Tool", stage: "pre", how: "Chests in the Caverns. Teleports you home. The Ice Mirror from Snow chests does the same." },
+  { n: "Grappling Hook", cat: "Tool", stage: "pre", how: "Craft 1 Hook and 3 Iron Chain or Lead Chain at an Iron Anvil. Skeletons in the Caverns drop the Hook." },
+  { n: "Lucky Horseshoe", cat: "Accessory", stage: "pre", how: "Chests on Sky Islands. No more fall damage." },
+  { n: "Shiny Red Balloon", cat: "Accessory", stage: "pre", how: "Chests on Sky Islands. Jump higher." },
+  { n: "Fledgling Wings", cat: "Accessory", stage: "pre", how: "A rare find in chests on Sky Islands. The only wings you can get before Hardmode." },
+  { n: "Starfury", cat: "Weapon", stage: "pre", how: "Chests on Sky Islands. A sword that calls down stars." },
+  { n: "Lava Charm", cat: "Accessory", stage: "pre", how: "Chests deep in the Caverns near the lava layer. Gives a few seconds of lava immunity." },
+  { n: "Feral Claws", cat: "Accessory", stage: "pre", how: "Ivy chests in the Underground Jungle. Faster melee swings." },
+  { n: "Anklet of the Wind", cat: "Accessory", stage: "pre", how: "Ivy chests in the Underground Jungle. Run faster." },
+  { n: "Band of Regeneration", cat: "Accessory", stage: "pre", how: "Chests in the Caverns. Slowly heals you." },
+  { n: "Enchanted Sword", cat: "Weapon", stage: "pre", how: "A rare sword shrine hidden in the Caverns. The sword fires a beam." },
+  { n: "Bed", cat: "Furniture", stage: "pre", how: "Craft 15 Wood and 5 Silk at a Sawmill. Right-click it to set your respawn point." },
+  { n: "Bug Net", cat: "Tool", stage: "pre", how: "Bought from the Merchant. Catches critters and Truffle Worms." },
+  { n: "Golden Key", cat: "Tool", stage: "pre", how: "Dropped by Dungeon enemies after Skeletron. Opens locked gold chests in the Dungeon." },
+  { n: "Muramasa", cat: "Weapon", stage: "pre", how: "Locked gold chests in the Dungeon. A fast blue sword." },
+  { n: "Water Bolt", cat: "Weapon", stage: "pre", how: "Gold chests in the Dungeon, and sometimes on Dungeon shelves. Strong early magic." },
+  { n: "Cobalt Shield", cat: "Accessory", stage: "pre", how: "Locked gold chests in the Dungeon. Stops knockback." },
+  { n: "Shadow Key", cat: "Tool", stage: "pre", how: "Locked gold chests in the Dungeon. Opens Shadow Chests in the Underworld." },
+  { n: "Bone", cat: "Material", stage: "pre", how: "Skeletons in the Dungeon after Skeletron. Needed for the Mechanical Skull." },
+  { n: "Gel", cat: "Material", stage: "pre", how: "Dropped by any slime. Used for torches and the Slime Crown." },
+  { n: "Lens", cat: "Material", stage: "pre", how: "Dropped by Demon Eyes at night." },
+  { n: "Silk", cat: "Material", stage: "pre", how: "Craft 7 Cobweb at a Loom. Cobwebs cover the walls of the Caverns." },
+  { n: "Feather", cat: "Material", stage: "pre", how: "Dropped by Harpies, which fly near Sky Islands and in space." },
+  { n: "Stinger", cat: "Material", stage: "pre", how: "Dropped by Hornets and Spiked Jungle Slimes in the Jungle." },
+  { n: "Jungle Spores", cat: "Material", stage: "pre", how: "Glowing bulbs on the walls of the Underground Jungle. Used for Jungle armor and the Blade of Grass." },
+  { n: "Flinx Fur", cat: "Material", stage: "pre", how: "Dropped by Flinxes in the underground Snow biome." },
+  { n: "Rotten Chunk", aka: ["Vertebra"], cat: "Material", stage: "pre", how: "Rotten Chunk drops from enemies in the Corruption. Crimson worlds get Vertebra instead, from Crimson enemies." },
+  { n: "Shadow Scale", aka: ["Tissue Sample"], cat: "Material", stage: "pre", how: "Shadow Scale drops from the Eater of Worlds. In Crimson worlds the Brain of Cthulhu drops Tissue Sample instead." },
+  { n: "Bee Wax", cat: "Material", stage: "pre", how: "Dropped by Queen Bee. Makes Bee armor for summoners." },
+  { n: "Guide Voodoo Doll", cat: "Summon", stage: "pre", how: "Dropped by Voodoo Demons in the Underworld. Only works while the Guide is alive." },
+  { n: "Meteorite", cat: "Ore", stage: "pre", how: "A meteor lands after you smash your first Shadow Orb or Crimson Heart, and sometimes at night after that. Needs 50% pickaxe power. Smelt 3 ore into a bar at a Furnace." },
+  { n: "Demonite Ore", aka: ["Crimtane Ore", "Demonite", "Crimtane"], cat: "Ore", stage: "pre", how: "Found deep in your world's Corruption (Demonite) or Crimson (Crimtane), and dropped by the Eye of Cthulhu. Needs 55% pickaxe power." },
+  { n: "Obsidian", cat: "Ore", stage: "pre", how: "Forms where water meets lava. Needs 55% pickaxe power, or use explosives." },
+  { n: "Hellstone", cat: "Ore", stage: "pre", how: "Found in the Underworld. Needs 65% pickaxe power, so use the Nightmare Pickaxe or Deathbringer Pickaxe. Make bars from 3 Hellstone and 1 Obsidian at a Hellforge." },
+  { n: "Iron Bar", aka: ["Lead Bar", "Iron Chain", "Lead Chain"], cat: "Material", stage: "pre", how: "Smelt 3 Iron or Lead ore at a Furnace. Chains are crafted from bars at an Iron Anvil." },
+  { n: "Pwnhammer", cat: "Tool", stage: "hm", how: "Dropped by the Wall of Flesh. Smashes Demon Altars and Crimson Altars." },
+  { n: "Hardmode ores", aka: ["Cobalt", "Palladium", "Mythril", "Orichalcum", "Adamantite", "Titanium"], cat: "Ore", stage: "hm", how: "Smash altars with the Pwnhammer. Each smash spreads ore through the world. The first tier is Cobalt or Palladium, the second is Mythril or Orichalcum, the third is Adamantite or Titanium." },
+  { n: "Soul of Light", cat: "Material", stage: "hm", how: "Dropped by enemies in the Underground Hallow." },
+  { n: "Soul of Night", cat: "Material", stage: "hm", how: "Dropped by enemies in the underground Corruption or Crimson." },
+  { n: "Soul of Flight", cat: "Material", stage: "hm", how: "Dropped by Wyverns, which fly high in the sky." },
+  { n: "Soul of Sight", aka: ["Soul of Might", "Soul of Fright"], cat: "Material", stage: "hm", how: "Soul of Sight comes from The Twins, Soul of Might from The Destroyer, and Soul of Fright from Skeletron Prime." },
+  { n: "Angel Wings", aka: ["Demon Wings"], cat: "Accessory", stage: "hm", how: "Craft 20 Soul of Flight, 25 Soul of Light (Angel) or Soul of Night (Demon), and 10 Feather at a Mythril Anvil." },
+  { n: "Crystal Shard", cat: "Material", stage: "hm", how: "Crystals growing in the Hallow, above and below ground." },
+  { n: "Pixie Dust", cat: "Material", stage: "hm", how: "Dropped by Pixies in the surface Hallow." },
+  { n: "Cursed Flame", aka: ["Ichor"], cat: "Material", stage: "hm", how: "Cursed Flame drops from Hardmode Corruption enemies, Ichor from Hardmode Crimson enemies. Most come from underground." },
+  { n: "Gelatin Crystal", cat: "Summon", stage: "hm", how: "A pink crystal growing in the Underground Hallow." },
+  { n: "Hallowed Bar", cat: "Material", stage: "hm", how: "Dropped by the three Mechanical bosses." },
+  { n: "Pickaxe Axe", aka: ["Drax"], cat: "Tool", stage: "hm", how: "Craft from Hallowed Bar plus one Soul of Sight, Soul of Might and Soul of Fright at a Mythril Anvil. Needed to mine Chlorophyte Ore." },
+  { n: "Chlorophyte Ore", aka: ["Chlorophyte"], cat: "Ore", stage: "hm", how: "Found in the mud of the Underground Jungle. Needs 200% pickaxe power. Smelt it at an Adamantite Forge." },
+  { n: "Truffle Worm", cat: "Summon", stage: "hm", how: "Found in the underground Glowing Mushroom biome in Hardmode. It runs away, so catch it with a Bug Net." },
+  { n: "Temple Key", cat: "Tool", stage: "hm", how: "Always dropped by Plantera. Opens the Jungle Temple door." },
+  { n: "Lihzahrd Power Cell", cat: "Summon", stage: "hm", how: "Chests and enemies inside the Jungle Temple." },
+  { n: "Ectoplasm", cat: "Material", stage: "hm", how: "Dropped by Dungeon Spirits in the Dungeon after Plantera. Makes Spectre gear." },
+  { n: "Beetle Husk", cat: "Material", stage: "hm", how: "Dropped by Golem. Makes Beetle armor." },
+  { n: "Picksaw", cat: "Tool", stage: "hm", how: "Dropped by Golem. The only early pickaxe that mines Lihzahrd Bricks." },
+  { n: "Lunar Fragments", aka: ["Lunar Fragment", "Solar Fragment", "Vortex Fragment", "Nebula Fragment", "Stardust Fragment"], cat: "Material", stage: "end", how: "Dropped by enemies and by the pillars themselves during the Lunar Events. There are four kinds: Solar, Vortex, Nebula and Stardust." },
+  { n: "Luminite", cat: "Ore", stage: "end", how: "Dropped by the Moon Lord. Needs 225% pickaxe power to mine once placed." },
+];
+
+const BIOMES = [
+  { n: "Forest", stage: "pre", layer: "Surface", what: "Where every world starts. Trees, slimes, and zombies at night.", why: "Wood, your first house, and Living Trees with chests inside." },
+  { n: "Caverns", stage: "pre", layer: "Underground", what: "Everything below the surface: ores, Life Crystals, chests and Skeletons.", why: "Life Crystal, Hermes Boots, Cloud in a Bottle and Magic Mirror. Look out for Spider Caves (home of the Stylist) and Granite and Marble caves." },
+  { n: "Desert", stage: "pre", layer: "Surface and underground", what: "Sand dunes on top and a big sandstone cave underneath. Sandstorms blow through.", why: "The Golfer sleeps in the underground desert. Pyramids are rare but hide treasure." },
+  { n: "Snow", stage: "pre", layer: "Surface and underground", what: "A cold biome with an ice cave below.", why: "Frozen chests (Ice Skates, Ice Mirror, Blizzard in a Bottle), Flinx Fur, and Deerclops." },
+  { n: "Jungle", stage: "pre", layer: "Surface and underground", what: "A dangerous mud biome with a huge underground section.", why: "Jungle Spores, Stinger, Bee Hives with Queen Bee, and Ivy chests. Later: Life Fruit, Chlorophyte Ore, Plantera and the Jungle Temple." },
+  { n: "Ocean", stage: "pre", layer: "Surface", what: "Water at both edges of the world.", why: "The Angler, fishing and sharks. Duke Fishron in Hardmode." },
+  { n: "Corruption", aka: ["Crimson"], stage: "pre", layer: "Surface and underground", what: "Every world has either the Corruption or the Crimson. It spreads over time.", why: "Shadow Orbs or Crimson Hearts, Demon Altars or Crimson Altars, your world's evil boss, and Demonite Ore or Crimtane Ore." },
+  { n: "Dungeon", stage: "pre", layer: "Surface and underground", what: "A giant brick tower on one side of the world. Entering before Skeletron is deadly.", why: "Golden Key chests, Water Bolt, Muramasa, Bone, and the Mechanic. Gets much harder after Plantera, when Ectoplasm drops." },
+  { n: "Underworld", stage: "pre", layer: "Bottom of the world", what: "The bottom of the world, full of lava and ash.", why: "Hellstone, Obsidian, Hellforges, Shadow Chests, Voodoo Demons, and the Wall of Flesh." },
+  { n: "Sky Islands", stage: "pre", layer: "Sky", what: "Floating islands high above the surface.", why: "Skyware chests with Starfury, Lucky Horseshoe, Shiny Red Balloon and Fledgling Wings. Harpies drop Feather." },
+  { n: "Glowing Mushroom", stage: "pre", layer: "Usually underground", what: "Blue glowing mud areas, usually underground.", why: "Glowing mushrooms. In Hardmode, the Truffle and the Truffle Worm." },
+  { n: "Shimmer", aka: ["Aether"], stage: "pre", layer: "Caverns", what: "A small glowing pool deep in the Caverns, near the outer part of the world.", why: "Drop items in to transform or un-craft them. Touching it makes you fall through blocks, so be careful." },
+  { n: "Hallow", aka: ["Underground Hallow"], stage: "hm", layer: "Surface and underground", what: "A rainbow biome that appears when Hardmode starts.", why: "Pixie Dust, Crystal Shard and Unicorns. Underground: Soul of Light and the Gelatin Crystal. The Empress of Light at night." },
+  { n: "Jungle Temple", stage: "hm", layer: "Underground Jungle", what: "A brick temple deep in the Underground Jungle, locked until Plantera.", why: "Lihzahrd Power Cell, deadly traps, and Golem." },
+];
+
+const NPCS = [
+  { n: "Guide", stage: "pre", how: "There from the start.", sells: "Tips. Show him an item to see what it can be crafted into." },
+  { n: "Merchant", stage: "pre", how: "Carry 50 silver or more.", sells: "Piggy Bank, Bug Net, torches, rope and arrows." },
+  { n: "Nurse", stage: "pre", how: "The Merchant lives in town and you have more than 100 max life.", sells: "Heals you for coins, even in the middle of a boss fight." },
+  { n: "Demolitionist", stage: "pre", how: "The Merchant lives in town and you carry an explosive.", sells: "Bombs, dynamite and grenades." },
+  { n: "Dye Trader", stage: "pre", how: "Carry a dye or a dye ingredient.", sells: "Dyes and the Dye Vat." },
+  { n: "Angler", stage: "pre", how: "Found asleep at the Ocean. Talk to him.", sells: "Daily fishing quests that pay out in fishing gear." },
+  { n: "Zoologist", stage: "pre", how: "Fill 10% of your Bestiary.", sells: "Town pet licenses and animal-themed gear." },
+  { n: "Golfer", stage: "pre", how: "Found asleep in the underground Desert.", sells: "Golf gear." },
+  { n: "Arms Dealer", stage: "pre", how: "Carry a gun or bullets.", sells: "Ammo, the Minishark and the Flintlock Pistol." },
+  { n: "Dryad", stage: "pre", how: "Beat the Eye of Cthulhu, your world's evil boss, Skeletron or another major boss.", sells: "Purification Powder, seeds and planter boxes." },
+  { n: "Painter", stage: "pre", how: "Have 8 other town NPCs.", sells: "Paint and paintings." },
+  { n: "Stylist", stage: "pre", how: "Found tied up in a Spider Cave in the Caverns. Free her.", sells: "Haircuts and hair dye." },
+  { n: "Goblin Tinkerer", stage: "pre", how: "Beat the Goblin Army, then find him tied up in the Caverns.", sells: "Tinkerer's Workshop, Rocket Boots, and reforging." },
+  { n: "Witch Doctor", stage: "pre", how: "Beat Queen Bee.", sells: "Imbuing Station, summoner gear and the Blowgun." },
+  { n: "Tavernkeep", stage: "pre", how: "Beat the Eater of Worlds or Brain of Cthulhu, then find him on the surface.", sells: "Eternia Crystals for the Old One's Army, plus that event's gear." },
+  { n: "Clothier", stage: "pre", how: "Beat Skeletron.", sells: "Vanity clothing." },
+  { n: "Mechanic", stage: "pre", how: "After Skeletron, find her tied up in the Dungeon.", sells: "Wire, the Wrench, switches and traps." },
+  { n: "Party Girl", stage: "pre", how: "Have a big town (20 residents in v1.4.5). She has a random chance to arrive each day.", sells: "Party items and fireworks." },
+  { n: "Wizard", stage: "hm", how: "Found tied up in the Caverns.", sells: "Crystal Ball and magic items." },
+  { n: "Tax Collector", stage: "hm", how: "Use Purification Powder on a Tortured Soul in the Underworld.", sells: "Collects money from your town for you." },
+  { n: "Truffle", stage: "hm", how: "Build an empty house in a surface Glowing Mushroom biome.", sells: "Autohammer and Mushroom Spear." },
+  { n: "Pirate", stage: "hm", how: "Beat the Pirate Invasion.", sells: "Cannon and pirate gear." },
+  { n: "Steampunker", stage: "hm", how: "Beat any Mechanical boss.", sells: "Clentaminator, Jetpack and teleporters." },
+  { n: "Cyborg", stage: "hm", how: "Beat Plantera.", sells: "Rockets and mines." },
+  { n: "Santa Claus", stage: "hm", how: "Beat the Frost Legion during the Christmas season.", sells: "Christmas decorations." },
+  { n: "Princess", stage: "hm", how: "Every other town NPC has moved in.", sells: "Royal vanity and furniture." },
+  { n: "Traveling Merchant", stage: "pre", visitor: true, how: "Visits on random mornings. Doesn't need a house.", sells: "Rotating rare items. Check every visit." },
+  { n: "Skeleton Merchant", stage: "pre", visitor: true, how: "Wanders the Caverns.", sells: "Odd items that change with the moon phase." },
+];
+
+const STATIONS = [
+  { n: "Work Bench", stage: "pre", recipe: "10 Wood, crafted by hand.", makes: "Basic furniture and most early stations." },
+  { n: "Furnace", stage: "pre", recipe: "20 Stone, 4 Wood and 3 Torch at a Work Bench.", makes: "Bars from ore, and Glass from Sand." },
+  { n: "Iron Anvil", aka: ["Lead Anvil", "Anvil"], stage: "pre", recipe: "5 Iron Bar or Lead Bar at a Work Bench.", makes: "Weapons, armor and tools." },
+  { n: "Sawmill", stage: "pre", recipe: "10 Wood, 2 Iron Bar or Lead Bar and 1 Chain at a Work Bench.", makes: "Beds, the Loom and nicer furniture." },
+  { n: "Loom", stage: "pre", recipe: "12 Wood at a Sawmill.", makes: "Silk, cloth armor and banners." },
+  { n: "Placed Bottle", aka: ["Bottle", "Alchemy Table"], stage: "pre", recipe: "Make Glass at a Furnace, craft a Bottle, then place it on a table.", makes: "Potions. The Alchemy Table found in the Dungeon is a better version." },
+  { n: "Demon Altar", aka: ["Crimson Altar"], stage: "pre", recipe: "Can't be crafted. Found in the Corruption or Crimson.", makes: "Boss summons like the Slime Crown and Suspicious Looking Eye. In Hardmode, smash them with the Pwnhammer for Hardmode ores." },
+  { n: "Hellforge", stage: "pre", recipe: "Found in ruined houses in the Underworld.", makes: "Hellstone bars." },
+  { n: "Tinkerer's Workshop", stage: "pre", recipe: "Bought from the Goblin Tinkerer.", makes: "Combines accessories into stronger ones." },
+  { n: "Mythril Anvil", aka: ["Orichalcum Anvil"], stage: "hm", recipe: "10 Mythril or Orichalcum bars at an Iron Anvil.", makes: "Hardmode armor and weapons, Mechanical boss summons, and wings." },
+  { n: "Adamantite Forge", aka: ["Titanium Forge"], stage: "hm", recipe: "A Hellforge and 30 Adamantite or Titanium ore at an Iron Anvil.", makes: "Hardmode bars, including Chlorophyte and Spectre." },
+  { n: "Crystal Ball", stage: "hm", recipe: "Bought from the Wizard.", makes: "Hardmode magic items. Click it for a magic buff." },
+  { n: "Autohammer", stage: "hm", recipe: "Bought from the Truffle.", makes: "Shroomite Bars." },
+  { n: "Ancient Manipulator", stage: "end", recipe: "Dropped by the Lunatic Cultist.", makes: "Lunar weapons, Luminite gear and the Celestial Sigil." },
+];
+
+const EVENTS = [
+  { n: "Blood Moon", stage: "pre", start: "Happens on random nights.", what: "Zombies and Demon Eyes swarm, enemies can open doors, and water turns red. Fishing pulls up special enemies.", loot: "The Money Trough, a portable Piggy Bank, from Blood Zombies and Dripplers." },
+  { n: "Slime Rain", stage: "pre", start: "Happens on random days.", what: "Slimes fall from the sky all over the surface.", loot: "Lots of Gel. King Slime arrives once enough slimes die." },
+  { n: "Goblin Army", stage: "pre", start: "Can start at random after you smash a Shadow Orb or Crimson Heart, or right away with a Goblin Battle Standard.", what: "Waves of goblins march on your town from the edge of the world.", loot: "Spiky Ball and Harpoon. In Hardmode, Shadowflame weapons. Beating it lets you find the Goblin Tinkerer." },
+  { n: "Old One's Army", stage: "pre", start: "Buy an Eternia Crystal and its stand from the Tavernkeep, then place the crystal on the stand.", what: "Defend the crystal from waves of enemies. Harder tiers unlock in Hardmode.", loot: "Defender Medals, which buy the Tavernkeep's gear." },
+  { n: "Pirate Invasion", stage: "hm", start: "Use a Pirate Map, dropped by Ocean enemies in Hardmode, or wait for one at random.", what: "Pirates attack your town, led by the Flying Dutchman ship.", loot: "Coin Gun (rare), Lucky Coin, Discount Card, Pirate Staff. Beating it lets the Pirate move in." },
+  { n: "Frost Legion", stage: "hm", start: "Use a Snow Globe, found in presents during the Christmas season.", what: "Snowmen with guns attack your town.", loot: "Beating it lets Santa Claus move in during Christmas." },
+  { n: "Solar Eclipse", stage: "hm", start: "Happens on random days after any Mechanical boss.", what: "The sun goes dark and movie monsters roam the surface all day.", loot: "The Broken Hero Sword from Mothron (after Plantera), needed for the Terra Blade." },
+  { n: "Pumpkin Moon", stage: "hm", start: "Use a Pumpkin Moon Medallion at night. Best after Plantera.", what: "Score points through waves of Halloween enemies, with Mourning Wood and Pumpking as bosses.", loot: "The Horseman's Blade, Raven Staff, Bat Scepter, Candy Corn Rifle, and more." },
+  { n: "Frost Moon", stage: "hm", start: "Use a Naughty Present at night. Best after Plantera.", what: "Waves of Christmas enemies, with Everscream, Santa-NK1 and the Ice Queen as bosses.", loot: "Razorpine, Blizzard Staff, Elf Melter, North Pole, Staff of the Frost Hydra." },
+  { n: "Martian Madness", stage: "hm", start: "After Golem, a Martian Probe may spot you near the surface and fly off to report.", what: "Martians invade with laser weapons, led by the Martian Saucer.", loot: "Influx Waver, Xenopopper, Laser Machinegun, Cosmic Car Key (a mount)." },
+  { n: "Lunar Events", aka: ["Celestial Pillars", "Celestial Pillar"], stage: "end", start: "Starts as soon as you beat the Lunatic Cultist.", what: "Four Celestial Pillars appear: Solar, Vortex, Nebula and Stardust. Kill 100 enemies near a pillar to break its shield, then destroy it.", loot: "Lunar Fragments for top-tier gear. Destroying all four summons the Moon Lord." },
+];
+
+const PICKS = [
+  ["Copper / Tin Pickaxe", 35], ["Iron Pickaxe", 40], ["Lead Pickaxe", 43], ["Silver Pickaxe", 45],
+  ["Tungsten Pickaxe", 50], ["Gold Pickaxe", 55], ["Platinum Pickaxe", 59],
+  ["Nightmare Pickaxe", 65], ["Deathbringer Pickaxe", 70], ["Molten Pickaxe", 100],
+  ["Cobalt Pickaxe", 110], ["Palladium Pickaxe", 130], ["Mythril Pickaxe", 150], ["Orichalcum Pickaxe", 165],
+  ["Adamantite Pickaxe", 180], ["Titanium Pickaxe", 190], ["Pickaxe Axe / Drax", 200],
+  ["Picksaw", 210], ["Luminite pickaxes and drills", 225],
+];
+const NEEDS = [
+  ["Meteorite", 50, "Tungsten Pickaxe"],
+  ["Demonite Ore, Crimtane Ore, Obsidian", 55, "Gold Pickaxe"],
+  ["Hellstone, Dungeon Bricks, Ebonstone, Crimstone, Pearlstone", 65, "Nightmare Pickaxe"],
+  ["Cobalt, Palladium", 100, "Molten Pickaxe"],
+  ["Mythril, Orichalcum", 110, "Cobalt Pickaxe"],
+  ["Adamantite, Titanium", 150, "Mythril Pickaxe"],
+  ["Chlorophyte Ore", 200, "Pickaxe Axe"],
+  ["Lihzahrd Bricks", 210, "Picksaw"],
+];
+
+const PROGRESSION = [
+  ["pre", "Build a house with walls, a door, a table, a chair and a torch. Make a Work Bench, then a Furnace and an Iron Anvil."],
+  ["pre", "Explore the Caverns. Smash every Life Crystal and open every chest for Hermes Boots, Cloud in a Bottle and a Magic Mirror."],
+  ["pre", "Upgrade to a Gold Pickaxe or Platinum Pickaxe and craft a Grappling Hook."],
+  ["pre", "Beat King Slime and the Eye of Cthulhu."],
+  ["pre", "Beat your world's evil boss: the Eater of Worlds or the Brain of Cthulhu."],
+  ["pre", "Beat Queen Bee in the Jungle."],
+  ["pre", "Beat Skeletron to open the Dungeon."],
+  ["pre", "Mine Hellstone in the Underworld for Molten armor, then beat the Wall of Flesh."],
+  ["hm", "Smash altars with the Pwnhammer for Hardmode ores. Collect Soul of Light, Soul of Night and Soul of Flight, and make wings."],
+  ["hm", "Beat The Twins, The Destroyer and Skeletron Prime. Craft the Pickaxe Axe and mine Chlorophyte Ore."],
+  ["hm", "Beat Plantera, then Golem in the Jungle Temple."],
+  ["hm", "Optional: Queen Slime, Empress of Light, Duke Fishron."],
+  ["end", "Beat the Lunatic Cultist and destroy the Celestial Pillars."],
+  ["end", "Beat the Moon Lord and craft Luminite gear."],
+];
+
+/* =========================================================
+   PAGE BUILDING
+   ========================================================= */
+const PAGES = new Map();      // title -> page
+const ALIASES = [];           // [text, title]
+const CATS = new Map();       // category -> [titles]
+
+const slug = t => t.replace(/ /g, "_").replace(/[^A-Za-z0-9._~-]/g, "");
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const art = w => /^[AEIOU]/i.test(w) ? "an" : "a";
+const stageWord = s => s === "end" ? "an endgame" : art(STAGE[s]) + " " + STAGE[s];
+const stageHTML = s => `<span class="stage ${s}">${STAGE[s]}</span>`;
+const initials = t => t.replace(/^The /, "").split(/\s+/).filter(w => /^[A-Z]/.test(w)).slice(0, 2).map(w => w[0]).join("") || t[0];
+
+function addPage(p) {
+  PAGES.set(p.title, p);
+  ALIASES.push([p.title, p.title]);
+  (p.aka || []).forEach(a => ALIASES.push([a, p.title]));
+  (p.cats || []).forEach(c => { if (!CATS.has(c)) CATS.set(c, []); CATS.get(c).push(p.title); });
+}
+
+const bossByItem = new Map(BOSSES.filter(b => b.item).map(b => [b.item, b.n]));
+
+BOSSES.forEach((b, i) => addPage({
+  title: b.n, type: "boss", stage: b.stage, cats: ["Bosses", STAGE[b.stage]],
+  lead: `is ${stageWord(b.stage)} boss ${b.via}.${b.opt ? " It is optional." : ""}`,
+  art: "var(--" + b.stage + ")",
+  info: [["Type", "Boss"], ["Stage", null, stageHTML(b.stage)], ["Summoned with", b.item || "—"], ["Fight in", b.area],
+         ["Expert item", b.expert.split(":")[0].replace(/\.$/, "")], ["Optional", b.opt ? "Yes" : "No"]],
+  sections: [
+    { h: "Summoning", p: [b.summon, b.where] },
+    { h: "Drops", p: [b.drops] },
+    { h: "Expert and Master Mode", p: [b.expert + " See Expert Mode."] },
+    { h: "What it unlocks", p: [b.unlocks] },
+    { h: "Tips", list: [b.tip] },
+    { h: "Fight order", order: i },
+  ],
+  navbox: "Bosses",
+}));
+
+ITEMS.forEach(it => addPage({
+  title: it.n, aka: it.aka, type: "item", stage: it.stage, cats: ["Items", it.cat === "Summon" ? "Summon items" : null, STAGE[it.stage]].filter(Boolean),
+  lead: `is ${art(it.cat)} ${it.cat.toLowerCase()}${it.cat === "Ore" || it.cat === "Material" ? "" : " item"} from ${STAGE[it.stage]}.`,
+  art: "var(--gold)",
+  info: [["Type", it.cat], ["Stage", null, stageHTML(it.stage)], ...(it.aka ? [["Also covers", it.aka.join(", ")]] : []),
+         ...(bossByItem.has(it.n) ? [["Summons", bossByItem.get(it.n)]] : [])],
+  sections: [{ h: "How to get it", p: [it.how] }, ...(bossByItem.has(it.n) ? [{ h: "Use", p: ["Summons " + bossByItem.get(it.n) + "."] }] : [])],
+}));
+
+// Summon items that only exist as part of a boss entry get their own short page.
+BOSSES.forEach(b => {
+  if (!b.item || PAGES.has(b.item)) return;
+  addPage({
+    title: b.item, type: "item", stage: b.stage, cats: ["Items", "Summon items", STAGE[b.stage]],
+    lead: `is the summon for ${b.n}.`, art: "var(--gold)",
+    info: [["Type", "Summon"], ["Stage", null, stageHTML(b.stage)], ["Summons", b.n], ["Use in", b.area]],
+    sections: [{ h: "How to get it", p: [b.summon] }, { h: "Use", p: ["Summons " + b.n + ". " + b.where] }],
+  });
+});
+
+BIOMES.forEach(bi => addPage({
+  title: bi.n, aka: bi.aka, type: "biome", stage: bi.stage, cats: ["Biomes", STAGE[bi.stage]],
+  lead: `is a biome${bi.stage === "hm" ? " that appears once Hardmode starts" : ""}.`, art: "#5f8f45",
+  info: [["Type", "Biome"], ["Stage", null, stageHTML(bi.stage)], ["Layer", bi.layer]],
+  sections: [{ h: "Overview", p: [bi.what] }, { h: "Why go there", p: [bi.why] }],
+  navbox: "Biomes",
+}));
+
+NPCS.forEach(n => addPage({
+  title: n.n, type: "npc", stage: n.stage, cats: ["Town NPCs", STAGE[n.stage]],
+  lead: n.visitor ? "is a visiting NPC. He doesn't live in a house." : `is a town NPC${n.stage === "hm" ? " who can move in once Hardmode starts" : ""}.`,
+  art: "#c98a5a",
+  info: [["Type", n.visitor ? "Visiting NPC" : "Town NPC"], ["Stage", null, stageHTML(n.stage)], ["Needs a house", n.visitor ? "No" : "Yes"]],
+  sections: [{ h: "How to get them", p: [n.how, ...(n.visitor ? [] : ["They also need an empty house. See Housing."])] }, { h: "What they offer", p: [n.sells] }],
+  navbox: "Town NPCs",
+}));
+
+STATIONS.forEach(s => addPage({
+  title: s.n, aka: s.aka, type: "station", stage: s.stage, cats: ["Crafting stations", STAGE[s.stage]],
+  lead: "is a crafting station. Stand near it to use its recipes.", art: "#9b7a5a",
+  info: [["Type", "Crafting station"], ["Stage", null, stageHTML(s.stage)]],
+  sections: [{ h: "How to get it", p: [s.recipe] }, { h: "What it makes", p: [s.makes] }],
+  navbox: "Crafting stations",
+}));
+
+EVENTS.forEach(e => addPage({
+  title: e.n, aka: e.aka, type: "event", stage: e.stage, cats: ["Events", STAGE[e.stage]],
+  lead: `is ${stageWord(e.stage)} event.`, art: "#d26a5a",
+  info: [["Type", "Event"], ["Stage", null, stageHTML(e.stage)]],
+  sections: [{ h: "How it starts", p: [e.start] }, { h: "What happens", p: [e.what] }, { h: "Rewards", p: [e.loot] }],
+  navbox: "Events",
+}));
+
+// Mechanics pages
+addPage({
+  title: "Hardmode", type: "mech", cats: ["Mechanics"], art: "var(--hm)",
+  lead: "is the second half of the game. It starts the moment you beat the Wall of Flesh, and it can't be undone in that world.",
+  info: [["Type", "Game mechanic"], ["Starts after", "Wall of Flesh"]],
+  sections: [
+    { h: "What changes", list: [
+      "Two diagonal stripes of Hallow and of your world's evil biome (Corruption or Crimson) carve through the world.",
+      "Enemies everywhere get much stronger, and new ones appear.",
+      "Demon Altars and Crimson Altars can be smashed with the Pwnhammer to spread Hardmode ores.",
+      "New town NPCs can move in, such as the Wizard, Steampunker and Cyborg.",
+      "New bosses unlock, starting with Queen Slime and the Mechanical bosses." ] },
+    { h: "First things to do", list: [
+      "Smash a few altars, then mine Cobalt or Palladium for your first Hardmode gear.",
+      "Farm Soul of Light and Soul of Night underground, and Soul of Flight from Wyverns, to craft Angel Wings or Demon Wings.",
+      "Build walls or dig tunnels around your town to slow the Hallow and evil biome from spreading into it." ] },
+  ],
+});
+addPage({
+  title: "Pickaxe power", type: "mech", cats: ["Mechanics"], art: "#a8a8a8",
+  lead: "is the number that decides what a pickaxe can mine. A block can only be mined once your pickaxe's power reaches that block's number.",
+  info: [["Type", "Game mechanic"], ["Shown as", "A percentage"]],
+  sections: [
+    { h: "What can I mine?", table: { head: ["Block", "Power needed", "Weakest pickaxe"], rows: NEEDS.map(([b, p, w]) => [b, p + "%", w]), num: 1 } },
+    { h: "Pickaxe ladder", table: { head: ["Pickaxe", "Power"], rows: PICKS.map(([p, v]) => [p, v + "%"]), num: 1 } },
+  ],
+});
+addPage({
+  title: "Expert Mode", aka: ["Master Mode"], type: "mech", cats: ["Mechanics"], art: "#d9a441",
+  lead: "is a harder difficulty you pick when creating a world. Master Mode is harder still.",
+  info: [["Type", "Difficulty"], ["Chosen", "When creating a world"]],
+  sections: [
+    { h: "What changes", list: [
+      "Enemies and bosses have more health, hit harder, and some use new attacks.",
+      "Bosses drop a Treasure Bag instead of loose items. Open it for the normal drops plus one Expert-only item.",
+      "Master Mode makes everything tougher again and adds relics and pets as boss rewards." ] },
+    { h: "Expert-only boss items", list: BOSSES.map(b => b.n + ": " + b.expert) },
+  ],
+});
+addPage({
+  title: "Housing", type: "mech", cats: ["Mechanics"], art: "#c98a5a",
+  lead: "is what every town NPC needs before moving in. Each NPC wants an empty, valid house of their own.",
+  info: [["Type", "Game mechanic"], ["Used by", "Town NPCs"]],
+  sections: [
+    { h: "A valid house needs", list: [
+      "A fully enclosed room made of solid blocks, with background walls you placed yourself.",
+      "Enough space: at least 60 tiles inside the frame, but not a huge hall.",
+      "An entrance: a door or a platform.",
+      "A light source, such as a torch.",
+      "A flat surface, like a table or work bench, and a chair." ] },
+    { h: "Checking a room", p: ["Open the housing menu in your inventory and use the query tool on a room. It tells you what's missing. Rooms inside the Corruption, Crimson or other evil areas won't count."] },
+  ],
+});
+addPage({
+  title: "Game progression", type: "mech", cats: ["Mechanics"], art: "var(--pre)",
+  lead: "is the usual order people play Terraria in, from the first night to the Moon Lord.",
+  info: [["Type", "Guide"], ["Steps", String(PROGRESSION.length)]],
+  sections: ["pre", "hm", "end"].map(s => ({ h: STAGE[s], olist: PROGRESSION.filter(x => x[0] === s).map(x => x[1]) })),
+});
+
+/* =========================================================
+   LINKING
+   ========================================================= */
+const escRx = s => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const sortedAliases = ALIASES.slice().sort((a, b) => b[0].length - a[0].length);
+const ALIAS_MAP = new Map(sortedAliases.map(([a, t]) => [esc(a), t]));
+const LINK_RX = new RegExp("(?<![\\w])(" + sortedAliases.map(a => escRx(esc(a[0]))).join("|") + ")(?![\\w])", "g");
+
+function linkify(text, self, used) {
+  return esc(text).replace(LINK_RX, m => {
+    const t = ALIAS_MAP.get(m);
+    if (!t || t === self || used.has(t)) return m;
+    used.add(t);
+    return `<a href="#${slug(t)}">${m}</a>`;
+  });
+}
+const link = t => `<a href="#${slug(t)}">${esc(t)}</a>`;
+
+function pageTexts(p) {
+  const out = [p.lead];
+  p.info.forEach(([, v]) => v && out.push(v));
+  p.sections.forEach(s => {
+    (s.p || []).forEach(x => out.push(x));
+    (s.list || []).forEach(x => out.push(x));
+    (s.olist || []).forEach(x => out.push(x));
+    if (s.table) s.table.rows.forEach(r => out.push(r[0]));
+  });
+  return out;
+}
+
+// "What links here"
+const BACKLINKS = new Map();
+for (const p of PAGES.values()) {
+  const seen = new Set();
+  pageTexts(p).forEach(text => {
+    for (const m of esc(text).matchAll(LINK_RX)) {
+      const t = ALIAS_MAP.get(m[1]);
+      if (t && t !== p.title) seen.add(t);
+    }
+  });
+  seen.forEach(t => { if (!BACKLINKS.has(t)) BACKLINKS.set(t, []); BACKLINKS.get(t).push(p.title); });
+}
+
+const BY_SLUG = new Map([...PAGES.keys()].map(t => [slug(t), t]));
+
+/* =========================================================
+   RENDERING
+   ========================================================= */
+const $ = s => document.querySelector(s);
+const pageEl = $("#page");
+
+function renderArticle(p) {
+  const used = new Set();
+  const L = s => linkify(s, p.title, used);
+  const info = `
+    <aside class="infobox" aria-label="${esc(p.title)} infobox">
+      <div class="ib-title">${esc(p.title)}</div>
+      <div class="ib-art"><div class="tile" style="--c:${p.art}" aria-hidden="true">${esc(initials(p.title))}</div></div>
+      <div class="ib-section">Info</div>
+      <table>${p.info.map(([k, v, html]) => `<tr><th>${esc(k)}</th><td>${html || L(v)}</td></tr>`).join("")}</table>
+    </aside>`;
+  const lead = `<p><b>${esc(p.title)}</b> ${L(p.lead)}</p>`;
+  const secs = p.sections.filter(s => s.order === undefined || true);
+  const toc = secs.length >= 3 ? `<nav class="toc" aria-label="Contents"><b>Contents</b><ol>${secs.map((s, i) =>
+    `<li><a href="#${slug(p.title)}" data-sec="s${i}"><span class="n">${i + 1}</span>${esc(s.h)}</a></li>`).join("")}</ol></nav>` : "";
+  const body = secs.map((s, i) => {
+    let inner = "";
+    if (s.p) inner += s.p.map(x => `<p>${L(x)}</p>`).join("");
+    if (s.list) inner += `<ul>${s.list.map(x => `<li>${L(x)}</li>`).join("")}</ul>`;
+    if (s.olist) inner += `<ol>${s.olist.map(x => `<li>${L(x)}</li>`).join("")}</ol>`;
+    if (s.table) inner += `<div class="table-wrap"><table class="wikitable"><thead><tr>${s.table.head.map(h => `<th>${esc(h)}</th>`).join("")}</tr></thead><tbody>${
+      s.table.rows.map(r => `<tr>${r.map((c, ci) => `<td${ci === s.table.num ? ' class="num"' : ""}>${ci === 0 ? L(c) : esc(c)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+    if (s.order !== undefined) {
+      const prev = BOSSES[s.order - 1], next = BOSSES[s.order + 1];
+      inner += `<p>${prev ? "Previous boss: " + link(prev.n) : "This is the first boss most players fight."}${prev && next ? " · " : " "}${next ? "Next boss: " + link(next.n) : "This is the last boss."}</p>`;
+    }
+    return `<h2 id="s${i}">${esc(s.h)}</h2>${inner}`;
+  }).join("");
+  const back = (BACKLINKS.get(p.title) || []).filter(t => !used.has(t) || true).sort();
+  const related = back.length ? `<h2>What links here</h2><p>${back.map(link).join(" · ")}</p>` : "";
+  const nav = p.navbox ? navbox(p.navbox, p.title) : "";
+  const cats = `<div class="catlinks"><b>Categories:</b> ${p.cats.map(c => `<a href="#Category.${slug(c)}">${esc(c)}</a>`).join("")}</div>`;
+  return `
+    <h1 class="title">${esc(p.title)}</h1>
+    <div class="sub">From Krew's Terraria Wiki</div>
+    <div class="body">${info}${lead}${toc}${body}${related}${nav}${cats}</div>`;
+}
+
+function navbox(cat, self) {
+  const titles = CATS.get(cat) || [];
+  const groups = ["pre", "hm", "end"].map(s => [s, titles.filter(t => PAGES.get(t).stage === s)]).filter(g => g[1].length);
+  return `<nav class="navbox" aria-label="${esc(cat)}"><div class="nb-title"><a href="#Category.${slug(cat)}">${esc(cat)}</a></div>${
+    groups.map(([s, ts]) => `<div class="row"><div>${STAGE[s]}</div><div>${ts.map(t =>
+      t === self ? `<a class="self" href="#${slug(t)}" aria-current="page">${esc(t)}</a>` : link(t)).join("")}</div></div>`).join("")}</nav>`;
+}
+
+function renderCategory(cat) {
+  const titles = (CATS.get(cat) || []).slice().sort((a, b) => a.localeCompare(b));
+  const byLetter = {};
+  titles.forEach(t => { const k = t.replace(/^The /, "")[0].toUpperCase(); (byLetter[k] = byLetter[k] || []).push(t); });
+  return `
+    <h1 class="title">Category: ${esc(cat)}</h1>
+    <div class="sub">From Krew's Terraria Wiki</div>
+    <div class="body">
+      <p>This category has ${titles.length} page${titles.length === 1 ? "" : "s"}.</p>
+      <div class="catlist">${Object.keys(byLetter).sort().map(k => `<section><h3>${k}</h3><ul>${byLetter[k].map(t => `<li>${link(t)}</li>`).join("")}</ul></section>`).join("")}</div>
+    </div>`;
+}
+
+function renderMain() {
+  const list = cat => (CATS.get(cat) || []);
+  const byStage = (cat, s) => list(cat).filter(t => PAGES.get(t).stage === s);
+  const stageBlock = cat => ["pre", "hm", "end"].map(s => {
+    const ts = byStage(cat, s); return ts.length ? `<h4>${STAGE[s]}</h4><p>${ts.map(link).join("")}</p>` : "";
+  }).join("");
+  const itemCats = {};
+  ITEMS.forEach(i => (itemCats[i.cat] = itemCats[i.cat] || []).push(i.n));
+  return `
+    <div class="welcome">
+      <h1>Welcome to Krew's <span>Terraria</span> Wiki</h1>
+      <p>Bosses, items, NPCs, biomes and events, written plain and simple. <span class="count">${PAGES.size}</span> pages so far.</p>
+    </div>
+    <div class="portals">
+      <section class="pbox"><h2>Bosses</h2><div class="pb-body">${stageBlock("Bosses")}</div></section>
+      <section class="pbox"><h2>Town NPCs</h2><div class="pb-body">${stageBlock("Town NPCs")}</div></section>
+      <section class="pbox"><h2>Biomes</h2><div class="pb-body">${stageBlock("Biomes")}</div></section>
+      <section class="pbox"><h2>Items</h2><div class="pb-body">${Object.keys(itemCats).sort().map(c =>
+        `<h4>${esc(c)}</h4><p>${itemCats[c].map(link).join("")}</p>`).join("")}</div></section>
+      <section class="pbox"><h2>Events</h2><div class="pb-body">${stageBlock("Events")}</div></section>
+      <section class="pbox"><h2>Crafting stations</h2><div class="pb-body">${stageBlock("Crafting stations")}</div></section>
+      <section class="pbox"><h2>Game mechanics</h2><div class="pb-body"><p>${list("Mechanics").map(link).join("")}</p>
+        <h4>Summon items</h4><p>${list("Summon items").map(link).join("")}</p></div></section>
+    </div>`;
+}
+
+let lastQuery = "";
+function renderSearch() {
+  const q = lastQuery.trim().toLowerCase();
+  const hits = [...PAGES.values()].map(p => {
+    const inTitle = p.title.toLowerCase().includes(q) || (p.aka || []).some(a => a.toLowerCase().includes(q));
+    const text = pageTexts(p).join(" ");
+    const idx = text.toLowerCase().indexOf(q);
+    return { p, score: inTitle ? 2 : idx >= 0 ? 1 : 0, snip: idx >= 0 ? text.slice(Math.max(0, idx - 50), idx + 90) : p.lead };
+  }).filter(h => q && h.score).sort((a, b) => b.score - a.score || a.p.title.localeCompare(b.p.title));
+  return `
+    <h1 class="title">Search results</h1>
+    <div class="sub">${hits.length} result${hits.length === 1 ? "" : "s"} for “${esc(lastQuery)}”</div>
+    <div class="body">${hits.length ? `<ul class="results">${hits.map(h =>
+      `<li>${link(h.p.title)}<small>…${esc(h.snip)}…</small></li>`).join("")}</ul>`
+      : `<p>No pages match. Try a different word, or search the <a href="https://terraria.wiki.gg/index.php?search=${encodeURIComponent(lastQuery)}" target="_blank" rel="noopener">official Terraria Wiki ↗</a>.</p>`}</div>`;
+}
+
+function renderMissing(s) {
+  return `<h1 class="title">${esc(s.replace(/_/g, " "))}</h1><div class="sub">From Krew's Terraria Wiki</div>
+    <div class="body"><p>There is no page with this name yet. Go back to the <a href="#Main_Page">Main Page</a> or use the search bar.</p></div>`;
+}
+
+/* Sidebar + tabs */
+$("#sidenav").innerHTML = `
+  <div class="portal"><h3>Navigation</h3><ul>
+    <li><a href="#Main_Page">Main Page</a></li>
+    <li><a href="#Game_progression">Game progression</a></li>
+    <li><a href="#Random">Random page</a></li>
+  </ul></div>
+  <div class="portal"><h3>Categories</h3><ul>
+    ${["Bosses", "Items", "Town NPCs", "Biomes", "Events", "Crafting stations", "Mechanics"].map(c => `<li><a href="#Category.${slug(c)}">${c}</a></li>`).join("")}
+  </ul></div>
+  <div class="portal"><h3>Game stages</h3><ul>
+    ${Object.values(STAGE).map(s => `<li><a href="#Category.${slug(s)}">${s}</a></li>`).join("")}
+  </ul></div>
+  <div class="portal"><h3>Popular pages</h3><ul>
+    ${["Hardmode", "Pickaxe power", "Housing", "Plantera", "Moon Lord", "Life Crystal"].map(t => `<li>${link(t)}</li>`).join("")}
+  </ul></div>`;
+
+function setTabs(kind, title) {
+  const official = kind === "article" ? `<a href="https://terraria.wiki.gg/wiki/${encodeURIComponent(title.replace(/ /g, "_"))}" target="_blank" rel="noopener">Official wiki ↗</a>` : "";
+  const label = kind === "category" ? "Category" : kind === "special" ? "Special page" : kind === "main" ? "Main Page" : "Page";
+  $("#tabs").innerHTML = `<button class="menu-btn" type="button" id="menuBtn" aria-expanded="false" aria-controls="side">☰ Menu</button><span class="on" style="display:block;padding:7px 14px 6px;border:1px solid var(--line);border-bottom:0;border-radius:6px 6px 0 0">${label}</span>${official}`;
+  $("#menuBtn").addEventListener("click", e => {
+    const open = $("#side").classList.toggle("open");
+    e.currentTarget.setAttribute("aria-expanded", open);
+  });
+}
+
+/* Router */
+function route() {
+  let h = decodeURIComponent(location.hash.slice(1)) || "Main_Page";
+  $("#side").classList.remove("open");
+  if (h === "Random") {
+    const all = [...PAGES.keys()];
+    const t = all[Math.floor(Math.random() * all.length)];
+    try { history.replaceState(null, "", "#" + slug(t)); } catch (e) {}
+    h = slug(t);
+  }
+  let title;
+  if (h === "Main_Page") { pageEl.innerHTML = renderMain(); setTabs("main"); title = "Main Page"; }
+  else if (h === "Search") { pageEl.innerHTML = renderSearch(); setTabs("special"); title = "Search"; }
+  else if (h.startsWith("Category.")) {
+    const want = h.slice(9);
+    const cat = [...CATS.keys()].find(c => slug(c) === want);
+    pageEl.innerHTML = cat ? renderCategory(cat) : renderMissing(h); setTabs("category"); title = cat || h;
+  } else if (BY_SLUG.has(h)) {
+    const p = PAGES.get(BY_SLUG.get(h)); pageEl.innerHTML = renderArticle(p); setTabs("article", p.title); title = p.title;
+  } else if (/^s\d+$/.test(h)) { return; }
+  else { pageEl.innerHTML = renderMissing(h); setTabs("special"); title = h; }
+  document.title = (title === "Main Page" ? "" : title + " · ") + "Krew's Terraria Wiki";
+  window.scrollTo(0, 0);
+}
+window.addEventListener("hashchange", route);
+
+// Table of contents jumps without changing the page
+pageEl.addEventListener("click", e => {
+  const a = e.target.closest("a[data-sec]");
+  if (!a) return;
+  e.preventDefault();
+  document.getElementById(a.dataset.sec)?.scrollIntoView({ behavior: "smooth", block: "start" });
+});
+
+/* Search box */
+const q = $("#q"), sug = $("#suggest");
+let active = -1, matches = [];
+const NAMES = [...new Map(ALIASES.map(([a, t]) => [a.toLowerCase(), [a, t]])).values()];
+function showSuggest() {
+  const v = q.value.trim().toLowerCase();
+  if (!v) { sug.hidden = true; return; }
+  const seen = new Set();
+  matches = NAMES.filter(([a]) => a.toLowerCase().includes(v))
+    .sort((x, y) => (y[0].toLowerCase().startsWith(v) - x[0].toLowerCase().startsWith(v)) || x[0].length - y[0].length)
+    .filter(([, t]) => !seen.has(t) && seen.add(t)).slice(0, 8);
+  active = -1;
+  sug.innerHTML = matches.map(([a, t], i) => `<a href="#${slug(t)}" role="option" data-i="${i}">${esc(a)}${a !== t ? `<small>→ ${esc(t)}</small>` : ""}</a>`).join("")
+    + `<a href="#Search" role="option" data-search="1">Search for “${esc(q.value.trim())}”</a>`;
+  sug.hidden = false;
+}
+function paint() { sug.querySelectorAll("a").forEach((a, i) => a.classList.toggle("active", i === active)); }
+q.addEventListener("input", showSuggest);
+q.addEventListener("focus", showSuggest);
+q.addEventListener("keydown", e => {
+  const n = sug.querySelectorAll("a").length;
+  if (e.key === "ArrowDown") { e.preventDefault(); active = (active + 1) % n; paint(); }
+  else if (e.key === "ArrowUp") { e.preventDefault(); active = (active - 1 + n) % n; paint(); }
+  else if (e.key === "Escape") { sug.hidden = true; q.blur(); }
+  else if (e.key === "Enter") {
+    e.preventDefault();
+    const v = q.value.trim(); if (!v) return;
+    const pick = active >= 0 ? sug.querySelectorAll("a")[active] : null;
+    const exact = NAMES.find(([a]) => a.toLowerCase() === v.toLowerCase());
+    go(pick && !pick.dataset.search ? pick.getAttribute("href").slice(1) : exact ? slug(exact[1]) : null, v);
+  }
+});
+sug.addEventListener("mousedown", e => {
+  const a = e.target.closest("a"); if (!a) return;
+  e.preventDefault();
+  go(a.dataset.search ? null : a.getAttribute("href").slice(1), q.value.trim());
+});
+function go(target, query) {
+  sug.hidden = true; q.blur();
+  if (target) { q.value = ""; location.hash = target; }
+  else { lastQuery = query; if (location.hash === "#Search") route(); else location.hash = "Search"; }
+}
+document.addEventListener("click", e => { if (!e.target.closest(".search")) sug.hidden = true; });
+document.addEventListener("keydown", e => {
+  if (e.key === "/" && !/^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName)) { e.preventDefault(); q.focus(); }
+});
+
+route();
+</script>
