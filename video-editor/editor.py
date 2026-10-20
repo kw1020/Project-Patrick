@@ -16,7 +16,7 @@ WIDTH, HEIGHT = 1080, 1920  # Instagram Reels, 9:16
 VIDEO_EXTS = {".mp4", ".mov", ".m4v", ".webm", ".mkv", ".avi", ".3gp"}
 AUDIO_EXTS = {".mp3", ".m4a", ".aac", ".wav", ".ogg", ".flac"}
 AUDIO_MODES = ("dog", "keep", "denoise", "mute")
-TALKING_LEVELS = ("gentle", "normal", "strict")
+TALKING_LEVELS = ("gentle", "normal", "strict", "strongest")
 REFRAME_MODES = ("fit", "crop", "none")
 FFMPEG_TIMEOUT = 900  # seconds
 _ENCODE_LOCK = threading.Lock()
@@ -274,6 +274,9 @@ def parse_commands(text: str, music_dir: Path) -> tuple[EditOptions, list[str]]:
         if re.search(r"\bgentle\b", low):
             opts.talking_detection = "gentle"
             notes.append("Gentle talking detection (removes less)")
+        elif re.search(r"\bstrongest\b", low):
+            opts.talking_detection = "strongest"
+            notes.append("Strongest talking detection (removes the most; may also cut some dog sounds)")
         elif re.search(r"\bstrict\b", low):
             opts.talking_detection = "strict"
             notes.append("Strict talking detection (removes more)")

@@ -38,6 +38,7 @@
       <option value="normal" selected>Normal</option>
       <option value="gentle">Gentle: removes less, use if dog sounds get cut</option>
       <option value="strict">Strict: removes more, use if voices are still audible</option>
+      <option value="strongest">Strongest: removes the most, may cut some dog sounds</option>
     </select>
     <label for="music_volume">Music volume: <span id="vol">35</span>%</label>
     <input id="music_volume" name="music_volume" type="range" min="5" max="100" value="35">
@@ -101,7 +102,7 @@ $('form').onsubmit = e => {
 
 function fail(msg) { $('go').disabled = false; $('barwrap').hidden = true; say(msg, 'err'); }
 
-const LEVELS = ['gentle', 'normal', 'strict'];  // least to most talking removed
+const LEVELS = ['gentle', 'normal', 'strict', 'strongest'];  // least to most talking removed
 let currentJob = null;
 
 function showResult(id, s) {

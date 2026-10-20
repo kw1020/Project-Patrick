@@ -15,7 +15,7 @@ whining, etc.). That's `dogaudio.py`, the default audio mode everywhere.
 ## What exists
 - `video-editor/`: Flask + ffmpeg editor. Upload a video (or **email** one with plain-English instructions),
   get back a 1080x1920 MP4. Remove/clean audio, add music, trim, speed, vertical reframe. Read `video-editor/README.md`.
-  Tests: `cd video-editor && .venv/bin/python -m unittest discover -s tests` (82 tests, needs ffmpeg; the end-to-end audio tests need `pip install espeakng-loader` or they skip).
+  Tests: `cd video-editor && .venv/bin/python -m unittest discover -s tests` (87 tests, needs ffmpeg; the end-to-end audio tests need `pip install espeakng-loader` or they skip).
 - `video-editor/drive_worker.py`: watches a shared Google Drive folder ("Ghost vids" in Krew's Drive); edits videos using instructions in
   the file name, writes `<name> [edited].mp4` to a separate finished folder (`GDRIVE_OUTPUT_FOLDER_ID`) and emails him when each is done. Setup in `video-editor/DRIVE_SETUP.md`. (Chat Drive connector can't carry real videos: base64 through context.)
 - `render.yaml` + `video-editor/Dockerfile`: deploy to Render as one service (website + email + Drive watchers).
@@ -26,7 +26,12 @@ whining, etc.). That's `dogaudio.py`, the default audio mode everywhere.
   Dockerfile is untested (no Docker daemon in the build sandbox); the gunicorn entry point was tested.
 - **Drive watcher untested against real Drive** (logic tested with a fake Drive; Google client libs import fine). Needs OAuth setup by Krew.
 - **Email watcher untested against real Gmail.** Needs a dedicated Gmail + App Password. Logic is tested with simulated emails.
-- **Dog-sounds mode (`video-editor/dogaudio.py`) is NOT validated on real dog audio.** It uses Silero VAD to silence
+- **FIRST REAL RESULT (Oct 20 2026): dog-sounds mode did NOT work well on Krew's real 50 s clip.** The 4K video processed (memory fix worked, ~62 MB output),
+  but the note said "Removed 1.2s of talking in 1 spot (out of 50s)" and Krew hears the background voices still there ("same clip"). Next: have him
+  rename the Drive file with `analyze` in the name to get `[analysis].txt` (per-second speech score + loudness), ask him roughly when voices are audible
+  and whether the dog is making noise at the same time, then tune `LEVELS`/add a loudness-aware rule in dogaudio.py. Added a `strongest` level
+  (0.12 threshold). Also: results landed beside the original, so `GDRIVE_OUTPUT_FOLDER_ID` in Render is missing/misnamed (code is tested correct).
+- **Dog-sounds mode (`video-editor/dogaudio.py`) was only validated on synthetic audio.** It uses Silero VAD to silence
   talking moments (it can't separate overlapping sounds, and may cut voice-like whines). Tested only on espeak speech
   + synthetic whine/breathing. The sandbox could reach only PyPI, so no real recordings were available. First priority:
   get Krew's real feedback ("voices still audible?" -> strict; "dog sounds cut?" -> gentle) and tune `LEVELS` in dogaudio.py.

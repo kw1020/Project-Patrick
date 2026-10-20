@@ -25,7 +25,7 @@ import email_worker
 from editor import EditError
 
 log = logging.getLogger("patrick.drive")
-EDITED, ERROR, WORKING = " [edited]", " [error]", " [working]"
+EDITED, ERROR, WORKING, ANALYSIS = " [edited]", " [error]", " [working]", " [analysis]"
 SETTLE_SECONDS = 30  # ignore files modified very recently, in case an upload is still finishing
 SCOPES = ["https://www.googleapis.com/auth/drive"]
 FOLDER_ID = re.compile(r"^[A-Za-z0-9_-]{10,}$")
@@ -111,7 +111,7 @@ def poll_once(drive, folder_id: str, music_dir: Path, max_mb: int = 500, now: da
         if not f.get("mimeType", "").startswith("video/") or EDITED in name or ERROR in name:
             continue
         stem = _stem(name)
-        if any(n.startswith(stem + EDITED) or n.startswith(stem + ERROR) for n in names):
+        if any(n.startswith(stem + m) for n in names for m in (EDITED, ERROR, ANALYSIS)):
             continue  # already done (or already failed once; rename the file to retry)
         if not _is_settled(f.get("modifiedTime", ""), now):
             continue
@@ -125,6 +125,17 @@ def poll_once(drive, folder_id: str, music_dir: Path, max_mb: int = 500, now: da
                     raise EditError(f"That video is over {max_mb} MB. Trim or compress it and try again.")
                 src = tmp / ("input" + (Path(name).suffix.lower() or ".mp4"))
                 drive.download(f["id"], src)
+                if re.search(r"\banalyz[es]e?\b", stem.lower()):  # report only: quick, and shows how the audio looks to the detector
+                    import dogaudio
+                    info = editor.probe(src)
+                    report = dogaudio.format_analysis(dogaudio.analyze(src, 0, min(info.duration, dogaudio.MAX_SECONDS)))
+                    (tmp / "analysis.txt").write_text(report)
+                    new_id = drive.upload(out_id, tmp / "analysis.txt", f"{stem}{ANALYSIS}.txt", "text/plain")
+                    log.info("Analysed %s", name)
+                    link = f"https://drive.google.com/file/d/{new_id}/view" if isinstance(new_id, str) else "(in your finished folder)"
+                    tell(f"Patrick analysed: {name}", f"The audio report is ready:\n{link}")
+                    handled += 1
+                    continue
                 opts, notes = editor.parse_commands(stem, music_dir)
                 result = editor.process(src, tmp / "out.mp4", opts)
                 new_id = drive.upload(out_id, tmp / "out.mp4", f"{stem}{EDITED}.mp4", "video/mp4")

@@ -149,6 +149,11 @@ class CommandParsingTests(Base):
         self.assertEqual(o.music.name, "chill.mp3")
         self.assertEqual(len(notes), 4)
 
+    def test_strongest_is_understood_in_plain_english(self):
+        o, notes = editor.parse_commands("my clip strongest", self.music_dir)
+        self.assertEqual(o.talking_detection, "strongest")
+        self.assertIn("Strongest", notes[0])
+
     def test_nothing_requested_gives_defaults(self):
         o, notes = editor.parse_commands("here's my video lol", self.music_dir)
         self.assertEqual((o.audio_mode, o.music, o.trim_end), ("dog", None, None))
@@ -446,6 +451,7 @@ class DogAudioLogicTests(unittest.TestCase):
         counts = {k: dogaudio.talking_mask(probs, *lv).sum() for k, lv in dogaudio.LEVELS.items()}
         self.assertLessEqual(counts["gentle"], counts["normal"])
         self.assertLessEqual(counts["normal"], counts["strict"])
+        self.assertLessEqual(counts["strict"], counts["strongest"])
         self.assertLess(counts["gentle"], counts["strict"])
 
     def test_gain_is_smooth_and_bounded(self):
@@ -549,11 +555,12 @@ class DogAudioEndToEndTests(Base):
 
     def test_strict_removes_at_least_as_much_as_gentle(self):
         talk = {}
-        for level in ("gentle", "normal", "strict"):
+        for level in ("gentle", "normal", "strict", "strongest"):
             wav = self.tmp / f"{level}.wav"
             talk[level] = dogaudio.isolate(self.mixed, wav, 0, self.total, level)["talking_seconds"]
         self.assertLessEqual(talk["gentle"], talk["normal"])
         self.assertLessEqual(talk["normal"], talk["strict"])
+        self.assertLessEqual(talk["strict"], talk["strongest"])
         self.assertGreater(talk["normal"], 3)  # actually found the talking
 
     def test_redo_buttons_change_how_much_talking_is_removed(self):
@@ -577,6 +584,20 @@ class DogAudioEndToEndTests(Base):
         self.assertEqual((gentle["level"], strict["level"]), ("gentle", "strict"))
         self.assertLessEqual(gentle["talking_seconds"], strict["talking_seconds"])
         self.assertGreater(gentle["talking_seconds"], 3)  # it found the talking at all
+
+    def test_the_analysis_report_shows_the_talking_where_it_really_is(self):
+        a = dogaudio.analyze(self.mixed, 0, self.total)
+        rows = {r["t"]: r for r in a["per_second"]}
+        talk_secs = [t for t in rows if any(k == "talk" and s + 0.5 <= t <= e - 1.5 for k, s, e in self.spans)]
+        dog_secs = [t for t in rows if any(k == "dog" and s + 0.5 <= t <= e - 1.5 for k, s, e in self.spans)]
+        self.assertTrue(talk_secs and dog_secs)
+        import statistics
+        # typical (median) values, because the detector has known blips: it lingers just after speech ends, and the
+        # synthetic whine at ~18s sounds voice-like to it
+        self.assertGreater(statistics.median(rows[t]["p_max"] for t in talk_secs), 0.9)      # talking scores high
+        self.assertLess(statistics.median(rows[t]["p_max"] for t in dog_secs), 0.5)          # dog-like sounds score low
+        self.assertGreater(a["percent_of_audio_flagged_at"][">=0.12"], a["percent_of_audio_flagged_at"][">=0.7"] - 1)
+        self.assertIn("second | p_max", dogaudio.format_analysis(a))
 
     def test_keep_mode_does_not_touch_audio(self):
         out, result = self.run_mode(audio_mode="keep")
@@ -773,6 +794,17 @@ class DriveTests(Base):
         self.drive.add("c.mp4", self.video.read_bytes())
         self.assertEqual(self.poll(), 1)
         self.assertTrue(all(f["folder"] == "folder" for f in self.drive.files))
+
+    def test_analyze_in_the_name_writes_a_report_and_does_not_edit_the_video(self):
+        self.drive.add("clip analyze.mp4", self.video.read_bytes())
+        self.assertEqual(self.poll(output_folder_id="out"), 1)
+        out = [f["name"] for f in self.drive.files if f["folder"] == "out"]
+        self.assertEqual(out, ["clip analyze [analysis].txt"])             # a report only: no [edited] video, no leftover [working]
+        report = self.drive.get("[analysis].txt")["data"].decode()
+        self.assertIn("second | p_max | p_mean | db", report)
+        self.assertIn("Share of the audio that counts as talking", report)
+        self.assertGreaterEqual(len([l for l in report.splitlines() if l.strip().endswith("dB") or "s |" in l]), 5)  # ~1 row per second
+        self.assertEqual(self.poll(output_folder_id="out"), 0)             # and it's not redone
 
     def test_the_finished_folder_setting_really_reaches_the_poller(self):
         """Regression: the logic was tested with an explicit folder, but not the step that reads it from Render's settings."""

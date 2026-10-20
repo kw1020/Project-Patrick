@@ -25,7 +25,7 @@ SR = 16000
 FRAME = 512  # samples per VAD frame at 16 kHz = 32 ms
 FRAME_SECONDS = FRAME / SR
 # level -> (speech score needed, shortest burst in frames that counts as talking). Lower = removes more.
-LEVELS = {"gentle": (0.7, 8), "normal": (0.5, 5), "strict": (0.3, 3)}
+LEVELS = {"gentle": (0.7, 8), "normal": (0.5, 5), "strict": (0.3, 3), "strongest": (0.12, 3)}
 BRIDGE_GAP = 12  # frames (~0.4 s): pauses shorter than this between talking are still talking
 PAD = 4          # frames (~0.13 s) added each side of talking
 MAX_SECONDS = 600
@@ -113,6 +113,30 @@ def isolate(src: Path, dst_wav: Path, start: float, duration: float, level: str 
     spans = [(round(s * FRAME_SECONDS, 2), round(min(e * FRAME_SECONDS, duration), 2)) for s, e in _runs(mask, True)]
     return {"clip_seconds": round(duration, 2), "spans": spans,
             "talking_seconds": round(sum(e - s for s, e in spans), 2)}
+
+
+def analyze(src: Path, start: float, duration: float) -> dict:
+    """Numbers about the audio, so detection can be tuned on real recordings without moving the video anywhere."""
+    mono = _decode(src, start, duration, SR, 1)
+    probs = speech_probabilities(mono)
+    per_sec = int(round(1 / FRAME_SECONDS))  # frames per second (~31)
+    rows = []
+    for i in range(0, len(probs), per_sec):
+        chunk = probs[i:i + per_sec]
+        seg = mono[int(i * FRAME): int((i + per_sec) * FRAME)]
+        rms = float(np.sqrt(np.mean(seg ** 2))) if len(seg) else 0.0
+        rows.append({"t": round(i * FRAME_SECONDS), "p_max": round(float(chunk.max()), 2), "p_mean": round(float(chunk.mean()), 2),
+                     "db": round(20 * np.log10(max(rms, 1e-6)), 1)})
+    counts = {f">={t}": round(float((probs >= t).mean()) * 100) for t in (0.7, 0.5, 0.3, 0.12)}
+    return {"clip_seconds": round(duration, 1), "percent_of_audio_flagged_at": counts, "per_second": rows}
+
+
+def format_analysis(a: dict) -> str:
+    lines = [f"Patrick audio analysis ({a['clip_seconds']}s). p = chance of human speech (0-1), db = loudness (0 is the loudest possible).",
+             "Share of the audio that counts as talking at each speech-score cutoff: "
+             + ", ".join(f"{k}: {v}%" for k, v in a["percent_of_audio_flagged_at"].items()), "", "second | p_max | p_mean | db"]
+    lines += [f"{r['t']:>5}s | {r['p_max']:.2f} | {r['p_mean']:.2f} | {r['db']:6.1f}" for r in a["per_second"]]
+    return "\n".join(lines) + "\n"
 
 
 def describe(report: dict) -> str:

@@ -7,7 +7,7 @@ don't set one), and Patrick **emails you** when each one is done (if the email s
 ```
 zoomies mute music: chill trim 0:03-0:15.mp4
 ```
-(`dog only`, `gentle`, `strict`, `keep audio`, `mute`, `denoise`, `music: name`, `trim a-b`, `speed 1.5`, `crop`.
+(`dog only`, `gentle`, `strict`, `strongest`, `analyze` (report only, no edit), `keep audio`, `mute`, `denoise`, `music: name`, `trim a-b`, `speed 1.5`, `crop`.
 Same words as the email version.) No instructions = people talking are removed and your dog's sounds kept.
 Beside the video you also get `<name> [notes].txt` saying what was done (e.g. how many seconds of talking were removed).
 If something fails you get `<name> [error].txt`.

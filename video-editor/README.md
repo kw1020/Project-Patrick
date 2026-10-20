@@ -27,7 +27,10 @@ In email or a Drive file name add `gentle` or `strict` to tune it; on the websit
 
 - **It removes moments, not voices.** If your dog whines *while* someone is talking, that whine is removed with the talking.
 - **It can mistake a voice-like whine for speech** and cut it. `gentle` removes less and fixes most of this.
-- **Voices still audible?** Use `strict`. Quiet, far-away talking is the hardest to catch.
+- **Voices still audible?** Use `strict`, then `strongest` (removes the most, may cut some dog sounds). Quiet, far-away talking is the hardest to catch.
+- **Real-world result so far (Oct 2026):** on Krew's first real 50 s clip at the default level, Patrick found only 1.2 s of talking and he could
+  still hear the background voices. The detector was only validated on computer-made speech. For tuning on real recordings, put the word
+  `analyze` in a Drive file name: Patrick then writes `<name> [analysis].txt` (per-second speech score and loudness) instead of editing the video.
 - Every edit reports what it did ("Removed 12.4s of talking in 3 spots"), so you can sanity-check it. Check this the first few times.
 - **Review before anything else happens.** On the website the finished video plays on the page with that note. Two buttons redo the
   edit from your original upload with one step more or less talking removed (gentle / normal / strict). The original result is kept, and
