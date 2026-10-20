@@ -46,6 +46,19 @@ Later, optional: email setup (dedicated Gmail + App Password), Drive setup (`vid
 He asked Claude to control his screen. The session he used had no computer-use tools and the account has only the one
 cloud environment. To get screen control he needs the Claude desktop app (Computer use on) or claude.ai with a Device picked.
 
+## Posting to Instagram/TikTok: research notes (Oct 2026, from web search; verify before building)
+Krew wants: email a clip -> Patrick edits -> shows him the video -> he approves -> posts to Instagram and TikTok. Human approval before any post.
+- Official Instagram API: publish Reels via a container with `media_type=REELS` and a PUBLIC `video_url`; third-party guides say it needs a
+  Meta developer app + app review (~weeks) and maybe a Business (not Creator) account. Unverified.
+- Official TikTok Content Posting API: per TikTok's docs, unaudited apps can only post privately until audited.
+- Posting services (Buffer free for 3 channels per one source, API on all plans; Ayrshare pricing sources conflict) use their own approved apps, so no
+  Meta/TikTok review for us. Leading idea: a "Post" button in Patrick that sends the approved video via Buffer's API. Not built; not verified that
+  Buffer's API handles Reels/TikTok well.
+- Open-source schedulers cloned for reference (NOT in this repo, sandbox only, gone after the session): Postiz (AGPL-3.0, needs ~9 containers
+  incl. Postgres, Redis, Temporal; has Instagram + TikTok providers) and Mixpost Lite (MIT, PHP/Laravel; Lite has only a Meta provider, TikTok likely Pro).
+  Don't copy Postiz code into Patrick: AGPL could force us to publish Patrick's source if it's served to others (Krew plans to sell AI services).
+- Unofficial "log in as you" Instagram libraries: avoid, ban risk on his income account.
+
 ## Next ideas (ask Krew which first)
 1. Help him deploy and test from his phone.
 2. Auto-captions (speech-to-text, burned in): biggest watch-time win.
