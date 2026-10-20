@@ -15,6 +15,7 @@
     <nav>
       <button id="tab-scan" class="tab active" type="button">Scan</button>
       <button id="tab-log" class="tab" type="button">Log</button>
+      <button id="tab-studio" class="tab" type="button">Studio</button>
     </nav>
   </header>
 
@@ -49,6 +50,33 @@
     <section id="log"></section>
   </main>
 
+  <main id="view-studio" hidden>
+    <section class="card">
+      <h2>Clip a long video</h2>
+      <label for="clip-url">Video link</label>
+      <input id="clip-url" type="url" inputmode="url" placeholder="https://www.youtube.com/watch?v=...">
+      <div class="actions" style="margin-top:10px">
+        <button id="clip-go" class="btn primary" type="button">Clip it</button>
+        <button id="clip-file-btn" class="btn" type="button">Upload video</button>
+      </div>
+      <input id="clip-file" type="file" accept="video/*" hidden>
+      <p class="hint">Only use videos you own or have the rights to.</p>
+    </section>
+
+    <section class="card">
+      <h2>Make a short from an idea</h2>
+      <label for="short-topic">Topic</label>
+      <input id="short-topic" type="text" maxlength="500" placeholder="e.g. 3 thrift finds that sell fast on eBay">
+      <button id="short-go" class="btn primary" type="button" style="width:100%;margin-top:10px">Write it and render it</button>
+    </section>
+
+    <p class="hint" id="studio-status" role="status" aria-live="polite"></p>
+    <section class="card" id="studio-services" hidden></section>
+    <section id="studio-jobs"></section>
+    <section id="studio-queue"></section>
+  </main>
+
   <script src="app.js" type="module"></script>
+  <script src="studio.js" type="module"></script>
 </body>
 </html>

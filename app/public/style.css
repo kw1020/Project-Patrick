@@ -35,7 +35,7 @@ nav { display: flex; gap: 6px; }
 main { max-width: 560px; margin: 0 auto; padding: 16px; display: grid; gap: 14px; }
 .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px; }
 label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
-input[type=text], input[type=number], input[type=password] {
+input[type=text], input[type=number], input[type=password], input[type=url], input[type=datetime-local], textarea {
   width: 100%; padding: 10px 12px; font: inherit; color: var(--text);
   background: var(--bg); border: 1px solid var(--line); border-radius: 10px;
 }
@@ -87,3 +87,17 @@ li { margin: 3px 0; }
 .pill.bought { color: var(--maybe); border-color: var(--maybe); }
 .pill.sold { color: var(--buy); border-color: var(--buy); }
 .empty { text-align: center; color: var(--muted); padding: 24px 0; }
+
+textarea { resize: vertical; min-height: 64px; }
+.clip { display: grid; gap: 10px; }
+.clip header { all: unset; display: flex; justify-content: space-between; gap: 8px; align-items: start; }
+.clip video { width: 100%; max-height: 420px; background: #000; border-radius: 12px; display: block; }
+.checks { display: flex; gap: 14px; flex-wrap: wrap; }
+.checks label { display: flex; align-items: center; gap: 6px; color: var(--text); font-size: 15px; margin: 0; }
+.pill.ready { color: var(--accent); border-color: var(--accent); }
+.pill.scheduled { color: var(--buy); border-color: var(--buy); }
+.pill.rendering { color: var(--maybe); border-color: var(--maybe); }
+.pill.failed { color: var(--pass); border-color: var(--pass); }
+.svc { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; font-size: 14px; }
+.svc .off { color: var(--pass); }
+.svc .on { color: var(--buy); }

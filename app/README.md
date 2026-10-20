@@ -21,6 +21,10 @@ The camera button is a normal file picker, so it works over plain http. Your pho
 - **Same wifi:** run it on a laptop and open `http://<laptop-ip>:3000` on the phone.
 - **Anywhere (what you want in a thrift store):** deploy `app/` to Render, Railway or Fly. Set `ANTHROPIC_API_KEY` and `PATRICK_PASSCODE` as environment variables, start command `npm start`. Then "Add to Home Screen" on the phone.
 
+## Studio (content agent)
+
+The **Studio** tab clips long videos, makes faceless shorts from ideas, writes TikTok, Instagram and YouTube captions, and schedules approved posts. It needs the video tools running next to Patrick, so setup lives in [`../studio/README.md`](../studio/README.md). `npm run start:mock` shows the whole Studio flow with fake videos.
+
 ## Settings (environment variables)
 
 | Variable | Default | Purpose |
@@ -29,6 +33,8 @@ The camera button is a normal file picker, so it works over plain http. Your pho
 | `PATRICK_PASSCODE` | none | Blocks strangers from spending your money. The phone asks once and remembers it. |
 | `PATRICK_MODEL` | `claude-opus-5-5` | Swap the model to trade cost against accuracy. |
 | `PATRICK_MAX_SCANS_PER_DAY` | 200 | Hard spending cap. |
+| `PATRICK_DATA_DIR` | `app/data` | Where the Studio queue and uploads are stored. |
+| `OPENSHORTS_URL`, `SHORTMAKER_URL`, `POSTIZ_URL`, `POSTIZ_API_KEY` | none | Studio services. `studio/docker-compose.yml` sets these for you. |
 
 ## What is and isn't real
 

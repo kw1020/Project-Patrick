@@ -62,15 +62,16 @@ function shrink(img, maxSide, quality) {
 }
 
 // ---------- tabs ----------
+const TABS = ["scan", "log", "studio"];
 function showTab(name) {
-  $("view-scan").hidden = name !== "scan";
-  $("view-log").hidden = name !== "log";
-  $("tab-scan").classList.toggle("active", name === "scan");
-  $("tab-log").classList.toggle("active", name === "log");
+  for (const t of TABS) {
+    $(`view-${t}`).hidden = name !== t;
+    $(`tab-${t}`).classList.toggle("active", name === t);
+  }
   if (name === "log") renderLog();
+  document.dispatchEvent(new CustomEvent("patrick:tab", { detail: name }));
 }
-$("tab-scan").addEventListener("click", () => showTab("scan"));
-$("tab-log").addEventListener("click", () => showTab("log"));
+for (const t of TABS) $(`tab-${t}`).addEventListener("click", () => showTab(t));
 
 // ---------- scanning ----------
 let busy = false;

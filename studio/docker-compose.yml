@@ -1,0 +1,191 @@
+# Patrick Studio: Patrick + OpenShorts + short-video-maker + Postiz on one machine.
+#   ./setup.sh            # once: downloads the tools and makes .env
+#   docker compose up -d --build
+# Patrick:   http://<this-machine>:3000   (Studio tab)
+# Postiz:    http://<this-machine>:4007   (connect TikTok / Instagram / YouTube, get the API key)
+name: patrick
+
+x-postiz-db: &postiz-db postgresql://postiz:${POSTIZ_DB_PASSWORD:?run ./setup.sh first}@postiz-postgres:5432/postiz
+
+services:
+  # ---------- Patrick ----------
+  patrick:
+    build: ../app
+    restart: unless-stopped
+    ports:
+      - "${PATRICK_PORT:-3000}:3000"
+    environment:
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      PATRICK_PASSCODE: ${PATRICK_PASSCODE:?set PATRICK_PASSCODE in studio/.env}
+      PATRICK_MODEL: ${PATRICK_MODEL:-claude-opus-5-5}
+      PATRICK_DATA_DIR: /data
+      OPENSHORTS_URL: http://openshorts:8000
+      SHORTMAKER_URL: http://shortmaker:3123
+      POSTIZ_URL: http://postiz:5000/api
+      POSTIZ_API_KEY: ${POSTIZ_API_KEY:-}
+      STUDIO_NICHE: ${STUDIO_NICHE:-}
+      STUDIO_VOICE: ${STUDIO_VOICE:-am_michael}
+      STUDIO_TIKTOK_PRIVACY: ${STUDIO_TIKTOK_PRIVACY:-SELF_ONLY}
+    volumes:
+      - patrick-data:/data
+
+  # ---------- OpenShorts: long video -> vertical clips (MIT) ----------
+  openshorts:
+    build: ./vendor/openshorts
+    restart: unless-stopped
+    environment:
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      RENDER_SERVICE_URL: http://openshorts-renderer:3100
+      WHISPER_MODEL: ${WHISPER_MODEL:-small}
+    volumes:
+      - openshorts-output:/app/output
+    expose:
+      - "8000"
+
+  openshorts-renderer:
+    build:
+      context: ./vendor/openshorts
+      dockerfile: render-service/Dockerfile
+    restart: unless-stopped
+    environment:
+      REMOTION_BUNDLE_PATH: /app/remotion
+      OUTPUT_DIR: /output
+      PORT: "3100"
+    volumes:
+      - openshorts-output:/output
+
+  # ---------- short-video-maker: script -> faceless short (MIT) ----------
+  shortmaker:
+    image: gyoridavid/short-video-maker:${SHORTMAKER_TAG:-latest-tiny}
+    restart: unless-stopped
+    # Same as upstream's compose: skip the image's `pnpm start`, which downloads pnpm on every boot.
+    command: ["node", "dist/index.js"]
+    environment:
+      PEXELS_API_KEY: ${PEXELS_API_KEY:-}
+      LOG_LEVEL: info
+    volumes:
+      - shortmaker-videos:/app/data/videos
+    expose:
+      - "3123"
+
+  # ---------- Postiz: scheduling to TikTok / Instagram / YouTube (AGPL-3.0) ----------
+  postiz:
+    image: ghcr.io/gitroomhq/postiz-app:${POSTIZ_TAG:-latest}
+    restart: unless-stopped
+    ports:
+      - "${POSTIZ_PORT:-4007}:5000"
+    environment:
+      MAIN_URL: ${POSTIZ_PUBLIC_URL:-http://localhost:4007}
+      FRONTEND_URL: ${POSTIZ_PUBLIC_URL:-http://localhost:4007}
+      NEXT_PUBLIC_BACKEND_URL: ${POSTIZ_PUBLIC_URL:-http://localhost:4007}/api
+      BACKEND_INTERNAL_URL: http://localhost:3000
+      JWT_SECRET: ${POSTIZ_JWT_SECRET:?run ./setup.sh first}
+      DATABASE_URL: *postiz-db
+      REDIS_URL: redis://postiz-redis:6379
+      TEMPORAL_ADDRESS: temporal:7233
+      IS_GENERAL: "true"
+      DISABLE_REGISTRATION: ${POSTIZ_DISABLE_REGISTRATION:-false}
+      STORAGE_PROVIDER: local
+      UPLOAD_DIRECTORY: /uploads
+      NEXT_PUBLIC_UPLOAD_DIRECTORY: /uploads
+      API_LIMIT: "30"
+      YOUTUBE_CLIENT_ID: ${YOUTUBE_CLIENT_ID:-}
+      YOUTUBE_CLIENT_SECRET: ${YOUTUBE_CLIENT_SECRET:-}
+      TIKTOK_CLIENT_ID: ${TIKTOK_CLIENT_ID:-}
+      TIKTOK_CLIENT_SECRET: ${TIKTOK_CLIENT_SECRET:-}
+      FACEBOOK_APP_ID: ${FACEBOOK_APP_ID:-}
+      FACEBOOK_APP_SECRET: ${FACEBOOK_APP_SECRET:-}
+      INSTAGRAM_APP_ID: ${INSTAGRAM_APP_ID:-}
+      INSTAGRAM_APP_SECRET: ${INSTAGRAM_APP_SECRET:-}
+      NX_ADD_PLUGINS: "false"
+    volumes:
+      - postiz-config:/config
+      - postiz-uploads:/uploads
+    depends_on:
+      postiz-postgres:
+        condition: service_healthy
+      postiz-redis:
+        condition: service_healthy
+      temporal:
+        condition: service_started
+
+  postiz-postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postiz
+      POSTGRES_PASSWORD: ${POSTIZ_DB_PASSWORD:?run ./setup.sh first}
+      POSTGRES_DB: postiz
+    volumes:
+      - postiz-db:/var/lib/postgresql/data
+    healthcheck:
+      test: pg_isready -U postiz -d postiz
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  postiz-redis:
+    image: redis:7.2
+    restart: unless-stopped
+    volumes:
+      - postiz-redis:/data
+    healthcheck:
+      test: redis-cli ping
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # Temporal runs Postiz's scheduled jobs.
+  temporal:
+    image: temporalio/auto-setup:1.28.1
+    restart: unless-stopped
+    environment:
+      DB: postgres12
+      DB_PORT: "5432"
+      POSTGRES_USER: temporal
+      POSTGRES_PWD: temporal
+      POSTGRES_SEEDS: temporal-postgresql
+      DYNAMIC_CONFIG_FILE_PATH: config/dynamicconfig/development-sql.yaml
+      ENABLE_ES: "true"
+      ES_SEEDS: temporal-elasticsearch
+      ES_VERSION: v7
+      TEMPORAL_NAMESPACE: default
+    volumes:
+      - ./vendor/postiz-app/dynamicconfig:/etc/temporal/config/dynamicconfig
+    depends_on:
+      - temporal-postgresql
+      - temporal-elasticsearch
+
+  temporal-postgresql:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: temporal
+      POSTGRES_PASSWORD: temporal
+    volumes:
+      - temporal-db:/var/lib/postgresql/data
+
+  temporal-elasticsearch:
+    image: elasticsearch:7.17.27
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - ES_JAVA_OPTS=-Xms256m -Xmx256m
+      - xpack.security.enabled=false
+      - cluster.routing.allocation.disk.threshold_enabled=true
+      - cluster.routing.allocation.disk.watermark.low=512mb
+      - cluster.routing.allocation.disk.watermark.high=256mb
+      - cluster.routing.allocation.disk.watermark.flood_stage=128mb
+    volumes:
+      - temporal-es:/usr/share/elasticsearch/data
+
+volumes:
+  patrick-data:
+  openshorts-output:
+  shortmaker-videos:
+  postiz-config:
+  postiz-uploads:
+  postiz-db:
+  postiz-redis:
+  temporal-db:
+  temporal-es:
