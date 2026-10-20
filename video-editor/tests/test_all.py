@@ -774,6 +774,46 @@ class DriveTests(Base):
         self.assertEqual(self.poll(), 1)
         self.assertTrue(all(f["folder"] == "folder" for f in self.drive.files))
 
+    def test_the_finished_folder_setting_really_reaches_the_poller(self):
+        """Regression: the logic was tested with an explicit folder, but not the step that reads it from Render's settings."""
+        import os, threading
+        from unittest import mock
+        got = {}
+        done = threading.Event()
+
+        def fake_poll(drive, folder_id, music_dir, max_mb=500, now=None, output_folder_id=None, notify=None):
+            got.update(folder=folder_id, out=output_folder_id)
+            done.set()
+            return 0
+
+        env = {"GDRIVE_CLIENT_ID": "id", "GDRIVE_CLIENT_SECRET": "secret", "GDRIVE_REFRESH_TOKEN": "tok",
+               "GDRIVE_FOLDER_ID": "dropFolderId123456", "GDRIVE_OUTPUT_FOLDER_ID": "finishedFolderId123456", "POLL_SECONDS": "3600"}
+        with mock.patch.dict(os.environ, env, clear=True), \
+                mock.patch.object(self.dw, "GoogleDrive", lambda *a: FakeDrive()), \
+                mock.patch.object(self.dw, "poll_once", fake_poll):
+            self.assertIsNotNone(self.dw.start_background())
+            self.assertTrue(done.wait(10), "the watcher never polled")
+        self.assertEqual(got, {"folder": "dropFolderId123456", "out": "finishedFolderId123456"})
+
+    def test_without_a_finished_folder_setting_results_stay_beside_the_original(self):
+        import os, threading
+        from unittest import mock
+        got, done = {}, threading.Event()
+
+        def fake_poll(drive, folder_id, music_dir, max_mb=500, now=None, output_folder_id=None, notify=None):
+            got["out"] = output_folder_id
+            done.set()
+            return 0
+
+        env = {"GDRIVE_CLIENT_ID": "id", "GDRIVE_CLIENT_SECRET": "secret", "GDRIVE_REFRESH_TOKEN": "tok",
+               "GDRIVE_FOLDER_ID": "dropFolderId123456", "POLL_SECONDS": "3600"}
+        with mock.patch.dict(os.environ, env, clear=True), \
+                mock.patch.object(self.dw, "GoogleDrive", lambda *a: FakeDrive()), \
+                mock.patch.object(self.dw, "poll_once", fake_poll):
+            self.dw.start_background()
+            self.assertTrue(done.wait(10))
+        self.assertIsNone(got["out"])
+
     def test_skip_typed_into_drive_settings_counts_as_not_set(self):
         import os
         from unittest import mock
