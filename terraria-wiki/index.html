@@ -2,26 +2,28 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@500;600;700&display=swap">
 <style>
 /* Layout: classic wiki frame. Fixed-width sidebar on the left, tab bar + search on top, one article panel. Sidebar folds into a menu on phones. Dark earth tones only. */
 :root {
   color-scheme: dark;
-  --frame: #17120f;        /* outer frame, like packed dirt */
-  --panel: #241c17;        /* article background */
-  --box: #2e241e;          /* infobox, tables, TOC */
+  --frame: #17120f;
+  --panel: #241c17;
+  --box: #2e241e;
   --box-head: #3b2e25;
   --line: #4d3d32;
   --fg: #eee4d4;
   --muted: #b3a38e;
-  --link: #8fd16a;         /* grass green */
-  --link-visited: #b9cf6e;
+  --link: #8fd16a;
   --link-hover: #c4f29a;
-  --new: #e8806e;
   --gold: #e9b949;
   --pre: #8fd16a;
   --hm: #e89ad0;
   --end: #6fd6cb;
+  --melee: #f08a5d;
+  --ranged: #8fd16a;
+  --magic: #b58cf0;
+  --summon: #6fb6f0;
   --serif: Georgia, "Linux Libertine", "Times New Roman", serif;
   --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --pixel: "Pixelify Sans", "Courier New", monospace;
@@ -32,10 +34,11 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 a { color: var(--link); text-decoration: none; }
 a:hover { color: var(--link-hover); text-decoration: underline; }
 a:focus-visible, button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+img.px, canvas.px { image-rendering: pixelated; image-rendering: crisp-edges; }
 
 .layout {
   display: grid; grid-template-columns: 196px minmax(0, 1fr); gap: 0 18px;
-  max-width: 1400px; margin: 0 auto; min-height: 100%;
+  max-width: 1400px; margin: 0 auto;
   padding-left: max(16px, env(safe-area-inset-left, 0px));
   padding-right: max(16px, env(safe-area-inset-right, 0px));
   padding-block: 12px 24px;
@@ -57,29 +60,31 @@ aside.side { font-size: 13.5px; }
 .portal ul { list-style: none; margin: 0; padding: 0; }
 .portal li a { display: block; padding: 3px 6px; border-radius: 4px; }
 .portal li a:hover { background: var(--box); text-decoration: none; }
+.portal li.subitem a { padding-left: 18px; font-size: 13px; }
 
 /* Top bar */
 .topbar { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding-top: 12px; }
 .tabs { display: flex; gap: 2px; align-items: flex-end; }
-.tabs a, .tabs button {
+.tabs > * {
   display: block; padding: 7px 14px 6px; font: 13.5px var(--sans); color: var(--link);
   background: var(--box); border: 1px solid var(--line); border-bottom: 0; border-radius: 6px 6px 0 0; cursor: pointer;
 }
-.tabs .on { background: var(--panel); color: var(--fg); position: relative; top: 1px; }
+.tabs .on { background: var(--panel); color: var(--fg); position: relative; top: 1px; cursor: default; }
 .tabs .menu-btn { display: none; color: var(--fg); }
-.search { position: relative; flex: 0 1 340px; margin-bottom: 6px; }
-.search input {
+.search { position: relative; flex: 0 1 360px; margin-bottom: 6px; }
+.search input, .bigsearch input {
   width: 100%; padding: 7px 12px; font: 15px var(--sans); color: var(--fg);
   background: var(--box); border: 1px solid var(--line); border-radius: 4px;
 }
-.search input::placeholder { color: var(--muted); }
+.search input::placeholder, .bigsearch input::placeholder { color: var(--muted); }
 .suggest {
   position: absolute; left: 0; right: 0; top: calc(100% + 2px); z-index: 20;
   background: var(--box); border: 1px solid var(--line); border-radius: 4px; overflow: hidden;
   box-shadow: 0 8px 24px rgba(0,0,0,.5);
 }
-.suggest a { display: block; padding: 6px 12px; color: var(--fg); }
-.suggest a small { color: var(--muted); margin-left: 6px; }
+.suggest a { display: flex; align-items: center; gap: 10px; padding: 5px 10px; color: var(--fg); }
+.suggest a img { width: 24px; height: 24px; flex: none; }
+.suggest a small { color: var(--muted); margin-left: auto; font-size: 12px; }
 .suggest a.active, .suggest a:hover { background: var(--box-head); text-decoration: none; }
 
 /* Article */
@@ -87,9 +92,11 @@ article.content {
   background: var(--panel); border: 1px solid var(--line); border-radius: 0 6px 6px 6px;
   padding: 18px 28px 28px; min-width: 0; min-height: 70vh;
 }
-h1.title { font: 400 30px/1.25 var(--serif); margin: 0 0 2px; padding-bottom: 4px; border-bottom: 1px solid var(--line); text-wrap: balance; }
+h1.title { font: 400 30px/1.25 var(--serif); margin: 0 0 2px; padding-bottom: 4px; border-bottom: 1px solid var(--line); text-wrap: balance; display: flex; align-items: center; gap: 12px; }
+h1.title img { width: 32px; height: 32px; }
 .sub { color: var(--muted); font-size: 12.5px; margin-bottom: 16px; }
 .body { overflow-wrap: anywhere; }
+.body::after { content: ""; display: block; clear: both; }
 .body h2 { font: 400 23px/1.3 var(--serif); margin: 1.4em 0 .5em; padding-bottom: 3px; border-bottom: 1px solid var(--line); }
 .body h3 { font: 700 16px var(--sans); margin: 1.2em 0 .3em; }
 .body p { margin: .5em 0 .8em; max-width: 80ch; }
@@ -103,14 +110,11 @@ h1.title { font: 400 30px/1.25 var(--serif); margin: 0 0 2px; padding-bottom: 4p
   background: var(--box); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; font-size: 13.5px;
 }
 .infobox .ib-title { background: var(--box-head); text-align: center; font: 700 15px var(--sans); padding: 8px 10px; }
-.infobox .ib-art { display: grid; place-items: center; padding: 16px 0; border-bottom: 1px solid var(--line); }
-.tile {
-  width: 72px; height: 72px; display: grid; place-items: center;
-  font: 700 28px/1 var(--pixel); color: #1b1410;
-  background: var(--c); border: 3px solid #1b1410;
-  box-shadow: inset -5px -5px 0 rgba(0,0,0,.28), inset 5px 5px 0 rgba(255,255,255,.25);
-  image-rendering: pixelated;
+.infobox .ib-art {
+  display: grid; place-items: center; padding: 18px 0; border-bottom: 1px solid var(--line);
+  background: radial-gradient(circle at 50% 50%, rgba(255,255,255,.06), transparent 60%);
 }
+.infobox .ib-art img { width: 96px; height: 96px; }
 .infobox table { width: 100%; border-collapse: collapse; }
 .infobox th, .infobox td { padding: 6px 10px; border-top: 1px solid var(--line); vertical-align: top; text-align: left; }
 .infobox th { width: 40%; color: var(--muted); font-weight: 700; }
@@ -119,13 +123,24 @@ h1.title { font: 400 30px/1.25 var(--serif); margin: 0 0 2px; padding-bottom: 4p
 
 .stage { font-weight: 700; color: var(--c); }
 .stage.pre { --c: var(--pre); } .stage.hm { --c: var(--hm); } .stage.end { --c: var(--end); }
+.cls { font-weight: 700; color: var(--c); }
+.cls.melee { --c: var(--melee); } .cls.ranged { --c: var(--ranged); } .cls.magic { --c: var(--magic); } .cls.summon { --c: var(--summon); }
 
 /* TOC */
 .toc { display: inline-block; background: var(--box); border: 1px solid var(--line); border-radius: 6px; padding: 8px 18px 10px 14px; margin: 4px 0 12px; font-size: 14px; }
 .toc b { display: block; text-align: center; margin-bottom: 4px; color: var(--fg); }
-.toc ol { margin: 0; padding-left: 1.2em; }
+.toc ol { list-style: none; margin: 0; padding-left: 0; }
 .toc .n { color: var(--muted); margin-right: 6px; font-variant-numeric: tabular-nums; }
-.toc ol { list-style: none; padding-left: 0; }
+
+/* Weapon demo */
+.demo { margin: .4em 0 1em; max-width: 620px; }
+.demo-frame { position: relative; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; background: #0f0c18; }
+.demo canvas { display: block; width: 100%; height: auto; aspect-ratio: 240 / 110; }
+.demo-btn {
+  position: absolute; right: 8px; bottom: 8px; padding: 4px 10px; font: 600 12.5px var(--sans);
+  color: var(--fg); background: rgba(23,18,15,.8); border: 1px solid var(--line); border-radius: 4px; cursor: pointer;
+}
+.demo figcaption { color: var(--muted); font-size: 12.5px; margin-top: 6px; }
 
 /* Tables */
 .table-wrap { overflow-x: auto; margin: .6em 0 1em; }
@@ -140,38 +155,63 @@ table.wikitable td.num { font-variant-numeric: tabular-nums; text-align: right; 
 .navbox .row { display: grid; grid-template-columns: 140px 1fr; border-top: 1px solid var(--line); }
 .navbox .row > div:first-child { padding: 6px 10px; font-weight: 700; color: var(--muted); background: rgba(0,0,0,.12); }
 .navbox .row > div:last-child { padding: 6px 10px; }
-.navbox .row a::after { content: " · "; color: var(--muted); }
-.navbox .row a:last-child::after { content: ""; }
+.dots a::after { content: " · "; color: var(--muted); }
+.dots a:last-child::after { content: ""; }
 .navbox .row a.self { color: var(--fg); font-weight: 700; }
 
-/* Categories footer */
 .catlinks { clear: both; margin-top: 22px; padding: 7px 12px; background: var(--box); border: 1px solid var(--line); border-radius: 6px; font-size: 13.5px; }
 .catlinks a::after { content: " | "; color: var(--muted); }
 .catlinks a:last-child::after { content: ""; }
 
-/* Main page */
-.welcome { text-align: center; padding: 18px 12px 22px; border-bottom: 1px solid var(--line); margin-bottom: 18px; }
-.welcome h1 { font: 700 clamp(24px, 4vw, 34px)/1.15 var(--pixel); margin: 0 0 6px; letter-spacing: .4px; }
-.welcome h1 span { color: var(--gold); }
-.welcome p { margin: 0 auto; color: var(--muted); max-width: 60ch; }
-.welcome .count { font-variant-numeric: tabular-nums; color: var(--fg); font-weight: 700; }
-.portals { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); }
-.pbox { background: var(--box); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+/* Gallery (category pages, search results) */
+.gallery { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 210px), 1fr)); margin: .4em 0 1.2em; }
+.gtile {
+  display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 2px 10px; align-items: center;
+  padding: 8px 10px; background: var(--box); border: 1px solid var(--line); border-radius: 6px; color: var(--fg);
+}
+.gtile:hover { border-color: var(--gold); text-decoration: none; background: var(--box-head); }
+.gtile img { width: 40px; height: 40px; grid-row: span 2; }
+.gtile b { font-weight: 700; color: var(--link); line-height: 1.25; }
+.gtile small { color: var(--muted); font-size: 12px; line-height: 1.3; }
+.subcats { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr)); margin-bottom: 1.2em; }
+.subcats a { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--box); border: 1px solid var(--line); border-radius: 6px; color: var(--fg); font-weight: 700; }
+.subcats a:hover { border-color: var(--gold); text-decoration: none; }
+.subcats img { width: 32px; height: 32px; }
+.subcats small { display: block; font-weight: 400; color: var(--muted); font-size: 12px; }
+
+/* Dashboard */
+.hero { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 20px; align-items: center; padding: 8px 0 20px; border-bottom: 1px solid var(--line); margin-bottom: 20px; }
+.hero h1 { font: 700 clamp(24px, 4vw, 36px)/1.1 var(--pixel); margin: 0 0 8px; letter-spacing: .4px; }
+.hero h1 span { color: var(--gold); }
+.hero p { margin: 0 0 12px; color: var(--muted); max-width: 62ch; }
+.hero .heroart { display: flex; gap: 6px; }
+.hero .heroart img { width: 56px; height: 56px; }
+.bigsearch { max-width: 560px; }
+.bigsearch input { padding: 11px 14px; font-size: 16px; border-radius: 6px; }
+.stats { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 130px), 1fr)); margin-bottom: 22px; }
+.stat { display: block; padding: 10px 12px; background: var(--box); border: 1px solid var(--line); border-radius: 6px; color: var(--fg); }
+.stat:hover { border-color: var(--gold); text-decoration: none; }
+.stat b { display: block; font: 700 26px/1.1 var(--pixel); color: var(--gold); font-variant-numeric: tabular-nums; }
+.stat span { font-size: 13px; color: var(--muted); }
+.dash { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); }
+.pbox { background: var(--box); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; min-width: 0; }
+.pbox.wide { grid-column: 1 / -1; }
 .pbox h2 { margin: 0; padding: 7px 12px; background: var(--box-head); font: 700 15px var(--sans); border: 0; }
-.pbox .pb-body { padding: 8px 12px 10px; font-size: 14px; }
-.pbox .pb-body h4 { margin: 6px 0 2px; font-size: 11.5px; text-transform: uppercase; letter-spacing: .09em; color: var(--muted); }
-.pbox .pb-body p { margin: 0 0 4px; }
-.pbox .pb-body a::after { content: " · "; color: var(--muted); }
-.pbox .pb-body a:last-child::after { content: ""; }
+.pbox .pb-body { padding: 10px 12px 12px; font-size: 14px; }
+.pbox .pb-body h4 { margin: 8px 0 2px; font-size: 11.5px; text-transform: uppercase; letter-spacing: .09em; color: var(--muted); }
+.pbox .pb-body p { margin: 0 0 6px; }
+.pbox ol.steps { margin: 0; padding-left: 1.4em; }
+.pbox ol.steps li { margin-bottom: 6px; }
+.legend { display: grid; gap: 6px; margin: 6px 0; }
+.legend div { display: flex; gap: 8px; align-items: baseline; }
+.featured { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: 16px; align-items: start; }
+.featured .demo { margin: 0; }
 
-/* Category listing */
-.catlist { columns: 3 220px; column-gap: 24px; }
-.catlist section { break-inside: avoid; margin-bottom: 10px; }
-.catlist h3 { margin: 0 0 2px; font: 700 15px var(--sans); }
-.catlist ul { margin: 0; padding-left: 1.2em; }
-
-.results li { margin-bottom: 8px; }
-.results small { display: block; color: var(--muted); }
+/* Search page */
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+.chip { padding: 5px 11px; font: 600 13px var(--sans); color: var(--fg); background: var(--box); border: 1px solid var(--line); border-radius: 999px; cursor: pointer; }
+.chip[aria-pressed="true"] { border-color: var(--gold); color: var(--gold); background: var(--box-head); }
+.count { color: var(--muted); font-size: 13px; margin: 4px 0 8px; }
 
 footer.foot { grid-column: 2; color: var(--muted); font-size: 12.5px; padding: 14px 4px 0; }
 footer.foot p { margin: 0 0 4px; }
@@ -188,6 +228,9 @@ footer.foot p { margin: 0 0 4px; }
   .navbox .row { grid-template-columns: 1fr; }
   footer.foot { grid-column: 1; }
   .mobile-brand { display: block !important; }
+  .hero { grid-template-columns: 1fr; }
+  .hero .heroart { display: none; }
+  .featured { grid-template-columns: 1fr; }
 }
 .mobile-brand { display: none; font: 700 20px var(--pixel); color: var(--fg); padding: 6px 0 2px; }
 .mobile-brand span { color: var(--gold); }
@@ -208,7 +251,7 @@ footer.foot p { margin: 0 0 4px; }
     <div class="topbar">
       <div class="tabs" id="tabs"></div>
       <div class="search">
-        <input id="q" type="search" placeholder="Search Krew's Terraria Wiki" autocomplete="off" aria-label="Search the wiki" aria-controls="suggest" aria-autocomplete="list">
+        <input id="q" type="search" placeholder="Search any weapon, item, NPC…" autocomplete="off" aria-label="Search the wiki" aria-controls="suggest" aria-autocomplete="list">
         <div class="suggest" id="suggest" role="listbox" hidden></div>
       </div>
     </div>
@@ -216,7 +259,7 @@ footer.foot p { margin: 0 0 4px; }
   </div>
 
   <footer class="foot">
-    <p>Krew's Terraria Wiki is a personal fan wiki. Pages are written in plain language from game facts (v1.4.5). Each article links to the official Terraria Wiki for exact numbers.</p>
+    <p>Krew's Terraria Wiki is a personal fan wiki. Pages are written in plain language from game facts (v1.4.5). Icons and weapon animations are drawn for this wiki and are not the in-game art. Each article links to the official Terraria Wiki for exact stats and the real sprites.</p>
     <p>Not affiliated with Re-Logic or the official Terraria Wiki. Terraria is a trademark of Re-Logic.</p>
   </footer>
 </div>
@@ -228,126 +271,126 @@ footer.foot p { margin: 0 0 4px; }
 const STAGE = { pre: "Pre-Hardmode", hm: "Hardmode", end: "Endgame" };
 
 const BOSSES = [
-  { n: "King Slime", stage: "pre", item: "Slime Crown", area: "Anywhere", via: "summoned with a Slime Crown",
-    summon: "Craft a Slime Crown from 20 Gel and a Gold or Platinum Crown at a Demon or Crimson Altar. He also shows up on his own during a Slime Rain once enough slimes die.",
+  { n: "King Slime", stage: "pre", c: "#4a8ae8", item: "Slime Crown", area: "Anywhere", via: "summoned with a Slime Crown",
+    summon: "Craft a Slime Crown from 20 Gel and a Gold or Platinum Crown at a Demon Altar or Crimson Altar. He also shows up on his own during a Slime Rain once enough slimes die.",
     where: "Anywhere, day or night.",
     drops: "Slime Saddle (a mount), Slime Hook, Ninja armor pieces, Solidifier.",
     expert: "Royal Gel: most slimes stop attacking you.",
     unlocks: "Nothing is locked behind him. He is an easy warm-up.",
     tip: "He teleports to you. Fight on flat ground with room to run." },
-  { n: "Eye of Cthulhu", stage: "pre", item: "Suspicious Looking Eye", area: "Night", via: "summoned at night with a Suspicious Looking Eye",
-    summon: "Craft a Suspicious Looking Eye from 6 Lens at a Demon or Crimson Altar. Lenses drop from Demon Eyes at night.",
+  { n: "Eye of Cthulhu", stage: "pre", c: "#d8d0c8", item: "Suspicious Looking Eye", area: "Night", via: "summoned at night with a Suspicious Looking Eye",
+    summon: "Craft a Suspicious Looking Eye from 6 Lens at a Demon Altar or Crimson Altar. Lenses drop from Demon Eyes at night.",
     where: "Night only. It can also arrive on its own once you have 200+ life and 10+ defense.",
     drops: "Demonite Ore or Crimtane Ore, seeds of your world's evil biome, arrows.",
     expert: "Shield of Cthulhu: a dash move.",
     unlocks: "Counts as a boss kill for the Dryad.",
     tip: "Its second phase charges in straight lines. Side-step with platforms or a Grappling Hook." },
-  { n: "Eater of Worlds", stage: "pre", item: "Worm Food", area: "Corruption", via: "found only in Corruption worlds",
+  { n: "Eater of Worlds", stage: "pre", c: "#8a5ad0", item: "Worm Food", area: "Corruption", via: "found only in Corruption worlds",
     summon: "Craft Worm Food from 15 Rotten Chunk and 30 Vile Powder at a Demon Altar, or smash 3 Shadow Orbs with a hammer.",
     where: "You must be standing in the Corruption.",
     drops: "Shadow Scale and Demonite Ore, used for the Nightmare Pickaxe and Shadow armor.",
     expert: "Worm Scarf: take less damage.",
     unlocks: "The Nightmare Pickaxe can mine Hellstone. The Tavernkeep shows up.",
     tip: "It splits into smaller worms. Weapons that pierce or explode hit many segments at once." },
-  { n: "Brain of Cthulhu", stage: "pre", item: "Bloody Spine", area: "Crimson", via: "found only in Crimson worlds",
+  { n: "Brain of Cthulhu", stage: "pre", c: "#c84a5a", item: "Bloody Spine", area: "Crimson", via: "found only in Crimson worlds",
     summon: "Craft a Bloody Spine from 15 Vertebra and 30 Vicious Powder at a Crimson Altar, or smash 3 Crimson Hearts.",
     where: "You must be standing in the Crimson.",
     drops: "Tissue Sample and Crimtane Ore, used for the Deathbringer Pickaxe and Crimson armor.",
     expert: "Brain of Confusion: confuses enemies when you get hit.",
     unlocks: "The Deathbringer Pickaxe can mine Hellstone. The Tavernkeep shows up.",
     tip: "Kill the floating Creepers first. In phase two, ignore the faded copies and hit the solid brain." },
-  { n: "Queen Bee", stage: "pre", item: "Abeemination", area: "Jungle", via: "who lives in the Jungle's Bee Hives",
+  { n: "Queen Bee", stage: "pre", c: "#e8c84a", item: "Abeemination", area: "Jungle", via: "who lives in the Jungle's Bee Hives",
     summon: "Craft an Abeemination by hand from 5 Honey Block, 5 Hive, 1 Stinger and 1 Bottled Honey. You can also break the larva inside a Bee Hive.",
     where: "Jungle or Underground Jungle.",
-    drops: "Bee Gun, Bee Keeper, Bees Knees, Bee Wax (for Bee armor), Hive Wand.",
+    drops: "Bee Gun, Bee Keeper, The Bee's Knees, Bee Wax (for Bee armor), Hive Wand.",
     expert: "Hive Pack: stronger bees.",
     unlocks: "The Witch Doctor moves in.",
     tip: "Standing in honey heals you slowly. Fight near a honey pool." },
-  { n: "Deerclops", stage: "pre", opt: true, item: "Deer Thing", area: "Snow", via: "found in the Snow biome",
-    summon: "Craft a Deer Thing from 3 Flinx Fur, 1 Lens and 5 Demonite Ore or Crimtane Ore at a Demon or Crimson Altar.",
+  { n: "Deerclops", stage: "pre", c: "#9a8a7a", opt: true, item: "Deer Thing", area: "Snow", via: "found in the Snow biome",
+    summon: "Craft a Deer Thing from 3 Flinx Fur, 1 Lens and 5 Demonite Ore or Crimtane Ore at a Demon Altar or Crimson Altar.",
     where: "Snow biome.",
     drops: "Lucy the Axe, Pew-matic Horn, Weather Pain, Houndius Shootius.",
     expert: "Bone Helm: summons an eye that fights for you.",
     unlocks: "Nothing depends on it.",
     tip: "Shadow hands appear when it gets dark. Keep a light source and keep moving." },
-  { n: "Skeletron", stage: "pre", item: null, area: "Dungeon", via: "who guards the Dungeon",
+  { n: "Skeletron", stage: "pre", c: "#d8d0b8", item: null, area: "Dungeon", via: "who guards the Dungeon",
     summon: "Talk to the Old Man at the Dungeon entrance at night and choose to curse him.",
     where: "Dungeon entrance, night only. It becomes unbeatable at dawn.",
     drops: "Skeletron Hand, Book of Skulls.",
     expert: "Bone Glove: throws bones at enemies.",
     unlocks: "Opens the Dungeon. The Clothier moves in, and the Mechanic can be found tied up inside the Dungeon.",
     tip: "Start right after dusk so you have the whole night. Focus the head." },
-  { n: "Wall of Flesh", stage: "pre", item: "Guide Voodoo Doll", area: "Underworld", via: "who guards the Underworld. Beating it starts Hardmode",
+  { n: "Wall of Flesh", stage: "pre", c: "#c86a6a", item: "Guide Voodoo Doll", area: "Underworld", via: "who guards the Underworld. Beating it starts Hardmode",
     summon: "Throw a Guide Voodoo Doll into lava in the Underworld while the Guide is alive. Voodoo Demons there drop the doll.",
     where: "Underworld. You can't run away from this fight.",
     drops: "Pwnhammer, a class emblem, and one of: Breaker Blade, Clockwork Assault Rifle, Laser Rifle, Firecracker.",
     expert: "Demon Heart: one extra accessory slot.",
     unlocks: "Hardmode begins and the world changes for good.",
     tip: "Build a long flat bridge across the Underworld before you start. It moves sideways and you need room to back up." },
-  { n: "Queen Slime", stage: "hm", opt: true, item: "Gelatin Crystal", area: "Underground Hallow", via: "summoned with a Gelatin Crystal",
+  { n: "Queen Slime", stage: "hm", c: "#e8a8e0", opt: true, item: "Gelatin Crystal", area: "Underground Hallow", via: "summoned with a Gelatin Crystal",
     summon: "Mine a Gelatin Crystal in the Underground Hallow.",
     where: "Anywhere once summoned.",
     drops: "Blade Staff, Hook of Dissonance, Gelatinous Pillion (a mount), Crystal Assassin armor pieces.",
     expert: "Volatile Gelatin: drops damaging gel when you're hit.",
     unlocks: "Nothing depends on her. Good loot for early Hardmode.",
     tip: "In phase two she flies. Ranged weapons and a mount help." },
-  { n: "The Twins", stage: "hm", item: "Mechanical Eye", area: "Night", via: "and one of the three Mechanical bosses",
+  { n: "The Twins", stage: "hm", c: "#8ae84a", item: "Mechanical Eye", area: "Night", via: "and one of the three Mechanical bosses",
     summon: "Craft a Mechanical Eye from 3 Lens, 5 Iron Bar or Lead Bar and 6 Soul of Light at a Mythril Anvil.",
     where: "Night only.",
     drops: "Soul of Sight, Hallowed Bar.",
     expert: "Mechanical Wheel Piece, part of a minecart upgrade.",
     unlocks: "Counts toward the three Mechanical bosses. The Steampunker moves in after any of them.",
     tip: "Kill one eye at a time. Many players take out Spazmatism, the green one, first." },
-  { n: "The Destroyer", stage: "hm", item: "Mechanical Worm", area: "Night", via: "and one of the three Mechanical bosses",
+  { n: "The Destroyer", stage: "hm", c: "#c83a3a", item: "Mechanical Worm", area: "Night", via: "and one of the three Mechanical bosses",
     summon: "Craft a Mechanical Worm from 6 Rotten Chunk or Vertebra, 5 Iron Bar or Lead Bar and 6 Soul of Night at a Mythril Anvil.",
     where: "Night only.",
     drops: "Soul of Might, Hallowed Bar.",
     expert: "Mechanical Wagon Piece, part of a minecart upgrade.",
     unlocks: "Counts toward the three Mechanical bosses.",
     tip: "It is huge, so weapons that pierce or hit many segments melt it." },
-  { n: "Skeletron Prime", stage: "hm", item: "Mechanical Skull", area: "Night", via: "and one of the three Mechanical bosses",
+  { n: "Skeletron Prime", stage: "hm", c: "#9aa0aa", item: "Mechanical Skull", area: "Night", via: "and one of the three Mechanical bosses",
     summon: "Craft a Mechanical Skull from 30 Bone, 5 Iron Bar or Lead Bar, 3 Soul of Light and 3 Soul of Night at a Mythril Anvil.",
     where: "Night only.",
     drops: "Soul of Fright, Hallowed Bar.",
     expert: "Mechanical Battery Piece, part of a minecart upgrade.",
     unlocks: "Counts toward the three Mechanical bosses.",
     tip: "Focus the head. When it starts spinning, back off and wait it out." },
-  { n: "Plantera", stage: "hm", item: "Plantera's Bulb", area: "Underground Jungle", via: "who grows deep in the Underground Jungle",
+  { n: "Plantera", stage: "hm", c: "#e85a8a", item: "Plantera's Bulb", area: "Underground Jungle", via: "who grows deep in the Underground Jungle",
     summon: "Break a pink Plantera's Bulb. Bulbs only grow after all three Mechanical bosses are dead.",
     where: "Underground Jungle. Leaving the Jungle makes her enrage.",
     drops: "Temple Key (always), plus one of: Grenade Launcher, Venus Magnum, Nettle Burst, Leaf Blower, Flower Pow, Wasp Gun, Seedler. Sometimes the Pygmy Staff.",
     expert: "Spore Sac: floating spores damage enemies.",
     unlocks: "The Jungle Temple, the harder Dungeon with Ectoplasm, the Cyborg, the Empress of Light, and the Pumpkin Moon and Frost Moon.",
     tip: "Clear a big open arena in the Underground Jungle first." },
-  { n: "Empress of Light", stage: "hm", opt: true, item: "Prismatic Lacewing", area: "Hallow", via: "who appears in the Hallow at night",
+  { n: "Empress of Light", stage: "hm", c: "#f0c0f0", opt: true, item: "Prismatic Lacewing", area: "Hallow", via: "who appears in the Hallow at night",
     summon: "Kill a Prismatic Lacewing, a glowing butterfly that flutters through the surface Hallow at night after Plantera.",
     where: "Hallow. If day comes mid-fight, her attacks become instantly lethal.",
     drops: "One of: Nightglow, Starlight, Eventide, Kaleidoscope. Rare: Empress Wings, Stellar Tune. Terraprisma only if you beat her during the day.",
     expert: "A Treasure Bag with extra loot.",
     unlocks: "Nothing depends on her, but her weapons are some of the best in the game.",
     tip: "Start as early in the night as you can." },
-  { n: "Duke Fishron", stage: "hm", opt: true, item: "Truffle Worm", area: "Ocean", via: "who is fished up from the Ocean",
+  { n: "Duke Fishron", stage: "hm", c: "#4ab0a0", opt: true, item: "Truffle Worm", area: "Ocean", via: "who is fished up from the Ocean",
     summon: "Go fishing in the Ocean with a Truffle Worm as bait.",
     where: "Ocean. Leaving the Ocean makes him enrage.",
     drops: "Fishron Wings, Flairon, Tsunami, Razorblade Typhoon, Tempest Staff, Bubble Gun.",
     expert: "Shrimpy Truffle: breathe and move fast in water.",
     unlocks: "Nothing depends on him.",
     tip: "Build sky platforms over the ocean so you have room to dodge." },
-  { n: "Golem", stage: "hm", item: "Lihzahrd Power Cell", area: "Jungle Temple", via: "who sits at the heart of the Jungle Temple",
+  { n: "Golem", stage: "hm", c: "#c8883a", item: "Lihzahrd Power Cell", area: "Jungle Temple", via: "who sits at the heart of the Jungle Temple",
     summon: "Place a Lihzahrd Power Cell on the Lihzahrd Altar deep inside the Jungle Temple.",
     where: "Jungle Temple. Open the door with the Temple Key.",
     drops: "Picksaw, Beetle Husk, Sun Stone, and one of: Stynger, Possessed Hatchet, Eye of the Golem, Heat Ray, Staff of Earth, Golem Fist.",
     expert: "Shiny Stone: big life regeneration while standing still.",
     unlocks: "The Lunatic Cultist and Martian Madness. The Picksaw mines Lihzahrd Bricks.",
     tip: "Kill the fists, then the head. In the last phase the head flies loose, so stay mobile." },
-  { n: "Lunatic Cultist", stage: "end", item: null, area: "Dungeon", via: "who leads a cult at the Dungeon entrance",
+  { n: "Lunatic Cultist", stage: "end", c: "#4a7ae8", item: null, area: "Dungeon", via: "who leads a cult at the Dungeon entrance",
     summon: "After Golem, a group of cultists chants at the Dungeon entrance. Attack them.",
     where: "Dungeon entrance.",
     drops: "Ancient Manipulator, the crafting station for endgame gear.",
     expert: "A Treasure Bag with extra loot.",
     unlocks: "The Lunar Events start right away.",
     tip: "When it splits into copies, find the real one and hit it fast." },
-  { n: "Moon Lord", stage: "end", item: "Celestial Sigil", area: "Anywhere", via: "and the final boss of the game",
+  { n: "Moon Lord", stage: "end", c: "#6fd6cb", item: "Celestial Sigil", area: "Anywhere", via: "and the final boss of the game",
     summon: "Appears about a minute after all four Celestial Pillars are destroyed. Later, a Celestial Sigil (20 of each Lunar Fragment at the Ancient Manipulator) summons him.",
     where: "Anywhere. Give yourself a big flat arena.",
     drops: "Luminite, Portal Gun, and one of: Meowmere, Terrarian, Star Wrath, S.D.M.G., Celebration Mk2, Last Prism, Lunar Flare, Rainbow Crystal Staff, Lunar Portal Staff.",
@@ -356,118 +399,281 @@ const BOSSES = [
     tip: "Destroy both hand eyes and the head eye, then the heart in his chest." },
 ];
 
+/* Weapon types: class, category name, icon */
+const WTYPES = {
+  sword:      { cls: "melee",  cat: "Swords",           label: "Sword" },
+  shortsword: { cls: "melee",  cat: "Swords",           label: "Shortsword" },
+  spear:      { cls: "melee",  cat: "Spears",           label: "Spear" },
+  yoyo:       { cls: "melee",  cat: "Yoyos",            label: "Yoyo" },
+  boomerang:  { cls: "melee",  cat: "Boomerangs",       label: "Boomerang" },
+  flail:      { cls: "melee",  cat: "Flails",           label: "Flail" },
+  bow:        { cls: "ranged", cat: "Bows",             label: "Bow" },
+  gun:        { cls: "ranged", cat: "Guns",             label: "Gun" },
+  launcher:   { cls: "ranged", cat: "Launchers",        label: "Launcher" },
+  staff:      { cls: "magic",  cat: "Wands and staffs", label: "Staff" },
+  book:       { cls: "magic",  cat: "Spell books",      label: "Spell book" },
+  magicgun:   { cls: "magic",  cat: "Magic guns",       label: "Magic gun" },
+  minion:     { cls: "summon", cat: "Minion staffs",    label: "Minion staff" },
+  whip:       { cls: "summon", cat: "Whips",            label: "Whip" },
+};
+const CLASSES = { melee: "Melee weapons", ranged: "Ranged weapons", magic: "Magic weapons", summon: "Summon weapons" };
+const CLASS_BLURB = {
+  melee: "Up-close weapons: swords, spears, yoyos, boomerangs and flails. Melee armor makes them swing faster and hit harder.",
+  ranged: "Bows, guns and launchers. They need ammo like arrows, bullets or rockets, which you buy or craft.",
+  magic: "Staffs, spell books and magic guns. They use mana instead of ammo, so grab Mana Crystals.",
+  summon: "Minion staffs call helpers that fight for you. Whips boost your minions on whatever you hit.",
+};
+
+// [name, type, stage, main color, accent color, fires a projectile?, how to get, what it does, aliases?]
+const WEAPON_ROWS = [
+  ["Copper Shortsword", "shortsword", "pre", "#d07a3a", "#7a4a22", 0, "Every new character starts with one.", "A tiny stabbing sword. Weak, but it's part of the Zenith recipe."],
+  ["Wooden Sword", "sword", "pre", "#b8844f", "#6b4a2f", 0, "Craft from Wood at a Work Bench.", "The first sword most players make."],
+  ["Iron Broadsword", "sword", "pre", "#c4c8d0", "#6b6f78", 0, "Craft from Iron Bar at an Iron Anvil. Worlds with Lead get the Lead Broadsword instead.", "A sturdy early sword.", ["Lead Broadsword"]],
+  ["Cactus Sword", "sword", "pre", "#5fa04a", "#3b6b2c", 0, "Craft from Cactus at a Work Bench. Cactus grows in the Desert.", "A cheap early sword that's a little better than wood."],
+  ["Enchanted Sword", "sword", "pre", "#7fd1e8", "#3b6fb0", 1, "Found in a rare sword shrine hidden in the Caverns.", "Swings and fires a magic beam."],
+  ["Starfury", "sword", "pre", "#f0b8f0", "#e9b949", 1, "Chests on Sky Islands.", "Each swing calls a star down from the sky."],
+  ["Ice Blade", "sword", "pre", "#a8e0f0", "#5a9fc8", 1, "Frozen chests in the underground Snow biome.", "Fires a small ice bolt with each swing."],
+  ["Muramasa", "sword", "pre", "#4a7fe0", "#1f3f8a", 0, "Locked gold chests in the Dungeon.", "A very fast blue katana."],
+  ["Blade of Grass", "sword", "pre", "#6fbf3f", "#e8a8c8", 0, "Craft from Jungle Spores, Stinger and Vine at an Iron Anvil.", "A jungle sword that can poison enemies."],
+  ["Light's Bane", "sword", "pre", "#8a5ad0", "#3a2a5a", 0, "Craft from Demonite Bar at an Iron Anvil.", "The Corruption sword. Part of the Night's Edge recipe."],
+  ["Blood Butcherer", "sword", "pre", "#d04040", "#5a1f1f", 0, "Craft from Crimtane Bar at an Iron Anvil.", "The Crimson sword. Makes enemies bleed. Part of the Night's Edge recipe."],
+  ["Volcano", "sword", "pre", "#f06a2a", "#f2c14e", 0, "Craft from Hellstone Bar at an Iron Anvil.", "A huge flaming sword that sets enemies on fire. Its old name was the Fiery Greatsword.", ["Fiery Greatsword"]],
+  ["Bee Keeper", "sword", "pre", "#e8c84a", "#3a2a1a", 0, "Dropped by Queen Bee.", "Releases angry bees when it hits."],
+  ["Night's Edge", "sword", "pre", "#7a4ae0", "#3ac090", 1, "Combine Light's Bane or Blood Butcherer, Muramasa, Blade of Grass and Volcano at a Demon Altar or Crimson Altar.", "The best sword before Hardmode. Its swing sends out a dark energy slash."],
+  ["Breaker Blade", "sword", "pre", "#a0a0ae", "#5a5a68", 0, "Dropped by the Wall of Flesh.", "A slow, heavy blade that hits extra hard on healthy enemies."],
+  ["Excalibur", "sword", "hm", "#f2d46a", "#e8e0c8", 1, "Craft from Hallowed Bar at a Mythril Anvil.", "A golden holy sword. Its swing sends out a light slash."],
+  ["True Excalibur", "sword", "hm", "#ffe58a", "#8fd16a", 1, "Upgrade Excalibur with Chlorophyte Bar at a Mythril Anvil.", "A stronger Excalibur and part of the Terra Blade recipe."],
+  ["True Night's Edge", "sword", "hm", "#9a5af0", "#4ae0a0", 1, "Upgrade Night's Edge with souls from the three Mechanical bosses at a Mythril Anvil.", "Fires a big green-and-purple blade beam. Part of the Terra Blade recipe."],
+  ["Seedler", "sword", "hm", "#6fd04a", "#c8a04a", 1, "Dropped by Plantera.", "Fires seeds that burst into smaller seeds."],
+  ["Starlight", "sword", "hm", "#f0d8ff", "#8ad8f0", 1, "Dropped by the Empress of Light.", "Stabs extremely fast and sprays bursts of light."],
+  ["Terra Blade", "sword", "hm", "#5ae05a", "#2a8a3a", 1, "Combine True Night's Edge, True Excalibur and a Broken Hero Sword at a Mythril Anvil.", "A famous green sword that fires a beam with every swing."],
+  ["The Horseman's Blade", "sword", "hm", "#f0862a", "#3a2a1a", 0, "Pumpkin Moon, dropped by the Pumpking.", "Hits release flaming pumpkin heads that chase enemies."],
+  ["Influx Waver", "sword", "hm", "#4ac8e8", "#2a4a8a", 1, "Martian Madness, dropped by the Martian Saucer.", "Fires energy that splits apart when it hits."],
+  ["Star Wrath", "sword", "end", "#f05ac8", "#4a2a8a", 1, "Dropped by the Moon Lord.", "Rains pink stars down around your cursor."],
+  ["Meowmere", "sword", "end", "#f2a8d8", "#8ad8f0", 1, "Dropped by the Moon Lord.", "Fires bouncing rainbow cats."],
+  ["Zenith", "sword", "end", "#8ae8c8", "#e8e0f0", 1, "Combine Terra Blade, Meowmere, Star Wrath, Influx Waver, The Horseman's Blade, Seedler, Starfury, Bee Keeper, Enchanted Sword and Copper Shortsword at a Mythril Anvil.", "Throws ghostly copies of every sword in its recipe. The strongest melee weapon in the game."],
+
+  ["Spear", "spear", "pre", "#c4c8d0", "#6b4a2f", 0, "Sometimes found in chests in the Caverns.", "A basic spear that pokes from a safe distance."],
+  ["Dark Lance", "spear", "pre", "#7a5ab8", "#2a1a3a", 0, "Shadow Chests in the Underworld.", "A long, dark spear with great reach."],
+  ["Gungnir", "spear", "hm", "#f2d46a", "#c8c0a8", 0, "Craft from Hallowed Bar at a Mythril Anvil.", "A golden spear with long reach."],
+  ["North Pole", "spear", "hm", "#a8e0f0", "#e84a4a", 1, "Frost Moon, dropped by the Ice Queen.", "Throws snowflakes as you stab."],
+  ["Daybreak", "spear", "end", "#f2a03a", "#f0e04a", 1, "Craft from Solar Fragment at the Ancient Manipulator.", "Throws burning spears that stick in enemies and explode."],
+
+  ["Wooden Yoyo", "yoyo", "pre", "#b8844f", "#6b4a2f", 0, "Craft from Wood at a Work Bench.", "A yoyo you steer with your cursor. Yoyos keep hitting while you move."],
+  ["Valor", "yoyo", "pre", "#4a7fe0", "#c8c8d8", 0, "Dropped by Dungeon enemies after Skeletron.", "A blue yoyo with strong knockback."],
+  ["Cascade", "yoyo", "pre", "#f06a2a", "#f2c14e", 0, "Dropped by enemies in the Underworld after Skeletron.", "A fiery yoyo that sets enemies on fire."],
+  ["Amarok", "yoyo", "hm", "#a8e0f0", "#4a8ac8", 0, "Dropped by enemies in the Snow biome in Hardmode.", "An icy yoyo that freezes enemies with frostburn."],
+  ["Terrarian", "yoyo", "end", "#5ae05a", "#f0e04a", 1, "Dropped by the Moon Lord.", "The best yoyo. Fires extra energy orbs at enemies."],
+
+  ["Wooden Boomerang", "boomerang", "pre", "#b8844f", "#6b4a2f", 0, "Chests on the surface.", "Thrown out, then flies back to you."],
+  ["Enchanted Boomerang", "boomerang", "pre", "#7fd1e8", "#3b6fb0", 0, "Chests in the Caverns.", "A magic boomerang that flies far and comes back."],
+  ["Possessed Hatchet", "boomerang", "hm", "#c8a04a", "#5a4a3a", 0, "Dropped by Golem.", "A spinning axe that homes in on enemies, then returns."],
+
+  ["Ball O' Hurt", "flail", "pre", "#8a5ad0", "#3a2a5a", 0, "Sometimes dropped when you smash a Shadow Orb.", "A spiked ball on a chain. Spin it, then throw it."],
+  ["Sunfury", "flail", "pre", "#f06a2a", "#f2c14e", 0, "Shadow Chests in the Underworld.", "A blazing flail that sets enemies on fire."],
+  ["Flower Pow", "flail", "hm", "#e85a8a", "#6fbf3f", 0, "Dropped by Plantera.", "Sprays sharp petals when it hits."],
+
+  ["Wooden Bow", "bow", "pre", "#b8844f", "#e8e0c8", 0, "Craft from Wood at a Work Bench.", "The first bow. Uses arrows as ammo."],
+  ["Demon Bow", "bow", "pre", "#8a5ad0", "#e8e0c8", 0, "Craft from Demonite Bar at an Iron Anvil.", "The Corruption bow."],
+  ["Tendon Bow", "bow", "pre", "#d04040", "#e8e0c8", 0, "Craft from Crimtane Bar at an Iron Anvil.", "The Crimson bow."],
+  ["Molten Fury", "bow", "pre", "#f06a2a", "#f2c14e", 0, "Craft from Hellstone Bar at an Iron Anvil.", "Turns wooden arrows into flaming arrows."],
+  ["Hellwing Bow", "bow", "pre", "#c84a2a", "#3a1a1a", 0, "Shadow Chests in the Underworld.", "Turns wooden arrows into fiery bats that chase enemies."],
+  ["The Bee's Knees", "bow", "pre", "#e8c84a", "#3a2a1a", 0, "Dropped by Queen Bee.", "Turns wooden arrows into streams of bees.", ["Bee's Knees", "Bees Knees"]],
+  ["Daedalus Stormbow", "bow", "hm", "#f0b0e8", "#a8e0f0", 0, "Dropped by Hallowed Mimics.", "Rains arrows down from the sky onto your cursor."],
+  ["Tsunami", "bow", "hm", "#3aa8e0", "#e8f0f8", 0, "Dropped by Duke Fishron.", "Fires five arrows at once in a spread."],
+  ["Eventide", "bow", "hm", "#f05ac8", "#4ac8e8", 0, "Dropped by the Empress of Light.", "Fires rainbow arrows from glowing portals."],
+  ["Phantasm", "bow", "end", "#4ac8e8", "#2a4a8a", 0, "Craft from Vortex Fragment at the Ancient Manipulator.", "Fires many arrows in quick bursts."],
+
+  ["Flintlock Pistol", "gun", "pre", "#9a7a5a", "#c4c8d0", 0, "Bought from the Arms Dealer.", "A simple pistol. Uses bullets."],
+  ["Musket", "gun", "pre", "#7a5a3a", "#c4c8d0", 0, "Sometimes dropped when you smash a Shadow Orb.", "A strong but slow early gun."],
+  ["The Undertaker", "gun", "pre", "#9a3030", "#c4c8d0", 0, "Sometimes dropped when you smash a Crimson Heart.", "The Crimson world's version of the Musket."],
+  ["Minishark", "gun", "pre", "#7a8a9a", "#c4c8d0", 0, "Bought from the Arms Dealer.", "A fast-firing machine gun. Great early on."],
+  ["Handgun", "gun", "pre", "#5a5a6a", "#c8c8d8", 0, "Locked gold chests in the Dungeon.", "An accurate, fast pistol."],
+  ["Phoenix Blaster", "gun", "pre", "#f06a2a", "#5a5a6a", 0, "Upgrade the Handgun with Hellstone Bar at an Iron Anvil.", "A fiery upgrade to the Handgun."],
+  ["Star Cannon", "gun", "pre", "#4a6ac8", "#e9b949", 0, "Craft from a Minishark, Meteorite Bar and Fallen Star at an Iron Anvil.", "Fires Fallen Stars as ammo."],
+  ["Clockwork Assault Rifle", "gun", "pre", "#8a8a9a", "#e9b949", 0, "Dropped by the Wall of Flesh.", "Fires bursts of three bullets."],
+  ["Megashark", "gun", "hm", "#7a8a9a", "#e9b949", 0, "Upgrade the Minishark with Illegal Gun Parts, Shark Fins and Soul of Might at a Mythril Anvil.", "A faster, stronger Minishark."],
+  ["Venus Magnum", "gun", "hm", "#e85a8a", "#6fbf3f", 0, "Dropped by Plantera.", "A rapid-fire flower pistol."],
+  ["Sniper Rifle", "gun", "hm", "#5a6a5a", "#c4c8d0", 0, "Dropped by Skeleton Snipers in the Dungeon after Plantera.", "Huge damage at long range. Right-click to zoom."],
+  ["Coin Gun", "gun", "hm", "#e9b949", "#c8c8d8", 0, "A rare drop during the Pirate Invasion.", "Fires your coins. Better coins hit harder, and you lose them."],
+  ["Elf Melter", "gun", "hm", "#e84a4a", "#6fbf3f", 0, "Frost Moon, dropped by Santa-NK1.", "A flamethrower that burns Gel as fuel."],
+  ["Xenopopper", "gun", "hm", "#4ac8e8", "#8a8a9a", 0, "Martian Madness.", "Fires bubbles that burst into lasers."],
+  ["Candy Corn Rifle", "gun", "hm", "#f2a03a", "#f2e8c8", 0, "Pumpkin Moon, dropped by the Pumpking.", "Fires candy corn that bounces off walls."],
+  ["S.D.M.G.", "gun", "end", "#5a4a7a", "#4ac8e8", 0, "Dropped by the Moon Lord.", "An extremely fast space machine gun."],
+  ["Vortex Beater", "gun", "end", "#4ac8a8", "#2a4a5a", 0, "Craft from Vortex Fragment at the Ancient Manipulator.", "Fires bullets with the occasional rocket."],
+
+  ["Grenade Launcher", "launcher", "hm", "#6a8a4a", "#c8a04a", 0, "Dropped by Plantera.", "Lobs explosive grenades. Uses rockets as ammo."],
+  ["Celebration Mk2", "launcher", "end", "#f05ac8", "#e9b949", 0, "Dropped by the Moon Lord.", "Fires huge exploding fireworks."],
+
+  ["Wand of Sparking", "staff", "pre", "#b8844f", "#f2a03a", 1, "Wooden chests on the surface.", "Shoots little sparks that set enemies on fire."],
+  ["Amethyst Staff", "staff", "pre", "#b07ae8", "#c87533", 1, "Craft from Amethyst and Copper Bar at an Iron Anvil.", "A starter magic staff. Rarer gems make stronger staffs."],
+  ["Vilethorn", "staff", "pre", "#8a5ad0", "#3a6a2a", 1, "Sometimes dropped when you smash a Shadow Orb.", "Grows a line of thorns through enemies and walls."],
+  ["Crimson Rod", "staff", "pre", "#d04040", "#5a1f1f", 1, "Sometimes dropped when you smash a Crimson Heart.", "Makes a little cloud that rains blood on enemies."],
+  ["Aqua Scepter", "staff", "pre", "#3aa8e0", "#f2d46a", 1, "Locked gold chests in the Dungeon.", "Sprays a stream of water."],
+  ["Magic Missile", "staff", "pre", "#4a7fe0", "#e8e0f0", 1, "Locked gold chests in the Dungeon.", "Fires a bolt you steer with your cursor."],
+  ["Flower of Fire", "staff", "pre", "#f06a2a", "#6fbf3f", 1, "Shadow Chests in the Underworld.", "Throws bouncing fireballs."],
+  ["Nettle Burst", "staff", "hm", "#6fbf3f", "#3a6a2a", 1, "Dropped by Plantera.", "Grows a spear of thorns toward your cursor."],
+  ["Staff of Earth", "staff", "hm", "#b8844f", "#e9b949", 1, "Dropped by Golem.", "Hurls big boulders."],
+  ["Inferno Fork", "staff", "hm", "#f06a2a", "#3a1a1a", 1, "Dropped by Diabolists in the Dungeon after Plantera.", "Launches fireballs that leave a burning blast."],
+  ["Shadowbeam Staff", "staff", "hm", "#8a5ad0", "#e8e0f0", 1, "Dropped by Necromancers in the Dungeon after Plantera.", "Fires a beam that bounces off walls."],
+  ["Nightglow", "staff", "hm", "#f0b0e8", "#4ac8e8", 1, "Dropped by the Empress of Light.", "Releases glowing orbs that hover, then chase enemies."],
+  ["Rainbow Crystal Staff", "staff", "end", "#f05ac8", "#4ac8e8", 1, "Dropped by the Moon Lord.", "Places a crystal that fires rainbow beams at enemies."],
+  ["Last Prism", "staff", "end", "#e8e0f0", "#f05ac8", 1, "Dropped by the Moon Lord.", "Fires rainbow beams that merge into one huge laser."],
+
+  ["Water Bolt", "book", "pre", "#3aa8e0", "#2a4a8a", 1, "Gold chests in the Dungeon, and sometimes on Dungeon shelves.", "Fires a bouncing ball of water. Strong early magic."],
+  ["Demon Scythe", "book", "pre", "#8a5ad0", "#d04040", 1, "Dropped by Demons in the Underworld.", "Throws spinning scythes."],
+  ["Book of Skulls", "book", "pre", "#d8d0b8", "#6b4a2f", 1, "Dropped by Skeletron.", "Fires flaming skulls."],
+  ["Golden Shower", "book", "hm", "#e9b949", "#8a6a2a", 1, "Craft from a Spell Tome, Ichor and Soul of Night at a Bookcase.", "Sprays ichor that lowers enemy defense."],
+  ["Cursed Flames", "book", "hm", "#8ae84a", "#3a6a2a", 1, "Craft from a Spell Tome, Cursed Flame and Soul of Night at a Bookcase.", "Throws cursed fireballs that bounce."],
+  ["Razorblade Typhoon", "book", "hm", "#3aa8e0", "#e8f0f8", 1, "Dropped by Duke Fishron.", "Fires homing spinning blades of water."],
+  ["Lunar Flare", "book", "end", "#4ac8e8", "#e8e0f0", 1, "Dropped by the Moon Lord.", "Calls down blasts of moonlight."],
+
+  ["Space Gun", "magicgun", "pre", "#6fbf3f", "#c4c8d0", 1, "Craft from Meteorite Bar at an Iron Anvil.", "A laser pistol that uses mana."],
+  ["Laser Rifle", "magicgun", "pre", "#b05ae8", "#8a8a9a", 1, "Dropped by the Wall of Flesh.", "Fires a fast purple laser."],
+  ["Bee Gun", "magicgun", "pre", "#e8c84a", "#3a2a1a", 1, "Dropped by Queen Bee.", "Shoots bees that chase enemies."],
+  ["Leaf Blower", "magicgun", "hm", "#6fbf3f", "#8a8a9a", 1, "Dropped by Plantera.", "Fires a rapid stream of sharp leaves."],
+  ["Wasp Gun", "magicgun", "hm", "#e8c84a", "#5a4a3a", 1, "Dropped by Plantera.", "Fires wasps that chase enemies."],
+  ["Heat Ray", "magicgun", "hm", "#f0862a", "#e9b949", 1, "Dropped by Golem.", "Fires a hot beam that pierces enemies."],
+  ["Bubble Gun", "magicgun", "hm", "#8ad8f0", "#e8f0f8", 1, "Dropped by Duke Fishron.", "Rapidly fires damaging bubbles."],
+  ["Nebula Blaze", "magicgun", "end", "#c84ae8", "#4a2a8a", 1, "Craft from Nebula Fragment at the Ancient Manipulator.", "Fires homing nebula bolts."],
+
+  ["Slime Staff", "minion", "pre", "#4a8ae8", "#b8844f", 0, "A very rare drop from slimes.", "Summons a baby slime to fight for you."],
+  ["Finch Staff", "minion", "pre", "#e8c84a", "#b8844f", 0, "Chests inside Living Trees in the Forest.", "Summons a little bird that pecks enemies."],
+  ["Flinx Staff", "minion", "pre", "#e8e0f0", "#4a8ac8", 0, "Crafted from Flinx Fur.", "Summons a fluffy flinx that charges enemies."],
+  ["Hornet Staff", "minion", "pre", "#e8c84a", "#3a2a1a", 0, "Craft from Bee Wax at an Iron Anvil.", "Summons a hornet that shoots stingers."],
+  ["Imp Staff", "minion", "pre", "#f06a2a", "#3a1a1a", 0, "Craft from Hellstone Bar at an Iron Anvil.", "Summons an imp that throws fireballs."],
+  ["Vampire Frog Staff", "minion", "pre", "#d04040", "#4a8a3a", 0, "Dropped by the enemies you fish up during a Blood Moon.", "Summons a frog that heals... no, bites enemies hard."],
+  ["Spider Staff", "minion", "hm", "#4a4a5a", "#d04040", 0, "Crafted from Spider Fang, dropped by Black Recluses in Hardmode spider caves.", "Summons spiders that crawl along walls and bite."],
+  ["Pirate Staff", "minion", "hm", "#9a7a5a", "#d04040", 0, "A drop during the Pirate Invasion.", "Summons pirates that fight for you."],
+  ["Optic Staff", "minion", "hm", "#8ae84a", "#d04040", 0, "Craft from Soul of Sight and Hallowed Bar at a Mythril Anvil.", "Summons a pair of little mechanical eyes."],
+  ["Blade Staff", "minion", "hm", "#f0b0e8", "#a8e0f0", 0, "Dropped by Queen Slime.", "Summons flying blades that slash enemies."],
+  ["Pygmy Staff", "minion", "hm", "#6fbf3f", "#b8844f", 0, "Sometimes dropped by Plantera.", "Summons pygmies that throw spears."],
+  ["Deadly Sphere Staff", "minion", "hm", "#9aa0aa", "#d04040", 0, "Dropped by Deadly Spheres during a Solar Eclipse.", "Summons spiked spheres that ram enemies."],
+  ["Raven Staff", "minion", "hm", "#4a4a5a", "#f06a2a", 0, "Pumpkin Moon, dropped by the Pumpking.", "Summons ravens that dive at enemies."],
+  ["Tempest Staff", "minion", "hm", "#3aa8e0", "#e8f0f8", 0, "Dropped by Duke Fishron.", "Summons little sharknados."],
+  ["Xeno Staff", "minion", "hm", "#4ac8e8", "#8a8a9a", 0, "Martian Madness.", "Summons little flying saucers."],
+  ["Terraprisma", "minion", "hm", "#e8e0f0", "#f05ac8", 0, "Dropped by the Empress of Light, but only if you beat her during the day.", "Summons a rainbow sword that flies at enemies. One of the strongest summons."],
+  ["Stardust Dragon Staff", "minion", "end", "#4a8ae8", "#e8e0f0", 0, "Craft from Stardust Fragment at the Ancient Manipulator.", "Summons a dragon that grows longer with every cast."],
+
+  ["Leather Whip", "whip", "pre", "#9a7a5a", "#6b4a2f", 0, "Bought from the Zoologist.", "The first whip. Whips boost your minions' damage on the enemy you hit."],
+  ["Firecracker", "whip", "pre", "#e84a3a", "#f2c14e", 0, "Dropped by the Wall of Flesh.", "Hitting an enemy makes your minions' attacks explode on it."],
+  ["Durendal", "whip", "hm", "#f2d46a", "#e8e0c8", 0, "Craft from Hallowed Bar at a Mythril Anvil.", "A golden whip that powers up your minions."],
+  ["Kaleidoscope", "whip", "hm", "#f05ac8", "#4ac8e8", 0, "Dropped by the Empress of Light.", "A rainbow whip that boosts minion damage."],
+];
+// Fix one description that reads oddly
+WEAPON_ROWS.find(r => r[0] === "Vampire Frog Staff")[7] = "Summons a frog that leaps at enemies and bites.";
+
+const WEAPONS = WEAPON_ROWS.map(([n, type, stage, c1, c2, proj, how, does, aka]) => ({ n, type, stage, c1, c2, proj: !!proj, how, does, aka, cls: WTYPES[type].cls }));
+
 const ITEMS = [
-  { n: "Life Crystal", cat: "Consumable", stage: "pre", how: "Glowing red hearts lying in the Caverns. Smash one with a pickaxe or hammer. Each gives +20 max life, up to 400." },
-  { n: "Life Fruit", cat: "Consumable", stage: "hm", how: "Grows in the Underground Jungle after you beat any Mechanical boss. Each gives +5 max life, up to 500." },
-  { n: "Mana Crystal", cat: "Consumable", stage: "pre", how: "Craft by hand from 5 Fallen Star. Stars fall from the sky at night. Each gives +20 mana, up to 200." },
-  { n: "Fallen Star", cat: "Material", stage: "pre", how: "Falls from the sky at night. Pick it up before sunrise or it disappears." },
-  { n: "Hermes Boots", cat: "Accessory", stage: "pre", how: "Chests in the Caverns. Lets you sprint." },
-  { n: "Cloud in a Bottle", cat: "Accessory", stage: "pre", how: "Chests in the Caverns. Gives a double jump." },
-  { n: "Magic Mirror", cat: "Tool", stage: "pre", how: "Chests in the Caverns. Teleports you home. The Ice Mirror from Snow chests does the same." },
-  { n: "Grappling Hook", cat: "Tool", stage: "pre", how: "Craft 1 Hook and 3 Iron Chain or Lead Chain at an Iron Anvil. Skeletons in the Caverns drop the Hook." },
-  { n: "Lucky Horseshoe", cat: "Accessory", stage: "pre", how: "Chests on Sky Islands. No more fall damage." },
-  { n: "Shiny Red Balloon", cat: "Accessory", stage: "pre", how: "Chests on Sky Islands. Jump higher." },
-  { n: "Fledgling Wings", cat: "Accessory", stage: "pre", how: "A rare find in chests on Sky Islands. The only wings you can get before Hardmode." },
-  { n: "Starfury", cat: "Weapon", stage: "pre", how: "Chests on Sky Islands. A sword that calls down stars." },
-  { n: "Lava Charm", cat: "Accessory", stage: "pre", how: "Chests deep in the Caverns near the lava layer. Gives a few seconds of lava immunity." },
-  { n: "Feral Claws", cat: "Accessory", stage: "pre", how: "Ivy chests in the Underground Jungle. Faster melee swings." },
-  { n: "Anklet of the Wind", cat: "Accessory", stage: "pre", how: "Ivy chests in the Underground Jungle. Run faster." },
-  { n: "Band of Regeneration", cat: "Accessory", stage: "pre", how: "Chests in the Caverns. Slowly heals you." },
-  { n: "Enchanted Sword", cat: "Weapon", stage: "pre", how: "A rare sword shrine hidden in the Caverns. The sword fires a beam." },
-  { n: "Bed", cat: "Furniture", stage: "pre", how: "Craft 15 Wood and 5 Silk at a Sawmill. Right-click it to set your respawn point." },
-  { n: "Bug Net", cat: "Tool", stage: "pre", how: "Bought from the Merchant. Catches critters and Truffle Worms." },
-  { n: "Golden Key", cat: "Tool", stage: "pre", how: "Dropped by Dungeon enemies after Skeletron. Opens locked gold chests in the Dungeon." },
-  { n: "Muramasa", cat: "Weapon", stage: "pre", how: "Locked gold chests in the Dungeon. A fast blue sword." },
-  { n: "Water Bolt", cat: "Weapon", stage: "pre", how: "Gold chests in the Dungeon, and sometimes on Dungeon shelves. Strong early magic." },
-  { n: "Cobalt Shield", cat: "Accessory", stage: "pre", how: "Locked gold chests in the Dungeon. Stops knockback." },
-  { n: "Shadow Key", cat: "Tool", stage: "pre", how: "Locked gold chests in the Dungeon. Opens Shadow Chests in the Underworld." },
-  { n: "Bone", cat: "Material", stage: "pre", how: "Skeletons in the Dungeon after Skeletron. Needed for the Mechanical Skull." },
-  { n: "Gel", cat: "Material", stage: "pre", how: "Dropped by any slime. Used for torches and the Slime Crown." },
-  { n: "Lens", cat: "Material", stage: "pre", how: "Dropped by Demon Eyes at night." },
-  { n: "Silk", cat: "Material", stage: "pre", how: "Craft 7 Cobweb at a Loom. Cobwebs cover the walls of the Caverns." },
-  { n: "Feather", cat: "Material", stage: "pre", how: "Dropped by Harpies, which fly near Sky Islands and in space." },
-  { n: "Stinger", cat: "Material", stage: "pre", how: "Dropped by Hornets and Spiked Jungle Slimes in the Jungle." },
-  { n: "Jungle Spores", cat: "Material", stage: "pre", how: "Glowing bulbs on the walls of the Underground Jungle. Used for Jungle armor and the Blade of Grass." },
-  { n: "Flinx Fur", cat: "Material", stage: "pre", how: "Dropped by Flinxes in the underground Snow biome." },
-  { n: "Rotten Chunk", aka: ["Vertebra"], cat: "Material", stage: "pre", how: "Rotten Chunk drops from enemies in the Corruption. Crimson worlds get Vertebra instead, from Crimson enemies." },
-  { n: "Shadow Scale", aka: ["Tissue Sample"], cat: "Material", stage: "pre", how: "Shadow Scale drops from the Eater of Worlds. In Crimson worlds the Brain of Cthulhu drops Tissue Sample instead." },
-  { n: "Bee Wax", cat: "Material", stage: "pre", how: "Dropped by Queen Bee. Makes Bee armor for summoners." },
-  { n: "Guide Voodoo Doll", cat: "Summon", stage: "pre", how: "Dropped by Voodoo Demons in the Underworld. Only works while the Guide is alive." },
-  { n: "Meteorite", cat: "Ore", stage: "pre", how: "A meteor lands after you smash your first Shadow Orb or Crimson Heart, and sometimes at night after that. Needs 50% pickaxe power. Smelt 3 ore into a bar at a Furnace." },
-  { n: "Demonite Ore", aka: ["Crimtane Ore", "Demonite", "Crimtane"], cat: "Ore", stage: "pre", how: "Found deep in your world's Corruption (Demonite) or Crimson (Crimtane), and dropped by the Eye of Cthulhu. Needs 55% pickaxe power." },
-  { n: "Obsidian", cat: "Ore", stage: "pre", how: "Forms where water meets lava. Needs 55% pickaxe power, or use explosives." },
-  { n: "Hellstone", cat: "Ore", stage: "pre", how: "Found in the Underworld. Needs 65% pickaxe power, so use the Nightmare Pickaxe or Deathbringer Pickaxe. Make bars from 3 Hellstone and 1 Obsidian at a Hellforge." },
-  { n: "Iron Bar", aka: ["Lead Bar", "Iron Chain", "Lead Chain"], cat: "Material", stage: "pre", how: "Smelt 3 Iron or Lead ore at a Furnace. Chains are crafted from bars at an Iron Anvil." },
-  { n: "Pwnhammer", cat: "Tool", stage: "hm", how: "Dropped by the Wall of Flesh. Smashes Demon Altars and Crimson Altars." },
-  { n: "Hardmode ores", aka: ["Cobalt", "Palladium", "Mythril", "Orichalcum", "Adamantite", "Titanium"], cat: "Ore", stage: "hm", how: "Smash altars with the Pwnhammer. Each smash spreads ore through the world. The first tier is Cobalt or Palladium, the second is Mythril or Orichalcum, the third is Adamantite or Titanium." },
-  { n: "Soul of Light", cat: "Material", stage: "hm", how: "Dropped by enemies in the Underground Hallow." },
-  { n: "Soul of Night", cat: "Material", stage: "hm", how: "Dropped by enemies in the underground Corruption or Crimson." },
-  { n: "Soul of Flight", cat: "Material", stage: "hm", how: "Dropped by Wyverns, which fly high in the sky." },
-  { n: "Soul of Sight", aka: ["Soul of Might", "Soul of Fright"], cat: "Material", stage: "hm", how: "Soul of Sight comes from The Twins, Soul of Might from The Destroyer, and Soul of Fright from Skeletron Prime." },
-  { n: "Angel Wings", aka: ["Demon Wings"], cat: "Accessory", stage: "hm", how: "Craft 20 Soul of Flight, 25 Soul of Light (Angel) or Soul of Night (Demon), and 10 Feather at a Mythril Anvil." },
-  { n: "Crystal Shard", cat: "Material", stage: "hm", how: "Crystals growing in the Hallow, above and below ground." },
-  { n: "Pixie Dust", cat: "Material", stage: "hm", how: "Dropped by Pixies in the surface Hallow." },
-  { n: "Cursed Flame", aka: ["Ichor"], cat: "Material", stage: "hm", how: "Cursed Flame drops from Hardmode Corruption enemies, Ichor from Hardmode Crimson enemies. Most come from underground." },
-  { n: "Gelatin Crystal", cat: "Summon", stage: "hm", how: "A pink crystal growing in the Underground Hallow." },
-  { n: "Hallowed Bar", cat: "Material", stage: "hm", how: "Dropped by the three Mechanical bosses." },
-  { n: "Pickaxe Axe", aka: ["Drax"], cat: "Tool", stage: "hm", how: "Craft from Hallowed Bar plus one Soul of Sight, Soul of Might and Soul of Fright at a Mythril Anvil. Needed to mine Chlorophyte Ore." },
-  { n: "Chlorophyte Ore", aka: ["Chlorophyte"], cat: "Ore", stage: "hm", how: "Found in the mud of the Underground Jungle. Needs 200% pickaxe power. Smelt it at an Adamantite Forge." },
-  { n: "Truffle Worm", cat: "Summon", stage: "hm", how: "Found in the underground Glowing Mushroom biome in Hardmode. It runs away, so catch it with a Bug Net." },
-  { n: "Temple Key", cat: "Tool", stage: "hm", how: "Always dropped by Plantera. Opens the Jungle Temple door." },
-  { n: "Lihzahrd Power Cell", cat: "Summon", stage: "hm", how: "Chests and enemies inside the Jungle Temple." },
-  { n: "Ectoplasm", cat: "Material", stage: "hm", how: "Dropped by Dungeon Spirits in the Dungeon after Plantera. Makes Spectre gear." },
-  { n: "Beetle Husk", cat: "Material", stage: "hm", how: "Dropped by Golem. Makes Beetle armor." },
-  { n: "Picksaw", cat: "Tool", stage: "hm", how: "Dropped by Golem. The only early pickaxe that mines Lihzahrd Bricks." },
-  { n: "Lunar Fragments", aka: ["Lunar Fragment", "Solar Fragment", "Vortex Fragment", "Nebula Fragment", "Stardust Fragment"], cat: "Material", stage: "end", how: "Dropped by enemies and by the pillars themselves during the Lunar Events. There are four kinds: Solar, Vortex, Nebula and Stardust." },
-  { n: "Luminite", cat: "Ore", stage: "end", how: "Dropped by the Moon Lord. Needs 225% pickaxe power to mine once placed." },
+  { n: "Life Crystal", cat: "Consumable", icon: "heart", c1: "#e04a5a", stage: "pre", how: "Glowing red hearts lying in the Caverns. Smash one with a pickaxe or hammer. Each gives +20 max life, up to 400." },
+  { n: "Life Fruit", cat: "Consumable", icon: "heart", c1: "#c8d84a", stage: "hm", how: "Grows in the Underground Jungle after you beat any Mechanical boss. Each gives +5 max life, up to 500." },
+  { n: "Mana Crystal", cat: "Consumable", icon: "star", c1: "#4a8ae8", stage: "pre", how: "Craft by hand from 5 Fallen Star. Stars fall from the sky at night. Each gives +20 mana, up to 200." },
+  { n: "Fallen Star", cat: "Material", icon: "star", c1: "#f2d84a", stage: "pre", how: "Falls from the sky at night. Pick it up before sunrise or it disappears." },
+  { n: "Hermes Boots", cat: "Accessory", icon: "boots", c1: "#c8a06a", stage: "pre", how: "Chests in the Caverns. Lets you sprint." },
+  { n: "Cloud in a Bottle", cat: "Accessory", icon: "bottle", c1: "#e8f0f8", stage: "pre", how: "Chests in the Caverns. Gives a double jump." },
+  { n: "Magic Mirror", cat: "Tool", icon: "mirror", c1: "#8ad8f0", stage: "pre", how: "Chests in the Caverns. Teleports you home. The Ice Mirror from Snow chests does the same." },
+  { n: "Grappling Hook", cat: "Tool", icon: "hook", c1: "#9aa0aa", stage: "pre", how: "Craft 1 Hook and 3 Iron Chain or Lead Chain at an Iron Anvil. Skeletons in the Caverns drop the Hook." },
+  { n: "Lucky Horseshoe", cat: "Accessory", icon: "ring", c1: "#e9b949", stage: "pre", how: "Chests on Sky Islands. No more fall damage." },
+  { n: "Shiny Red Balloon", cat: "Accessory", icon: "orb", c1: "#e04a4a", stage: "pre", how: "Chests on Sky Islands. Jump higher." },
+  { n: "Fledgling Wings", cat: "Accessory", icon: "wings", c1: "#e8e0d0", stage: "pre", how: "A rare find in chests on Sky Islands. The only wings you can get before Hardmode." },
+  { n: "Lava Charm", cat: "Accessory", icon: "ring", c1: "#f06a2a", stage: "pre", how: "Chests deep in the Caverns near the lava layer. Gives a few seconds of lava immunity." },
+  { n: "Feral Claws", cat: "Accessory", icon: "ring", c1: "#b8844f", stage: "pre", how: "Ivy chests in the Underground Jungle. Faster melee swings." },
+  { n: "Anklet of the Wind", cat: "Accessory", icon: "ring", c1: "#6fbf3f", stage: "pre", how: "Ivy chests in the Underground Jungle. Run faster." },
+  { n: "Band of Regeneration", cat: "Accessory", icon: "ring", c1: "#e04a5a", stage: "pre", how: "Chests in the Caverns. Slowly heals you." },
+  { n: "Cobalt Shield", cat: "Accessory", icon: "shield", c1: "#3a6ae0", stage: "pre", how: "Locked gold chests in the Dungeon. Stops knockback." },
+  { n: "Bed", cat: "Furniture", icon: "bed", c1: "#c84a4a", stage: "pre", how: "Craft 15 Wood and 5 Silk at a Sawmill. Right-click it to set your respawn point." },
+  { n: "Bug Net", cat: "Tool", icon: "net", c1: "#e8e0d0", stage: "pre", how: "Bought from the Merchant. Catches critters and Truffle Worms." },
+  { n: "Golden Key", cat: "Tool", icon: "key", c1: "#e9b949", stage: "pre", how: "Dropped by Dungeon enemies after Skeletron. Opens locked gold chests in the Dungeon." },
+  { n: "Shadow Key", cat: "Tool", icon: "key", c1: "#7a5ab8", stage: "pre", how: "Locked gold chests in the Dungeon. Opens Shadow Chests in the Underworld." },
+  { n: "Bone", cat: "Material", icon: "bone", c1: "#e8e0c8", stage: "pre", how: "Skeletons in the Dungeon after Skeletron. Needed for the Mechanical Skull." },
+  { n: "Gel", cat: "Material", icon: "drop", c1: "#4a8ae8", stage: "pre", how: "Dropped by any slime. Used for torches and the Slime Crown." },
+  { n: "Lens", cat: "Material", icon: "orb", c1: "#e8e0f0", stage: "pre", how: "Dropped by Demon Eyes at night." },
+  { n: "Silk", cat: "Material", icon: "bag", c1: "#e8e0f0", stage: "pre", how: "Craft 7 Cobweb at a Loom. Cobwebs cover the walls of the Caverns." },
+  { n: "Feather", cat: "Material", icon: "feather", c1: "#e8e0f0", stage: "pre", how: "Dropped by Harpies, which fly near Sky Islands and in space." },
+  { n: "Stinger", cat: "Material", icon: "drop", c1: "#e8c84a", stage: "pre", how: "Dropped by Hornets and Spiked Jungle Slimes in the Jungle." },
+  { n: "Jungle Spores", cat: "Material", icon: "orb", c1: "#6fbf3f", stage: "pre", how: "Glowing bulbs on the walls of the Underground Jungle. Used for Jungle armor and the Blade of Grass." },
+  { n: "Flinx Fur", cat: "Material", icon: "bag", c1: "#e8f0f8", stage: "pre", how: "Dropped by Flinxes in the underground Snow biome." },
+  { n: "Rotten Chunk", aka: ["Vertebra"], cat: "Material", icon: "bag", c1: "#8a7a5a", stage: "pre", how: "Rotten Chunk drops from enemies in the Corruption. Crimson worlds get Vertebra instead, from Crimson enemies." },
+  { n: "Shadow Scale", aka: ["Tissue Sample"], cat: "Material", icon: "feather", c1: "#7a5ab8", stage: "pre", how: "Shadow Scale drops from the Eater of Worlds. In Crimson worlds the Brain of Cthulhu drops Tissue Sample instead." },
+  { n: "Bee Wax", cat: "Material", icon: "bar", c1: "#e8c84a", stage: "pre", how: "Dropped by Queen Bee. Makes Bee armor and the Hornet Staff." },
+  { n: "Guide Voodoo Doll", cat: "Summon", icon: "doll", c1: "#c8a06a", stage: "pre", how: "Dropped by Voodoo Demons in the Underworld. Only works while the Guide is alive." },
+  { n: "Meteorite", cat: "Ore", icon: "ore", c1: "#c85a3a", stage: "pre", how: "A meteor lands after you smash your first Shadow Orb or Crimson Heart, and sometimes at night after that. Needs 50% pickaxe power. Smelt 3 ore into a bar at a Furnace.", aka: ["Meteorite Bar"] },
+  { n: "Demonite Ore", aka: ["Crimtane Ore", "Demonite", "Crimtane", "Demonite Bar", "Crimtane Bar"], cat: "Ore", icon: "ore", c1: "#8a5ad0", stage: "pre", how: "Found deep in your world's Corruption (Demonite) or Crimson (Crimtane), and dropped by the Eye of Cthulhu. Needs 55% pickaxe power. Smelt it into bars at a Furnace." },
+  { n: "Obsidian", cat: "Ore", icon: "ore", c1: "#4a3a6a", stage: "pre", how: "Forms where water meets lava. Needs 55% pickaxe power, or use explosives." },
+  { n: "Hellstone", aka: ["Hellstone Bar"], cat: "Ore", icon: "ore", c1: "#f06a2a", stage: "pre", how: "Found in the Underworld. Needs 65% pickaxe power, so use the Nightmare Pickaxe or Deathbringer Pickaxe. Make bars from 3 Hellstone and 1 Obsidian at a Hellforge." },
+  { n: "Iron Bar", aka: ["Lead Bar", "Iron Chain", "Lead Chain"], cat: "Material", icon: "bar", c1: "#b0b4bc", stage: "pre", how: "Smelt 3 Iron or Lead ore at a Furnace. Chains are crafted from bars at an Iron Anvil." },
+  { n: "Pwnhammer", cat: "Tool", icon: "hammer", c1: "#e8c84a", stage: "hm", how: "Dropped by the Wall of Flesh. Smashes Demon Altars and Crimson Altars." },
+  { n: "Hardmode ores", aka: ["Cobalt", "Palladium", "Mythril", "Orichalcum", "Adamantite", "Titanium"], cat: "Ore", icon: "ore", c1: "#3a8ae0", stage: "hm", how: "Smash altars with the Pwnhammer. Each smash spreads ore through the world. The first tier is Cobalt or Palladium, the second is Mythril or Orichalcum, the third is Adamantite or Titanium." },
+  { n: "Soul of Light", cat: "Material", icon: "soul", c1: "#f0a8e0", stage: "hm", how: "Dropped by enemies in the Underground Hallow." },
+  { n: "Soul of Night", cat: "Material", icon: "soul", c1: "#8a5ad0", stage: "hm", how: "Dropped by enemies in the underground Corruption or Crimson." },
+  { n: "Soul of Flight", cat: "Material", icon: "soul", c1: "#8ad8f0", stage: "hm", how: "Dropped by Wyverns, which fly high in the sky." },
+  { n: "Soul of Sight", aka: ["Soul of Might", "Soul of Fright"], cat: "Material", icon: "soul", c1: "#8ae84a", stage: "hm", how: "Soul of Sight comes from The Twins, Soul of Might from The Destroyer, and Soul of Fright from Skeletron Prime." },
+  { n: "Angel Wings", aka: ["Demon Wings"], cat: "Accessory", icon: "wings", c1: "#f0e8f8", stage: "hm", how: "Craft 20 Soul of Flight, 25 Soul of Light (Angel) or Soul of Night (Demon), and 10 Feather at a Mythril Anvil." },
+  { n: "Crystal Shard", cat: "Material", icon: "gem", c1: "#f0a8e0", stage: "hm", how: "Crystals growing in the Hallow, above and below ground." },
+  { n: "Pixie Dust", cat: "Material", icon: "bag", c1: "#f2e88a", stage: "hm", how: "Dropped by Pixies in the surface Hallow." },
+  { n: "Cursed Flame", aka: ["Ichor"], cat: "Material", icon: "drop", c1: "#8ae84a", stage: "hm", how: "Cursed Flame drops from Hardmode Corruption enemies, Ichor from Hardmode Crimson enemies. Most come from underground." },
+  { n: "Gelatin Crystal", cat: "Summon", icon: "gem", c1: "#f0a8e0", stage: "hm", how: "A pink crystal growing in the Underground Hallow." },
+  { n: "Hallowed Bar", cat: "Material", icon: "bar", c1: "#f2d46a", stage: "hm", how: "Dropped by the three Mechanical bosses." },
+  { n: "Pickaxe Axe", aka: ["Drax"], cat: "Tool", icon: "pick", c1: "#f2d46a", stage: "hm", how: "Craft from Hallowed Bar plus one Soul of Sight, Soul of Might and Soul of Fright at a Mythril Anvil. Needed to mine Chlorophyte Ore." },
+  { n: "Chlorophyte Ore", aka: ["Chlorophyte", "Chlorophyte Bar"], cat: "Ore", icon: "ore", c1: "#6fd04a", stage: "hm", how: "Found in the mud of the Underground Jungle. Needs 200% pickaxe power. Smelt it at an Adamantite Forge." },
+  { n: "Truffle Worm", cat: "Summon", icon: "worm", c1: "#4a8ae8", stage: "hm", how: "Found in the underground Glowing Mushroom biome in Hardmode. It runs away, so catch it with a Bug Net." },
+  { n: "Broken Hero Sword", cat: "Material", icon: "bag", c1: "#5ae05a", stage: "hm", how: "Dropped by Mothron during a Solar Eclipse after Plantera. Needed for the Terra Blade." },
+  { n: "Temple Key", cat: "Tool", icon: "key", c1: "#c8883a", stage: "hm", how: "Always dropped by Plantera. Opens the Jungle Temple door." },
+  { n: "Lihzahrd Power Cell", cat: "Summon", icon: "gem", c1: "#e9b949", stage: "hm", how: "Chests and enemies inside the Jungle Temple." },
+  { n: "Ectoplasm", cat: "Material", icon: "drop", c1: "#8ad8f0", stage: "hm", how: "Dropped by Dungeon Spirits in the Dungeon after Plantera. Makes Spectre gear." },
+  { n: "Beetle Husk", cat: "Material", icon: "shield", c1: "#7a5ab8", stage: "hm", how: "Dropped by Golem. Makes Beetle armor." },
+  { n: "Picksaw", cat: "Tool", icon: "pick", c1: "#c8883a", stage: "hm", how: "Dropped by Golem. The only early pickaxe that mines Lihzahrd Bricks." },
+  { n: "Lunar Fragments", aka: ["Lunar Fragment", "Solar Fragment", "Vortex Fragment", "Nebula Fragment", "Stardust Fragment"], cat: "Material", icon: "gem", c1: "#6fd6cb", stage: "end", how: "Dropped by enemies and by the pillars themselves during the Lunar Events. There are four kinds: Solar, Vortex, Nebula and Stardust." },
+  { n: "Luminite", aka: ["Luminite Bar"], cat: "Ore", icon: "ore", c1: "#6fd6cb", stage: "end", how: "Dropped by the Moon Lord. Needs 225% pickaxe power to mine once placed." },
 ];
 
 const BIOMES = [
-  { n: "Forest", stage: "pre", layer: "Surface", what: "Where every world starts. Trees, slimes, and zombies at night.", why: "Wood, your first house, and Living Trees with chests inside." },
-  { n: "Caverns", stage: "pre", layer: "Underground", what: "Everything below the surface: ores, Life Crystals, chests and Skeletons.", why: "Life Crystal, Hermes Boots, Cloud in a Bottle and Magic Mirror. Look out for Spider Caves (home of the Stylist) and Granite and Marble caves." },
-  { n: "Desert", stage: "pre", layer: "Surface and underground", what: "Sand dunes on top and a big sandstone cave underneath. Sandstorms blow through.", why: "The Golfer sleeps in the underground desert. Pyramids are rare but hide treasure." },
-  { n: "Snow", stage: "pre", layer: "Surface and underground", what: "A cold biome with an ice cave below.", why: "Frozen chests (Ice Skates, Ice Mirror, Blizzard in a Bottle), Flinx Fur, and Deerclops." },
-  { n: "Jungle", stage: "pre", layer: "Surface and underground", what: "A dangerous mud biome with a huge underground section.", why: "Jungle Spores, Stinger, Bee Hives with Queen Bee, and Ivy chests. Later: Life Fruit, Chlorophyte Ore, Plantera and the Jungle Temple." },
-  { n: "Ocean", stage: "pre", layer: "Surface", what: "Water at both edges of the world.", why: "The Angler, fishing and sharks. Duke Fishron in Hardmode." },
-  { n: "Corruption", aka: ["Crimson"], stage: "pre", layer: "Surface and underground", what: "Every world has either the Corruption or the Crimson. It spreads over time.", why: "Shadow Orbs or Crimson Hearts, Demon Altars or Crimson Altars, your world's evil boss, and Demonite Ore or Crimtane Ore." },
-  { n: "Dungeon", stage: "pre", layer: "Surface and underground", what: "A giant brick tower on one side of the world. Entering before Skeletron is deadly.", why: "Golden Key chests, Water Bolt, Muramasa, Bone, and the Mechanic. Gets much harder after Plantera, when Ectoplasm drops." },
-  { n: "Underworld", stage: "pre", layer: "Bottom of the world", what: "The bottom of the world, full of lava and ash.", why: "Hellstone, Obsidian, Hellforges, Shadow Chests, Voodoo Demons, and the Wall of Flesh." },
-  { n: "Sky Islands", stage: "pre", layer: "Sky", what: "Floating islands high above the surface.", why: "Skyware chests with Starfury, Lucky Horseshoe, Shiny Red Balloon and Fledgling Wings. Harpies drop Feather." },
-  { n: "Glowing Mushroom", stage: "pre", layer: "Usually underground", what: "Blue glowing mud areas, usually underground.", why: "Glowing mushrooms. In Hardmode, the Truffle and the Truffle Worm." },
-  { n: "Shimmer", aka: ["Aether"], stage: "pre", layer: "Caverns", what: "A small glowing pool deep in the Caverns, near the outer part of the world.", why: "Drop items in to transform or un-craft them. Touching it makes you fall through blocks, so be careful." },
-  { n: "Hallow", aka: ["Underground Hallow"], stage: "hm", layer: "Surface and underground", what: "A rainbow biome that appears when Hardmode starts.", why: "Pixie Dust, Crystal Shard and Unicorns. Underground: Soul of Light and the Gelatin Crystal. The Empress of Light at night." },
-  { n: "Jungle Temple", stage: "hm", layer: "Underground Jungle", what: "A brick temple deep in the Underground Jungle, locked until Plantera.", why: "Lihzahrd Power Cell, deadly traps, and Golem." },
+  { n: "Forest", stage: "pre", c1: "#4a8a3a", c2: "#6ab0e0", layer: "Surface", what: "Where every world starts. Trees, slimes, and zombies at night.", why: "Wood, your first house, and Living Trees with chests inside." },
+  { n: "Caverns", stage: "pre", c1: "#7a6a5a", c2: "#2a2420", layer: "Underground", what: "Everything below the surface: ores, Life Crystals, chests and Skeletons.", why: "Life Crystal, Hermes Boots, Cloud in a Bottle and Magic Mirror. Look out for Spider Caves (home of the Stylist) and Granite and Marble caves." },
+  { n: "Desert", stage: "pre", c1: "#e0c070", c2: "#8ac0e8", layer: "Surface and underground", what: "Sand dunes on top and a big sandstone cave underneath. Sandstorms blow through.", why: "The Golfer sleeps in the underground desert. Pyramids are rare but hide treasure." },
+  { n: "Snow", stage: "pre", c1: "#e8f0f8", c2: "#9ac8e8", layer: "Surface and underground", what: "A cold biome with an ice cave below.", why: "Frozen chests (Ice Skates, Ice Mirror, Blizzard in a Bottle, Ice Blade), Flinx Fur, and Deerclops." },
+  { n: "Jungle", stage: "pre", c1: "#3a8a2a", c2: "#5a8a4a", layer: "Surface and underground", what: "A dangerous mud biome with a huge underground section.", why: "Jungle Spores, Stinger, Bee Hives with Queen Bee, and Ivy chests. Later: Life Fruit, Chlorophyte Ore, Plantera and the Jungle Temple." },
+  { n: "Ocean", stage: "pre", c1: "#e8d090", c2: "#3a8ad0", layer: "Surface", what: "Water at both edges of the world.", why: "The Angler, fishing and sharks. Duke Fishron in Hardmode." },
+  { n: "Corruption", aka: ["Crimson"], stage: "pre", c1: "#6a4a8a", c2: "#3a2a4a", layer: "Surface and underground", what: "Every world has either the Corruption or the Crimson. It spreads over time.", why: "Shadow Orbs or Crimson Hearts, Demon Altars or Crimson Altars, your world's evil boss, and Demonite Ore or Crimtane Ore." },
+  { n: "Dungeon", stage: "pre", c1: "#3a5a8a", c2: "#1a1a2a", layer: "Surface and underground", what: "A giant brick tower on one side of the world. Entering before Skeletron is deadly.", why: "Golden Key chests, Water Bolt, Muramasa, Handgun, Bone, and the Mechanic. Gets much harder after Plantera, when Ectoplasm drops." },
+  { n: "Underworld", stage: "pre", c1: "#c84a2a", c2: "#3a1a1a", layer: "Bottom of the world", what: "The bottom of the world, full of lava and ash.", why: "Hellstone, Obsidian, Hellforges, Shadow Chests, Voodoo Demons, and the Wall of Flesh." },
+  { n: "Sky Islands", stage: "pre", c1: "#e8e0f0", c2: "#6ab0e0", layer: "Sky", what: "Floating islands high above the surface.", why: "Skyware chests with Starfury, Lucky Horseshoe, Shiny Red Balloon and Fledgling Wings. Harpies drop Feather." },
+  { n: "Glowing Mushroom", stage: "pre", c1: "#4a7ae8", c2: "#1a2040", layer: "Usually underground", what: "Blue glowing mud areas, usually underground.", why: "Glowing mushrooms. In Hardmode, the Truffle and the Truffle Worm." },
+  { n: "Shimmer", aka: ["Aether"], stage: "pre", c1: "#f0a8e0", c2: "#3a2a5a", layer: "Caverns", what: "A small glowing pool deep in the Caverns, near the outer part of the world.", why: "Drop items in to transform or un-craft them. Touching it makes you fall through blocks, so be careful." },
+  { n: "Hallow", aka: ["Underground Hallow"], stage: "hm", c1: "#f0a8e0", c2: "#a8e0f0", layer: "Surface and underground", what: "A rainbow biome that appears when Hardmode starts.", why: "Pixie Dust, Crystal Shard and Unicorns. Underground: Soul of Light and the Gelatin Crystal. The Empress of Light at night." },
+  { n: "Jungle Temple", stage: "hm", c1: "#9a7a3a", c2: "#3a2a1a", layer: "Underground Jungle", what: "A brick temple deep in the Underground Jungle, locked until Plantera.", why: "Lihzahrd Power Cell, deadly traps, and Golem." },
 ];
 
 const NPCS = [
-  { n: "Guide", stage: "pre", how: "There from the start.", sells: "Tips. Show him an item to see what it can be crafted into." },
-  { n: "Merchant", stage: "pre", how: "Carry 50 silver or more.", sells: "Piggy Bank, Bug Net, torches, rope and arrows." },
-  { n: "Nurse", stage: "pre", how: "The Merchant lives in town and you have more than 100 max life.", sells: "Heals you for coins, even in the middle of a boss fight." },
-  { n: "Demolitionist", stage: "pre", how: "The Merchant lives in town and you carry an explosive.", sells: "Bombs, dynamite and grenades." },
-  { n: "Dye Trader", stage: "pre", how: "Carry a dye or a dye ingredient.", sells: "Dyes and the Dye Vat." },
-  { n: "Angler", stage: "pre", how: "Found asleep at the Ocean. Talk to him.", sells: "Daily fishing quests that pay out in fishing gear." },
-  { n: "Zoologist", stage: "pre", how: "Fill 10% of your Bestiary.", sells: "Town pet licenses and animal-themed gear." },
-  { n: "Golfer", stage: "pre", how: "Found asleep in the underground Desert.", sells: "Golf gear." },
-  { n: "Arms Dealer", stage: "pre", how: "Carry a gun or bullets.", sells: "Ammo, the Minishark and the Flintlock Pistol." },
-  { n: "Dryad", stage: "pre", how: "Beat the Eye of Cthulhu, your world's evil boss, Skeletron or another major boss.", sells: "Purification Powder, seeds and planter boxes." },
-  { n: "Painter", stage: "pre", how: "Have 8 other town NPCs.", sells: "Paint and paintings." },
-  { n: "Stylist", stage: "pre", how: "Found tied up in a Spider Cave in the Caverns. Free her.", sells: "Haircuts and hair dye." },
-  { n: "Goblin Tinkerer", stage: "pre", how: "Beat the Goblin Army, then find him tied up in the Caverns.", sells: "Tinkerer's Workshop, Rocket Boots, and reforging." },
-  { n: "Witch Doctor", stage: "pre", how: "Beat Queen Bee.", sells: "Imbuing Station, summoner gear and the Blowgun." },
-  { n: "Tavernkeep", stage: "pre", how: "Beat the Eater of Worlds or Brain of Cthulhu, then find him on the surface.", sells: "Eternia Crystals for the Old One's Army, plus that event's gear." },
-  { n: "Clothier", stage: "pre", how: "Beat Skeletron.", sells: "Vanity clothing." },
-  { n: "Mechanic", stage: "pre", how: "After Skeletron, find her tied up in the Dungeon.", sells: "Wire, the Wrench, switches and traps." },
-  { n: "Party Girl", stage: "pre", how: "Have a big town (20 residents in v1.4.5). She has a random chance to arrive each day.", sells: "Party items and fireworks." },
-  { n: "Wizard", stage: "hm", how: "Found tied up in the Caverns.", sells: "Crystal Ball and magic items." },
-  { n: "Tax Collector", stage: "hm", how: "Use Purification Powder on a Tortured Soul in the Underworld.", sells: "Collects money from your town for you." },
-  { n: "Truffle", stage: "hm", how: "Build an empty house in a surface Glowing Mushroom biome.", sells: "Autohammer and Mushroom Spear." },
-  { n: "Pirate", stage: "hm", how: "Beat the Pirate Invasion.", sells: "Cannon and pirate gear." },
-  { n: "Steampunker", stage: "hm", how: "Beat any Mechanical boss.", sells: "Clentaminator, Jetpack and teleporters." },
-  { n: "Cyborg", stage: "hm", how: "Beat Plantera.", sells: "Rockets and mines." },
-  { n: "Santa Claus", stage: "hm", how: "Beat the Frost Legion during the Christmas season.", sells: "Christmas decorations." },
-  { n: "Princess", stage: "hm", how: "Every other town NPC has moved in.", sells: "Royal vanity and furniture." },
-  { n: "Traveling Merchant", stage: "pre", visitor: true, how: "Visits on random mornings. Doesn't need a house.", sells: "Rotating rare items. Check every visit." },
-  { n: "Skeleton Merchant", stage: "pre", visitor: true, how: "Wanders the Caverns.", sells: "Odd items that change with the moon phase." },
+  { n: "Guide", stage: "pre", c1: "#6a8ac8", how: "There from the start.", sells: "Tips. Show him an item to see what it can be crafted into." },
+  { n: "Merchant", stage: "pre", c1: "#9a7a5a", how: "Carry 50 silver or more.", sells: "Piggy Bank, Bug Net, torches, rope and arrows." },
+  { n: "Nurse", stage: "pre", c1: "#e8e0f0", how: "The Merchant lives in town and you have more than 100 max life.", sells: "Heals you for coins, even in the middle of a boss fight." },
+  { n: "Demolitionist", stage: "pre", c1: "#c8a04a", how: "The Merchant lives in town and you carry an explosive.", sells: "Bombs, dynamite and grenades." },
+  { n: "Dye Trader", stage: "pre", c1: "#c84ae8", how: "Carry a dye or a dye ingredient.", sells: "Dyes and the Dye Vat." },
+  { n: "Angler", stage: "pre", c1: "#3aa8e0", how: "Found asleep at the Ocean. Talk to him.", sells: "Daily fishing quests that pay out in fishing gear." },
+  { n: "Zoologist", stage: "pre", c1: "#6fbf3f", how: "Fill 10% of your Bestiary.", sells: "Town pet licenses, the Leather Whip, and animal-themed gear." },
+  { n: "Golfer", stage: "pre", c1: "#e8e0d0", how: "Found asleep in the underground Desert.", sells: "Golf gear." },
+  { n: "Arms Dealer", stage: "pre", c1: "#5a5a6a", how: "Carry a gun or bullets.", sells: "Ammo, the Minishark and the Flintlock Pistol." },
+  { n: "Dryad", stage: "pre", c1: "#6fbf3f", how: "Beat the Eye of Cthulhu, your world's evil boss, Skeletron or another major boss.", sells: "Purification Powder, seeds and planter boxes." },
+  { n: "Painter", stage: "pre", c1: "#e84a4a", how: "Have 8 other town NPCs.", sells: "Paint and paintings." },
+  { n: "Stylist", stage: "pre", c1: "#e85a8a", how: "Found tied up in a Spider Cave in the Caverns. Free her.", sells: "Haircuts and hair dye." },
+  { n: "Goblin Tinkerer", stage: "pre", c1: "#4a6ac8", how: "Beat the Goblin Army, then find him tied up in the Caverns.", sells: "Tinkerer's Workshop, Rocket Boots, and reforging." },
+  { n: "Witch Doctor", stage: "pre", c1: "#3a8a2a", how: "Beat Queen Bee.", sells: "Imbuing Station, summoner gear and the Blowgun." },
+  { n: "Tavernkeep", stage: "pre", c1: "#9a6a3a", how: "Beat the Eater of Worlds or Brain of Cthulhu, then find him on the surface.", sells: "Eternia Crystals for the Old One's Army, plus that event's gear." },
+  { n: "Clothier", stage: "pre", c1: "#c83a3a", how: "Beat Skeletron.", sells: "Vanity clothing." },
+  { n: "Mechanic", stage: "pre", c1: "#d04040", how: "After Skeletron, find her tied up in the Dungeon.", sells: "Wire, the Wrench, switches and traps." },
+  { n: "Party Girl", stage: "pre", c1: "#f05ac8", how: "Have a big town (20 residents in v1.4.5). She has a random chance to arrive each day.", sells: "Party items and fireworks." },
+  { n: "Wizard", stage: "hm", c1: "#5a4ac8", how: "Found tied up in the Caverns.", sells: "Crystal Ball and magic items." },
+  { n: "Tax Collector", stage: "hm", c1: "#3a3a4a", how: "Use Purification Powder on a Tortured Soul in the Underworld.", sells: "Collects money from your town for you." },
+  { n: "Truffle", stage: "hm", c1: "#4a7ae8", how: "Build an empty house in a surface Glowing Mushroom biome.", sells: "Autohammer and Mushroom Spear." },
+  { n: "Pirate", stage: "hm", c1: "#9a3a2a", how: "Beat the Pirate Invasion.", sells: "Cannon and pirate gear." },
+  { n: "Steampunker", stage: "hm", c1: "#c8883a", how: "Beat any Mechanical boss.", sells: "Clentaminator, Jetpack and teleporters." },
+  { n: "Cyborg", stage: "hm", c1: "#9aa0aa", how: "Beat Plantera.", sells: "Rockets and mines." },
+  { n: "Santa Claus", stage: "hm", c1: "#d03a3a", how: "Beat the Frost Legion during the Christmas season.", sells: "Christmas decorations." },
+  { n: "Princess", stage: "hm", c1: "#f0a8e0", how: "Every other town NPC has moved in.", sells: "Royal vanity and furniture." },
+  { n: "Traveling Merchant", stage: "pre", c1: "#8a6a9a", visitor: true, how: "Visits on random mornings. Doesn't need a house.", sells: "Rotating rare items. Check every visit." },
+  { n: "Skeleton Merchant", stage: "pre", c1: "#d8d0b8", visitor: true, how: "Wanders the Caverns.", sells: "Odd items that change with the moon phase." },
 ];
 
 const STATIONS = [
@@ -477,28 +683,29 @@ const STATIONS = [
   { n: "Sawmill", stage: "pre", recipe: "10 Wood, 2 Iron Bar or Lead Bar and 1 Chain at a Work Bench.", makes: "Beds, the Loom and nicer furniture." },
   { n: "Loom", stage: "pre", recipe: "12 Wood at a Sawmill.", makes: "Silk, cloth armor and banners." },
   { n: "Placed Bottle", aka: ["Bottle", "Alchemy Table"], stage: "pre", recipe: "Make Glass at a Furnace, craft a Bottle, then place it on a table.", makes: "Potions. The Alchemy Table found in the Dungeon is a better version." },
-  { n: "Demon Altar", aka: ["Crimson Altar"], stage: "pre", recipe: "Can't be crafted. Found in the Corruption or Crimson.", makes: "Boss summons like the Slime Crown and Suspicious Looking Eye. In Hardmode, smash them with the Pwnhammer for Hardmode ores." },
+  { n: "Demon Altar", aka: ["Crimson Altar"], stage: "pre", recipe: "Can't be crafted. Found in the Corruption or Crimson.", makes: "Boss summons like the Slime Crown and Suspicious Looking Eye, plus the Night's Edge. In Hardmode, smash them with the Pwnhammer for Hardmode ores." },
   { n: "Hellforge", stage: "pre", recipe: "Found in ruined houses in the Underworld.", makes: "Hellstone bars." },
   { n: "Tinkerer's Workshop", stage: "pre", recipe: "Bought from the Goblin Tinkerer.", makes: "Combines accessories into stronger ones." },
-  { n: "Mythril Anvil", aka: ["Orichalcum Anvil"], stage: "hm", recipe: "10 Mythril or Orichalcum bars at an Iron Anvil.", makes: "Hardmode armor and weapons, Mechanical boss summons, and wings." },
+  { n: "Bookcase", stage: "pre", recipe: "Crafted from Wood and Books at a Sawmill. Books are found in the Dungeon.", makes: "Spell books like Golden Shower and Cursed Flames, once you have a Spell Tome in Hardmode." },
+  { n: "Mythril Anvil", aka: ["Orichalcum Anvil"], stage: "hm", recipe: "10 Mythril or Orichalcum bars at an Iron Anvil.", makes: "Hardmode armor and weapons, Mechanical boss summons, wings, and the Terra Blade and Zenith." },
   { n: "Adamantite Forge", aka: ["Titanium Forge"], stage: "hm", recipe: "A Hellforge and 30 Adamantite or Titanium ore at an Iron Anvil.", makes: "Hardmode bars, including Chlorophyte and Spectre." },
   { n: "Crystal Ball", stage: "hm", recipe: "Bought from the Wizard.", makes: "Hardmode magic items. Click it for a magic buff." },
   { n: "Autohammer", stage: "hm", recipe: "Bought from the Truffle.", makes: "Shroomite Bars." },
-  { n: "Ancient Manipulator", stage: "end", recipe: "Dropped by the Lunatic Cultist.", makes: "Lunar weapons, Luminite gear and the Celestial Sigil." },
+  { n: "Ancient Manipulator", stage: "end", recipe: "Dropped by the Lunatic Cultist.", makes: "Lunar weapons like Daybreak and Phantasm, Luminite gear and the Celestial Sigil." },
 ];
 
 const EVENTS = [
-  { n: "Blood Moon", stage: "pre", start: "Happens on random nights.", what: "Zombies and Demon Eyes swarm, enemies can open doors, and water turns red. Fishing pulls up special enemies.", loot: "The Money Trough, a portable Piggy Bank, from Blood Zombies and Dripplers." },
-  { n: "Slime Rain", stage: "pre", start: "Happens on random days.", what: "Slimes fall from the sky all over the surface.", loot: "Lots of Gel. King Slime arrives once enough slimes die." },
-  { n: "Goblin Army", stage: "pre", start: "Can start at random after you smash a Shadow Orb or Crimson Heart, or right away with a Goblin Battle Standard.", what: "Waves of goblins march on your town from the edge of the world.", loot: "Spiky Ball and Harpoon. In Hardmode, Shadowflame weapons. Beating it lets you find the Goblin Tinkerer." },
-  { n: "Old One's Army", stage: "pre", start: "Buy an Eternia Crystal and its stand from the Tavernkeep, then place the crystal on the stand.", what: "Defend the crystal from waves of enemies. Harder tiers unlock in Hardmode.", loot: "Defender Medals, which buy the Tavernkeep's gear." },
-  { n: "Pirate Invasion", stage: "hm", start: "Use a Pirate Map, dropped by Ocean enemies in Hardmode, or wait for one at random.", what: "Pirates attack your town, led by the Flying Dutchman ship.", loot: "Coin Gun (rare), Lucky Coin, Discount Card, Pirate Staff. Beating it lets the Pirate move in." },
-  { n: "Frost Legion", stage: "hm", start: "Use a Snow Globe, found in presents during the Christmas season.", what: "Snowmen with guns attack your town.", loot: "Beating it lets Santa Claus move in during Christmas." },
-  { n: "Solar Eclipse", stage: "hm", start: "Happens on random days after any Mechanical boss.", what: "The sun goes dark and movie monsters roam the surface all day.", loot: "The Broken Hero Sword from Mothron (after Plantera), needed for the Terra Blade." },
-  { n: "Pumpkin Moon", stage: "hm", start: "Use a Pumpkin Moon Medallion at night. Best after Plantera.", what: "Score points through waves of Halloween enemies, with Mourning Wood and Pumpking as bosses.", loot: "The Horseman's Blade, Raven Staff, Bat Scepter, Candy Corn Rifle, and more." },
-  { n: "Frost Moon", stage: "hm", start: "Use a Naughty Present at night. Best after Plantera.", what: "Waves of Christmas enemies, with Everscream, Santa-NK1 and the Ice Queen as bosses.", loot: "Razorpine, Blizzard Staff, Elf Melter, North Pole, Staff of the Frost Hydra." },
-  { n: "Martian Madness", stage: "hm", start: "After Golem, a Martian Probe may spot you near the surface and fly off to report.", what: "Martians invade with laser weapons, led by the Martian Saucer.", loot: "Influx Waver, Xenopopper, Laser Machinegun, Cosmic Car Key (a mount)." },
-  { n: "Lunar Events", aka: ["Celestial Pillars", "Celestial Pillar"], stage: "end", start: "Starts as soon as you beat the Lunatic Cultist.", what: "Four Celestial Pillars appear: Solar, Vortex, Nebula and Stardust. Kill 100 enemies near a pillar to break its shield, then destroy it.", loot: "Lunar Fragments for top-tier gear. Destroying all four summons the Moon Lord." },
+  { n: "Blood Moon", stage: "pre", c1: "#d03a3a", start: "Happens on random nights.", what: "Zombies and Demon Eyes swarm, enemies can open doors, and water turns red. Fishing pulls up special enemies.", loot: "The Money Trough, a portable Piggy Bank, from Blood Zombies and Dripplers. The Vampire Frog Staff from fished-up enemies." },
+  { n: "Slime Rain", stage: "pre", c1: "#4a8ae8", start: "Happens on random days.", what: "Slimes fall from the sky all over the surface.", loot: "Lots of Gel. King Slime arrives once enough slimes die." },
+  { n: "Goblin Army", stage: "pre", c1: "#4a6ac8", start: "Can start at random after you smash a Shadow Orb or Crimson Heart, or right away with a Goblin Battle Standard.", what: "Waves of goblins march on your town from the edge of the world.", loot: "Spiky Ball and Harpoon. In Hardmode, Shadowflame weapons. Beating it lets you find the Goblin Tinkerer." },
+  { n: "Old One's Army", stage: "pre", c1: "#e9b949", start: "Buy an Eternia Crystal and its stand from the Tavernkeep, then place the crystal on the stand.", what: "Defend the crystal from waves of enemies. Harder tiers unlock in Hardmode.", loot: "Defender Medals, which buy the Tavernkeep's gear." },
+  { n: "Pirate Invasion", stage: "hm", c1: "#9a7a5a", start: "Use a Pirate Map, dropped by Ocean enemies in Hardmode, or wait for one at random.", what: "Pirates attack your town, led by the Flying Dutchman ship.", loot: "Coin Gun (rare), Lucky Coin, Discount Card, Pirate Staff. Beating it lets the Pirate move in." },
+  { n: "Frost Legion", stage: "hm", c1: "#a8e0f0", start: "Use a Snow Globe, found in presents during the Christmas season.", what: "Snowmen with guns attack your town.", loot: "Beating it lets Santa Claus move in during Christmas." },
+  { n: "Solar Eclipse", stage: "hm", c1: "#f2a03a", start: "Happens on random days after any Mechanical boss.", what: "The sun goes dark and movie monsters roam the surface all day.", loot: "Deadly Sphere Staff, and the Broken Hero Sword from Mothron (after Plantera), needed for the Terra Blade." },
+  { n: "Pumpkin Moon", stage: "hm", c1: "#f0862a", start: "Use a Pumpkin Moon Medallion at night. Best after Plantera.", what: "Score points through waves of Halloween enemies, with Mourning Wood and the Pumpking as bosses.", loot: "The Horseman's Blade, Raven Staff, Candy Corn Rifle, and more." },
+  { n: "Frost Moon", stage: "hm", c1: "#8ad8f0", start: "Use a Naughty Present at night. Best after Plantera.", what: "Waves of Christmas enemies, with Everscream, Santa-NK1 and the Ice Queen as bosses.", loot: "North Pole, Elf Melter, Razorpine, Blizzard Staff, and more." },
+  { n: "Martian Madness", stage: "hm", c1: "#4ac8e8", start: "After Golem, a Martian Probe may spot you near the surface and fly off to report.", what: "Martians invade with laser weapons, led by the Martian Saucer.", loot: "Influx Waver, Xenopopper, Xeno Staff, Cosmic Car Key (a mount)." },
+  { n: "Lunar Events", aka: ["Celestial Pillars", "Celestial Pillar"], stage: "end", c1: "#6fd6cb", start: "Starts as soon as you beat the Lunatic Cultist.", what: "Four Celestial Pillars appear: Solar, Vortex, Nebula and Stardust. Kill 100 enemies near a pillar to break its shield, then destroy it.", loot: "Lunar Fragments for gear like Daybreak, Phantasm, Nebula Blaze and the Stardust Dragon Staff. Destroying all four summons the Moon Lord." },
 ];
 
 const PICKS = [
@@ -528,42 +735,408 @@ const PROGRESSION = [
   ["pre", "Beat your world's evil boss: the Eater of Worlds or the Brain of Cthulhu."],
   ["pre", "Beat Queen Bee in the Jungle."],
   ["pre", "Beat Skeletron to open the Dungeon."],
-  ["pre", "Mine Hellstone in the Underworld for Molten armor, then beat the Wall of Flesh."],
+  ["pre", "Mine Hellstone in the Underworld, craft the Night's Edge, then beat the Wall of Flesh."],
   ["hm", "Smash altars with the Pwnhammer for Hardmode ores. Collect Soul of Light, Soul of Night and Soul of Flight, and make wings."],
   ["hm", "Beat The Twins, The Destroyer and Skeletron Prime. Craft the Pickaxe Axe and mine Chlorophyte Ore."],
   ["hm", "Beat Plantera, then Golem in the Jungle Temple."],
-  ["hm", "Optional: Queen Slime, Empress of Light, Duke Fishron."],
+  ["hm", "Optional: Queen Slime, Empress of Light, Duke Fishron. Work toward the Terra Blade."],
   ["end", "Beat the Lunatic Cultist and destroy the Celestial Pillars."],
-  ["end", "Beat the Moon Lord and craft Luminite gear."],
+  ["end", "Beat the Moon Lord, craft Luminite gear, and go for the Zenith."],
 ];
+
+/* =========================================================
+   PIXEL ICONS (original drawings, 16x16)
+   ========================================================= */
+function shade(hex, amt) {
+  const n = parseInt(hex.slice(1), 16);
+  let r = n >> 16, g = (n >> 8) & 255, b = n & 255;
+  const f = v => Math.max(0, Math.min(255, Math.round(amt >= 0 ? v + (255 - v) * amt : v * (1 + amt))));
+  return "#" + [f(r), f(g), f(b)].map(v => v.toString(16).padStart(2, "0")).join("");
+}
+const ICON_CACHE = new Map();
+const ICON_CANVAS = new Map();
+
+function drawIcon(type, c1, c2) {
+  const g = Array.from({ length: 16 }, () => Array(16).fill(null));
+  const P = (x, y, c) => { x = Math.round(x); y = Math.round(y); if (x >= 0 && x < 16 && y >= 0 && y < 16) g[y][x] = c; };
+  const L = (x0, y0, x1, y1, c) => { const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0), 1); for (let i = 0; i <= n; i++) P(x0 + (x1 - x0) * i / n, y0 + (y1 - y0) * i / n, c); };
+  const R = (x0, y0, x1, y1, c) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) P(x, y, c); };
+  const C = (cx, cy, r, c, ring) => { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const d = Math.hypot(x - cx, y - cy); if (ring ? Math.abs(d - r) < 0.7 : d <= r + 0.25) P(x, y, c); } };
+  const sword = (bx, by, len) => {
+    for (let i = 1; i <= len; i++) { P(bx + i, by - i, "a"); P(bx + i, by - i - 1, "b"); }
+    P(bx + len + 1, by - len - 1, "b");
+    for (let k = -2; k <= 2; k++) P(bx + k, by + k, "c");
+    P(bx - 1, by + 1, "d"); P(bx - 2, by + 2, "d"); P(bx - 3, by + 3, "c");
+  };
+  const gun = () => { R(3, 5, 13, 7, "a"); L(3, 5, 13, 5, "b"); P(14, 5, "g"); P(14, 6, "g"); R(3, 8, 5, 12, "d"); L(4, 8, 4, 12, "e"); P(6, 9, "g"); P(7, 9, "g"); P(12, 4, "c"); R(7, 7, 9, 7, "c"); };
+  switch (type) {
+    case "sword": sword(4, 11, 9); break;
+    case "shortsword": sword(5, 10, 5); break;
+    case "spear": L(1, 14, 10, 5, "d"); L(2, 14, 10, 6, "e"); P(11, 4, "a"); P(12, 3, "a"); P(13, 2, "b"); P(14, 1, "b"); P(12, 4, "a"); P(11, 3, "a"); P(10, 3, "c"); P(12, 5, "c"); break;
+    case "yoyo": C(8, 9, 5, "a"); C(8, 9, 2.2, "c"); P(6, 7, "b"); P(7, 6, "b"); P(5, 8, "b"); L(8, 0, 8, 3, "w"); break;
+    case "boomerang": L(2, 4, 8, 12, "a"); L(3, 4, 8, 11, "b"); L(8, 12, 14, 4, "a"); L(8, 11, 13, 4, "s"); P(2, 4, "c"); P(14, 4, "c"); P(2, 3, "c"); P(14, 3, "c"); break;
+    case "flail": L(1, 1, 3, 3, "d"); [[4, 4], [5, 5], [7, 7]].forEach(([x, y]) => P(x, y, "g")); C(11, 11, 3, "a"); P(10, 10, "b"); P(10, 9, "b"); P(11, 7, "c"); P(15, 11, "c"); P(11, 15, "c"); P(8, 12, "c"); P(14, 8, "c"); P(14, 14, "c"); break;
+    case "bow": for (let a = -66; a <= 66; a += 3) { const r = a * Math.PI / 180; P(2 + 10 * Math.cos(r), 8 + 7.6 * Math.sin(r), "a"); P(2 + 9 * Math.cos(r), 8 + 7.1 * Math.sin(r), "b"); } L(6, 1, 6, 15, "w"); P(12, 7, "c"); P(12, 8, "c"); P(12, 9, "c"); break;
+    case "gun": gun(); break;
+    case "magicgun": gun(); P(9, 6, "c"); P(10, 6, "c"); P(9, 4, "w"); P(10, 3, "c"); break;
+    case "launcher": R(1, 4, 14, 8, "a"); L(1, 4, 14, 4, "b"); R(4, 4, 5, 8, "c"); R(11, 4, 12, 8, "c"); R(7, 9, 8, 13, "d"); P(15, 5, "s"); P(15, 6, "s"); P(15, 7, "s"); break;
+    case "staff": L(2, 14, 10, 6, "d"); L(3, 14, 10, 7, "e"); P(10, 5, "g"); P(11, 6, "g"); C(12, 4, 2, "a"); P(11, 3, "b"); P(12, 2, "w"); break;
+    case "book": R(3, 2, 12, 13, "a"); R(3, 2, 4, 13, "s"); R(12, 3, 12, 12, "w"); L(5, 2, 11, 2, "b"); C(8, 7.5, 2, "c"); P(7, 6, "w"); break;
+    case "minion": L(2, 14, 9, 7, "d"); L(3, 14, 9, 8, "e"); P(9, 6, "c"); P(8, 5, "c"); P(10, 5, "c"); P(7, 4, "c"); P(11, 4, "c"); C(9, 2.6, 1.6, "a"); P(9, 1, "w"); break;
+    case "whip": L(1, 14, 4, 11, "d"); P(1, 15, "c"); for (let t = 0; t <= 1; t += 0.04) P(4 + 11 * t, 11 - 9 * t + 2.2 * Math.sin(t * 3 * Math.PI), "a"); P(15, 2, "c"); P(14, 1, "c"); break;
+    case "heart": for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const nx = (x - 7.5) / 6.6, ny = -(y - 7) / 6.6; if (Math.pow(nx * nx + ny * ny - 1, 3) - nx * nx * ny * ny * ny <= 0) P(x, y, "a"); } P(4, 4, "w"); P(5, 4, "b"); P(4, 5, "b"); break;
+    case "star": for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const a = Math.atan2(y - 8.3, x - 7.5) + Math.PI / 2, d = Math.hypot(x - 7.5, y - 8.3); const k = Math.cos(Math.PI / 5) / Math.cos(((a % (2 * Math.PI / 5)) + 2 * Math.PI / 5) % (2 * Math.PI / 5) - Math.PI / 5); if (d <= 3.6 + 3.8 * Math.max(0, k - 0.82) / 0.18) P(x, y, "a"); } P(7, 5, "w"); P(6, 7, "b"); break;
+    case "ore": C(8, 9, 5.6, "g"); C(7, 8, 3, "h"); [[6, 8], [9, 7], [10, 11], [5, 11], [8, 10], [11, 9], [7, 12], [4, 9]].forEach(([x, y]) => P(x, y, "a")); P(9, 6, "b"); P(6, 10, "b"); break;
+    case "bar": R(4, 7, 12, 10, "a"); L(5, 6, 12, 6, "b"); L(4, 11, 12, 11, "s"); L(13, 7, 13, 10, "s"); P(6, 8, "w"); break;
+    case "key": C(4, 4, 2.5, "a", true); L(6, 6, 13, 13, "a"); L(7, 6, 13, 12, "b"); P(10, 12, "a"); P(11, 13, "a"); P(12, 14, "a"); P(13, 10, "a"); break;
+    case "ring": for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const d = Math.hypot(x - 8, y - 9); if (d >= 3.3 && d <= 5.2) P(x, y, "a"); } P(5, 7, "b"); P(6, 6, "b"); C(8, 3.6, 1.6, "c"); P(8, 3, "w"); break;
+    case "boots": R(4, 2, 8, 11, "a"); R(4, 11, 13, 13, "a"); L(4, 14, 13, 14, "s"); L(5, 2, 5, 10, "b"); P(9, 4, "c"); P(10, 3, "c"); P(10, 5, "c"); P(11, 4, "c"); break;
+    case "wings": for (let y = 3; y <= 13; y++) { const w = Math.round((13 - y) * 0.55) + 2; L(7 - w, y, 7, y, y < 6 ? "b" : "a"); L(8, y, 8 + w, y, y < 6 ? "b" : "a"); } L(7, 2, 8, 2, "c"); break;
+    case "shield": R(4, 3, 12, 9, "a"); R(5, 10, 11, 11, "a"); R(6, 12, 10, 12, "a"); R(7, 13, 9, 13, "a"); L(4, 3, 12, 3, "b"); C(8, 7, 1.6, "c"); break;
+    case "mirror": C(8, 6, 4.6, "c"); C(8, 6, 3.3, "a"); P(6, 4, "w"); P(7, 4, "w"); P(6, 5, "w"); L(8, 11, 8, 15, "d"); L(7, 12, 7, 15, "e"); break;
+    case "hook": L(1, 15, 8, 8, "g"); for (let a = -40; a <= 210; a += 10) { const r = a * Math.PI / 180; P(10.5 + 3.5 * Math.cos(r), 5.5 - 3.5 * Math.sin(r), "a"); } P(14, 8, "c"); break;
+    case "bag": C(8, 10, 4.6, "a"); R(7, 4, 9, 5, "c"); P(6, 3, "a"); P(10, 3, "a"); P(6, 8, "b"); P(7, 7, "b"); break;
+    case "orb": C(8, 8, 5.4, "a"); C(8, 8, 2.8, "c", true); P(6, 5, "w"); P(5, 6, "b"); P(6, 6, "b"); break;
+    case "soul": C(8, 9, 4, "a"); C(8, 9, 2, "b"); P(8, 3, "a"); P(7, 4, "a"); P(9, 4, "a"); P(8, 1, "c"); P(4, 5, "c"); P(12, 5, "c"); break;
+    case "gem": for (let y = 2; y <= 14; y++) { const w = y < 6 ? (y - 2) + 2 : Math.round((14 - y) * 0.75); L(8 - w, y, 8 + w, y, y < 6 ? "b" : "a"); } L(8, 3, 8, 12, "c"); break;
+    case "drop": for (let y = 2; y <= 14; y++) { const w = y < 8 ? (y - 2) * 0.6 : Math.sqrt(Math.max(0, 25 - (y - 9.5) ** 2)); L(8 - w, y, 8 + w, y, "a"); } P(6, 9, "w"); P(6, 10, "b"); break;
+    case "feather": L(3, 13, 12, 2, "s"); for (let i = 0; i < 9; i++) { L(4 + i, 12 - i, 6 + i, 13 - i + 1, "a"); P(4 + i, 11 - i, "b"); } break;
+    case "bone": L(4, 11, 11, 4, "a"); L(4, 12, 12, 4, "a"); C(3.5, 11.5, 1.6, "a"); C(4.5, 12.5, 1.6, "a"); C(11.5, 3.5, 1.6, "a"); C(12.5, 4.5, 1.6, "a"); P(5, 10, "b"); break;
+    case "pick": L(2, 14, 10, 6, "d"); L(3, 14, 10, 7, "e"); L(6, 2, 14, 10, "a"); L(6, 3, 13, 10, "s"); P(5, 2, "b"); P(14, 11, "b"); P(10, 6, "c"); break;
+    case "hammer": L(2, 14, 9, 7, "d"); L(3, 14, 9, 8, "e"); R(7, 2, 13, 6, "a"); L(7, 2, 13, 2, "b"); R(9, 3, 11, 5, "c"); break;
+    case "net": L(2, 14, 8, 8, "d"); C(10.5, 5.5, 4, "w", true); [[9, 4], [11, 6], [10, 7], [12, 4]].forEach(([x, y]) => P(x, y, "g")); break;
+    case "bottle": R(6, 2, 9, 4, "c"); R(4, 5, 11, 13, "a"); L(4, 13, 11, 13, "s"); C(7, 9, 1.6, "w"); P(10, 7, "w"); break;
+    case "doll": C(8, 4, 3, "a"); R(5, 7, 11, 12, "a"); L(3, 8, 4, 8, "a"); L(12, 8, 13, 8, "a"); R(6, 13, 7, 15, "s"); R(9, 13, 10, 15, "s"); P(7, 4, "o"); P(9, 4, "o"); L(5, 9, 11, 11, "c"); break;
+    case "worm": for (let i = 0; i < 6; i++) C(3 + i * 2, 9 + Math.sin(i) * 2, 1.8, i === 5 ? "b" : "a"); P(14, 8, "w"); break;
+    case "bed": R(2, 5, 3, 13, "d"); R(12, 8, 13, 13, "d"); R(4, 9, 12, 11, "a"); L(4, 9, 12, 9, "b"); R(4, 7, 6, 8, "w"); break;
+    case "boss": C(8, 8, 6.4, "a"); R(4, 6, 6, 8, "w"); R(10, 6, 12, 8, "w"); P(5, 7, "o"); P(11, 7, "o"); L(5, 11, 11, 11, "o"); P(6, 11, "w"); P(8, 11, "w"); P(10, 11, "w"); P(3, 2, "c"); P(4, 3, "c"); P(13, 2, "c"); P(12, 3, "c"); P(6, 4, "b"); P(5, 5, "b"); break;
+    case "npc": C(8, 4.5, 2.7, "k"); L(5, 2, 11, 2, "c"); P(5, 3, "c"); P(11, 3, "c"); P(7, 4, "o"); P(9, 4, "o"); R(5, 8, 11, 12, "a"); L(5, 8, 11, 8, "b"); R(3, 8, 4, 11, "a"); R(12, 8, 13, 11, "a"); R(6, 13, 7, 15, "s"); R(9, 13, 10, 15, "s"); break;
+    case "biome": R(0, 0, 15, 15, "c"); R(11, 2, 12, 3, "w"); for (let x = 0; x < 16; x++) { const top = 9 + Math.round(Math.sin(x / 2.4) * 1.4); P(x, top, "b"); for (let y = top + 1; y < 16; y++) P(x, y, y > 12 ? "s" : "a"); } L(4, 5, 4, 9, "d"); C(4, 4.5, 2, "s"); break;
+    case "moon": C(8, 8, 6, "a"); C(6, 6, 1.4, "s"); C(10, 10, 1, "s"); P(5, 9, "b"); P(4, 7, "b"); P(1, 2, "w"); P(14, 13, "w"); P(13, 1, "w"); break;
+    case "anvil": R(2, 5, 14, 7, "g"); P(1, 5, "g"); P(0, 5, "g"); L(2, 5, 14, 5, "h"); R(6, 8, 10, 10, "g"); R(4, 11, 12, 13, "g"); L(4, 13, 12, 13, "s"); break;
+    case "scroll": R(3, 2, 12, 13, "p"); R(2, 1, 13, 2, "d"); R(2, 13, 13, 14, "d"); [5, 7, 9, 11].forEach(y => L(5, y, y === 11 ? 8 : 10, y, "s")); break;
+  }
+  // 1px dark outline around everything
+  const out = g.map(r => r.slice());
+  for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+    if (g[y][x]) continue;
+    if ([[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => g[y + dy]?.[x + dx] && g[y + dy][x + dx] !== "o")) out[y][x] = "o";
+  }
+  const pal = { a: c1, b: shade(c1, .38), s: shade(c1, -.32), c: c2, d: "#6b4a2f", e: "#8f6a46", w: "#f6f0e4", o: "#120d0a", g: "#8f949e", h: "#b7bcc4", k: "#e8b890", p: "#e8dcb8" };
+  const cv = document.createElement("canvas"); cv.width = cv.height = 16;
+  const x = cv.getContext("2d");
+  out.forEach((row, y) => row.forEach((k, xx) => { if (k) { x.fillStyle = pal[k] || k; x.fillRect(xx, y, 1, 1); } }));
+  return cv;
+}
+function iconCanvas(type, c1, c2) {
+  const key = type + c1 + c2;
+  if (!ICON_CANVAS.has(key)) ICON_CANVAS.set(key, drawIcon(type, c1, c2));
+  return ICON_CANVAS.get(key);
+}
+function iconURL(type, c1, c2) {
+  const key = type + c1 + c2;
+  if (!ICON_CACHE.has(key)) ICON_CACHE.set(key, iconCanvas(type, c1, c2).toDataURL());
+  return ICON_CACHE.get(key);
+}
+
+/* =========================================================
+   WEAPON DEMO ANIMATIONS (original, drawn on canvas)
+   ========================================================= */
+const W = 240, H = 110, GROUND = 92, HANDX = 66, HANDY = 74;
+const DEMOS = new Set();
+let rafId = 0;
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+function demoReach(w) {
+  if (w.type === "sword") return w.proj ? 196 : 100;
+  if (w.type === "shortsword") return 98;
+  if (w.type === "spear") return 116;
+  if (w.type === "flail") return 150;
+  if (w.type === "whip") return 158;
+  return 196;
+}
+function hitTimes(w) {
+  switch (w.type) {
+    case "sword": return w.proj ? [0.62] : [0.2];
+    case "shortsword": case "spear": return [0.18, 0.68];
+    case "yoyo": return [0.32, 0.5, 0.68];
+    case "boomerang": return [0.45];
+    case "flail": return [0.72];
+    case "bow": return [0.32, 0.82];
+    case "gun": return [0.12, 0.27, 0.42, 0.57, 0.72, 0.87];
+    case "launcher": return [0.48];
+    case "staff": case "magicgun": return [0.42, 0.9];
+    case "book": return [0.5];
+    case "minion": return [0.42, 0.82];
+    case "whip": return [0.24, 0.74];
+  }
+  return [0.5];
+}
+const PERIOD = 1.6;
+
+function makeDemo(canvas, w, btn) {
+  const ctx = canvas.getContext("2d");
+  const icon = iconCanvas(w.type, w.c1, w.c2);
+  const st = { canvas, ctx, w, icon, parts: [], lastU: 0, wobble: 0, t0: performance.now(), playing: !reduceMotion, btn, frozenAt: 0.3 };
+  st.dummyX = demoReach(w);
+  return st;
+}
+
+function drawScene(d, now) {
+  const { ctx, w, icon } = d;
+  const time = d.playing ? (now - d.t0) / 1000 : d.frozenAt * PERIOD;
+  const u = (time % PERIOD) / PERIOD;
+  ctx.imageSmoothingEnabled = false;
+  // backdrop
+  const sky = ctx.createLinearGradient(0, 0, 0, H);
+  sky.addColorStop(0, "#141028"); sky.addColorStop(1, "#2a2440");
+  ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = "#e8e0c8"; [[20, 12], [70, 24], [130, 8], [180, 20], [222, 10], [98, 16]].forEach(([x, y]) => ctx.fillRect(x, y, 1, 1));
+  ctx.fillStyle = "#1e1a32";
+  for (let x = 0; x < W; x += 2) { const h = 22 + Math.sin(x / 19) * 8 + Math.sin(x / 7) * 2; ctx.fillRect(x, GROUND - h, 2, h); }
+  ctx.fillStyle = "#4f8a34"; ctx.fillRect(0, GROUND, W, 3);
+  ctx.fillStyle = "#6b4a2f"; ctx.fillRect(0, GROUND + 3, W, H - GROUND - 3);
+  ctx.fillStyle = "#5a3e27"; for (let x = 3; x < W; x += 9) ctx.fillRect(x, GROUND + 7 + (x % 3), 2, 2);
+
+  // hit events
+  const prev = d.lastU;
+  hitTimes(w).forEach(h => { const crossed = prev <= u ? (prev < h && h <= u) : (h > prev || h <= u); if (crossed && d.playing) spawnHit(d); });
+  d.lastU = u;
+
+  // target dummy
+  const wob = Math.sin(d.wobble * 30) * d.wobble * 6;
+  d.wobble = Math.max(0, d.wobble - 0.03);
+  const dx = d.dummyX + wob;
+  ctx.fillStyle = "#6b4a2f"; ctx.fillRect(d.dummyX - 1, GROUND - 20, 3, 20);
+  ctx.fillStyle = "#c8a86a"; ctx.fillRect(dx - 7, GROUND - 38, 14, 20);
+  ctx.fillStyle = "#a88a52"; ctx.fillRect(dx - 7, GROUND - 26, 14, 2);
+  ctx.fillStyle = "#d8bc80"; ctx.fillRect(dx - 5, GROUND - 48, 10, 10);
+  ctx.fillStyle = "#c84a3a"; ctx.fillRect(dx - 2, GROUND - 32, 4, 4);
+
+  // player (an original simple adventurer)
+  const px = 54, bob = Math.round(Math.sin(time * 6) * 0.5);
+  ctx.fillStyle = "#3a3048"; ctx.fillRect(px + 1, GROUND - 8, 3, 8); ctx.fillRect(px + 6, GROUND - 8, 3, 8);
+  ctx.fillStyle = "#3f6fa8"; ctx.fillRect(px, GROUND - 20 + bob, 10, 12);
+  ctx.fillStyle = "#5a8ac8"; ctx.fillRect(px, GROUND - 20 + bob, 10, 2);
+  ctx.fillStyle = "#e8b890"; ctx.fillRect(px + 1, GROUND - 29 + bob, 8, 9);
+  ctx.fillStyle = "#5a3a22"; ctx.fillRect(px, GROUND - 31 + bob, 10, 3); ctx.fillRect(px, GROUND - 29 + bob, 2, 4);
+  ctx.fillStyle = "#120d0a"; ctx.fillRect(px + 6, GROUND - 26 + bob, 1, 2);
+
+  const hx = HANDX, hy = HANDY + bob;
+  const drawIconAt = (x, y, ang, gx, gy, s = 1) => { ctx.save(); ctx.translate(x, y); ctx.rotate(ang); ctx.scale(s, s); ctx.drawImage(icon, -gx, -gy); ctx.restore(); };
+  const glow = (x, y, r, c) => { ctx.fillStyle = c; ctx.globalAlpha = 0.35; ctx.fillRect(x - r - 1, y - r - 1, r * 2 + 2, r * 2 + 2); ctx.globalAlpha = 1; ctx.fillRect(x - r / 2, y - r / 2, r, r); };
+  const lerp = (a, b, k) => a + (b - a) * k;
+  const tx = d.dummyX, ty = GROUND - 30;
+
+  switch (w.type) {
+    case "sword": {
+      const s = Math.min(u / 0.32, 1);
+      const ang = u < 0.32 ? lerp(-2.0, 1.25, s * s * (3 - 2 * s)) : 1.25;
+      drawIconAt(hx, hy, ang, 3, 13);
+      if (u < 0.32 && u > 0.05) { ctx.strokeStyle = w.c1; ctx.globalAlpha = 0.35; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(hx, hy, 15, -2.6 + 0, ang - 0.75); ctx.stroke(); ctx.globalAlpha = 1; }
+      if (w.proj && u > 0.22 && u < 0.62) { const k = (u - 0.22) / 0.4; const x = lerp(hx + 14, tx - 6, k); trail(ctx, x, ty + 2, w); ctx.strokeStyle = w.c1; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x - 4, ty + 2, 7, -1.1, 1.1); ctx.stroke(); ctx.strokeStyle = w.c2; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(x - 6, ty + 2, 6, -1, 1); ctx.stroke(); }
+      break;
+    }
+    case "shortsword": case "spear": {
+      const reach = w.type === "spear" ? 26 : 14;
+      const ph = (u % 0.5) / 0.5; const ext = Math.sin(Math.min(ph / 0.45, 1) * Math.PI) * reach;
+      drawIconAt(hx + ext, hy - 2, Math.PI / 4, w.type === "spear" ? 2 : 3, w.type === "spear" ? 13 : 12);
+      if (w.proj && ph > 0.15 && ph < 0.5) { const k = (ph - 0.15) / 0.35; const x = lerp(hx + 30, tx, k); glow(x, ty - 6 - Math.sin(k * Math.PI) * 10, 3, w.c1); }
+      break;
+    }
+    case "yoyo": {
+      const out = u < 0.22 ? u / 0.22 : u > 0.86 ? (1 - u) / 0.14 : 1;
+      const ox = Math.cos(time * 7) * 7, oy = Math.sin(time * 7) * 5;
+      const yx = lerp(hx, tx - 10 + ox * out, out), yy = lerp(hy, ty + oy * out, out);
+      ctx.strokeStyle = "#e8e0c8"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(yx, yy); ctx.stroke();
+      drawIconAt(yx, yy, time * 14, 8, 9, 0.8);
+      if (w.proj && out === 1) { const k = (u * 3) % 1; glow(lerp(yx, tx, k), lerp(yy, ty - 4, k), 2, w.c2); }
+      break;
+    }
+    case "boomerang": {
+      const k = Math.sin(u * Math.PI);
+      const bx = lerp(hx, tx - 4, k), by = hy - 6 - Math.sin(u * Math.PI * 2) * 10;
+      drawIconAt(bx, by, time * 16, 8, 8, 0.9);
+      break;
+    }
+    case "flail": {
+      let bx, by;
+      if (u < 0.5) { const a = time * 14; bx = hx + Math.cos(a) * 13; by = hy - 6 + Math.sin(a) * 13; }
+      else { const k = Math.sin(Math.min((u - 0.5) / 0.22, 1) * Math.PI / 2) * (u > 0.85 ? (1 - u) / 0.15 : 1); bx = lerp(hx + 10, tx - 8, k); by = lerp(hy - 4, ty, k); }
+      ctx.fillStyle = "#8f949e"; for (let i = 1; i < 8; i++) ctx.fillRect(Math.round(lerp(hx, bx, i / 8)), Math.round(lerp(hy, by, i / 8)), 1, 1);
+      ctx.fillStyle = w.c1; ctx.fillRect(bx - 3, by - 3, 7, 7); ctx.fillStyle = shade(w.c1, .4); ctx.fillRect(bx - 2, by - 2, 2, 2);
+      ctx.fillStyle = w.c2; [[0, -5], [5, 0], [0, 5], [-5, 0]].forEach(([a, b]) => ctx.fillRect(bx + a, by + b, 1, 1));
+      ctx.fillStyle = "#6b4a2f"; ctx.fillRect(hx - 1, hy - 1, 3, 3);
+      break;
+    }
+    case "bow": {
+      drawIconAt(hx + 2, hy - 2, 0, 6, 8);
+      [0, 0.5].forEach(st0 => { const k = (u - st0 + 1) % 1; if (k < 0.32) { const kk = k / 0.32; const ax = lerp(hx + 8, tx - 6, kk), ay = hy - 3 - Math.sin(kk * Math.PI) * 10; ctx.fillStyle = "#c8a06a"; ctx.fillRect(ax - 8, ay, 8, 1); ctx.fillStyle = "#e8e0f0"; ctx.fillRect(ax, ay - 1, 2, 3); ctx.fillStyle = w.c1; ctx.fillRect(ax - 9, ay - 1, 2, 3); } });
+      break;
+    }
+    case "gun": case "magicgun": case "launcher": {
+      const recoil = w.type === "launcher" ? (u < 0.08 ? 3 : 0) : ((u * 6.6) % 1 < 0.2 ? 1 : 0);
+      drawIconAt(hx - recoil + 2, hy - 2, 0, 4, 9);
+      const mx = hx + 14 - recoil, my = hy - 7;
+      if (w.type === "gun") {
+        hitTimes(w).forEach(h => { const k = (u - (h - 0.12) + 1) % 1; if (k < 0.12) { const x = lerp(mx, tx - 6, k / 0.12); ctx.fillStyle = "#ffe08a"; ctx.fillRect(x, my + (h * 37 % 3) - 1, 5, 1); } if (k < 0.03) { ctx.fillStyle = "#ffd060"; ctx.fillRect(mx, my - 2, 3, 5); } });
+      } else if (w.type === "launcher") {
+        if (u < 0.48) { const k = u / 0.48; const x = lerp(mx, tx - 8, k), y = my - Math.sin(k * Math.PI) * 14; ctx.fillStyle = w.c2; ctx.fillRect(x - 4, y - 1, 6, 3); ctx.fillStyle = "#ffb040"; ctx.fillRect(x - 7, y, 3, 1); trail(ctx, x - 6, y, { c1: "#9aa0aa", c2: "#ffb040" }); }
+        if (u > 0.48 && u < 0.7) { const r = (u - 0.48) / 0.22 * 16; ctx.strokeStyle = "#ffb040"; ctx.lineWidth = 2; ctx.globalAlpha = 1 - (u - 0.48) / 0.22; ctx.beginPath(); ctx.arc(tx, ty, r, 0, Math.PI * 2); ctx.stroke(); ctx.globalAlpha = 1; }
+      } else {
+        [0, 0.48].forEach(s0 => { const k = (u - s0 + 1) % 1; if (k < 0.42) { const kk = k / 0.42; const x = lerp(mx, tx - 4, kk), y = my - Math.sin(kk * Math.PI) * 6; trail(ctx, x, y, w); glow(x, y, 3, w.c1); } });
+      }
+      break;
+    }
+    case "staff": {
+      drawIconAt(hx, hy, -0.2, 3, 13);
+      const ox = hx + 10, oy = hy - 15;
+      [0, 0.48].forEach(s0 => { const k = (u - s0 + 1) % 1; if (k < 0.42) { const kk = k / 0.42; const x = lerp(ox, tx - 4, kk), y = lerp(oy, ty, kk) - Math.sin(kk * Math.PI) * 8; trail(ctx, x, y, w); glow(x, y, 3, w.c1); } });
+      if ((u * 2) % 1 < 0.1) glow(ox, oy, 2, w.c2);
+      break;
+    }
+    case "book": {
+      const fy = Math.sin(time * 4) * 1.5;
+      drawIconAt(hx + 4, hy - 8 + fy, 0, 8, 8, 0.8);
+      if (u > 0.08 && u < 0.5) { const kk = (u - 0.08) / 0.42; [-10, 0, 10].forEach(off => { const x = lerp(hx + 12, tx - 4, kk), y = lerp(hy - 10, ty + off * 0.3, kk) + off * Math.sin(kk * Math.PI); trail(ctx, x, y, w); glow(x, y, 2, w.c1); }); }
+      break;
+    }
+    case "minion": {
+      drawIconAt(hx, hy, -0.2, 3, 13);
+      [0, 0.42].forEach((s0, i) => {
+        const k = (u - s0 + 1) % 1;
+        const home = [hx - 16 + i * 6, hy - 30 + Math.sin(time * 5 + i) * 3];
+        let mx = home[0], my = home[1];
+        if (k < 0.42) { const p = Math.sin((k / 0.42) * Math.PI); mx = lerp(home[0], tx - 8, p); my = lerp(home[1], ty, p); }
+        minion(ctx, mx, my, w, time, i);
+      });
+      break;
+    }
+    case "whip": {
+      [0, 0.5].forEach(s0 => {
+        const k = ((u - s0 + 1) % 1);
+        if (k > 0.45) return;
+        const e = Math.sin((k / 0.45) * Math.PI);
+        const ex = lerp(hx + 4, tx - 6, e), ey = lerp(hy - 4, ty, e) - 6 * Math.sin(e * Math.PI);
+        ctx.fillStyle = w.c1;
+        for (let i = 0; i <= 24; i++) { const t = i / 24; const x = lerp(hx, ex, t), y = lerp(hy, ey, t) - Math.sin(t * Math.PI) * 14 * (1 - e) + Math.sin(t * 9 + time * 20) * (1 - e) * 3; ctx.fillRect(Math.round(x), Math.round(y), 2, 2); }
+        ctx.fillStyle = w.c2; ctx.fillRect(ex - 1, ey - 1, 3, 3);
+      });
+      ctx.fillStyle = "#6b4a2f"; ctx.fillRect(hx - 1, hy - 3, 3, 5);
+      break;
+    }
+  }
+
+  // particles: sparks and damage numbers
+  d.parts = d.parts.filter(p => (p.life -= 1) > 0);
+  d.parts.forEach(p => {
+    p.x += p.vx; p.y += p.vy; p.vy += p.g;
+    ctx.globalAlpha = Math.min(1, p.life / 20);
+    if (p.text) { ctx.font = "bold 9px 'Pixelify Sans', monospace"; ctx.fillStyle = "#120d0a"; ctx.fillText(p.text, p.x + 1, p.y + 1); ctx.fillStyle = p.c; ctx.fillText(p.text, p.x, p.y); }
+    else { ctx.fillStyle = p.c; ctx.fillRect(p.x, p.y, 2, 2); }
+    ctx.globalAlpha = 1;
+  });
+}
+function trail(ctx, x, y, w) { ctx.fillStyle = w.c2; ctx.globalAlpha = 0.5; for (let i = 1; i <= 4; i++) ctx.fillRect(x - i * 3, y + ((i * 7) % 3) - 1, 2, 2); ctx.globalAlpha = 1; }
+function minion(ctx, x, y, w, time, i) {
+  x = Math.round(x); y = Math.round(y);
+  const flap = Math.sin(time * 18 + i) > 0 ? -2 : 1;
+  ctx.fillStyle = w.c2; ctx.fillRect(x - 7, y - 2 + flap, 4, 2); ctx.fillRect(x + 4, y - 2 + flap, 4, 2);
+  ctx.fillStyle = "#120d0a"; ctx.fillRect(x - 4, y - 4, 9, 8);
+  ctx.fillStyle = w.c1; ctx.fillRect(x - 3, y - 3, 7, 6);
+  ctx.fillStyle = shade(w.c1, .4); ctx.fillRect(x - 3, y - 3, 7, 1);
+  ctx.fillStyle = "#f6f0e4"; ctx.fillRect(x + 1, y - 1, 2, 2);
+}
+function spawnHit(d) {
+  d.wobble = 0.5;
+  const x = d.dummyX, y = GROUND - 34;
+  for (let i = 0; i < 7; i++) d.parts.push({ x, y, vx: (Math.random() - .5) * 2.4, vy: -Math.random() * 1.8, g: .12, life: 22, c: i % 2 ? d.w.c1 : "#ffe08a" });
+  const crit = Math.random() < 0.18;
+  d.parts.push({ x: x - 6 + Math.random() * 8, y: y - 10, vx: 0, vy: -0.45, g: 0, life: 40, text: String(Math.floor(18 + Math.random() * 80) * (crit ? 2 : 1)), c: crit ? "#ff6040" : "#ffb040" });
+}
+function loop(now) {
+  DEMOS.forEach(d => { if (!d.canvas.isConnected) { DEMOS.delete(d); return; } if (d.playing) drawScene(d, now); });
+  rafId = DEMOS.size ? requestAnimationFrame(loop) : 0;
+}
+function mountDemos(root) {
+  root.querySelectorAll("canvas[data-demo]").forEach(cv => {
+    const w = WEAPON_BY_NAME.get(cv.dataset.demo); if (!w) return;
+    const btn = cv.parentElement.querySelector(".demo-btn");
+    const d = makeDemo(cv, w, btn);
+    drawScene(d, performance.now());
+    DEMOS.add(d);
+    const label = () => { btn.textContent = d.playing ? "Pause" : "Play"; btn.setAttribute("aria-pressed", d.playing); };
+    label();
+    btn.addEventListener("click", () => { d.playing = !d.playing; if (d.playing) d.t0 = performance.now() - d.frozenAt * PERIOD * 1000; label(); if (!rafId) rafId = requestAnimationFrame(loop); });
+  });
+  if (DEMOS.size && !rafId) rafId = requestAnimationFrame(loop);
+}
+const demoHTML = (w, caption = true) => `
+  <figure class="demo">
+    <div class="demo-frame"><canvas class="px" width="${W}" height="${H}" data-demo="${esc(w.n)}" role="img" aria-label="Animation of the ${esc(w.n)} hitting a target dummy"></canvas><button type="button" class="demo-btn">Pause</button></div>
+    ${caption ? `<figcaption>Example animation of how a ${esc(WTYPES[w.type].label.toLowerCase())} like this is used. Drawn for this wiki; see the official wiki for the real in-game look.</figcaption>` : ""}
+  </figure>`;
 
 /* =========================================================
    PAGE BUILDING
    ========================================================= */
-const PAGES = new Map();      // title -> page
-const ALIASES = [];           // [text, title]
-const CATS = new Map();       // category -> [titles]
+const PAGES = new Map();
+const ALIASES = [];
+const NOLINK = new Set(["Spear"]);
+const CATS = new Map();
+const PARENT = new Map();      // category -> parent category
+const KIND_LABEL = { weapon: "Weapon", item: "Item", boss: "Boss", npc: "NPC", biome: "Biome", event: "Event", station: "Crafting station", mech: "Guide" };
 
 const slug = t => t.replace(/ /g, "_").replace(/[^A-Za-z0-9._~-]/g, "");
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const art = w => /^[AEIOU]/i.test(w) ? "an" : "a";
 const stageWord = s => s === "end" ? "an endgame" : art(STAGE[s]) + " " + STAGE[s];
 const stageHTML = s => `<span class="stage ${s}">${STAGE[s]}</span>`;
-const initials = t => t.replace(/^The /, "").split(/\s+/).filter(w => /^[A-Z]/.test(w)).slice(0, 2).map(w => w[0]).join("") || t[0];
+const clsHTML = c => `<span class="cls ${c}">${CLASSES[c].replace(" weapons", "")}</span>`;
+function hashColor(s) { const pal = ["#c8883a", "#6fb6f0", "#8fd16a", "#e89ad0", "#e9b949", "#b58cf0", "#f08a5d", "#6fd6cb"]; let h = 0; for (const ch of s) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return pal[h % pal.length]; }
 
 function addPage(p) {
   PAGES.set(p.title, p);
-  ALIASES.push([p.title, p.title]);
+  if (!NOLINK.has(p.title)) ALIASES.push([p.title, p.title]);
   (p.aka || []).forEach(a => ALIASES.push([a, p.title]));
   (p.cats || []).forEach(c => { if (!CATS.has(c)) CATS.set(c, []); CATS.get(c).push(p.title); });
 }
 
 const bossByItem = new Map(BOSSES.filter(b => b.item).map(b => [b.item, b.n]));
+const WEAPON_BY_NAME = new Map(WEAPONS.map(w => [w.n, w]));
+
+// Which weapons are ingredients for other weapons
+const USED_IN = new Map();
+WEAPONS.forEach(v => {
+  if (!/^(Combine|Upgrade)/.test(v.how)) return;
+  WEAPONS.forEach(w => { if (w !== v && new RegExp("(?<![\\w])" + w.n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "(?![\\w])").test(v.how)) { if (!USED_IN.has(w.n)) USED_IN.set(w.n, []); USED_IN.get(w.n).push(v.n); } });
+});
+
+Object.entries(CLASSES).forEach(([k, c]) => PARENT.set(c, "Weapons"));
+Object.values(WTYPES).forEach(t => PARENT.set(t.cat, CLASSES[t.cls]));
+
+WEAPONS.forEach(w => {
+  const t = WTYPES[w.type];
+  const used = USED_IN.get(w.n) || [];
+  addPage({
+    title: w.n, aka: w.aka, kind: "weapon", stage: w.stage, icon: [w.type, w.c1, w.c2],
+    cats: [...new Set(["Weapons", CLASSES[w.cls], t.cat, STAGE[w.stage]])],
+    lead: `is ${art(STAGE[w.stage])} ${STAGE[w.stage]} ${t.label.toLowerCase()}, a ${w.cls} weapon. ${w.does}`,
+    info: [["Type", null, `${esc(t.label)} (<a href="#Category.${slug(t.cat)}">${esc(t.cat)}</a>)`], ["Class", null, clsHTML(w.cls)], ["Stage", null, stageHTML(w.stage)],
+           ["Obtained", w.how.split(/(?<=\.)\s/)[0]], ...(w.proj ? [["Projectile", "Yes"]] : []), ...(used.length ? [["Used to craft", used.join(", ")]] : [])],
+    sections: [
+      { h: "In action", demo: w },
+      { h: "How to get it", p: [w.how] },
+      ...(used.length ? [{ h: "Used to craft", p: [`The ${w.n} is an ingredient in: ${used.join(", ")}.`] }] : []),
+    ],
+    navbox: t.cat,
+    blurb: w.does,
+  });
+});
 
 BOSSES.forEach((b, i) => addPage({
-  title: b.n, type: "boss", stage: b.stage, cats: ["Bosses", STAGE[b.stage]],
+  title: b.n, kind: "boss", stage: b.stage, icon: ["boss", b.c, shade(b.c, -.45)], cats: ["Bosses", STAGE[b.stage]],
   lead: `is ${stageWord(b.stage)} boss ${b.via}.${b.opt ? " It is optional." : ""}`,
-  art: "var(--" + b.stage + ")",
   info: [["Type", "Boss"], ["Stage", null, stageHTML(b.stage)], ["Summoned with", b.item || "—"], ["Fight in", b.area],
          ["Expert item", b.expert.split(":")[0].replace(/\.$/, "")], ["Optional", b.opt ? "Yes" : "No"]],
   sections: [
@@ -574,65 +1147,65 @@ BOSSES.forEach((b, i) => addPage({
     { h: "Tips", list: [b.tip] },
     { h: "Fight order", order: i },
   ],
-  navbox: "Bosses",
+  navbox: "Bosses", blurb: b.where,
 }));
 
 ITEMS.forEach(it => addPage({
-  title: it.n, aka: it.aka, type: "item", stage: it.stage, cats: ["Items", it.cat === "Summon" ? "Summon items" : null, STAGE[it.stage]].filter(Boolean),
+  title: it.n, aka: it.aka, kind: "item", stage: it.stage, icon: [it.icon, it.c1, it.c2 || shade(it.c1, -.4)],
+  cats: ["Items", it.cat === "Summon" ? "Summon items" : it.cat === "Ore" ? "Ores and bars" : it.cat === "Accessory" ? "Accessories" : it.cat === "Material" ? "Materials" : it.cat === "Tool" ? "Tools" : it.cat === "Consumable" ? "Consumables" : "Furniture", STAGE[it.stage]],
   lead: `is ${art(it.cat)} ${it.cat.toLowerCase()}${it.cat === "Ore" || it.cat === "Material" ? "" : " item"} from ${STAGE[it.stage]}.`,
-  art: "var(--gold)",
   info: [["Type", it.cat], ["Stage", null, stageHTML(it.stage)], ...(it.aka ? [["Also covers", it.aka.join(", ")]] : []),
          ...(bossByItem.has(it.n) ? [["Summons", bossByItem.get(it.n)]] : [])],
   sections: [{ h: "How to get it", p: [it.how] }, ...(bossByItem.has(it.n) ? [{ h: "Use", p: ["Summons " + bossByItem.get(it.n) + "."] }] : [])],
+  blurb: it.how,
 }));
 
-// Summon items that only exist as part of a boss entry get their own short page.
 BOSSES.forEach(b => {
   if (!b.item || PAGES.has(b.item)) return;
   addPage({
-    title: b.item, type: "item", stage: b.stage, cats: ["Items", "Summon items", STAGE[b.stage]],
-    lead: `is the summon for ${b.n}.`, art: "var(--gold)",
+    title: b.item, kind: "item", stage: b.stage, icon: ["orb", b.c, "#e9b949"], cats: ["Items", "Summon items", STAGE[b.stage]],
+    lead: `is the summon for ${b.n}.`,
     info: [["Type", "Summon"], ["Stage", null, stageHTML(b.stage)], ["Summons", b.n], ["Use in", b.area]],
     sections: [{ h: "How to get it", p: [b.summon] }, { h: "Use", p: ["Summons " + b.n + ". " + b.where] }],
+    blurb: "Summons " + b.n + ".",
   });
 });
 
 BIOMES.forEach(bi => addPage({
-  title: bi.n, aka: bi.aka, type: "biome", stage: bi.stage, cats: ["Biomes", STAGE[bi.stage]],
-  lead: `is a biome${bi.stage === "hm" ? " that appears once Hardmode starts" : ""}.`, art: "#5f8f45",
+  title: bi.n, aka: bi.aka, kind: "biome", stage: bi.stage, icon: ["biome", bi.c1, bi.c2], cats: ["Biomes", STAGE[bi.stage]],
+  lead: `is a biome${bi.stage === "hm" ? " that appears once Hardmode starts" : ""}.`,
   info: [["Type", "Biome"], ["Stage", null, stageHTML(bi.stage)], ["Layer", bi.layer]],
   sections: [{ h: "Overview", p: [bi.what] }, { h: "Why go there", p: [bi.why] }],
-  navbox: "Biomes",
+  navbox: "Biomes", blurb: bi.what,
 }));
 
 NPCS.forEach(n => addPage({
-  title: n.n, type: "npc", stage: n.stage, cats: ["Town NPCs", STAGE[n.stage]],
-  lead: n.visitor ? "is a visiting NPC. He doesn't live in a house." : `is a town NPC${n.stage === "hm" ? " who can move in once Hardmode starts" : ""}.`,
-  art: "#c98a5a",
+  title: n.n, kind: "npc", stage: n.stage, icon: ["npc", n.c1, shade(n.c1, -.5)], cats: ["Town NPCs", STAGE[n.stage]],
+  lead: n.visitor ? "is a visiting NPC who doesn't live in a house." : `is a town NPC${n.stage === "hm" ? " who can move in once Hardmode starts" : ""}.`,
   info: [["Type", n.visitor ? "Visiting NPC" : "Town NPC"], ["Stage", null, stageHTML(n.stage)], ["Needs a house", n.visitor ? "No" : "Yes"]],
   sections: [{ h: "How to get them", p: [n.how, ...(n.visitor ? [] : ["They also need an empty house. See Housing."])] }, { h: "What they offer", p: [n.sells] }],
-  navbox: "Town NPCs",
+  navbox: "Town NPCs", blurb: n.how,
 }));
 
 STATIONS.forEach(s => addPage({
-  title: s.n, aka: s.aka, type: "station", stage: s.stage, cats: ["Crafting stations", STAGE[s.stage]],
-  lead: "is a crafting station. Stand near it to use its recipes.", art: "#9b7a5a",
+  title: s.n, aka: s.aka, kind: "station", stage: s.stage, icon: ["anvil", "#8f949e", "#e9b949"], cats: ["Crafting stations", STAGE[s.stage]],
+  lead: "is a crafting station. Stand near it to use its recipes.",
   info: [["Type", "Crafting station"], ["Stage", null, stageHTML(s.stage)]],
   sections: [{ h: "How to get it", p: [s.recipe] }, { h: "What it makes", p: [s.makes] }],
-  navbox: "Crafting stations",
+  navbox: "Crafting stations", blurb: s.makes,
 }));
 
 EVENTS.forEach(e => addPage({
-  title: e.n, aka: e.aka, type: "event", stage: e.stage, cats: ["Events", STAGE[e.stage]],
-  lead: `is ${stageWord(e.stage)} event.`, art: "#d26a5a",
+  title: e.n, aka: e.aka, kind: "event", stage: e.stage, icon: ["moon", e.c1, "#e9b949"], cats: ["Events", STAGE[e.stage]],
+  lead: `is ${stageWord(e.stage)} event.`,
   info: [["Type", "Event"], ["Stage", null, stageHTML(e.stage)]],
   sections: [{ h: "How it starts", p: [e.start] }, { h: "What happens", p: [e.what] }, { h: "Rewards", p: [e.loot] }],
-  navbox: "Events",
+  navbox: "Events", blurb: e.what,
 }));
 
-// Mechanics pages
+const MECH_ICON = ["scroll", "#e8dcb8", "#6b4a2f"];
 addPage({
-  title: "Hardmode", type: "mech", cats: ["Mechanics"], art: "var(--hm)",
+  title: "Hardmode", kind: "mech", icon: ["scroll", "#e89ad0", "#6b4a2f"], cats: ["Mechanics"],
   lead: "is the second half of the game. It starts the moment you beat the Wall of Flesh, and it can't be undone in that world.",
   info: [["Type", "Game mechanic"], ["Starts after", "Wall of Flesh"]],
   sections: [
@@ -647,18 +1220,20 @@ addPage({
       "Farm Soul of Light and Soul of Night underground, and Soul of Flight from Wyverns, to craft Angel Wings or Demon Wings.",
       "Build walls or dig tunnels around your town to slow the Hallow and evil biome from spreading into it." ] },
   ],
+  blurb: "The second half of the game, after the Wall of Flesh.",
 });
 addPage({
-  title: "Pickaxe power", type: "mech", cats: ["Mechanics"], art: "#a8a8a8",
+  title: "Pickaxe power", kind: "mech", icon: ["pick", "#b7bcc4", "#e9b949"], cats: ["Mechanics"],
   lead: "is the number that decides what a pickaxe can mine. A block can only be mined once your pickaxe's power reaches that block's number.",
   info: [["Type", "Game mechanic"], ["Shown as", "A percentage"]],
   sections: [
     { h: "What can I mine?", table: { head: ["Block", "Power needed", "Weakest pickaxe"], rows: NEEDS.map(([b, p, w]) => [b, p + "%", w]), num: 1 } },
     { h: "Pickaxe ladder", table: { head: ["Pickaxe", "Power"], rows: PICKS.map(([p, v]) => [p, v + "%"]), num: 1 } },
   ],
+  blurb: "What each pickaxe can mine.",
 });
 addPage({
-  title: "Expert Mode", aka: ["Master Mode"], type: "mech", cats: ["Mechanics"], art: "#d9a441",
+  title: "Expert Mode", aka: ["Master Mode"], kind: "mech", icon: ["scroll", "#e9b949", "#6b4a2f"], cats: ["Mechanics"],
   lead: "is a harder difficulty you pick when creating a world. Master Mode is harder still.",
   info: [["Type", "Difficulty"], ["Chosen", "When creating a world"]],
   sections: [
@@ -668,9 +1243,10 @@ addPage({
       "Master Mode makes everything tougher again and adds relics and pets as boss rewards." ] },
     { h: "Expert-only boss items", list: BOSSES.map(b => b.n + ": " + b.expert) },
   ],
+  blurb: "Harder worlds with extra boss loot.",
 });
 addPage({
-  title: "Housing", type: "mech", cats: ["Mechanics"], art: "#c98a5a",
+  title: "Housing", kind: "mech", icon: ["scroll", "#c8883a", "#6b4a2f"], cats: ["Mechanics"],
   lead: "is what every town NPC needs before moving in. Each NPC wants an empty, valid house of their own.",
   info: [["Type", "Game mechanic"], ["Used by", "Town NPCs"]],
   sections: [
@@ -679,15 +1255,24 @@ addPage({
       "Enough space: at least 60 tiles inside the frame, but not a huge hall.",
       "An entrance: a door or a platform.",
       "A light source, such as a torch.",
-      "A flat surface, like a table or work bench, and a chair." ] },
+      "A flat surface, like a table or Work Bench, and a chair." ] },
     { h: "Checking a room", p: ["Open the housing menu in your inventory and use the query tool on a room. It tells you what's missing. Rooms inside the Corruption, Crimson or other evil areas won't count."] },
   ],
+  blurb: "How to build a house NPCs will move into.",
 });
 addPage({
-  title: "Game progression", type: "mech", cats: ["Mechanics"], art: "var(--pre)",
+  title: "Game progression", kind: "mech", icon: ["scroll", "#8fd16a", "#6b4a2f"], cats: ["Mechanics"],
   lead: "is the usual order people play Terraria in, from the first night to the Moon Lord.",
   info: [["Type", "Guide"], ["Steps", String(PROGRESSION.length)]],
   sections: ["pre", "hm", "end"].map(s => ({ h: STAGE[s], olist: PROGRESSION.filter(x => x[0] === s).map(x => x[1]) })),
+  blurb: "The usual order to play the game in.",
+});
+addPage({
+  title: "Weapon classes", aka: ["Weapon class"], kind: "mech", icon: ["sword", "#c4c8d0", "#e9b949"], cats: ["Mechanics"],
+  lead: "are the four styles of fighting in Terraria: melee, ranged, magic and summon. Armor sets boost one class, so most players pick one and stick with it.",
+  info: [["Type", "Game mechanic"], ["Classes", "4"]],
+  sections: Object.keys(CLASSES).map(c => ({ h: CLASSES[c], p: [CLASS_BLURB[c]], catlink: CLASSES[c] })),
+  blurb: "Melee, ranged, magic and summon explained.",
 });
 
 /* =========================================================
@@ -696,7 +1281,7 @@ addPage({
 const escRx = s => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const sortedAliases = ALIASES.slice().sort((a, b) => b[0].length - a[0].length);
 const ALIAS_MAP = new Map(sortedAliases.map(([a, t]) => [esc(a), t]));
-const LINK_RX = new RegExp("(?<![\\w])(" + sortedAliases.map(a => escRx(esc(a[0]))).join("|") + ")(?![\\w])", "g");
+const LINK_RX = new RegExp("(?<![\\w])(" + sortedAliases.map(a => escRx(esc(a[0]))).join("|") + ")(?![\\w])(?!\\s[A-Z][a-z])", "g");
 
 function linkify(text, self, used) {
   return esc(text).replace(LINK_RX, m => {
@@ -707,6 +1292,11 @@ function linkify(text, self, used) {
   });
 }
 const link = t => `<a href="#${slug(t)}">${esc(t)}</a>`;
+const iconFor = t => { const p = PAGES.get(t); return p ? iconURL(...p.icon) : ""; };
+const catIcon = c => {
+  const first = (CATS.get(c) || [])[0];
+  return first ? iconFor(first) : iconURL(...MECH_ICON);
+};
 
 function pageTexts(p) {
   const out = [p.lead];
@@ -720,7 +1310,6 @@ function pageTexts(p) {
   return out;
 }
 
-// "What links here"
 const BACKLINKS = new Map();
 for (const p of PAGES.values()) {
   const seen = new Set();
@@ -741,23 +1330,31 @@ const BY_SLUG = new Map([...PAGES.keys()].map(t => [slug(t), t]));
 const $ = s => document.querySelector(s);
 const pageEl = $("#page");
 
+const tile = t => {
+  const p = PAGES.get(t);
+  const sub = p.kind === "weapon" ? `${WTYPES[WEAPON_BY_NAME.get(t).type].label} · ${STAGE[p.stage]}` : `${KIND_LABEL[p.kind]}${p.stage ? " · " + STAGE[p.stage] : ""}`;
+  return `<a class="gtile" href="#${slug(t)}"><img class="px" src="${iconFor(t)}" alt=""><b>${esc(t)}</b><small>${esc(sub)}</small></a>`;
+};
+
 function renderArticle(p) {
   const used = new Set();
   const L = s => linkify(s, p.title, used);
   const info = `
     <aside class="infobox" aria-label="${esc(p.title)} infobox">
       <div class="ib-title">${esc(p.title)}</div>
-      <div class="ib-art"><div class="tile" style="--c:${p.art}" aria-hidden="true">${esc(initials(p.title))}</div></div>
+      <div class="ib-art"><img class="px" src="${iconURL(...p.icon)}" alt="${esc(p.title)} icon, drawn for this wiki"></div>
       <div class="ib-section">Info</div>
       <table>${p.info.map(([k, v, html]) => `<tr><th>${esc(k)}</th><td>${html || L(v)}</td></tr>`).join("")}</table>
     </aside>`;
   const lead = `<p><b>${esc(p.title)}</b> ${L(p.lead)}</p>`;
-  const secs = p.sections.filter(s => s.order === undefined || true);
+  const secs = p.sections;
   const toc = secs.length >= 3 ? `<nav class="toc" aria-label="Contents"><b>Contents</b><ol>${secs.map((s, i) =>
     `<li><a href="#${slug(p.title)}" data-sec="s${i}"><span class="n">${i + 1}</span>${esc(s.h)}</a></li>`).join("")}</ol></nav>` : "";
   const body = secs.map((s, i) => {
     let inner = "";
+    if (s.demo) inner += demoHTML(s.demo);
     if (s.p) inner += s.p.map(x => `<p>${L(x)}</p>`).join("");
+    if (s.catlink) inner += `<p class="dots">${(CATS.get(s.catlink) || []).length} weapons · <a href="#Category.${slug(s.catlink)}">Browse ${esc(s.catlink.toLowerCase())}</a></p>`;
     if (s.list) inner += `<ul>${s.list.map(x => `<li>${L(x)}</li>`).join("")}</ul>`;
     if (s.olist) inner += `<ol>${s.olist.map(x => `<li>${L(x)}</li>`).join("")}</ol>`;
     if (s.table) inner += `<div class="table-wrap"><table class="wikitable"><thead><tr>${s.table.head.map(h => `<th>${esc(h)}</th>`).join("")}</tr></thead><tbody>${
@@ -768,8 +1365,8 @@ function renderArticle(p) {
     }
     return `<h2 id="s${i}">${esc(s.h)}</h2>${inner}`;
   }).join("");
-  const back = (BACKLINKS.get(p.title) || []).filter(t => !used.has(t) || true).sort();
-  const related = back.length ? `<h2>What links here</h2><p>${back.map(link).join(" · ")}</p>` : "";
+  const back = (BACKLINKS.get(p.title) || []).slice().sort();
+  const related = back.length ? `<h2>What links here</h2><p class="dots">${back.map(link).join("")}</p>` : "";
   const nav = p.navbox ? navbox(p.navbox, p.title) : "";
   const cats = `<div class="catlinks"><b>Categories:</b> ${p.cats.map(c => `<a href="#Category.${slug(c)}">${esc(c)}</a>`).join("")}</div>`;
   return `
@@ -781,65 +1378,158 @@ function renderArticle(p) {
 function navbox(cat, self) {
   const titles = CATS.get(cat) || [];
   const groups = ["pre", "hm", "end"].map(s => [s, titles.filter(t => PAGES.get(t).stage === s)]).filter(g => g[1].length);
-  return `<nav class="navbox" aria-label="${esc(cat)}"><div class="nb-title"><a href="#Category.${slug(cat)}">${esc(cat)}</a></div>${
-    groups.map(([s, ts]) => `<div class="row"><div>${STAGE[s]}</div><div>${ts.map(t =>
+  const parent = PARENT.get(cat);
+  return `<nav class="navbox" aria-label="${esc(cat)}"><div class="nb-title"><a href="#Category.${slug(cat)}">${esc(cat)}</a>${parent ? ` · <a href="#Category.${slug(parent)}">${esc(parent)}</a>` : ""}</div>${
+    groups.map(([s, ts]) => `<div class="row"><div>${STAGE[s]}</div><div class="dots">${ts.map(t =>
       t === self ? `<a class="self" href="#${slug(t)}" aria-current="page">${esc(t)}</a>` : link(t)).join("")}</div></div>`).join("")}</nav>`;
 }
 
+function childCats(cat) { return [...PARENT.entries()].filter(([, p]) => p === cat).map(([c]) => c); }
+
 function renderCategory(cat) {
-  const titles = (CATS.get(cat) || []).slice().sort((a, b) => a.localeCompare(b));
-  const byLetter = {};
-  titles.forEach(t => { const k = t.replace(/^The /, "")[0].toUpperCase(); (byLetter[k] = byLetter[k] || []).push(t); });
+  const titles = (CATS.get(cat) || []).slice();
+  const kids = childCats(cat);
+  const crumbs = [];
+  for (let c = PARENT.get(cat); c; c = PARENT.get(c)) crumbs.unshift(c);
+  const sub = kids.length ? `<h2>Subcategories</h2><div class="subcats">${kids.map(k =>
+    `<a href="#Category.${slug(k)}"><img class="px" src="${catIcon(k)}" alt=""><span>${esc(k)}<small>${(CATS.get(k) || []).length} pages</small></span></a>`).join("")}</div>` : "";
+  let listing;
+  if (kids.length) {
+    listing = kids.map(k => `<h2>${esc(k)}</h2><div class="gallery">${(CATS.get(k) || []).map(tile).join("")}</div>`).join("");
+  } else if (["Pre-Hardmode", "Hardmode", "Endgame"].includes(cat)) {
+    const byKind = {};
+    titles.forEach(t => (byKind[KIND_LABEL[PAGES.get(t).kind]] = byKind[KIND_LABEL[PAGES.get(t).kind]] || []).push(t));
+    listing = Object.keys(byKind).sort().map(k => `<h2>${esc(k)}s</h2><div class="gallery">${byKind[k].sort().map(tile).join("")}</div>`).join("");
+  } else {
+    const hasStages = titles.some(t => PAGES.get(t).stage);
+    listing = hasStages
+      ? ["pre", "hm", "end"].map(s => { const ts = titles.filter(t => PAGES.get(t).stage === s); return ts.length ? `<h2>${STAGE[s]}</h2><div class="gallery">${ts.map(tile).join("")}</div>` : ""; }).join("")
+      : `<div class="gallery">${titles.sort().map(tile).join("")}</div>`;
+  }
+  const blurb = Object.entries(CLASSES).find(([, c]) => c === cat);
   return `
     <h1 class="title">Category: ${esc(cat)}</h1>
-    <div class="sub">From Krew's Terraria Wiki</div>
+    <div class="sub">${crumbs.length ? crumbs.map(c => `<a href="#Category.${slug(c)}">${esc(c)}</a> › `).join("") : ""}From Krew's Terraria Wiki</div>
     <div class="body">
+      ${blurb ? `<p>${linkify(CLASS_BLURB[blurb[0]], "", new Set())}</p>` : ""}
       <p>This category has ${titles.length} page${titles.length === 1 ? "" : "s"}.</p>
-      <div class="catlist">${Object.keys(byLetter).sort().map(k => `<section><h3>${k}</h3><ul>${byLetter[k].map(t => `<li>${link(t)}</li>`).join("")}</ul></section>`).join("")}</div>
+      ${sub}${listing}
     </div>`;
 }
 
+let featured;
 function renderMain() {
-  const list = cat => (CATS.get(cat) || []);
-  const byStage = (cat, s) => list(cat).filter(t => PAGES.get(t).stage === s);
-  const stageBlock = cat => ["pre", "hm", "end"].map(s => {
-    const ts = byStage(cat, s); return ts.length ? `<h4>${STAGE[s]}</h4><p>${ts.map(link).join("")}</p>` : "";
-  }).join("");
-  const itemCats = {};
-  ITEMS.forEach(i => (itemCats[i.cat] = itemCats[i.cat] || []).push(i.n));
+  const n = c => (CATS.get(c) || []).length;
+  featured = featured || WEAPONS[Math.floor(Math.random() * WEAPONS.length)];
+  const fp = PAGES.get(featured.n);
+  const stat = (num, label, cat) => `<a class="stat" href="#Category.${slug(cat)}"><b>${num}</b><span>${label}</span></a>`;
+  const byStage = (cat, s) => (CATS.get(cat) || []).filter(t => PAGES.get(t).stage === s);
+  const stageBlock = cat => ["pre", "hm", "end"].map(s => { const ts = byStage(cat, s); return ts.length ? `<h4>${STAGE[s]}</h4><p class="dots">${ts.map(link).join("")}</p>` : ""; }).join("");
+  const heroIcons = ["Terra Blade", "Zenith", "Life Crystal", "Moon Lord", "Guide"].filter(t => PAGES.has(t)).map(t => `<img class="px" src="${iconFor(t)}" alt="">`).join("");
   return `
-    <div class="welcome">
-      <h1>Welcome to Krew's <span>Terraria</span> Wiki</h1>
-      <p>Bosses, items, NPCs, biomes and events, written plain and simple. <span class="count">${PAGES.size}</span> pages so far.</p>
+    <section class="hero">
+      <div>
+        <h1>Welcome to Krew's <span>Terraria</span> Wiki</h1>
+        <p>Terraria is a 2D adventure game where you dig, build, craft and fight your way from a wooden sword to the Moon Lord. This wiki explains every part of it in plain words, with no ads. Pick a category below, or search for anything.</p>
+        <div class="bigsearch"><input id="dashq" type="search" placeholder="Search any weapon, item, NPC, boss…" aria-label="Search the wiki" autocomplete="off"></div>
+      </div>
+      <div class="heroart" aria-hidden="true">${heroIcons}</div>
+    </section>
+    <div class="stats">
+      ${stat(n("Weapons"), "Weapons", "Weapons")}${stat(n("Items"), "Items", "Items")}${stat(n("Bosses"), "Bosses", "Bosses")}
+      ${stat(n("Town NPCs"), "NPCs", "Town NPCs")}${stat(n("Biomes"), "Biomes", "Biomes")}${stat(n("Events"), "Events", "Events")}
+      <a class="stat" href="#All_pages"><b>${PAGES.size}</b><span>Pages in total</span></a>
     </div>
-    <div class="portals">
+    <div class="dash">
+      <section class="pbox"><h2>New to Terraria? Start here</h2><div class="pb-body"><ol class="steps">
+        <li>Build a house before the first night. See ${link("Housing")}.</li>
+        <li>Dig down and smash every ${link("Life Crystal")} for more health.</li>
+        <li>Pick a fighting style. See ${link("Weapon classes")}.</li>
+        <li>Fight your first boss, ${link("King Slime")} or the ${link("Eye of Cthulhu")}.</li>
+        <li>Follow the full ${link("Game progression")} from there.</li>
+      </ol></div></section>
+      <section class="pbox"><h2>How this wiki works</h2><div class="pb-body">
+        <p>Every page has an info box on the right with the quick facts. Blue-green words are links to other pages.</p>
+        <div class="legend">
+          <div>${stageHTML("pre")}<span>Before the Wall of Flesh</span></div>
+          <div>${stageHTML("hm")}<span>After the Wall of Flesh</span></div>
+          <div>${stageHTML("end")}<span>The final stretch</span></div>
+        </div>
+        <p>Weapon pages have an animation showing how the weapon fights. The <b>Official wiki ↗</b> tab on every page opens the same topic on the official wiki for exact stats.</p>
+      </div></section>
+      <section class="pbox wide"><h2>Featured weapon: ${esc(featured.n)}</h2><div class="pb-body featured">
+        <div>
+          <p><img class="px" src="${iconURL(...fp.icon)}" alt="" style="width:48px;height:48px;float:left;margin:0 10px 6px 0"><b>${link(featured.n)}</b> is ${art(STAGE[featured.stage])} ${stageHTML(featured.stage)} ${esc(WTYPES[featured.type].label.toLowerCase())}. ${esc(featured.does)}</p>
+          <p><b>How to get it:</b> ${linkify(featured.how, featured.n, new Set())}</p>
+          <p><a href="#${slug(featured.n)}">Read more →</a> · <button type="button" class="chip" id="shuffle">Show another</button></p>
+        </div>
+        ${demoHTML(featured, false)}
+      </div></section>
+      <section class="pbox"><h2>Weapons</h2><div class="pb-body">
+        ${Object.entries(CLASSES).map(([k, c]) => `<h4><a href="#Category.${slug(c)}">${esc(c)}</a> (${n(c)})</h4><p class="dots">${childCats(c).map(t => `<a href="#Category.${slug(t)}">${esc(t)}</a>`).join("")}</p>`).join("")}
+      </div></section>
       <section class="pbox"><h2>Bosses</h2><div class="pb-body">${stageBlock("Bosses")}</div></section>
       <section class="pbox"><h2>Town NPCs</h2><div class="pb-body">${stageBlock("Town NPCs")}</div></section>
+      <section class="pbox"><h2>Items</h2><div class="pb-body">
+        ${["Accessories", "Consumables", "Materials", "Ores and bars", "Tools", "Summon items", "Furniture"].filter(c => CATS.has(c)).map(c => `<h4><a href="#Category.${slug(c)}">${esc(c)}</a> (${n(c)})</h4>`).join("")}
+      </div></section>
       <section class="pbox"><h2>Biomes</h2><div class="pb-body">${stageBlock("Biomes")}</div></section>
-      <section class="pbox"><h2>Items</h2><div class="pb-body">${Object.keys(itemCats).sort().map(c =>
-        `<h4>${esc(c)}</h4><p>${itemCats[c].map(link).join("")}</p>`).join("")}</div></section>
       <section class="pbox"><h2>Events</h2><div class="pb-body">${stageBlock("Events")}</div></section>
       <section class="pbox"><h2>Crafting stations</h2><div class="pb-body">${stageBlock("Crafting stations")}</div></section>
-      <section class="pbox"><h2>Game mechanics</h2><div class="pb-body"><p>${list("Mechanics").map(link).join("")}</p>
-        <h4>Summon items</h4><p>${list("Summon items").map(link).join("")}</p></div></section>
+      <section class="pbox"><h2>Game mechanics</h2><div class="pb-body"><p class="dots">${(CATS.get("Mechanics") || []).map(link).join("")}</p></div></section>
     </div>`;
 }
 
-let lastQuery = "";
-function renderSearch() {
-  const q = lastQuery.trim().toLowerCase();
-  const hits = [...PAGES.values()].map(p => {
-    const inTitle = p.title.toLowerCase().includes(q) || (p.aka || []).some(a => a.toLowerCase().includes(q));
-    const text = pageTexts(p).join(" ");
-    const idx = text.toLowerCase().indexOf(q);
-    return { p, score: inTitle ? 2 : idx >= 0 ? 1 : 0, snip: idx >= 0 ? text.slice(Math.max(0, idx - 50), idx + 90) : p.lead };
-  }).filter(h => q && h.score).sort((a, b) => b.score - a.score || a.p.title.localeCompare(b.p.title));
+/* Search page */
+const KIND_FILTERS = [["all", "All"], ["weapon", "Weapons"], ["item", "Items"], ["boss", "Bosses"], ["npc", "NPCs"], ["biome", "Biomes"], ["event", "Events"], ["station", "Crafting"], ["mech", "Guides"]];
+const search = { q: "", kind: "all", cls: "all", stage: "all" };
+function searchHits() {
+  const q = search.q.trim().toLowerCase();
+  return [...PAGES.values()].filter(p =>
+    (search.kind === "all" || p.kind === search.kind) &&
+    (search.cls === "all" || (p.kind === "weapon" && WEAPON_BY_NAME.get(p.title).cls === search.cls)) &&
+    (search.stage === "all" || p.stage === search.stage)
+  ).map(p => {
+    if (!q) return { p, score: 1 };
+    const names = [p.title, ...(p.aka || [])].map(s => s.toLowerCase());
+    const score = names.some(s => s === q) ? 4 : names.some(s => s.startsWith(q)) ? 3 : names.some(s => s.includes(q)) ? 2 : pageTexts(p).join(" ").toLowerCase().includes(q) ? 1 : 0;
+    return { p, score };
+  }).filter(h => h.score).sort((a, b) => b.score - a.score || a.p.title.localeCompare(b.p.title));
+}
+function renderSearchResults() {
+  const hits = searchHits();
+  $("#sres").innerHTML = hits.length ? `<div class="gallery">${hits.map(h => tile(h.p.title)).join("")}</div>`
+    : `<p>No pages match. Try a different word, or search the <a href="https://terraria.wiki.gg/index.php?search=${encodeURIComponent(search.q)}" target="_blank" rel="noopener">official Terraria Wiki ↗</a>.</p>`;
+  $("#scount").textContent = `${hits.length} page${hits.length === 1 ? "" : "s"}${search.q ? ` matching “${search.q}”` : ""}`;
+}
+function renderSearchPage(title) {
+  const chips = (group, opts, cur) => `<div class="chips" role="group" aria-label="${group}">${opts.map(([v, l]) => `<button type="button" class="chip" data-g="${group}" data-v="${v}" aria-pressed="${v === cur}">${l}</button>`).join("")}</div>`;
   return `
-    <h1 class="title">Search results</h1>
-    <div class="sub">${hits.length} result${hits.length === 1 ? "" : "s"} for “${esc(lastQuery)}”</div>
-    <div class="body">${hits.length ? `<ul class="results">${hits.map(h =>
-      `<li>${link(h.p.title)}<small>…${esc(h.snip)}…</small></li>`).join("")}</ul>`
-      : `<p>No pages match. Try a different word, or search the <a href="https://terraria.wiki.gg/index.php?search=${encodeURIComponent(lastQuery)}" target="_blank" rel="noopener">official Terraria Wiki ↗</a>.</p>`}</div>`;
+    <h1 class="title">${title}</h1>
+    <div class="sub">Search every weapon, item, NPC, boss, biome and event</div>
+    <div class="body">
+      <div class="bigsearch"><input id="sq" type="search" value="${esc(search.q)}" placeholder="Type a name, like Terra Blade or Nurse" aria-label="Search pages" autocomplete="off"></div>
+      ${chips("kind", KIND_FILTERS, search.kind)}
+      <div id="clsChips" ${search.kind === "weapon" ? "" : "hidden"}>${chips("cls", [["all", "All classes"], ...Object.entries(CLASSES).map(([k, c]) => [k, c.replace(" weapons", "")])], search.cls)}</div>
+      ${chips("stage", [["all", "Any stage"], ...Object.entries(STAGE)], search.stage)}
+      <div class="count" id="scount" aria-live="polite"></div>
+      <div id="sres"></div>
+    </div>`;
+}
+function wireSearchPage() {
+  const sq = $("#sq");
+  sq.addEventListener("input", () => { search.q = sq.value; renderSearchResults(); });
+  pageEl.querySelectorAll(".chip[data-g]").forEach(b => b.addEventListener("click", () => {
+    search[b.dataset.g] = b.dataset.v;
+    if (b.dataset.g === "kind" && b.dataset.v !== "weapon") search.cls = "all";
+    pageEl.querySelectorAll(`.chip[data-g="${b.dataset.g}"]`).forEach(x => x.setAttribute("aria-pressed", x.dataset.v === b.dataset.v));
+    if (b.dataset.g === "kind") {
+      $("#clsChips").hidden = search.kind !== "weapon";
+      pageEl.querySelectorAll('.chip[data-g="cls"]').forEach(x => x.setAttribute("aria-pressed", x.dataset.v === search.cls));
+    }
+    renderSearchResults();
+  }));
+  renderSearchResults();
 }
 
 function renderMissing(s) {
@@ -851,23 +1541,27 @@ function renderMissing(s) {
 $("#sidenav").innerHTML = `
   <div class="portal"><h3>Navigation</h3><ul>
     <li><a href="#Main_Page">Main Page</a></li>
+    <li><a href="#All_pages">Search all pages</a></li>
     <li><a href="#Game_progression">Game progression</a></li>
     <li><a href="#Random">Random page</a></li>
   </ul></div>
+  <div class="portal"><h3>Weapons</h3><ul>
+    <li><a href="#Category.Weapons">All weapons</a></li>
+    ${Object.values(CLASSES).map(c => `<li class="subitem"><a href="#Category.${slug(c)}">${c}</a></li>`).join("")}
+  </ul></div>
   <div class="portal"><h3>Categories</h3><ul>
-    ${["Bosses", "Items", "Town NPCs", "Biomes", "Events", "Crafting stations", "Mechanics"].map(c => `<li><a href="#Category.${slug(c)}">${c}</a></li>`).join("")}
+    ${["Items", "Bosses", "Town NPCs", "Biomes", "Events", "Crafting stations", "Mechanics"].map(c => `<li><a href="#Category.${slug(c)}">${c}</a></li>`).join("")}
   </ul></div>
   <div class="portal"><h3>Game stages</h3><ul>
     ${Object.values(STAGE).map(s => `<li><a href="#Category.${slug(s)}">${s}</a></li>`).join("")}
-  </ul></div>
-  <div class="portal"><h3>Popular pages</h3><ul>
-    ${["Hardmode", "Pickaxe power", "Housing", "Plantera", "Moon Lord", "Life Crystal"].map(t => `<li>${link(t)}</li>`).join("")}
   </ul></div>`;
+PARENT.set("Accessories", "Items"); PARENT.set("Consumables", "Items"); PARENT.set("Materials", "Items"); PARENT.set("Ores and bars", "Items");
+PARENT.set("Tools", "Items"); PARENT.set("Summon items", "Items"); PARENT.set("Furniture", "Items");
 
 function setTabs(kind, title) {
   const official = kind === "article" ? `<a href="https://terraria.wiki.gg/wiki/${encodeURIComponent(title.replace(/ /g, "_"))}" target="_blank" rel="noopener">Official wiki ↗</a>` : "";
-  const label = kind === "category" ? "Category" : kind === "special" ? "Special page" : kind === "main" ? "Main Page" : "Page";
-  $("#tabs").innerHTML = `<button class="menu-btn" type="button" id="menuBtn" aria-expanded="false" aria-controls="side">☰ Menu</button><span class="on" style="display:block;padding:7px 14px 6px;border:1px solid var(--line);border-bottom:0;border-radius:6px 6px 0 0">${label}</span>${official}`;
+  const label = kind === "category" ? "Category" : kind === "special" ? "Search" : kind === "main" ? "Main Page" : "Page";
+  $("#tabs").innerHTML = `<button class="menu-btn" type="button" id="menuBtn" aria-expanded="false" aria-controls="side">☰ Menu</button><span class="on">${label}</span>${official}`;
   $("#menuBtn").addEventListener("click", e => {
     const open = $("#side").classList.toggle("open");
     e.currentTarget.setAttribute("aria-expanded", open);
@@ -878,50 +1572,55 @@ function setTabs(kind, title) {
 function route() {
   let h = decodeURIComponent(location.hash.slice(1)) || "Main_Page";
   $("#side").classList.remove("open");
+  if (/^s\d+$/.test(h)) return;
   if (h === "Random") {
     const all = [...PAGES.keys()];
-    const t = all[Math.floor(Math.random() * all.length)];
-    try { history.replaceState(null, "", "#" + slug(t)); } catch (e) {}
-    h = slug(t);
+    h = slug(all[Math.floor(Math.random() * all.length)]);
+    try { history.replaceState(null, "", "#" + h); } catch (e) {}
   }
   let title;
-  if (h === "Main_Page") { pageEl.innerHTML = renderMain(); setTabs("main"); title = "Main Page"; }
-  else if (h === "Search") { pageEl.innerHTML = renderSearch(); setTabs("special"); title = "Search"; }
-  else if (h.startsWith("Category.")) {
+  if (h === "Main_Page") {
+    pageEl.innerHTML = renderMain(); setTabs("main"); title = "Main Page";
+    const dq = $("#dashq");
+    dq.addEventListener("keydown", e => { if (e.key === "Enter") { search.q = dq.value; search.kind = "all"; search.cls = "all"; search.stage = "all"; location.hash = "Search"; } });
+    $("#shuffle").addEventListener("click", () => { featured = null; route(); });
+  } else if (h === "Search" || h === "All_pages") {
+    if (h === "All_pages") { search.q = ""; search.kind = "all"; search.cls = "all"; search.stage = "all"; }
+    pageEl.innerHTML = renderSearchPage(h === "Search" ? "Search" : "All pages"); setTabs("special"); title = "Search"; wireSearchPage();
+  } else if (h.startsWith("Category.")) {
     const want = h.slice(9);
     const cat = [...CATS.keys()].find(c => slug(c) === want);
-    pageEl.innerHTML = cat ? renderCategory(cat) : renderMissing(h); setTabs("category"); title = cat || h;
+    pageEl.innerHTML = cat ? renderCategory(cat) : renderMissing(h); setTabs("category"); title = cat ? "Category: " + cat : h;
   } else if (BY_SLUG.has(h)) {
     const p = PAGES.get(BY_SLUG.get(h)); pageEl.innerHTML = renderArticle(p); setTabs("article", p.title); title = p.title;
-  } else if (/^s\d+$/.test(h)) { return; }
-  else { pageEl.innerHTML = renderMissing(h); setTabs("special"); title = h; }
+  } else { pageEl.innerHTML = renderMissing(h); setTabs("special"); title = h; }
   document.title = (title === "Main Page" ? "" : title + " · ") + "Krew's Terraria Wiki";
+  mountDemos(pageEl);
   window.scrollTo(0, 0);
 }
 window.addEventListener("hashchange", route);
 
-// Table of contents jumps without changing the page
 pageEl.addEventListener("click", e => {
   const a = e.target.closest("a[data-sec]");
   if (!a) return;
   e.preventDefault();
-  document.getElementById(a.dataset.sec)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  document.getElementById(a.dataset.sec)?.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
 });
 
-/* Search box */
+/* Header search box with suggestions */
 const q = $("#q"), sug = $("#suggest");
-let active = -1, matches = [];
-const NAMES = [...new Map(ALIASES.map(([a, t]) => [a.toLowerCase(), [a, t]])).values()];
+let active = -1;
+const NAMES = [...new Map(ALIASES.concat([...NOLINK].map(t => [t, t])).map(([a, t]) => [a.toLowerCase(), [a, t]])).values()];
 function showSuggest() {
   const v = q.value.trim().toLowerCase();
   if (!v) { sug.hidden = true; return; }
   const seen = new Set();
-  matches = NAMES.filter(([a]) => a.toLowerCase().includes(v))
+  const matches = NAMES.filter(([a]) => a.toLowerCase().includes(v))
     .sort((x, y) => (y[0].toLowerCase().startsWith(v) - x[0].toLowerCase().startsWith(v)) || x[0].length - y[0].length)
     .filter(([, t]) => !seen.has(t) && seen.add(t)).slice(0, 8);
   active = -1;
-  sug.innerHTML = matches.map(([a, t], i) => `<a href="#${slug(t)}" role="option" data-i="${i}">${esc(a)}${a !== t ? `<small>→ ${esc(t)}</small>` : ""}</a>`).join("")
-    + `<a href="#Search" role="option" data-search="1">Search for “${esc(q.value.trim())}”</a>`;
+  sug.innerHTML = matches.map(([a, t]) => { const p = PAGES.get(t); return `<a href="#${slug(t)}" role="option"><img class="px" src="${iconFor(t)}" alt="">${esc(a)}<small>${a !== t ? "→ " + esc(t) : esc(p.kind === "weapon" ? WTYPES[WEAPON_BY_NAME.get(t).type].label : KIND_LABEL[p.kind])}</small></a>`; }).join("")
+    + `<a href="#Search" role="option" data-search="1">See all results for “${esc(q.value.trim())}”</a>`;
   sug.hidden = false;
 }
 function paint() { sug.querySelectorAll("a").forEach((a, i) => a.classList.toggle("active", i === active)); }
@@ -948,7 +1647,7 @@ sug.addEventListener("mousedown", e => {
 function go(target, query) {
   sug.hidden = true; q.blur();
   if (target) { q.value = ""; location.hash = target; }
-  else { lastQuery = query; if (location.hash === "#Search") route(); else location.hash = "Search"; }
+  else { search.q = query; search.kind = "all"; search.cls = "all"; search.stage = "all"; q.value = ""; if (location.hash === "#Search") route(); else location.hash = "Search"; }
 }
 document.addEventListener("click", e => { if (!e.target.closest(".search")) sug.hidden = true; });
 document.addEventListener("keydown", e => {
