@@ -21,6 +21,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import editor
+import email_worker
 from editor import EditError
 
 log = logging.getLogger("patrick.drive")
@@ -61,11 +62,12 @@ class GoogleDrive:
             while not done:
                 _, done = downloader.next_chunk()
 
-    def upload(self, folder_id: str, path: Path, name: str, mimetype: str) -> None:
+    def upload(self, folder_id: str, path: Path, name: str, mimetype: str) -> str:
         from googleapiclient.http import MediaFileUpload
         media = MediaFileUpload(str(path), mimetype=mimetype, resumable=True)
-        self._svc.files().create(body={"name": name, "parents": [folder_id]}, media_body=media,
-                                 fields="id", supportsAllDrives=True).execute()
+        created = self._svc.files().create(body={"name": name, "parents": [folder_id]}, media_body=media,
+                                           fields="id", supportsAllDrives=True).execute()
+        return created["id"]
 
 
 def _stem(name: str) -> str:
@@ -80,12 +82,26 @@ def _is_settled(modified: str, now: datetime) -> bool:
     return (now - when).total_seconds() >= SETTLE_SECONDS
 
 
-def poll_once(drive, folder_id: str, music_dir: Path, max_mb: int = 500, now: datetime | None = None) -> int:
-    """Edit every new video in the folder. Returns how many files were handled (edited or errored)."""
+def poll_once(drive, folder_id: str, music_dir: Path, max_mb: int = 500, now: datetime | None = None,
+              output_folder_id: str | None = None, notify=None) -> int:
+    """Edit every new video in the folder. Returns how many files were handled (edited or errored).
+
+    Results go to output_folder_id (or beside the original if not given). notify(subject, body), if given,
+    is called once per finished video so you get told; if it breaks, the editing still counts.
+    """
     now = now or datetime.now(timezone.utc)
+    out_id = output_folder_id or folder_id
     children = drive.list_children(folder_id)
-    names = [c["name"] for c in children]
+    names = [c["name"] for c in children] + ([c["name"] for c in drive.list_children(out_id)] if out_id != folder_id else [])
     handled = 0
+
+    def tell(subject: str, body: str) -> None:
+        if notify is None:
+            return
+        try:
+            notify(subject, body)
+        except Exception:
+            log.exception("Couldn't send the notification (the video is still done)")
 
     for f in children:
         name = f["name"]
@@ -107,11 +123,15 @@ def poll_once(drive, folder_id: str, music_dir: Path, max_mb: int = 500, now: da
                 drive.download(f["id"], src)
                 opts, notes = editor.parse_commands(stem, music_dir)
                 result = editor.process(src, tmp / "out.mp4", opts)
-                drive.upload(folder_id, tmp / "out.mp4", f"{stem}{EDITED}.mp4", "video/mp4")
+                new_id = drive.upload(out_id, tmp / "out.mp4", f"{stem}{EDITED}.mp4", "video/mp4")
                 summary = "\n".join([f"• {n}" for n in notes] + ([f"• {result['audio_note']}"] if result.get("audio_note") else []))
                 if summary:  # a short "what I did" note next to the video, so you can check Patrick's work
                     (tmp / "notes.txt").write_text(f"What Patrick did to {name}:\n{summary}\n")
-                    drive.upload(folder_id, tmp / "notes.txt", f"{stem} [notes].txt", "text/plain")
+                    drive.upload(out_id, tmp / "notes.txt", f"{stem} [notes].txt", "text/plain")
+                link = f"https://drive.google.com/file/d/{new_id}/view" if isinstance(new_id, str) else "(in your finished folder)"
+                tell(f"Patrick finished: {name}",
+                     f"Your edited video is ready:\n{link}\n\n{summary or 'Made it vertical (no other edits).'}\n\n"
+                     "Watch it before you post it. If voices are audible or dog sounds got cut, tell Patrick and it can be redone.")
                 log.info("Done %s (%ss): %s", name, result["duration"], "; ".join(notes) or "default edit")
             except Exception as e:  # tell the user in Drive instead of failing silently
                 reason = str(e) if isinstance(e, EditError) else "Something went wrong while editing."
@@ -119,7 +139,8 @@ def poll_once(drive, folder_id: str, music_dir: Path, max_mb: int = 500, now: da
                     log.exception("Failed on %s", name)
                 note = tmp / "error.txt"
                 note.write_text(f"Couldn't edit {name}.\n{reason}\n\nRename the file and it will be tried again.\n")
-                drive.upload(folder_id, note, f"{stem}{ERROR}.txt", "text/plain")
+                drive.upload(out_id, note, f"{stem}{ERROR}.txt", "text/plain")
+                tell(f"Patrick couldn't edit: {name}", f"{reason}\n\nRename the file in Drive and Patrick will try again.")
         handled += 1
     return handled
 
@@ -138,6 +159,13 @@ def start_background() -> threading.Thread | None:
     if not FOLDER_ID.match(folder_id):
         log.error("GDRIVE_FOLDER_ID doesn't look right; Drive watcher not started")
         return None
+    out_id = os.environ.get("GDRIVE_OUTPUT_FOLDER_ID", "").strip() if editor.env_is_set("GDRIVE_OUTPUT_FOLDER_ID") else None
+    if out_id and not FOLDER_ID.match(out_id):
+        log.error("GDRIVE_OUTPUT_FOLDER_ID doesn't look right; Drive watcher not started")
+        return None
+    notify = None
+    if email_worker.email_configured():  # tell Krew by email when a video is finished
+        notify = email_worker.send_notification
     music_dir = Path(os.environ.get("MUSIC_DIR", Path(__file__).parent / "music"))
     poll = int(os.environ.get("POLL_SECONDS", 30))
     max_mb = int(os.environ.get("DRIVE_MAX_MB", 500))
@@ -148,7 +176,7 @@ def start_background() -> threading.Thread | None:
         log.info("Watching Drive folder %s", folder_id)
         while True:
             try:
-                poll_once(drive, folder_id, music_dir, max_mb)
+                poll_once(drive, folder_id, music_dir, max_mb, output_folder_id=out_id, notify=notify)
             except Exception:
                 log.exception("Drive check failed; will retry")
             time.sleep(poll)

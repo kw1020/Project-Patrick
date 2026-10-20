@@ -570,18 +570,20 @@ class FakeDrive:
     def __init__(self):
         self.files = []  # dicts: id, name, mimeType, size, modifiedTime, data
 
-    def add(self, name, data, mime="video/mp4", modified="2026-01-01T00:00:00Z"):
+    def add(self, name, data, mime="video/mp4", modified="2026-01-01T00:00:00Z", folder="folder"):
         self.files.append({"id": f"id{len(self.files)}", "name": name, "mimeType": mime,
-                           "size": str(len(data)), "modifiedTime": modified, "data": data})
+                           "size": str(len(data)), "modifiedTime": modified, "data": data, "folder": folder})
 
     def list_children(self, folder_id):
-        return [{k: v for k, v in f.items() if k != "data"} for f in self.files]
+        return [{k: v for k, v in f.items() if k not in ("data", "folder")}
+                for f in self.files if f["folder"] == folder_id]
 
     def download(self, file_id, dest):
         dest.write_bytes(next(f["data"] for f in self.files if f["id"] == file_id))
 
     def upload(self, folder_id, path, name, mimetype):
-        self.add(name, path.read_bytes(), mimetype)
+        self.add(name, path.read_bytes(), mimetype, folder=folder_id)
+        return self.files[-1]["id"]
 
     def names(self):
         return [f["name"] for f in self.files]
@@ -648,6 +650,50 @@ class DriveTests(Base):
         self.drive.download = lambda *a: self.fail("should not download")
         self.poll(max_mb=1)
         self.assertEqual(self.drive.names()[-1], "huge [error].txt")
+
+    # ---- results in a separate "finished" folder + an email when each video is done
+    def test_results_go_to_the_finished_folder_and_nothing_is_redone(self):
+        self.drive.add("zoomies.mp4", self.video.read_bytes())
+        self.assertEqual(self.poll(output_folder_id="out"), 1)
+        in_folder = [f["name"] for f in self.drive.files if f["folder"] == "folder"]
+        out_folder = [f["name"] for f in self.drive.files if f["folder"] == "out"]
+        self.assertEqual(in_folder, ["zoomies.mp4"])                       # the input folder stays clean
+        self.assertIn("zoomies [edited].mp4", out_folder)
+        self.assertIn("zoomies [notes].txt", out_folder)
+        self.assertEqual(self.poll(output_folder_id="out"), 0)             # already done: found by looking in the finished folder
+
+    def test_you_get_told_once_per_video_with_a_link(self):
+        sent = []
+        self.drive.add("a.mp4", self.video.read_bytes())
+        self.poll(output_folder_id="out", notify=lambda subject, body: sent.append((subject, body)))
+        self.assertEqual(len(sent), 1)
+        subject, body = sent[0]
+        self.assertIn("a.mp4", subject)
+        edited_id = next(f["id"] for f in self.drive.files if f["name"].endswith("[edited].mp4"))
+        self.assertIn(f"https://drive.google.com/file/d/{edited_id}/view", body)
+        self.assertIn("talking", body)                                      # includes what was removed
+        self.poll(output_folder_id="out", notify=lambda *a: sent.append(a))
+        self.assertEqual(len(sent), 1)                                      # no repeat email next time
+
+    def test_a_failed_video_also_tells_you(self):
+        sent = []
+        self.drive.add("broken.mp4", b"not a video")
+        self.poll(output_folder_id="out", notify=lambda subject, body: sent.append((subject, body)))
+        self.assertEqual(len(sent), 1)
+        self.assertIn("couldn't edit", sent[0][0])
+        self.assertEqual([f["name"] for f in self.drive.files if f["folder"] == "out"], ["broken [error].txt"])
+
+    def test_a_broken_email_does_not_stop_the_edit(self):
+        def boom(subject, body):
+            raise RuntimeError("smtp down")
+        self.drive.add("b.mp4", self.video.read_bytes())
+        self.assertEqual(self.poll(output_folder_id="out", notify=boom), 1)
+        self.assertTrue(any(f["name"] == "b [edited].mp4" for f in self.drive.files))
+
+    def test_poll_without_a_finished_folder_still_works_beside_the_original(self):
+        self.drive.add("c.mp4", self.video.read_bytes())
+        self.assertEqual(self.poll(), 1)
+        self.assertTrue(all(f["folder"] == "folder" for f in self.drive.files))
 
     def test_skip_typed_into_drive_settings_counts_as_not_set(self):
         import os

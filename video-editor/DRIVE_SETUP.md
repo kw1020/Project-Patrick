@@ -1,7 +1,8 @@
 # Connect Patrick to Google Drive
 
 **What you get:** drop a video in a Drive folder (from your phone, or a school computer) and Patrick edits it.
-The finished video appears in the same folder as `<name> [edited].mp4`. Put instructions in the file name:
+The finished video appears as `<name> [edited].mp4` in your **finished folder** (or beside the original if you
+don't set one), and Patrick **emails you** when each one is done (if the email settings are filled in). Put instructions in the file name:
 
 ```
 zoomies mute music: chill trim 0:03-0:15.mp4
@@ -19,8 +20,9 @@ It checks the folder every 30 seconds and never deletes or overwrites anything.
 Use the **dedicated Patrick Google account**, not your personal one. The app gets that account's Drive
 access, so if the key ever leaks only the shared folder is exposed, not all of your Drive.
 
-1. **Make the folder.** In *your* Drive, create a folder (e.g. `Patrick Videos`) and **share it with the Patrick Gmail as Editor**.
-   Open the folder; the **folder ID** is the end of the address: `drive.google.com/drive/folders/THIS_PART`.
+1. **Make the folders.** In *your* Drive, make one folder to drop videos into (e.g. `Ghost vids`) and one for results
+   (e.g. `Finished Videos`). **Share both with the Patrick Gmail as Editor.**
+   Open each folder; its **folder ID** is the end of the address: `drive.google.com/drive/folders/THIS_PART`.
 2. **Google Cloud** (console.cloud.google.com, signed in as the Patrick account):
    1. Create a project (any name).
    2. APIs & Services → Library → enable **Google Drive API**.
@@ -33,8 +35,12 @@ access, so if the key ever leaks only the shared folder is exposed, not all of y
    2. In the left list type the scope `https://www.googleapis.com/auth/drive` → **Authorize APIs** → sign in as the Patrick account.
       Google warns the app is unverified: **Advanced → Go to (app) → Allow**. That's expected for your own app.
    3. **Exchange authorization code for tokens** → copy the **Refresh token**.
-4. **Give Render the four values** (Dashboard → your service → Environment):
-   `GDRIVE_CLIENT_ID`, `GDRIVE_CLIENT_SECRET`, `GDRIVE_REFRESH_TOKEN`, `GDRIVE_FOLDER_ID`. It restarts and starts watching.
+4. **Give Render the values** (Dashboard → your service → Environment):
+   `GDRIVE_CLIENT_ID`, `GDRIVE_CLIENT_SECRET`, `GDRIVE_REFRESH_TOKEN`, `GDRIVE_FOLDER_ID` (the drop folder) and
+   `GDRIVE_OUTPUT_FOLDER_ID` (the finished folder; use **Add Environment Variable**, it isn't pre-listed). It restarts and starts watching.
+5. **For the "it's done" emails**, also fill in `EMAIL_ADDRESS` (the Patrick Gmail), `EMAIL_APP_PASSWORD` (that account's
+   16-letter App Password; Google Account → Security → 2-Step Verification → App passwords) and `ALLOWED_SENDERS` (your own address;
+   the notices go there). No email settings = the videos still get edited, you just don't get told.
 
 Google's menu names change now and then; if a step looks different, tell me what you see and I'll adjust.
 

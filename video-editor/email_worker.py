@@ -136,6 +136,17 @@ def check_inbox(cfg: dict) -> int:
     return handled
 
 
+def send_notification(subject: str, body: str) -> None:
+    """Email a short note to the allowed sender(s), e.g. "your video is ready". Needs the EMAIL_* settings."""
+    cfg = _settings()
+    msg = EmailMessage()
+    msg["From"], msg["To"], msg["Subject"] = cfg["EMAIL_ADDRESS"], ", ".join(sorted(cfg["allowed"])), subject
+    msg.set_content(body)
+    with smtplib.SMTP_SSL(cfg["smtp_host"]) as smtp:
+        smtp.login(cfg["EMAIL_ADDRESS"], cfg["EMAIL_APP_PASSWORD"])
+        smtp.send_message(msg)
+
+
 def email_configured() -> bool:
     return all(editor.env_is_set(k) for k in ("EMAIL_ADDRESS", "EMAIL_APP_PASSWORD", "ALLOWED_SENDERS"))
 

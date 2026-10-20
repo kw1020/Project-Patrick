@@ -15,9 +15,9 @@ whining, etc.). That's `dogaudio.py`, the default audio mode everywhere.
 ## What exists
 - `video-editor/`: Flask + ffmpeg editor. Upload a video (or **email** one with plain-English instructions),
   get back a 1080x1920 MP4. Remove/clean audio, add music, trim, speed, vertical reframe. Read `video-editor/README.md`.
-  Tests: `cd video-editor && .venv/bin/python -m unittest discover -s tests` (69 tests, needs ffmpeg; the end-to-end audio tests need `pip install espeakng-loader` or they skip).
-- `video-editor/drive_worker.py`: watches a shared Google Drive folder; edits videos using instructions in the file name,
-  writes `<name> [edited].mp4` back. Setup in `video-editor/DRIVE_SETUP.md`. (Chat Drive connector can't carry real videos: base64 through context.)
+  Tests: `cd video-editor && .venv/bin/python -m unittest discover -s tests` (74 tests, needs ffmpeg; the end-to-end audio tests need `pip install espeakng-loader` or they skip).
+- `video-editor/drive_worker.py`: watches a shared Google Drive folder ("Ghost vids" in Krew's Drive); edits videos using instructions in
+  the file name, writes `<name> [edited].mp4` to a separate finished folder (`GDRIVE_OUTPUT_FOLDER_ID`) and emails him when each is done. Setup in `video-editor/DRIVE_SETUP.md`. (Chat Drive connector can't carry real videos: base64 through context.)
 - `render.yaml` + `video-editor/Dockerfile`: deploy to Render as one service (website + email + Drive watchers).
 - `docs/instagram-playbook.md`: how views/monetization work, settings, 30-day growth plan.
 

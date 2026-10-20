@@ -26,5 +26,7 @@ services:
         sync: false
       - key: GDRIVE_REFRESH_TOKEN
         sync: false
-      - key: GDRIVE_FOLDER_ID
+      - key: GDRIVE_FOLDER_ID           # the folder you drop videos into
         sync: false
+      # GDRIVE_OUTPUT_FOLDER_ID (the "Finished Videos" folder) is added by hand in Render > Environment, not here:
+      # a new variable in this file can make Render pause its automatic sync and ask for a value.
