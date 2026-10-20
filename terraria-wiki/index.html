@@ -1,3 +1,4 @@
+<meta charset="utf-8">
 <title>Krew's Terraria Wiki</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -115,6 +116,20 @@ h1.title img { width: 32px; height: 32px; }
   background: radial-gradient(circle at 50% 50%, rgba(255,255,255,.06), transparent 60%);
 }
 .infobox .ib-art img { width: 96px; height: 96px; }
+.infobox .ib-art img.custom { width: auto; height: auto; max-width: 250px; max-height: 220px; }
+.ib-art.dragover { outline: 2px dashed var(--gold); outline-offset: -6px; }
+.pic-tools { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; padding: 8px; border-bottom: 1px solid var(--line); }
+.pic-tools button, .clip-tools button {
+  padding: 4px 10px; font: 600 12.5px var(--sans); color: var(--fg);
+  background: var(--box-head); border: 1px solid var(--line); border-radius: 4px; cursor: pointer;
+}
+.pic-tools button:hover, .clip-tools button:hover { border-color: var(--gold); color: var(--gold); }
+.pic-note { flex-basis: 100%; text-align: center; color: var(--muted); font-size: 12px; margin: 0; }
+.pic-note:empty { display: none; }
+.clip { margin: .4em 0 1em; max-width: 620px; }
+.clip img { display: block; max-width: 100%; border: 1px solid var(--line); border-radius: 6px; background: #0f0c18; }
+.clip figcaption, .clip-tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; color: var(--muted); font-size: 12.5px; margin-top: 6px; }
+.clip-tools { margin: -.4em 0 1em; }
 .infobox table { width: 100%; border-collapse: collapse; }
 .infobox th, .infobox td { padding: 6px 10px; border-top: 1px solid var(--line); vertical-align: top; text-align: left; }
 .infobox th { width: 40%; color: var(--muted); font-weight: 700; }
@@ -1292,7 +1307,87 @@ function linkify(text, self, used) {
   });
 }
 const link = t => `<a href="#${slug(t)}">${esc(t)}</a>`;
-const iconFor = t => { const p = PAGES.get(t); return p ? iconURL(...p.icon) : ""; };
+const iconFor = t => { if (PIC.has(t)) return PIC.get(t); const p = PAGES.get(t); return p ? iconURL(...p.icon) : ""; };
+
+/* =========================================================
+   YOUR OWN PICTURES (saved in this browser with IndexedDB)
+   ========================================================= */
+const PIC = new Map();       // page title -> picture; "title#clip" -> weapon GIF/clip
+let dbPromise = null;
+function picDB() {
+  if (!dbPromise) dbPromise = new Promise((res, rej) => {
+    try {
+      const r = indexedDB.open("krew-terraria-wiki", 1);
+      r.onupgradeneeded = () => r.result.createObjectStore("pics");
+      r.onsuccess = () => res(r.result);
+      r.onerror = () => rej(r.error);
+    } catch (e) { rej(e); }
+  });
+  return dbPromise;
+}
+async function loadPics() {
+  try {
+    const d = await picDB();
+    await new Promise(res => {
+      const rq = d.transaction("pics").objectStore("pics").openCursor();
+      rq.onsuccess = () => { const c = rq.result; if (c) { PIC.set(c.key, c.value); c.continue(); } else res(); };
+      rq.onerror = () => res();
+    });
+  } catch (e) { /* storage blocked: pictures just won't persist */ }
+}
+async function storePic(key, val) {
+  try {
+    const d = await picDB();
+    await new Promise((res, rej) => {
+      const tx = d.transaction("pics", "readwrite");
+      val === null ? tx.objectStore("pics").delete(key) : tx.objectStore("pics").put(val, key);
+      tx.oncomplete = res; tx.onerror = () => rej(tx.error);
+    });
+    val === null ? PIC.delete(key) : PIC.set(key, val);
+    return true;
+  } catch (e) { return false; }
+}
+const readAsURL = file => new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = () => rej(fr.error); fr.readAsDataURL(file); });
+function picNote(msg) { const n = pageEl.querySelector(".pic-note"); if (n) n.textContent = msg; }
+async function setPic(key, file) {
+  if (!file || !/^image\//.test(file.type)) return picNote("That file isn't a picture. Use a PNG, JPG, GIF or WebP.");
+  if (file.size > 10e6) return picNote("That picture is over 10 MB. Use a smaller one.");
+  const ok = await storePic(key, await readAsURL(file));
+  if (!ok) return picNote("This browser blocked saving. Pictures can't be saved in a private window.");
+  route(true);
+}
+const filePicker = Object.assign(document.createElement("input"), { type: "file", accept: "image/*", hidden: true });
+document.body.appendChild(filePicker);
+let pickKey = null;
+filePicker.addEventListener("change", () => { if (pickKey && filePicker.files[0]) setPic(pickKey, filePicker.files[0]); });
+function upscale(img) {
+  const fit = () => {
+    const w = img.naturalWidth, h = img.naturalHeight; if (!w) return;
+    const k = Math.max(1, Math.min(5, Math.floor(160 / Math.max(w, h))));
+    if (k > 1) { img.style.width = w * k + "px"; img.classList.add("px"); }
+  };
+  img.complete ? fit() : img.addEventListener("load", fit);
+}
+function wirePics() {
+  pageEl.querySelectorAll("[data-pic-act]").forEach(b => b.addEventListener("click", async () => {
+    const key = b.dataset.key;
+    if (b.dataset.picAct === "remove") { await storePic(key, null); route(true); }
+    else { pickKey = key; filePicker.value = ""; filePicker.click(); }
+  }));
+  pageEl.querySelectorAll("img[data-upscale]").forEach(upscale);
+  pageEl.querySelectorAll("[data-drop]").forEach(zone => {
+    zone.addEventListener("dragover", e => { e.preventDefault(); zone.classList.add("dragover"); });
+    zone.addEventListener("dragleave", () => zone.classList.remove("dragover"));
+    zone.addEventListener("drop", e => { e.preventDefault(); zone.classList.remove("dragover"); setPic(zone.dataset.drop, e.dataTransfer.files[0]); });
+  });
+}
+// Paste a picture anywhere on a page to set that page's picture
+document.addEventListener("paste", e => {
+  if (/^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName)) return;
+  const zone = pageEl.querySelector(".ib-art[data-drop]"); if (!zone) return;
+  const file = [...(e.clipboardData?.files || [])].find(f => /^image\//.test(f.type));
+  if (file) { e.preventDefault(); setPic(zone.dataset.drop, file); }
+});
 const catIcon = c => {
   const first = (CATS.get(c) || [])[0];
   return first ? iconFor(first) : iconURL(...MECH_ICON);
@@ -1342,7 +1437,14 @@ function renderArticle(p) {
   const info = `
     <aside class="infobox" aria-label="${esc(p.title)} infobox">
       <div class="ib-title">${esc(p.title)}</div>
-      <div class="ib-art"><img class="px" src="${iconURL(...p.icon)}" alt="${esc(p.title)} icon, drawn for this wiki"></div>
+      <div class="ib-art" data-drop="${esc(p.title)}">${PIC.has(p.title)
+        ? `<img class="custom" data-upscale src="${PIC.get(p.title)}" alt="${esc(p.title)}">`
+        : `<img class="px" src="${iconURL(...p.icon)}" alt="${esc(p.title)} icon, drawn for this wiki">`}</div>
+      <div class="pic-tools">
+        <button type="button" data-pic-act="add" data-key="${esc(p.title)}">${PIC.has(p.title) ? "Change picture" : "Add real picture"}</button>
+        ${PIC.has(p.title) ? `<button type="button" data-pic-act="remove" data-key="${esc(p.title)}">Remove</button>` : ""}
+        <p class="pic-note">${PIC.has(p.title) ? "" : "Drop, paste or upload a picture"}</p>
+      </div>
       <div class="ib-section">Info</div>
       <table>${p.info.map(([k, v, html]) => `<tr><th>${esc(k)}</th><td>${html || L(v)}</td></tr>`).join("")}</table>
     </aside>`;
@@ -1352,7 +1454,13 @@ function renderArticle(p) {
     `<li><a href="#${slug(p.title)}" data-sec="s${i}"><span class="n">${i + 1}</span>${esc(s.h)}</a></li>`).join("")}</ol></nav>` : "";
   const body = secs.map((s, i) => {
     let inner = "";
-    if (s.demo) inner += demoHTML(s.demo);
+    if (s.demo) {
+      const ck = p.title + "#clip";
+      if (PIC.has(ck)) inner += `<figure class="clip" data-drop="${esc(ck)}"><img data-upscale src="${PIC.get(ck)}" alt="${esc(p.title)} in action"><figcaption>Your clip of the ${esc(p.title)}.
+        <button type="button" class="chip" data-pic-act="add" data-key="${esc(ck)}">Change</button><button type="button" class="chip" data-pic-act="remove" data-key="${esc(ck)}">Remove</button></figcaption></figure>`;
+      inner += demoHTML(s.demo);
+      if (!PIC.has(ck)) inner += `<div class="clip-tools" data-drop="${esc(ck)}"><button type="button" data-pic-act="add" data-key="${esc(ck)}">Add a real GIF of this weapon</button><span>or drop one here</span></div>`;
+    }
     if (s.p) inner += s.p.map(x => `<p>${L(x)}</p>`).join("");
     if (s.catlink) inner += `<p class="dots">${(CATS.get(s.catlink) || []).length} weapons · <a href="#Category.${slug(s.catlink)}">Browse ${esc(s.catlink.toLowerCase())}</a></p>`;
     if (s.list) inner += `<ul>${s.list.map(x => `<li>${L(x)}</li>`).join("")}</ul>`;
@@ -1459,7 +1567,7 @@ function renderMain() {
       </div></section>
       <section class="pbox wide"><h2>Featured weapon: ${esc(featured.n)}</h2><div class="pb-body featured">
         <div>
-          <p><img class="px" src="${iconURL(...fp.icon)}" alt="" style="width:48px;height:48px;float:left;margin:0 10px 6px 0"><b>${link(featured.n)}</b> is ${art(STAGE[featured.stage])} ${stageHTML(featured.stage)} ${esc(WTYPES[featured.type].label.toLowerCase())}. ${esc(featured.does)}</p>
+          <p><img class="px" src="${iconFor(featured.n)}" alt="" style="width:48px;height:48px;float:left;margin:0 10px 6px 0"><b>${link(featured.n)}</b> is ${art(STAGE[featured.stage])} ${stageHTML(featured.stage)} ${esc(WTYPES[featured.type].label.toLowerCase())}. ${esc(featured.does)}</p>
           <p><b>How to get it:</b> ${linkify(featured.how, featured.n, new Set())}</p>
           <p><a href="#${slug(featured.n)}">Read more →</a> · <button type="button" class="chip" id="shuffle">Show another</button></p>
         </div>
@@ -1569,7 +1677,8 @@ function setTabs(kind, title) {
 }
 
 /* Router */
-function route() {
+function route(keepScroll) {
+  const scrollY = window.scrollY;
   let h = decodeURIComponent(location.hash.slice(1)) || "Main_Page";
   $("#side").classList.remove("open");
   if (/^s\d+$/.test(h)) return;
@@ -1596,9 +1705,10 @@ function route() {
   } else { pageEl.innerHTML = renderMissing(h); setTabs("special"); title = h; }
   document.title = (title === "Main Page" ? "" : title + " · ") + "Krew's Terraria Wiki";
   mountDemos(pageEl);
-  window.scrollTo(0, 0);
+  wirePics();
+  window.scrollTo(0, keepScroll === true ? scrollY : 0);
 }
-window.addEventListener("hashchange", route);
+window.addEventListener("hashchange", () => route());
 
 pageEl.addEventListener("click", e => {
   const a = e.target.closest("a[data-sec]");
@@ -1655,4 +1765,5 @@ document.addEventListener("keydown", e => {
 });
 
 route();
+loadPics().then(() => { if (PIC.size) route(true); });
 </script>
