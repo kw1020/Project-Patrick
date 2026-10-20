@@ -19,6 +19,8 @@
   .row { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
   button { background:var(--accent); color:#04222c; font-weight:700; border:0; cursor:pointer; margin-top:6px; }
   button:disabled { opacity:.5; cursor:default; }
+  button.secondary { background:transparent; color:var(--accent); border:1px solid var(--accent); font-weight:600; }
+  #redo { margin-top:12px; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); } #redo button { margin-top:0; }
   .link { background:none; color:var(--muted); font-weight:400; width:auto; padding:0; border:0; text-decoration:underline; }
   .err { color:var(--bad); } .ok { color:var(--good); }
   video { width:100%; border-radius:12px; background:#000; max-height:70vh; }

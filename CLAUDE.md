@@ -15,7 +15,7 @@ whining, etc.). That's `dogaudio.py`, the default audio mode everywhere.
 ## What exists
 - `video-editor/`: Flask + ffmpeg editor. Upload a video (or **email** one with plain-English instructions),
   get back a 1080x1920 MP4. Remove/clean audio, add music, trim, speed, vertical reframe. Read `video-editor/README.md`.
-  Tests: `cd video-editor && .venv/bin/python -m unittest discover -s tests` (59 tests, needs ffmpeg; 8 end-to-end audio tests need `pip install espeakng-loader` or they skip).
+  Tests: `cd video-editor && .venv/bin/python -m unittest discover -s tests` (69 tests, needs ffmpeg; the end-to-end audio tests need `pip install espeakng-loader` or they skip).
 - `video-editor/drive_worker.py`: watches a shared Google Drive folder; edits videos using instructions in the file name,
   writes `<name> [edited].mp4` back. Setup in `video-editor/DRIVE_SETUP.md`. (Chat Drive connector can't carry real videos: base64 through context.)
 - `render.yaml` + `video-editor/Dockerfile`: deploy to Render as one service (website + email + Drive watchers).
@@ -34,8 +34,15 @@ whining, etc.). That's `dogaudio.py`, the default audio mode everywhere.
 - Lesson from this build: a unit test passed while bridging was broken (padding hid it). Check numbers, not just "OK".
 - Work is on branch `claude/confident-cannon-9805ak`; no PR opened (only open one when Krew asks).
 
+## Review screen (built Oct 2026)
+Web page shows the edited video + a note of what was removed, with "Redo: remove more talking" / "Redo: keep more dog sounds" buttons
+(`POST /api/jobs/<id>/redo`, reuses the original upload). Krew's rule: he must SEE the result before anything is posted; any future
+Instagram/TikTok "Post" button must live on this screen and require his tap. Never auto-post.
+
 ## Krew's deployment checklist (update the current step when he reports progress)
-**Current step: 1** (he has not confirmed anything yet; Claude can't see his screen, only what he tells it).
+**Current step: 5-6.** Steps 1-4 DONE: Render service `patrick-video-editor` is Live at https://patrick-video-editor.onrender.com
+(Blueprint "Patrick", branch claude/confident-cannon-9805ak, Free plan, healthz verified 200). He has NOT yet reported the result of
+uploading a real clip. Claude can't see his screen, only what he tells it. A Claude Code session on his PC (bridge env) exists via `claude remote-control`.
 1. Make a Render account (render.com, sign in with GitHub, let it see `kw1020/Project-Patrick`).
 2. New+ > Blueprint > pick the repo and branch `claude/confident-cannon-9805ak`.
 3. Set `PATRICK_PASSWORD` (long); leave `EMAIL_*` and `GDRIVE_*` blank for now.

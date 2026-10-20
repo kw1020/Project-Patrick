@@ -62,6 +62,33 @@ def create_app(password: str, data_dir: Path | None = None, music_dir: Path | No
         except (OSError, json.JSONDecodeError):
             abort(404)
 
+    def save_options(folder: Path, saved: dict) -> None:
+        (folder / "options.json").write_text(json.dumps(saved))
+
+    def load_options(folder: Path) -> dict:
+        try:
+            return json.loads((folder / "options.json").read_text())
+        except (OSError, json.JSONDecodeError):
+            return {}
+
+    def build_options(folder: Path, saved: dict) -> EditOptions:
+        opts = EditOptions(
+            trim_start=saved["trim_start"], trim_end=saved["trim_end"], reframe=saved["reframe"],
+            audio_mode=saved["audio_mode"], talking_detection=saved["talking_detection"],
+            music_volume=saved["music_volume"], speed=saved["speed"])
+        if saved.get("music_upload"):
+            opts.music = folder / saved["music_upload"]
+        elif saved.get("music_choice"):
+            opts.music = editor.find_music(saved["music_choice"], music_dir)
+        opts.validate()
+        return opts
+
+    def link_or_copy(src: Path, dst: Path) -> None:
+        try:
+            os.link(src, dst)  # instant and uses no extra disk when possible
+        except OSError:
+            shutil.copy2(src, dst)
+
     def cleanup_old_jobs() -> None:
         cutoff = time.time() - job_ttl_hours * 3600
         for folder in jobs_dir.iterdir():
@@ -139,6 +166,10 @@ def create_app(password: str, data_dir: Path | None = None, music_dir: Path | No
             opts.validate()
         except (ValueError, EditError) as e:
             return jsonify(error=str(e) if isinstance(e, EditError) else "One of the numbers isn't valid."), 400
+        saved = {"trim_start": opts.trim_start, "trim_end": opts.trim_end, "reframe": opts.reframe,
+                 "audio_mode": opts.audio_mode, "talking_detection": opts.talking_detection,
+                 "music_volume": opts.music_volume, "speed": opts.speed,
+                 "music_upload": None, "music_choice": None}
 
         job_id = uuid.uuid4().hex
         folder = jobs_dir / job_id
@@ -154,20 +185,63 @@ def create_app(password: str, data_dir: Path | None = None, music_dir: Path | No
                 return jsonify(error="That music file type isn't supported."), 400
             opts.music = folder / f"music{m_ext}"
             music_file.save(opts.music)
+            saved["music_upload"] = opts.music.name
         elif form.get("music_choice"):
             opts.music = editor.find_music(form["music_choice"], music_dir)
             if opts.music is None:
                 shutil.rmtree(folder)
                 return jsonify(error="That music track doesn't exist."), 400
+            saved["music_choice"] = form["music_choice"]
 
         cleanup_old_jobs()
+        save_options(folder, saved)
         write_state(folder, status="queued")
         pool.submit(run_job, folder, src, opts)
         return jsonify(id=job_id), 202
 
     @app.get("/api/jobs/<job_id>")
     def job_status(job_id: str):
-        return jsonify(read_state(job_path(job_id)))
+        folder = job_path(job_id)
+        state = read_state(folder)
+        saved = load_options(folder)
+        if saved:  # lets the page show which strength was used and whether redo makes sense
+            state["mode"], state["level"] = saved["audio_mode"], saved["talking_detection"]
+        return jsonify(state)
+
+    @app.post("/api/jobs/<job_id>/redo")
+    def redo_job(job_id: str):
+        """Run the same edit again from the original upload, with a different talking-detection strength."""
+        old = job_path(job_id)
+        state, saved = read_state(old), load_options(old)
+        level = (request.get_json(silent=True) or {}).get("talking_detection")
+        if level not in editor.TALKING_LEVELS:
+            return jsonify(error=f"Pick one of: {', '.join(editor.TALKING_LEVELS)}."), 400
+        if not saved or saved.get("audio_mode") != "dog":
+            return jsonify(error="Redo only works for 'Dog sounds only' edits."), 400
+        if state.get("status") != "done":
+            return jsonify(error="Wait for the current edit to finish first."), 409
+        original = next(old.glob("input.*"), None)
+        if original is None:
+            return jsonify(error="The original video is gone (old uploads are deleted). Upload it again."), 410
+
+        new_id = uuid.uuid4().hex
+        folder = jobs_dir / new_id
+        folder.mkdir()
+        src = folder / original.name
+        link_or_copy(original, src)
+        music = saved.get("music_upload")
+        if music and Path(music).name == music and (old / music).exists():
+            link_or_copy(old / music, folder / music)
+        saved = {**saved, "talking_detection": level}
+        try:
+            opts = build_options(folder, saved)
+        except EditError as e:
+            shutil.rmtree(folder, ignore_errors=True)
+            return jsonify(error=str(e)), 400
+        save_options(folder, saved)
+        write_state(folder, status="queued")
+        pool.submit(run_job, folder, src, opts)
+        return jsonify(id=new_id), 202
 
     @app.get("/jobs/<job_id>/video")
     def job_video(job_id: str):

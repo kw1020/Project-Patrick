@@ -140,7 +140,9 @@ class CommandParsingTests(Base):
 
 class WebAppTests(Base):
     def setUp(self):
-        self.app = create_app("secret-pw", data_dir=self.tmp / f"data-{time.time_ns()}", music_dir=self.music_dir)
+        data = self.tmp / f"data-{time.time_ns()}"
+        self.app = create_app("secret-pw", data_dir=data, music_dir=self.music_dir)
+        self.app.config["TEST_DATA"] = data
         self.client = self.app.test_client()
 
     def login(self):
@@ -192,6 +194,77 @@ class WebAppTests(Base):
         out.write_bytes(video.data)
         self.assertEqual(streams(out)["video"]["height"], 1920)
         self.assertIn("attachment", self.client.get(f"/jobs/{job_id}/video?download=1").headers["Content-Disposition"])
+
+    # ---- review screen: detection level in status, one-tap redo from the original upload
+    def redo(self, job_id, level):
+        return self.client.post(f"/api/jobs/{job_id}/redo", json={"talking_detection": level})
+
+    def test_status_reports_mode_and_strength(self):
+        self.login()
+        job_id = self.upload(talking_detection="gentle").get_json()["id"]
+        state = self.wait(job_id)
+        self.assertEqual((state["status"], state["mode"], state["level"]), ("done", "dog", "gentle"))
+        self.assertIn("audio_note", state)
+
+    def test_redo_makes_a_new_job_and_keeps_the_original(self):
+        self.login()
+        first = self.upload().get_json()["id"]
+        self.assertEqual(self.wait(first)["level"], "normal")
+        r = self.redo(first, "strict")
+        self.assertEqual(r.status_code, 202, r.data)
+        second = r.get_json()["id"]
+        self.assertNotEqual(first, second)
+        state = self.wait(second)
+        self.assertEqual((state["status"], state["level"]), ("done", "strict"))
+        self.assertEqual(self.wait(first)["level"], "normal")  # original untouched
+        self.assertEqual(self.client.get(f"/jobs/{first}/video").status_code, 200)
+        self.assertEqual(self.client.get(f"/jobs/{second}/video").status_code, 200)
+
+    def test_redo_keeps_the_other_settings_and_the_uploaded_music(self):
+        self.login()
+        first = self.upload(trim_end="3", speed="1.5",
+                            music_file=(io.BytesIO(self.song.read_bytes()), "beat.mp3")).get_json()["id"]
+        self.wait(first)
+        second = self.redo(first, "gentle").get_json()["id"]
+        state = self.wait(second)
+        self.assertAlmostEqual(state["duration"], 2.0, delta=0.15)  # 3s trimmed, 1.5x faster
+        self.assertTrue((self.app.config["TEST_DATA"] / "jobs" / second / "music.mp3").exists())
+        out = self.tmp / "redo-music.mp4"
+        out.write_bytes(self.client.get(f"/jobs/{second}/video").data)
+        self.assertIn("audio", streams(out))
+
+    def test_redo_rejects_bad_requests(self):
+        self.login()
+        done = self.upload().get_json()["id"]
+        self.wait(done)
+        self.assertEqual(self.redo(done, "extreme").status_code, 400)
+        self.assertEqual(self.client.post(f"/api/jobs/{done}/redo").status_code, 400)  # no level at all
+        self.assertEqual(self.redo("0" * 32, "strict").status_code, 404)
+        self.assertEqual(self.redo("not-an-id", "strict").status_code, 404)
+        muted = self.upload(audio_mode="mute").get_json()["id"]
+        self.wait(muted)
+        self.assertEqual(self.redo(muted, "strict").status_code, 400)  # redo is only for dog-sounds edits
+
+    def test_redo_is_refused_while_the_first_edit_is_still_running(self):
+        self.login()
+        folder = self.app.config["TEST_DATA"] / "jobs" / ("a" * 32)
+        folder.mkdir(parents=True)
+        (folder / "job.json").write_text('{"status": "processing"}')
+        (folder / "options.json").write_text(json.dumps({
+            "trim_start": 0, "trim_end": None, "reframe": "fit", "audio_mode": "dog", "talking_detection": "normal",
+            "music_volume": 0.35, "speed": 1.0, "music_upload": None, "music_choice": None}))
+        self.assertEqual(self.redo("a" * 32, "strict").status_code, 409)
+
+    def test_redo_after_the_original_upload_was_deleted(self):
+        self.login()
+        first = self.upload().get_json()["id"]
+        self.wait(first)
+        for f in (self.app.config["TEST_DATA"] / "jobs" / first).glob("input.*"):
+            f.unlink()
+        self.assertEqual(self.redo(first, "strict").status_code, 410)
+
+    def test_redo_requires_login(self):
+        self.assertEqual(self.client.post("/api/jobs/" + "a" * 32 + "/redo", json={"talking_detection": "strict"}).status_code, 401)
 
     def test_bad_inputs_get_clear_errors(self):
         self.login()
@@ -445,6 +518,28 @@ class DogAudioEndToEndTests(Base):
         self.assertLessEqual(talk["gentle"], talk["normal"])
         self.assertLessEqual(talk["normal"], talk["strict"])
         self.assertGreater(talk["normal"], 3)  # actually found the talking
+
+    def test_redo_buttons_change_how_much_talking_is_removed(self):
+        app = create_app("pw", data_dir=self.tmp / f"web-{time.time_ns()}", music_dir=self.music_dir)
+        client = app.test_client()
+        client.post("/login", data={"password": "pw"})
+
+        def wait(job_id):
+            for _ in range(240):
+                s = client.get(f"/api/jobs/{job_id}").get_json()
+                if s["status"] in ("done", "error"):
+                    return s
+                time.sleep(0.25)
+            self.fail("job never finished")
+
+        first = client.post("/api/jobs", data={"video": (io.BytesIO(self.mixed.read_bytes()), "mixed.mp4"),
+                                               "talking_detection": "gentle", "reframe": "none"},
+                            content_type="multipart/form-data").get_json()["id"]
+        gentle = wait(first)
+        strict = wait(client.post(f"/api/jobs/{first}/redo", json={"talking_detection": "strict"}).get_json()["id"])
+        self.assertEqual((gentle["level"], strict["level"]), ("gentle", "strict"))
+        self.assertLessEqual(gentle["talking_seconds"], strict["talking_seconds"])
+        self.assertGreater(gentle["talking_seconds"], 3)  # it found the talking at all
 
     def test_keep_mode_does_not_touch_audio(self):
         out, result = self.run_mode(audio_mode="keep")

@@ -173,7 +173,7 @@ def build_command(src: Path, dst: Path, opts: EditOptions, info: MediaInfo) -> t
 def process(src: Path, dst: Path, opts: EditOptions) -> dict:
     opts.validate()
     info = probe(src)
-    audio_note = None
+    audio_note, talking_seconds = None, None
     cleaned = dst.with_suffix(".dog.wav")
     try:
         if opts.audio_mode == "dog" and info.has_audio:
@@ -183,14 +183,15 @@ def process(src: Path, dst: Path, opts: EditOptions) -> dict:
                 raise EditError(f"Trim start is past the end of the video ({info.duration:.1f}s long).")
             with _ENCODE_LOCK:
                 report = dogaudio.isolate(src, cleaned, opts.trim_start, end - opts.trim_start, opts.talking_detection)
-            audio_note = dogaudio.describe(report)
+            audio_note, talking_seconds = dogaudio.describe(report), report["talking_seconds"]
             opts = replace(opts, audio_override=cleaned)
-        return _encode(src, dst, opts, info, audio_note)
+        return _encode(src, dst, opts, info, audio_note, talking_seconds)
     finally:
         cleaned.unlink(missing_ok=True)
 
 
-def _encode(src: Path, dst: Path, opts: EditOptions, info: MediaInfo, audio_note: str | None) -> dict:
+def _encode(src: Path, dst: Path, opts: EditOptions, info: MediaInfo, audio_note: str | None,
+            talking_seconds: float | None = None) -> dict:
     cmd, out_len = build_command(src, dst, opts, info)
     try:
         with _ENCODE_LOCK:  # web jobs and email jobs share one small server: one encode at a time
@@ -203,6 +204,7 @@ def _encode(src: Path, dst: Path, opts: EditOptions, info: MediaInfo, audio_note
     result = {"duration": round(out_len, 2), "size_bytes": dst.stat().st_size, "had_audio": info.has_audio}
     if audio_note:
         result["audio_note"] = audio_note
+        result["talking_seconds"] = talking_seconds
     return result
 
 

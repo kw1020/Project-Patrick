@@ -10,7 +10,7 @@
 
   <label for="audio_mode">Original audio</label>
   <select id="audio_mode" name="audio_mode">
-    <option value="dog" selected>Dog sounds only (remove people talking)</option>
+    <option value="dog" selected>Dog sounds only</option>
     <option value="keep">Keep as is</option>
     <option value="denoise">Clean up background noise</option>
     <option value="mute">Remove it completely</option>
@@ -67,6 +67,11 @@
 
 <div id="result" class="card" hidden>
   <video id="player" controls playsinline></video>
+  <p id="note" class="hint" role="status"></p>
+  <div id="redo" class="row" hidden>
+    <button id="redo-more" type="button" class="secondary">Redo: remove more talking</button>
+    <button id="redo-less" type="button" class="secondary">Redo: keep more dog sounds</button>
+  </div>
   <button id="dl" type="button">Download</button>
 </div>
 
@@ -96,15 +101,41 @@ $('form').onsubmit = e => {
 
 function fail(msg) { $('go').disabled = false; $('barwrap').hidden = true; say(msg, 'err'); }
 
+const LEVELS = ['gentle', 'normal', 'strict'];  // least to most talking removed
+let currentJob = null;
+
+function showResult(id, s) {
+  currentJob = id;
+  $('go').disabled = false; $('barwrap').hidden = true; say('Done!', 'ok');
+  $('player').src = '/jobs/' + id + '/video';
+  $('note').textContent = (s.audio_note || '') + (s.mode === 'dog' ? ' Strength: ' + s.level + '.' : '');
+  const i = LEVELS.indexOf(s.level), dog = s.mode === 'dog' && i >= 0;
+  $('redo').hidden = !dog;
+  $('redo-more').hidden = !dog || i === LEVELS.length - 1;   // already at the strictest
+  $('redo-less').hidden = !dog || i === 0;                   // already at the gentlest
+  $('redo-more').onclick = () => redo(LEVELS[i + 1]);
+  $('redo-less').onclick = () => redo(LEVELS[i - 1]);
+  $('dl').onclick = () => location.href = '/jobs/' + id + '/video?download=1';
+  $('result').hidden = false;
+}
+
+async function redo(level) {
+  const previous = currentJob;
+  $('result').hidden = true; $('go').disabled = true; $('barwrap').hidden = false; $('bar').style.width = '100%';
+  say('Redoing it with ' + level + ' talking detection…');
+  try {
+    const r = await fetch('/api/jobs/' + previous + '/redo', {method: 'POST', headers: {'Content-Type': 'application/json'},
+                                                              body: JSON.stringify({talking_detection: level})});
+    const body = await r.json();
+    if (!r.ok) { fail(body.error || 'Redo failed.'); $('result').hidden = false; return; }
+    poll(body.id);
+  } catch { fail('Network problem. Try again.'); $('result').hidden = false; }
+}
+
 async function poll(id) {
   try {
     const s = await (await fetch('/api/jobs/' + id)).json();
-    if (s.status === 'done') {
-      $('go').disabled = false; $('barwrap').hidden = true; say('Done! ' + (s.audio_note || ''), 'ok');
-      $('player').src = '/jobs/' + id + '/video'; $('result').hidden = false;
-      $('dl').onclick = () => location.href = '/jobs/' + id + '/video?download=1';
-      return;
-    }
+    if (s.status === 'done') return showResult(id, s);
     if (s.status === 'error') return fail(s.error);
   } catch { /* keep trying */ }
   setTimeout(() => poll(id), 1500);

@@ -29,6 +29,10 @@ In email or a Drive file name add `gentle` or `strict` to tune it; on the websit
 - **It can mistake a voice-like whine for speech** and cut it. `gentle` removes less and fixes most of this.
 - **Voices still audible?** Use `strict`. Quiet, far-away talking is the hardest to catch.
 - Every edit reports what it did ("Removed 12.4s of talking in 3 spots"), so you can sanity-check it. Check this the first few times.
+- **Review before anything else happens.** On the website the finished video plays on the page with that note. Two buttons redo the
+  edit from your original upload with one step more or less talking removed (gentle / normal / strict). The original result is kept, and
+  the buttons disappear at either extreme. Uploads and results are deleted when the free server restarts or after 72 hours.
+  (Posting to Instagram/TikTok is not built yet; when it is, it must only be possible from this review screen, after a tap.)
 - Gaps where talking was removed are silent. Add music (`music: name`) if that sounds odd.
 - Tested only on synthetic stand-ins (computer speech plus made-up breathing/whining), **never on real dog recordings**.
   The test numbers: talking was removed completely and dog-like sounds kept; `normal` also clipped about half a second of a
