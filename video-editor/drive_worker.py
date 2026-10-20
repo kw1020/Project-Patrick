@@ -35,6 +35,7 @@ STATUS_NAME = "Patrick status.txt"
 STARTED = time.time()
 LAST_POLL: dict = {}      # what the most recent look at the Drive folder found
 LAST_ERROR: dict = {}     # the most recent problem, if any
+WATCH: dict = {}          # which folders this watcher was told to use (set at startup)
 _published = {"stable": None, "at": 0.0}
 
 
@@ -195,8 +196,12 @@ def status_text() -> str:
              f"Version: {os.environ.get('RENDER_GIT_COMMIT', 'unknown')[:7]}",
              f"Uptime: {int(time.time() - STARTED)} seconds (a small number that keeps resetting means the server keeps restarting)",
              f"Memory used by the Python process: {resource.getrusage(resource.RUSAGE_SELF).ru_maxrss // 1024} MB (limit on the free plan: 512 MB)",
+             f"Drop folder (where you put videos) ends in: ...{WATCH.get('drop', '?')[-8:]}",
+             f"Results go to the folder ending in: ...{WATCH.get('out', '?')[-8:]}",
              f"Last look at the drop folder: {p.get('at', 'not yet')}",
              f"Items in the drop folder: {p.get('folder_items', '?')}"]
+    if WATCH.get("drop") and WATCH.get("drop") == WATCH.get("out"):
+        lines.append("Note: results are saved in the same folder the videos come from (no separate finished folder is set).")
     lines += [f"  - {v}" for v in p.get("videos", [])] or ["  (no videos)"]
     if LAST_ERROR:
         lines.append(f"Last problem: {LAST_ERROR.get('at')} while handling {LAST_ERROR.get('video')}: {LAST_ERROR.get('what')}")
@@ -292,6 +297,7 @@ def start_background() -> threading.Thread | None:
     max_mb = int(os.environ.get("DRIVE_MAX_MB", 500))
     drive = GoogleDrive(os.environ["GDRIVE_CLIENT_ID"], os.environ["GDRIVE_CLIENT_SECRET"],
                         os.environ["GDRIVE_REFRESH_TOKEN"])
+    WATCH.update(drop=folder_id, out=out_id or folder_id)
 
     def loop() -> None:
         log.info("Watching Drive folder %s", folder_id)

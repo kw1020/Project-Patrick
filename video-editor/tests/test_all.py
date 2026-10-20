@@ -818,6 +818,7 @@ class DriveTests(Base):
     # ---- the status note: lets problems be diagnosed from Drive instead of server logs
     def test_the_status_note_says_what_the_watcher_sees(self):
         self.dw.LAST_POLL.clear(); self.dw.LAST_ERROR.clear(); self.dw._published.update(stable=None, at=0.0)
+        self.dw.WATCH.update(drop="dropFolderIdAAAA1234", out="finishedFolderBBBB5678")
         self.drive.add("done.mp4", self.video.read_bytes())
         self.drive.add("done [edited].mp4", b"x")
         self.drive.add("new.mp4", self.video.read_bytes(), modified="2026-10-08T12:00:10Z")   # still "uploading"
@@ -831,6 +832,12 @@ class DriveTests(Base):
         self.assertIn("done.mp4: already done", text)
         self.assertIn("new.mp4: changed in the last", text)
         self.assertIn("Last problem: none", text)
+        self.assertIn("Drop folder (where you put videos) ends in: ...AAAA1234", text)
+        self.assertIn("Results go to the folder ending in: ...BBBB5678", text)
+        self.assertNotIn("same folder the videos come from", text)
+        self.dw.WATCH.update(drop="sameFolderIdZZZZ9999", out="sameFolderIdZZZZ9999")   # misconfigured/unset finished folder
+        self.assertIn("same folder the videos come from", self.dw.status_text())
+        self.dw.WATCH.clear()
 
     def test_the_status_note_is_only_rewritten_when_something_changes(self):
         self.dw.LAST_POLL.clear(); self.dw.LAST_ERROR.clear(); self.dw._published.update(stable=None, at=0.0)
