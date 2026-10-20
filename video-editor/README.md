@@ -40,6 +40,17 @@ In email or a Drive file name add `gentle` or `strict` to tune it; on the websit
 - Needs `numpy` and `pysilero-vad` (in `requirements.txt`). Uses roughly 100 MB of memory and under a second per clip.
 - Loudness normalization is skipped in this mode; it would boost quiet breathing into loud hiss.
 
+## Memory on the free server (learned the hard way)
+The free Render instance has 512 MB. A 4K iPhone video (HEVC, 10-bit) made the editor use **774 MB** and the instance was killed over and
+over ("Ran out of memory"), which also left no error note. Fixes, with the measured results on a 4K HEVC test clip:
+- Videos are shrunk to at most 1920 on the long side *before* any other filter, and ffmpeg is limited to 1 decoder / 2 encoder threads.
+- The encoder uses `ultrafast` (small memory; ~70 MB instead of ~340 MB). Files come out a bit bigger.
+- Result: ffmpeg peaks at ~320 MB in the default mode (was 774 MB), plus ~40-150 MB for the Python server. That fits, but the margin is
+  not large, and **only a 4K test clip was measured, not your real 105 MB iPhone file or the real server.** If it still runs out, trim/lower
+  the clip, or use a bigger Render instance (Standard has 2 GB).
+- Safety net: the Drive watcher leaves a `<name> [working].txt` note while it edits. If the server dies mid-edit, the restart turns it into
+  `<name> [error].txt` and skips that video, instead of crashing in a loop.
+
 ## Setup
 
 ```bash

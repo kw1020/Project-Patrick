@@ -15,7 +15,7 @@ whining, etc.). That's `dogaudio.py`, the default audio mode everywhere.
 ## What exists
 - `video-editor/`: Flask + ffmpeg editor. Upload a video (or **email** one with plain-English instructions),
   get back a 1080x1920 MP4. Remove/clean audio, add music, trim, speed, vertical reframe. Read `video-editor/README.md`.
-  Tests: `cd video-editor && .venv/bin/python -m unittest discover -s tests` (74 tests, needs ffmpeg; the end-to-end audio tests need `pip install espeakng-loader` or they skip).
+  Tests: `cd video-editor && .venv/bin/python -m unittest discover -s tests` (82 tests, needs ffmpeg; the end-to-end audio tests need `pip install espeakng-loader` or they skip).
 - `video-editor/drive_worker.py`: watches a shared Google Drive folder ("Ghost vids" in Krew's Drive); edits videos using instructions in
   the file name, writes `<name> [edited].mp4` to a separate finished folder (`GDRIVE_OUTPUT_FOLDER_ID`) and emails him when each is done. Setup in `video-editor/DRIVE_SETUP.md`. (Chat Drive connector can't carry real videos: base64 through context.)
 - `render.yaml` + `video-editor/Dockerfile`: deploy to Render as one service (website + email + Drive watchers).
@@ -31,6 +31,10 @@ whining, etc.). That's `dogaudio.py`, the default audio mode everywhere.
   + synthetic whine/breathing. The sandbox could reach only PyPI, so no real recordings were available. First priority:
   get Krew's real feedback ("voices still audible?" -> strict; "dog sounds cut?" -> gentle) and tune `LEVELS` in dogaudio.py.
   Chat Drive connector can't carry real videos, so can't test on his footage in-session unless tiny.
+- **Free Render instance = 512 MB.** Krew's real iPhone 4K MOV (IMG_8534.MOV, 105 MB) crashed it in a loop ("Ran out of memory", Events page).
+  Measured on a synthetic 4K HEVC clip: ffmpeg 774 MB -> 321 MB after shrinking-first + ultrafast + fewer threads (see README "Memory on the free
+  server"). NOT yet verified on his real file / the real server. Drive watcher now leaves "[working]" notes and turns a crash into an
+  "[error]" note instead of looping. Free CPU is also very slow; the paid plans are the likely long-term answer if it's still too slow.
 - Lesson from this build: a unit test passed while bridging was broken (padding hid it). Check numbers, not just "OK".
 - Work is on branch `claude/confident-cannon-9805ak`; no PR opened (only open one when Krew asks).
 

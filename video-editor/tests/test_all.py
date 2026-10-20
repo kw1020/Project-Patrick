@@ -70,6 +70,32 @@ class EditorTests(Base):
         out, _ = self.run_edit(self.video, reframe="none")
         self.assertEqual(streams(out)["video"]["width"], 1280)
 
+    def make_big(self, name, size):
+        path = self.tmp / name
+        ffmpeg("-f", "lavfi", "-i", f"testsrc2=size={size}:rate=30:duration=1", "-f", "lavfi", "-i", "sine=frequency=300:duration=1",
+               "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest", str(path))
+        return path
+
+    def test_4k_phone_videos_come_out_as_1080x1920_in_every_reframe_mode(self):
+        portrait, landscape = self.make_big("p4k.mp4", "2160x3840"), self.make_big("l4k.mp4", "3840x2160")
+        for src in (portrait, landscape):
+            for reframe in ("fit", "crop"):
+                out, _ = self.run_edit(src, reframe=reframe)
+                v = streams(out)["video"]
+                self.assertEqual((v["width"], v["height"]), (1080, 1920), f"{src.name} {reframe}")
+
+    def test_reframe_none_still_shrinks_4k_to_at_most_1920_on_the_long_side(self):
+        out, _ = self.run_edit(self.make_big("p4k_none.mp4", "2160x3840"), reframe="none")
+        v = streams(out)["video"]
+        self.assertEqual((v["width"], v["height"]), (1080, 1920))
+        out, _ = self.run_edit(self.make_big("l4k_none.mp4", "3840x2160"), reframe="none")
+        v = streams(out)["video"]
+        self.assertEqual((v["width"], v["height"]), (1920, 1080))
+
+    def test_small_videos_are_not_enlarged_by_the_size_cap(self):
+        out, _ = self.run_edit(self.video, reframe="none")        # 1280x720 source
+        self.assertEqual(streams(out)["video"]["width"], 1280)
+
     def test_trim_and_speed_change_length(self):
         _, r = self.run_edit(self.video, trim_start=1, trim_end=5, speed=2.0)
         self.assertAlmostEqual(r["duration"], 2.0, delta=0.1)
@@ -443,6 +469,17 @@ class BuildCommandTests(Base):
         self.assertIn("[2:a]volume=", graph)       # music is the third input
         self.assertNotIn("loudnorm", graph)        # dog mode doesn't boost quiet breathing
 
+    def test_memory_savers_are_in_the_command(self):
+        # Regression guard: a 4K phone video made the 512 MB free server run out of memory (measured 774 MB before the fix).
+        cmd, _ = editor.build_command(Path("v.mp4"), Path("o.mp4"), EditOptions(audio_mode="keep"), editor.MediaInfo(6.0, True))
+        graph = cmd[cmd.index("-filter_complex") + 1]
+        self.assertTrue(graph.startswith("[0:v]scale='if(gt(iw,ih)"), "must shrink big videos before any other filter")
+        i = cmd.index("-i")
+        self.assertEqual(cmd[cmd.index("-threads") + 1], "1")           # decoder threads, set before the input
+        self.assertLess(cmd.index("-threads"), i)
+        self.assertEqual(cmd[cmd.index("-preset") + 1], "ultrafast")    # small encoder memory
+        self.assertEqual(cmd[cmd.index("-filter_threads") + 1], "1")
+
     def test_other_modes_still_normalize_loudness(self):
         graph = editor.build_command(Path("v.mp4"), Path("o.mp4"), EditOptions(audio_mode="keep"),
                                      editor.MediaInfo(6.0, True))[0]
@@ -585,6 +622,9 @@ class FakeDrive:
         self.add(name, path.read_bytes(), mimetype, folder=folder_id)
         return self.files[-1]["id"]
 
+    def trash(self, file_id):
+        self.files = [f for f in self.files if f["id"] != file_id]
+
     def names(self):
         return [f["name"] for f in self.files]
 
@@ -689,6 +729,45 @@ class DriveTests(Base):
         self.drive.add("b.mp4", self.video.read_bytes())
         self.assertEqual(self.poll(output_folder_id="out", notify=boom), 1)
         self.assertTrue(any(f["name"] == "b [edited].mp4" for f in self.drive.files))
+
+    # ---- "[working]" notes: visible progress, and no crash loops if the server dies mid-edit
+    def test_a_working_note_is_there_during_the_edit_and_gone_after(self):
+        seen = []
+        original_download = self.drive.download
+
+        def spy(file_id, dest):
+            seen.append([f["name"] for f in self.drive.files if f["folder"] == "out"])
+            original_download(file_id, dest)
+        self.drive.download = spy
+        self.drive.add("w.mp4", self.video.read_bytes())
+        self.poll(output_folder_id="out")
+        self.assertEqual(seen, [["w [working].txt"]])                        # marker visible while it works
+        self.assertFalse(any("[working]" in f["name"] for f in self.drive.files))   # and cleaned up afterwards
+
+    def test_working_note_is_also_removed_when_the_edit_fails(self):
+        self.drive.add("bad.mp4", b"not a video")
+        self.poll(output_folder_id="out")
+        self.assertEqual([f["name"] for f in self.drive.files if f["folder"] == "out"], ["bad [error].txt"])
+
+    def test_after_a_crash_the_video_is_marked_failed_instead_of_retried_forever(self):
+        self.drive.add("big.mp4", self.video.read_bytes())
+        self.drive.add("big [working].txt", b"x", mime="text/plain", folder="out")  # left behind by the killed server
+        told = []
+        self.assertEqual(self.dw.recover_interrupted(self.drive, "out", lambda s, b: told.append((s, b))), 1)
+        out = [f["name"] for f in self.drive.files if f["folder"] == "out"]
+        self.assertEqual(out, ["big [error].txt"])                           # marker gone, error note in its place
+        self.assertIn("ran out of memory", self.drive.get("[error].txt")["data"].decode())
+        self.assertEqual(len(told), 1)
+        downloads = []
+        self.drive.download = lambda *a: downloads.append(a)
+        self.assertEqual(self.poll(output_folder_id="out"), 0)               # the next poll skips it: no loop
+        self.assertEqual(downloads, [])
+
+    def test_recovery_leaves_finished_videos_alone(self):
+        self.drive.add("ok [working].txt", b"x", mime="text/plain", folder="out")
+        self.drive.add("ok [edited].mp4", b"video", folder="out")
+        self.assertEqual(self.dw.recover_interrupted(self.drive, "out"), 0)  # nothing to report
+        self.assertEqual([f["name"] for f in self.drive.files if f["folder"] == "out"], ["ok [edited].mp4"])
 
     def test_poll_without_a_finished_folder_still_works_beside_the_original(self):
         self.drive.add("c.mp4", self.video.read_bytes())

@@ -83,11 +83,21 @@ def _num(x: float) -> str:
     return f"{x:.3f}".rstrip("0").rstrip(".")
 
 
+# Shrink anything bigger than 1920 on its long side straight away, before any other filter. A 4K phone video
+# is ~4x the pixels of what Instagram uses, and handling it at full size needs more memory than a small server has.
+CAP_SIZE = (f"scale='if(gt(iw,ih),min({HEIGHT},iw),-2)':'if(gt(iw,ih),-2,min({HEIGHT},ih))':flags=fast_bilinear")
+# Fewer worker threads = far less memory (each thread holds its own frames). Plenty fast for 1080x1920.
+DECODE_THREADS, ENCODE_THREADS = "1", "2"
+# "ultrafast" keeps the encoder's memory small (~70 MB vs ~340 MB for "veryfast" on a 4K source; measured). Files come out
+# somewhat bigger, which doesn't matter: Instagram re-encodes uploads anyway.
+X264_PRESET, X264_CRF = "ultrafast", "22"
+
+
 def _video_chain(opts: EditOptions) -> str:
     if opts.reframe == "fit":
         # whole frame centred over a blurred, zoomed copy of itself, so nothing is cut off
         parts = [
-            "[0:v]split=2[bg][fg]",
+            "[c]split=2[bg][fg]",
             # blur a quarter-size copy, then scale it up: looks the same (it's blurred anyway) and encodes far faster
             f"[bg]scale={WIDTH // 4}:{HEIGHT // 4}:force_original_aspect_ratio=increase,crop={WIDTH // 4}:{HEIGHT // 4},"
             f"boxblur=6:2,scale={WIDTH}:{HEIGHT}[b]",
@@ -96,14 +106,14 @@ def _video_chain(opts: EditOptions) -> str:
         ]
         chain = ";".join(parts)
     elif opts.reframe == "crop":
-        chain = (f"[0:v]scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=increase,"
+        chain = (f"[c]scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=increase,"
                  f"crop={WIDTH}:{HEIGHT},setsar=1")
     else:
-        chain = "[0:v]scale=trunc(iw/2)*2:trunc(ih/2)*2,setsar=1"  # h264 needs even dimensions
+        chain = "[c]scale=trunc(iw/2)*2:trunc(ih/2)*2,setsar=1"  # h264 needs even dimensions
     chain += ",fps=30"
     if opts.speed != 1.0:
         chain += f",setpts=PTS/{_num(opts.speed)}"
-    return chain + "[v]"
+    return f"[0:v]{CAP_SIZE}[c];" + chain + "[v]"
 
 
 def _audio_chain(opts: EditOptions, has_audio: bool, out_len: float,
@@ -151,8 +161,8 @@ def build_command(src: Path, dst: Path, opts: EditOptions, info: MediaInfo) -> t
     clip_len = end - opts.trim_start
     out_len = clip_len / opts.speed
 
-    cmd = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
-           "-ss", _num(opts.trim_start), "-t", _num(clip_len), "-i", str(src)]
+    cmd = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-filter_threads", "1", "-filter_complex_threads", "1",
+           "-threads", DECODE_THREADS, "-ss", _num(opts.trim_start), "-t", _num(clip_len), "-i", str(src)]
     next_input, orig_in, music_in = 1, "[0:a]", "[1:a]"
     if opts.audio_override is not None:  # already trimmed to the clip, so no -ss/-t here
         cmd += ["-i", str(opts.audio_override)]
@@ -165,7 +175,7 @@ def build_command(src: Path, dst: Path, opts: EditOptions, info: MediaInfo) -> t
     graph = _video_chain(opts) + (";" + audio_graph if audio_graph else "")
     cmd += ["-filter_complex", graph, "-map", "[v]"]
     cmd += ["-map", "[a]", "-c:a", "aac", "-b:a", "192k", "-ar", "44100"] if has_out_audio else ["-an"]
-    cmd += ["-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p",
+    cmd += ["-c:v", "libx264", "-preset", X264_PRESET, "-crf", X264_CRF, "-pix_fmt", "yuv420p", "-threads", ENCODE_THREADS,
             "-t", _num(out_len), "-movflags", "+faststart", str(dst)]
     return cmd, out_len
 

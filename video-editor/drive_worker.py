@@ -25,7 +25,7 @@ import email_worker
 from editor import EditError
 
 log = logging.getLogger("patrick.drive")
-EDITED, ERROR = " [edited]", " [error]"
+EDITED, ERROR, WORKING = " [edited]", " [error]", " [working]"
 SETTLE_SECONDS = 30  # ignore files modified very recently, in case an upload is still finishing
 SCOPES = ["https://www.googleapis.com/auth/drive"]
 FOLDER_ID = re.compile(r"^[A-Za-z0-9_-]{10,}$")
@@ -61,6 +61,9 @@ class GoogleDrive:
             done = False
             while not done:
                 _, done = downloader.next_chunk()
+
+    def trash(self, file_id: str) -> None:
+        self._svc.files().update(fileId=file_id, body={"trashed": True}, supportsAllDrives=True).execute()
 
     def upload(self, folder_id: str, path: Path, name: str, mimetype: str) -> str:
         from googleapiclient.http import MediaFileUpload
@@ -116,6 +119,7 @@ def poll_once(drive, folder_id: str, music_dir: Path, max_mb: int = 500, now: da
         log.info("Editing %s", name)
         with tempfile.TemporaryDirectory() as tmp:
             tmp = Path(tmp)
+            marker = _put_marker(drive, out_id, tmp, stem)
             try:
                 if int(f.get("size", 0)) > max_mb * 1024 * 1024:
                     raise EditError(f"That video is over {max_mb} MB. Trim or compress it and try again.")
@@ -141,8 +145,59 @@ def poll_once(drive, folder_id: str, music_dir: Path, max_mb: int = 500, now: da
                 note.write_text(f"Couldn't edit {name}.\n{reason}\n\nRename the file and it will be tried again.\n")
                 drive.upload(out_id, note, f"{stem}{ERROR}.txt", "text/plain")
                 tell(f"Patrick couldn't edit: {name}", f"{reason}\n\nRename the file in Drive and Patrick will try again.")
+            finally:
+                _drop_marker(drive, marker)
         handled += 1
     return handled
+
+
+def _put_marker(drive, out_id: str, tmp: Path, stem: str):
+    """A tiny "[working]" note shows you Patrick has started, and tells a restarted Patrick that the last run was cut off."""
+    try:
+        note = tmp / "working.txt"
+        note.write_text("Patrick is editing this video. This note disappears when it's done.\n")
+        return drive.upload(out_id, note, f"{stem}{WORKING}.txt", "text/plain")
+    except Exception:
+        log.exception("Couldn't leave the working note (editing continues)")
+        return None
+
+
+def _drop_marker(drive, marker) -> None:
+    if marker is None:
+        return
+    try:
+        drive.trash(marker)
+    except Exception:
+        log.exception("Couldn't remove the working note")
+
+
+def recover_interrupted(drive, out_id: str, notify=None) -> int:
+    """Run once at startup. A leftover "[working]" note means the server stopped mid-edit (usually it ran out of memory).
+    Say so in an error note and skip that video, instead of starting it again and crashing again."""
+    files = drive.list_children(out_id)
+    names = [f["name"] for f in files]
+    fixed = 0
+    for f in files:
+        name = f["name"]
+        if not name.endswith(WORKING + ".txt"):
+            continue
+        stem = name[: -len(WORKING + ".txt")]
+        finished = any(n.startswith(stem + EDITED) or n.startswith(stem + ERROR) for n in names)
+        if not finished:
+            reason = ("The Patrick server stopped partway through editing this video, usually because it ran out of memory.\n"
+                      "Try a shorter or smaller clip. Rename the video file in Drive and Patrick will try again.\n")
+            with tempfile.TemporaryDirectory() as tmp:
+                note = Path(tmp) / "error.txt"
+                note.write_text(reason)
+                drive.upload(out_id, note, f"{stem}{ERROR}.txt", "text/plain")
+            if notify is not None:
+                try:
+                    notify(f"Patrick couldn't finish: {stem}", reason)
+                except Exception:
+                    log.exception("Couldn't send the notification")
+            fixed += 1
+        _drop_marker(drive, f["id"])
+    return fixed
 
 
 def drive_configured() -> bool:
@@ -174,6 +229,12 @@ def start_background() -> threading.Thread | None:
 
     def loop() -> None:
         log.info("Watching Drive folder %s", folder_id)
+        try:
+            n = recover_interrupted(drive, out_id or folder_id, notify)
+            if n:
+                log.warning("Found %d video(s) the server was cut off while editing; marked them as errors", n)
+        except Exception:
+            log.exception("Startup check failed; continuing")
         while True:
             try:
                 poll_once(drive, folder_id, music_dir, max_mb, output_folder_id=out_id, notify=notify)
