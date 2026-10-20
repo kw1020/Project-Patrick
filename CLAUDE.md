@@ -31,6 +31,11 @@ whining, etc.). That's `dogaudio.py`, the default audio mode everywhere.
   rename the Drive file with `analyze` in the name to get `[analysis].txt` (per-second speech score + loudness), ask him roughly when voices are audible
   and whether the dog is making noise at the same time, then tune `LEVELS`/add a loudness-aware rule in dogaudio.py. Added a `strongest` level
   (0.12 threshold). Also: results landed beside the original, so `GDRIVE_OUTPUT_FOLDER_ID` in Render is missing/misnamed (code is tested correct).
+- **Drive watcher status note (added Oct 20):** the watcher writes `Patrick status.txt` (what it sees, running git version via RENDER_GIT_COMMIT,
+  uptime, memory, last error) into the finished folder (or the drop folder if no finished folder is set). Read it with the Drive connector
+  (download_file_content, base64) instead of asking Krew for Render log screenshots. Context: after he renamed the video to "IMG_8534 analyze.MOV"
+  no [analysis]/[working]/[error] note ever appeared; cause unknown at that time (server asleep at first; UptimeRobot pinger now keeps it awake).
+  Krew says the background voices are "there a lot" (so quiet but frequent), and he posted a muted+music version that night as the fallback.
 - **Dog-sounds mode (`video-editor/dogaudio.py`) was only validated on synthetic audio.** It uses Silero VAD to silence
   talking moments (it can't separate overlapping sounds, and may cut voice-like whines). Tested only on espeak speech
   + synthetic whine/breathing. The sandbox could reach only PyPI, so no real recordings were available. First priority:

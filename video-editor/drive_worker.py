@@ -11,9 +11,11 @@ Needs Google OAuth credentials for a dedicated Patrick Google account (see DRIVE
 """
 from __future__ import annotations
 
+import io
 import logging
 import os
 import re
+import resource
 import tempfile
 import threading
 import time
@@ -29,6 +31,11 @@ EDITED, ERROR, WORKING, ANALYSIS = " [edited]", " [error]", " [working]", " [ana
 SETTLE_SECONDS = 30  # ignore files modified very recently, in case an upload is still finishing
 SCOPES = ["https://www.googleapis.com/auth/drive"]
 FOLDER_ID = re.compile(r"^[A-Za-z0-9_-]{10,}$")
+STATUS_NAME = "Patrick status.txt"
+STARTED = time.time()
+LAST_POLL: dict = {}      # what the most recent look at the Drive folder found
+LAST_ERROR: dict = {}     # the most recent problem, if any
+_published = {"stable": None, "at": 0.0}
 
 
 class GoogleDrive:
@@ -61,6 +68,17 @@ class GoogleDrive:
             done = False
             while not done:
                 _, done = downloader.next_chunk()
+
+    def write_text(self, folder_id: str, name: str, text: str) -> None:
+        """Create the file, or replace its contents if a file with that name is already in the folder."""
+        from googleapiclient.http import MediaIoBaseUpload
+        media = MediaIoBaseUpload(io.BytesIO(text.encode()), mimetype="text/plain")
+        existing = [f for f in self.list_children(folder_id) if f["name"] == name]
+        if existing:
+            self._svc.files().update(fileId=existing[0]["id"], media_body=media, supportsAllDrives=True).execute()
+        else:
+            self._svc.files().create(body={"name": name, "parents": [folder_id]}, media_body=media,
+                                     fields="id", supportsAllDrives=True).execute()
 
     def trash(self, file_id: str) -> None:
         self._svc.files().update(fileId=file_id, body={"trashed": True}, supportsAllDrives=True).execute()
@@ -97,6 +115,8 @@ def poll_once(drive, folder_id: str, music_dir: Path, max_mb: int = 500, now: da
     children = drive.list_children(folder_id)
     names = [c["name"] for c in children] + ([c["name"] for c in drive.list_children(out_id)] if out_id != folder_id else [])
     handled = 0
+    LAST_POLL.clear()
+    LAST_POLL.update(at=now.strftime("%H:%M:%S UTC"), folder_items=len(children), videos=[], waiting=[])
 
     def tell(subject: str, body: str) -> None:
         if notify is None:
@@ -112,9 +132,13 @@ def poll_once(drive, folder_id: str, music_dir: Path, max_mb: int = 500, now: da
             continue
         stem = _stem(name)
         if any(n.startswith(stem + m) for n in names for m in (EDITED, ERROR, ANALYSIS)):
+            LAST_POLL["videos"].append(f"{name}: already done (a result or error note exists), skipped")
             continue  # already done (or already failed once; rename the file to retry)
         if not _is_settled(f.get("modifiedTime", ""), now):
+            LAST_POLL["videos"].append(f"{name}: changed in the last {SETTLE_SECONDS}s (maybe still uploading), will retry")
             continue
+        LAST_POLL["videos"].append(f"{name}: to do now")
+        LAST_POLL["waiting"].append(name)
 
         log.info("Editing %s", name)
         with tempfile.TemporaryDirectory() as tmp:
@@ -149,6 +173,7 @@ def poll_once(drive, folder_id: str, music_dir: Path, max_mb: int = 500, now: da
                      "Watch it before you post it. If voices are audible or dog sounds got cut, tell Patrick and it can be redone.")
                 log.info("Done %s (%ss): %s", name, result["duration"], "; ".join(notes) or "default edit")
             except Exception as e:  # tell the user in Drive instead of failing silently
+                LAST_ERROR.update(at=now.strftime("%H:%M:%S UTC"), video=name, what=f"{type(e).__name__}: {str(e)[:300]}")
                 reason = str(e) if isinstance(e, EditError) else "Something went wrong while editing."
                 if not isinstance(e, EditError):
                     log.exception("Failed on %s", name)
@@ -160,6 +185,36 @@ def poll_once(drive, folder_id: str, music_dir: Path, max_mb: int = 500, now: da
                 _drop_marker(drive, marker)
         handled += 1
     return handled
+
+
+def status_text() -> str:
+    """A plain-text snapshot of what the watcher sees, so problems can be diagnosed without reading server logs."""
+    p = LAST_POLL
+    lines = [f"Patrick status (Drive watcher)",
+             f"Updated: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}",
+             f"Version: {os.environ.get('RENDER_GIT_COMMIT', 'unknown')[:7]}",
+             f"Uptime: {int(time.time() - STARTED)} seconds (a small number that keeps resetting means the server keeps restarting)",
+             f"Memory used by the Python process: {resource.getrusage(resource.RUSAGE_SELF).ru_maxrss // 1024} MB (limit on the free plan: 512 MB)",
+             f"Last look at the drop folder: {p.get('at', 'not yet')}",
+             f"Items in the drop folder: {p.get('folder_items', '?')}"]
+    lines += [f"  - {v}" for v in p.get("videos", [])] or ["  (no videos)"]
+    if LAST_ERROR:
+        lines.append(f"Last problem: {LAST_ERROR.get('at')} while handling {LAST_ERROR.get('video')}: {LAST_ERROR.get('what')}")
+    else:
+        lines.append("Last problem: none since this version started")
+    return "\n".join(lines) + "\n"
+
+
+def publish_status(drive, out_id: str) -> bool:
+    """Write the status note to Drive when something changed, and at least every 5 minutes. Returns True if it wrote."""
+    body = status_text()
+    stable = "\n".join(l for l in body.splitlines() if not l.startswith(("Updated:", "Uptime:", "Memory used", "Last look")))
+    if stable == _published["stable"] and time.time() - _published["at"] < 300:
+        return False
+    drive.write_text(out_id, STATUS_NAME, body)
+    _published.update(stable=stable, at=time.time())
+    log.info("Status: %s", " | ".join(l.strip() for l in stable.splitlines()[2:] if l.strip()))
+    return True
 
 
 def _put_marker(drive, out_id: str, tmp: Path, stem: str):
@@ -249,8 +304,14 @@ def start_background() -> threading.Thread | None:
         while True:
             try:
                 poll_once(drive, folder_id, music_dir, max_mb, output_folder_id=out_id, notify=notify)
-            except Exception:
+            except Exception as e:
+                LAST_ERROR.update(at=datetime.now(timezone.utc).strftime("%H:%M:%S UTC"), video="(checking the folder)",
+                                  what=f"{type(e).__name__}: {str(e)[:300]}")
                 log.exception("Drive check failed; will retry")
+            try:
+                publish_status(drive, out_id or folder_id)
+            except Exception:
+                log.exception("Couldn't write the status note (editing is not affected)")
             time.sleep(poll)
 
     thread = threading.Thread(target=loop, name="drive-watcher", daemon=True)

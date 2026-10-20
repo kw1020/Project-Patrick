@@ -126,16 +126,32 @@ def analyze(src: Path, start: float, duration: float) -> dict:
         seg = mono[int(i * FRAME): int((i + per_sec) * FRAME)]
         rms = float(np.sqrt(np.mean(seg ** 2))) if len(seg) else 0.0
         rows.append({"t": round(i * FRAME_SECONDS), "p_max": round(float(chunk.max()), 2), "p_mean": round(float(chunk.mean()), 2),
-                     "db": round(20 * np.log10(max(rms, 1e-6)), 1)})
+                     "db": round(20 * np.log10(max(rms, 1e-6)), 1), "flat": _flatness(seg)})
     counts = {f">={t}": round(float((probs >= t).mean()) * 100) for t in (0.7, 0.5, 0.3, 0.12)}
-    return {"clip_seconds": round(duration, 1), "percent_of_audio_flagged_at": counts, "per_second": rows}
+    dbs = np.array([r["db"] for r in rows]) if rows else np.zeros(1)
+    loud = {f"p{q}": round(float(np.percentile(dbs, q)), 1) for q in (10, 50, 90)}
+    return {"clip_seconds": round(duration, 1), "percent_of_audio_flagged_at": counts, "loudness_db_percentiles": loud,
+            "per_second": rows}
+
+
+def _flatness(seg: np.ndarray) -> float:
+    """0 = very pitched/tonal (voices, whines), 1 = noise-like (breathing, wind). A hint for telling them apart."""
+    if len(seg) < 512:
+        return 0.0
+    power = np.abs(np.fft.rfft(seg * np.hanning(len(seg)))) ** 2
+    freqs = np.fft.rfftfreq(len(seg), 1 / SR)
+    band = power[(freqs >= 100) & (freqs <= 4000)] + 1e-12
+    return round(float(np.exp(np.mean(np.log(band))) / np.mean(band)), 3)
 
 
 def format_analysis(a: dict) -> str:
     lines = [f"Patrick audio analysis ({a['clip_seconds']}s). p = chance of human speech (0-1), db = loudness (0 is the loudest possible).",
              "Share of the audio that counts as talking at each speech-score cutoff: "
-             + ", ".join(f"{k}: {v}%" for k, v in a["percent_of_audio_flagged_at"].items()), "", "second | p_max | p_mean | db"]
-    lines += [f"{r['t']:>5}s | {r['p_max']:.2f} | {r['p_mean']:.2f} | {r['db']:6.1f}" for r in a["per_second"]]
+             + ", ".join(f"{k}: {v}%" for k, v in a["percent_of_audio_flagged_at"].items()),
+             "Loudness across the clip (dB, closer to 0 = louder): " + ", ".join(f"{k}: {v}" for k, v in a["loudness_db_percentiles"].items()),
+             "flat: 0 = pitched/tonal like a voice or whine, 1 = noise-like like breathing", "",
+             "second | p_max | p_mean | db | flat"]
+    lines += [f"{r['t']:>5}s | {r['p_max']:.2f} | {r['p_mean']:.2f} | {r['db']:6.1f} | {r['flat']:.3f}" for r in a["per_second"]]
     return "\n".join(lines) + "\n"
 
 

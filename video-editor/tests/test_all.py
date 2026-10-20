@@ -646,6 +646,14 @@ class FakeDrive:
     def trash(self, file_id):
         self.files = [f for f in self.files if f["id"] != file_id]
 
+    def write_text(self, folder_id, name, text):
+        self.writes = getattr(self, "writes", 0) + 1
+        for f in self.files:
+            if f["folder"] == folder_id and f["name"] == name:
+                f["data"] = text.encode()
+                return
+        self.add(name, text.encode(), "text/plain", folder=folder_id)
+
     def names(self):
         return [f["name"] for f in self.files]
 
@@ -801,10 +809,39 @@ class DriveTests(Base):
         out = [f["name"] for f in self.drive.files if f["folder"] == "out"]
         self.assertEqual(out, ["clip analyze [analysis].txt"])             # a report only: no [edited] video, no leftover [working]
         report = self.drive.get("[analysis].txt")["data"].decode()
-        self.assertIn("second | p_max | p_mean | db", report)
+        self.assertIn("second | p_max | p_mean | db | flat", report)
+        self.assertIn("Loudness across the clip", report)
         self.assertIn("Share of the audio that counts as talking", report)
         self.assertGreaterEqual(len([l for l in report.splitlines() if l.strip().endswith("dB") or "s |" in l]), 5)  # ~1 row per second
         self.assertEqual(self.poll(output_folder_id="out"), 0)             # and it's not redone
+
+    # ---- the status note: lets problems be diagnosed from Drive instead of server logs
+    def test_the_status_note_says_what_the_watcher_sees(self):
+        self.dw.LAST_POLL.clear(); self.dw.LAST_ERROR.clear(); self.dw._published.update(stable=None, at=0.0)
+        self.drive.add("done.mp4", self.video.read_bytes())
+        self.drive.add("done [edited].mp4", b"x")
+        self.drive.add("new.mp4", self.video.read_bytes(), modified="2026-10-08T12:00:10Z")   # still "uploading"
+        self.drive.add("notes.txt", b"hi", mime="text/plain")
+        now = self.dw.datetime(2026, 10, 8, 12, 0, 20, tzinfo=self.dw.timezone.utc)
+        self.poll(now=now)
+        self.assertTrue(self.dw.publish_status(self.drive, "folder"))
+        text = self.drive.get("Patrick status.txt")["data"].decode()
+        self.assertIn("Version:", text)
+        self.assertIn("Items in the drop folder: 4", text)
+        self.assertIn("done.mp4: already done", text)
+        self.assertIn("new.mp4: changed in the last", text)
+        self.assertIn("Last problem: none", text)
+
+    def test_the_status_note_is_only_rewritten_when_something_changes(self):
+        self.dw.LAST_POLL.clear(); self.dw.LAST_ERROR.clear(); self.dw._published.update(stable=None, at=0.0)
+        self.poll()
+        self.assertTrue(self.dw.publish_status(self.drive, "out"))
+        self.assertFalse(self.dw.publish_status(self.drive, "out"))             # nothing changed: no write
+        self.assertEqual(self.drive.writes, 1)
+        self.dw.LAST_ERROR.update(at="12:00:00 UTC", video="x.mp4", what="RefreshError: invalid_grant")
+        self.assertTrue(self.dw.publish_status(self.drive, "out"))              # a problem appeared: write
+        self.assertIn("invalid_grant", self.drive.get("Patrick status.txt")["data"].decode())
+        self.assertEqual(len([f for f in self.drive.files if f["name"] == "Patrick status.txt"]), 1)  # replaced, not duplicated
 
     def test_the_finished_folder_setting_really_reaches_the_poller(self):
         """Regression: the logic was tested with an explicit folder, but not the step that reads it from Render's settings."""
