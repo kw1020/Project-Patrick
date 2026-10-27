@@ -156,8 +156,8 @@ def _corner_timer_check(app, popup) -> str:
     if not screen.contains(g.topLeft()) or g.width() < 50 or g.height() < 20:
         raise RuntimeError(f"the corner timer is off screen ({g.x()},{g.y()} {g.width()}x{g.height()})")
     detail = f"'{popup.mini_clock.text()}' at {g.x()},{g.y()} {g.width()}x{g.height()}"
-    if sys.platform != "win32":
-        return detail
+    if sys.platform != "win32" or app.platformName() != "windows":
+        return detail + f" ({app.platformName()} display)"  # e.g. the off-screen one in the tests
     import win32gui
 
     hwnd = int(popup.winId())
