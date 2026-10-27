@@ -16,6 +16,19 @@ from gameswap.machine import Machine, State
 from gameswap.testrun import TestRunner
 
 
+class StubActions:
+    """Stand-in for keyboard/window actions; Phase 2 tests never press anything."""
+
+    def foreground(self):
+        return 0
+
+    def bring_to_front(self, hwnd):
+        return True
+
+    def can_read_ui(self):
+        return False
+
+
 @pytest.fixture
 def world(tmp_path, monkeypatch):
     """A pretend PC with the Minecraft Launcher installed and Schedule I in Steam."""
@@ -44,8 +57,9 @@ def world(tmp_path, monkeypatch):
 
     cfg = Config()
     cfg.games["minecraft"].launch_path = str(launcher_exe)
+    cfg.games["minecraft"].auto_click_play = False  # you click PLAY in these tests
     mon = system.monitor()
-    drivers = make_drivers(cfg, mon)
+    drivers = make_drivers(cfg, mon, actions=StubActions())
 
     class World:
         pass
@@ -120,20 +134,17 @@ def test_schedule1_not_installed_is_reported(world, monkeypatch):
     assert problems and "isn't installed" in problems[0]
 
 
-def test_unautomated_steps_stop_and_explain(world):
-    d = world.drivers["minecraft"]
+def test_unautomated_schedule1_steps_stop_and_explain(world):
+    d = world.drivers["schedule1"]
     r = d.load_save(threading.Event())
-    assert not r.ok and "Phase 3" in r.detail and "Continue" in r.detail
+    assert not r.ok and "Phase 4" in r.detail and "Continue" in r.detail
     assert not d.check_ready().ready
     assert not d.save(threading.Event()).ok
-    assert not world.drivers["schedule1"].save(threading.Event()).ok
 
 
 def test_test_load_reports_launch_and_detection(world):
     runner = TestRunner(world.cfg, world.drivers)
-    world.system.add(minecraft_game())
-    world.monitor.scan_now()
-    assert runner.test_load("minecraft")
+    assert runner.test_load("schedule1")
     while runner.busy:
         time.sleep(0.02)
     assert runner.last_result.ok
@@ -150,37 +161,28 @@ def run_until(m: Machine, cond, timeout=10.0):
     raise AssertionError(f"timed out in {m.state} ({m.error})")
 
 
-def test_phase2_round_trip_with_manual_steps(world):
-    """Start -> Minecraft launched -> you load + Continue -> play -> you save/quit +
-    Continue -> GameSwap checks Minecraft really closed -> Schedule I via Steam."""
+def test_schedule1_manual_steps_round_trip(world):
+    """Schedule I (Phase 4 not built yet): launched by Steam, you load + Continue,
+    then you save/quit + Continue, and GameSwap checks it really closed."""
     cfg = world.cfg
+    cfg.rotation = ["schedule1", "minecraft"]
     cfg.play_seconds = 20
     cfg.warning_seconds = [10, 5]
-    cfg.switch_delay_seconds = 0.2
-    cfg.launch_timeout = 10
     m = Machine(cfg, world.drivers)
     m.on_sound = lambda k: None
-    click_play_later(world.system)
-    m.start()
+    m._enter(State.LAUNCHING)
     run_until(m, lambda: m.state == State.ERROR)
-    assert m._error_from == State.LOADING
-    assert "by hand" in m.error
-
-    m.continue_manual()  # you opened your world
+    assert m._error_from == State.LOADING and "by hand" in m.error
+    m.continue_manual()
     assert m.state == State.PLAYING
     m.switch_now()
     run_until(m, lambda: m.state == State.ERROR)
     assert m._error_from == State.SAVING
-
-    m.continue_manual()  # pressed too early: Minecraft is still open
-    assert m.state == State.ERROR, "must not switch while Minecraft is still running"
-
-    world.system.remove(next(p for p in world.system.procs if p.info["name"] == "javaw.exe"))
-    m.continue_manual()  # now really closed
+    m.continue_manual()
+    assert m.state == State.ERROR, "must not switch while Schedule I is still running"
+    world.system.remove(next(p for p in world.system.procs if p.info["name"] == "Schedule I.exe"))
+    m.continue_manual()
     assert m.state == State.SWITCHING
-    run_until(m, lambda: m.state == State.ERROR and m.driver.key == "schedule1")
-    assert world.drivers["schedule1"].is_running()
-    assert m._error_from == State.LOADING
     m.shutdown()
 
 

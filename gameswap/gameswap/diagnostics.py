@@ -11,12 +11,10 @@ contains folder paths, which include your Windows user name.
 
 from __future__ import annotations
 
-import gzip
 import json
 import logging
 import os
 import platform
-import struct
 import sys
 import time
 from pathlib import Path
@@ -24,27 +22,13 @@ from pathlib import Path
 from . import __version__, steam, winapi
 from .config import LOG_DIR, Config
 from .drivers.minecraft import MinecraftDriver, default_game_dir, find_launcher, list_worlds, start_menu_shortcuts
+from .mcworld import level_name
 from .drivers.schedule1 import Schedule1Driver
 
 log = logging.getLogger("gameswap.diag")
 
 MINECRAFT_OPTIONS = ("guiScale", "fullscreen", "lang", "pauseOnLostFocus", "overrideWidth", "overrideHeight")
 UIA_MAX_LINES = 1500
-
-
-def level_name(level_dat: Path) -> str:
-    """The world name shown in Minecraft's world list (stored inside level.dat)."""
-    try:
-        data = gzip.decompress(level_dat.read_bytes())
-    except (OSError, EOFError, gzip.BadGzipFile):
-        return ""
-    marker = b"\x08\x00\x09LevelName"  # NBT: string tag named "LevelName"
-    i = data.find(marker)
-    if i < 0:
-        return ""
-    i += len(marker)
-    (length,) = struct.unpack(">H", data[i:i + 2])
-    return data[i + 2:i + 2 + length].decode("utf-8", errors="replace")
 
 
 def read_options(path: Path) -> dict[str, str]:

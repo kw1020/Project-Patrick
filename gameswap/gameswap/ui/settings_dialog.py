@@ -133,7 +133,16 @@ class SettingsDialog(QDialog):
             folder_row.addWidget(wd["folder"])
             folder_row.addWidget(folder_btn)
             wd["steam"] = QLineEdit(g.steam_app_id)
-            wd["save"] = QLineEdit(g.save_name)
+            if key == "minecraft":
+                wd["save"] = self._world_picker(g)
+            else:
+                wd["save"] = QLineEdit(g.save_name)
+            wd["auto_play"] = QCheckBox("Press Quick Play / PLAY in the launcher for me")
+            wd["auto_play"].setChecked(g.auto_click_play)
+            wd["settle"] = _dspin(g.ready_settle_seconds, 0, 60)
+            wd["backup"] = QCheckBox("Back up the world/save before every Start")
+            wd["backup"].setChecked(g.backup_before_start)
+            wd["keep"] = _spin(g.backups_keep, 1, 100, " backups")
             wd["driver"] = QComboBox()
             if key in DRIVERS:
                 wd["driver"].addItem("Real game", DRIVERS[key][0])
@@ -149,8 +158,17 @@ class SettingsDialog(QDialog):
             if is_steam:
                 form.addRow("Steam App ID", wd["steam"])
             form.addRow("Save to load" if is_steam else "World to open", wd["save"])
-            form.addRow("", _hint("Real driver (Phase 2): launches the game and detects it. You load the save, "
-                                  "save and quit by hand, then press Continue; Phases 3-4 automate those steps."))
+            if is_steam:
+                form.addRow("", _hint("Schedule I (until Phase 4): GameSwap launches it through Steam and "
+                                      "detects it. You load, save and quit by hand, then press Continue."))
+            else:
+                form.addRow(wd["auto_play"])
+                form.addRow("Wait for terrain after joining", wd["settle"])
+                form.addRow("", _hint("Minecraft (Phase 3): opens your world, starts the timer once you're in "
+                                      "the world, saves with the pause menu (confirmed in Minecraft's log) and "
+                                      "closes normally."))
+            form.addRow(wd["backup"])
+            form.addRow("Keep", wd["keep"])
             sim = g.simulation
             wd["sim_launch"] = _dspin(sim.launch_seconds, 0, 120)
             wd["sim_load"] = _dspin(sim.load_seconds, 0, 120)
@@ -239,6 +257,28 @@ class SettingsDialog(QDialog):
         if path:
             edit.setText(path.replace("/", "\\"))
 
+    def _world_picker(self, g) -> QComboBox:
+        """Dropdown of the worlds in the .minecraft folder (you can also type a name)."""
+        from pathlib import Path
+
+        from ..drivers.minecraft import default_game_dir, list_worlds
+        from ..mcworld import level_name
+
+        box = QComboBox()
+        box.setEditable(True)
+        game_dir = Path(g.game_folder) if g.game_folder else default_game_dir()
+        current = -1
+        for folder in list_worlds(game_dir):
+            shown = level_name(game_dir / "saves" / folder / "level.dat") or folder
+            box.addItem(shown if shown == folder else f"{shown}   [{folder}]", folder)
+            if g.save_name in (folder, shown):
+                current = box.count() - 1
+        if current >= 0:
+            box.setCurrentIndex(current)
+        else:
+            box.setEditText(g.save_name)
+        return box
+
     def _browse_folder(self, edit: QLineEdit) -> None:
         path = QFileDialog.getExistingDirectory(self, "Choose the folder", edit.text())
         if path:
@@ -295,7 +335,15 @@ class SettingsDialog(QDialog):
             g.launch_path = wd["path"].text().strip()
             g.game_folder = wd["folder"].text().strip()
             g.steam_app_id = wd["steam"].text().strip()
-            g.save_name = wd["save"].text().strip()
+            if isinstance(wd["save"], QComboBox):
+                i = wd["save"].findText(wd["save"].currentText())
+                g.save_name = (wd["save"].itemData(i) if i >= 0 else wd["save"].currentText()).strip()
+            else:
+                g.save_name = wd["save"].text().strip()
+            g.auto_click_play = wd["auto_play"].isChecked()
+            g.ready_settle_seconds = wd["settle"].value()
+            g.backup_before_start = wd["backup"].isChecked()
+            g.backups_keep = wd["keep"].value()
             g.driver = wd["driver"].currentData()
             s = g.simulation
             s.launch_seconds = wd["sim_launch"].value()

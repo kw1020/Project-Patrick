@@ -69,3 +69,26 @@ def test_window_runs_a_short_cycle(app, tmp_path, monkeypatch):
     assert "EMERGENCY STOP" in win.log_view.toPlainText()
     win.machine.state = State.IDLE  # let the window close without the "quit?" question
     win.close()
+
+
+def test_settings_world_picker_lists_worlds_and_saves_the_folder(app, tmp_path):
+    from fake_minecraft import level_dat
+
+    from gameswap.config import Config
+    from gameswap.ui.settings_dialog import SettingsDialog
+
+    mc_dir = tmp_path / ".minecraft"
+    for folder, shown in (("New World (2)", "Krew's Challenge"), ("Old", "Old")):
+        (mc_dir / "saves" / folder).mkdir(parents=True)
+        (mc_dir / "saves" / folder / "level.dat").write_bytes(level_dat(shown))
+    cfg = Config()
+    cfg.games["minecraft"].game_folder = str(mc_dir)
+    dlg = SettingsDialog(cfg)
+    picker = dlg._game_widgets["minecraft"]["save"]
+    assert [picker.itemText(i) for i in range(picker.count())] == ["Krew's Challenge   [New World (2)]", "Old"]
+    picker.setCurrentIndex(0)
+    dlg._game_widgets["minecraft"]["settle"].setValue(4.5)
+    assert dlg._collect() == []
+    assert dlg.cfg.games["minecraft"].save_name == "New World (2)"
+    assert dlg.cfg.games["minecraft"].ready_settle_seconds == 4.5
+    assert cfg.games["minecraft"].save_name == "", "the original settings change only when you press Save"

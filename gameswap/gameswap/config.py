@@ -39,8 +39,15 @@ class GameConfig:
     # .minecraft folder, or Schedule I's install folder. Blank = find it automatically.
     game_folder: str = ""
     steam_app_id: str = ""
-    # Minecraft world name / Schedule I save slot to load. Used from Phases 3-4.
+    # Minecraft world (folder or shown name) / Schedule I save to load.
     save_name: str = ""
+    # Minecraft: press Quick Play / PLAY in the launcher for you.
+    auto_click_play: bool = True
+    # After the game says you've joined, wait this long for terrain before the timer starts.
+    ready_settle_seconds: float = 3.0
+    # Zip the world/save before every Start, keeping this many backups.
+    backup_before_start: bool = True
+    backups_keep: int = 5
     simulation: SimulationConfig = field(default_factory=SimulationConfig)
 
 

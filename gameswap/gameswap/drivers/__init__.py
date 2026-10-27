@@ -8,7 +8,8 @@ from .simulated import SimulatedGame
 __all__ = ["GameDriver", "ReadyCheck", "StepResult", "SimulatedGame", "make_drivers"]
 
 
-def make_drivers(cfg: Config, monitor: ProcessMonitor) -> dict[str, GameDriver]:
+def make_drivers(cfg: Config, monitor: ProcessMonitor, actions=None) -> dict[str, GameDriver]:
+    """actions: what the drivers use to press keys/buttons (tests pass a fake)."""
     from .minecraft import MinecraftDriver
     from .schedule1 import Schedule1Driver
 
@@ -17,6 +18,8 @@ def make_drivers(cfg: Config, monitor: ProcessMonitor) -> dict[str, GameDriver]:
     for key, game_cfg in cfg.games.items():
         if game_cfg.driver == "simulated":
             drivers[key] = SimulatedGame(key, game_cfg)
+        elif game_cfg.driver == "minecraft":
+            drivers[key] = MinecraftDriver(key, game_cfg, monitor, actions=actions)
         elif game_cfg.driver in real:
             drivers[key] = real[game_cfg.driver](key, game_cfg, monitor)
         else:

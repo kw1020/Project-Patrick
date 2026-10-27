@@ -8,15 +8,27 @@ Each game gets 10 minutes of verified gameplay. Only one game runs at a time, an
 | Phase | What it adds | Status |
 |---|---|---|
 | 1 | App window, timer, state machine, OBS scene switching, overlay, sounds, logs | Built (checklist in section 7) |
-| **2** | Launching each game and detecting its process and window; Diagnostics | **Built: test it with the checklist in section 8** |
-| 3 | Minecraft: open your world, verify gameplay, Save and Quit, normal exit | Not started |
+| 2 | Launching each game and detecting its process and window; Diagnostics | Built (checklist in section 8) |
+| **3** | Minecraft: open your world, verify gameplay, verified save, normal exit, world backups | **Built: test it with the checklist in section 9** |
 | 4 | Schedule I: load your save, verify gameplay, verified save, normal exit | Not started |
 | 5 | Full automatic run, error recovery polish, one-file `.exe` | Not started |
 
-**What Phase 2 does with the real games:**
-- **Schedule I:** GameSwap asks Steam to start it (`steam.exe -applaunch 3164500`, Steam's own command), then detects the game's process and window.
-- **Minecraft:** GameSwap opens the Minecraft Launcher, **you click PLAY**, and GameSwap detects the game and its window. The official launcher has no supported way to press Play from outside, so Phase 3 will automate that click only after Diagnostics shows how its buttons look on your PC.
-- **Loading your save, saving, and quitting are still done by you.** When GameSwap reaches one of those steps, it stops and tells you what to do. You do it, then press **Continue**. GameSwap checks your answer where it can: it refuses to move on until the game's process has really exited. Phases 3–4 automate these steps.
+**What GameSwap does with the real games now:**
+
+**Minecraft (Phase 3, automatic).** Every step is checked against something Minecraft itself reports:
+
+| Step | What GameSwap does | How it knows it worked |
+|---|---|---|
+| Launch | Opens the launcher and presses your world's **Quick Play** entry, or **PLAY** if that entry isn't there. It uses Windows' accessibility system, like a screen reader: no mouse moves, no keys. If it can't find exactly one match, it asks you to click. | Minecraft's process and window appear. |
+| Open world | Quick Play opens your world directly. Otherwise the status asks you to open it (Singleplayer → your world → Play Selected World), and GameSwap notices by itself when you do. | Minecraft locks that world's folder (`session.lock`), and GameSwap checks it's your world, not another one. |
+| Timer starts | Waits for real gameplay. | The world is open, Minecraft's log says **"*you* joined the game"**, the terrain wait (3 s) has passed, and Minecraft is the active window. |
+| Save | Presses **Esc**, but only after confirming Minecraft's window is in front. Never more than twice. | Minecraft's log says **"Saving and pausing game..."**, which it writes when it saves the world on pause. |
+| Quit | Asks the window to close, the same as clicking its **X**. Minecraft then saves and unloads the world itself. | The log shows **"Stopping server"** and **"Saving worlds"**, the world folder unlocks, and the Java process exits. |
+| Backup | Zips your world into `C:\GameSwap\backups\` before every Start, keeping the last 5. | The zip appears there. |
+
+GameSwap doesn't click Minecraft's "Save and Quit to Title" button. Its position changes with Minecraft version, GUI scale and window size, and GameSwap can't see the screen to confirm it, which would break the no-blind-input rule. Closing the window makes Minecraft run its own save-and-unload, and the log confirms it.
+
+**Schedule I (until Phase 4).** GameSwap asks Steam to start it (`steam.exe -applaunch 3164500`, Steam's own command) and detects its process and window. **Loading, saving and quitting are still done by you:** GameSwap stops and tells you what to do; you do it and press **Continue**. It refuses to move on until Schedule I has really exited.
 
 Each game can also be set to **Simulated** (Settings → Games → Game driver), a pretend game for testing the timer, buttons and OBS without starting anything.
 
@@ -61,7 +73,7 @@ If Windows shows *"Windows protected your PC"*, click **More info** and then **R
 
 ## 4. Run the automatic tests
 
-Double-click **`run_tests.bat`**. Expected result: **every line says PASSED**, ending with something like `62 passed`.
+Double-click **`run_tests.bat`**. Expected result: **every line says PASSED**, ending with something like `80 passed`.
 These tests check the timer, every state change, warnings, pause, stop, Emergency Stop, the error handling, and OBS control. The OBS tests use a fake OBS, so your real OBS isn't affected.
 
 ## 5. Set up OBS (one time)
@@ -139,6 +151,8 @@ After testing, send me:
 
 ## 8. Phase 2 test checklist (do this on your PC)
 
+> **Since Phase 3, Minecraft's steps are automatic,** so P2–P7 below no longer match what Minecraft does; use section 9 for Minecraft instead. P1 and P8–P14 still apply, and so does the Schedule I part of P7–P9.
+
 First: **Settings → Games**, set **Game driver → Real game** for both, and leave the paths blank. Keep Play time at **1 min** for now. Close both games and the Minecraft Launcher.
 
 | # | Do this | It PASSES if |
@@ -163,14 +177,39 @@ After testing, send me:
 2. the **Diagnostics report from P14** (in `C:\GameSwap\logs\`). It contains folder paths with your Windows user name, but no passwords or login tokens;
 3. today's log file from the same folder.
 
-## 9. What I still need from you for Phases 3–4
+## 9. Phase 3 test checklist: Minecraft (do this on your PC)
 
-Diagnostics answers most setup questions automatically: launcher, version, worlds, Minecraft options, Steam folders, monitors. Please tell me:
+**Before you start:** make your own copy of your world as well, for extra safety. In Minecraft: Singleplayer → select the world → **Edit** → **Make Backup**. GameSwap also zips it before every Start.
 
-**Minecraft**
-1. Which world GameSwap should open (as shown in the Diagnostics world list).
-2. Is the game modded (Fabric, Forge, etc.) or vanilla?
-3. Your Windows **display scale** (Settings → System → Display → Scale), e.g. 100% or 125%.
+Setup: **Settings → Games → Minecraft**:
+- Game driver **Real game**.
+- **World to open:** pick your world from the list.
+- **Press Quick Play / PLAY for me** ticked.
+
+Set Schedule I's driver to **Simulated** so you can test Minecraft on its own. Play time **1 min**. Close Minecraft and the launcher. Open your world once by hand first, so it's in the launcher's Quick Play list, then quit Minecraft.
+
+| # | Do this | It PASSES if |
+|---|---|---|
+| M1 | Press **Start** | The log shows "Backing up Minecraft world" and a new zip appears in `C:\GameSwap\backups\`. The launcher opens and the log says **Pressed Quick Play '...'** (or **Pressed PLAY**). Minecraft starts **without you touching anything**. |
+| M2 | Watch the countdown | It stays at `--:--` through the Mojang screen and the "Loading terrain" screen. It starts at **1:00** only when you can see and move in the world. *Tell me how many seconds after you could move it started.* |
+| M3 | If M1 said "Pressed PLAY" | The status says "open your world". Open it yourself; the timer starts by itself, with no Continue. |
+| M4 | Open a **different** world instead (repeat M3 with the wrong one) | A red box says the wrong world was opened. The timer does not start. |
+| M5 | Let it reach 0:00 while you walk around | OBS shows Switching, the pause menu appears, and the log says **"Minecraft confirmed 'Saving and pausing game' (Esc press 1)"**. Then Minecraft closes and the log says **"world saved and unloaded ('Saving worlds')"**. The Games box shows "not running" **before** the next game starts. |
+| M6 | Repeat, but have your **inventory open** at 0:00 | Esc press 2 is used, and the save is still confirmed. |
+| M7 | Repeat, but **hold Ctrl (sprint)** at 0:00 | The Start menu does **not** open, and the save is confirmed. |
+| M8 | Repeat, but click into **OBS** just before 0:00 | GameSwap brings Minecraft back to the front, *or* stops with "no keys were sent". **Keys never go to OBS.** |
+| M9 | Mid-turn, **Test Save** (Games box) | The log says Test Save PASSED and Minecraft is paused, not closed. |
+| M10 | Open your world, and while it loads click into another window | Either the timer waits until Minecraft is in front, or a red box says Minecraft paused itself and to press Esc, then Continue. |
+| M11 | Run 4 real turns, Minecraft ↔ simulated Schedule I | Every Minecraft turn opens the right world automatically, saves (confirmed) and closes cleanly. Afterwards, open the world by hand: everything you did in each turn is still there. |
+| M12 | After testing, look in `C:\GameSwap\backups\minecraft-<your world>\` | It holds at most 5 zips, and the newest opens as a normal world. |
+
+After testing, send me:
+1. which M-tests passed or failed;
+2. today's log file;
+3. a **Diagnostics** report made with the launcher open;
+4. your answer to M2 (how long after you could move did the timer start).
+
+## 10. What I still need from you for Phase 4 (Schedule I)
 
 **Schedule I**
 1. Which **save slot** to load, and what the main menu shows (Continue? Load Game? slot names?).
@@ -195,6 +234,11 @@ gameswap/
     steam.py           finds Steam, its libraries, and Schedule I's folder from Steam's own files
     winapi.py          small Windows helpers (windows, registry, shortcuts)
     diagnostics.py     the Diagnostics report
+    actions.py         every key press / button press / window close GameSwap can do (with safety checks)
+    mclog.py           reads Minecraft's log to confirm joins, saves and world unloads
+    mcworld.py         reads world names from level.dat
+    backup.py          zips worlds/saves before each Start
+  backups/             your world backups (newest 5 per world)
     obs.py             OBS WebSocket control (scenes, recording check)
     overlay.py         local web server for the OBS overlays
     overlay_pages/     the overlay pages (timer + switching screen)
@@ -223,6 +267,9 @@ gameswap/
 | "Steam wasn't found" / "isn't installed in any Steam library" | Browse to `steam.exe` in Settings, or set Schedule I's Install folder (Steam → Schedule I → Manage → Browse local files). |
 | Steam shows a "choose launch option" box | Pick the normal option. Tell me about it, and Phase 4 will handle it. |
 | Minecraft's window appears but GameSwap keeps waiting | Run Diagnostics while it's open and send me the "Game processes" part. |
+| "Couldn't press PLAY automatically" | Click PLAY yourself; GameSwap carries on. Send me a Diagnostics report made with the launcher open, so I can fix the automatic press. |
+| "there is no world called ..." | Pick the world from the list in Settings. If your launcher installation uses its own game folder, set **.minecraft folder** to that folder. |
+| "pressed Esc twice but Minecraft didn't report saving" | Is the world opened to LAN? Close LAN, then press Retry. GameSwap never closes a game whose save it couldn't confirm. |
 | "Python 3.12 was not found" | Do step 1 again and make sure **Add python.exe to PATH** is ticked. |
 | "OBS isn't answering" | Open OBS and check step 5a. |
 | "OBS rejected the password" | Copy it again from **Show Connect Info** into Settings → OBS. |
