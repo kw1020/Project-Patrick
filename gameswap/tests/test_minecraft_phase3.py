@@ -41,6 +41,7 @@ def make(pc, **game):
     for k, v in game.items():
         setattr(g, k, v)
     cfg.games["schedule1"].driver = "simulated"
+    cfg.games["schedule1"].save_prompt_seconds = 0
     for s in (cfg.games["schedule1"].simulation,):
         s.launch_seconds = s.load_seconds = s.save_seconds = s.exit_seconds = 0.05
         s.ready_after_seconds = 0.1

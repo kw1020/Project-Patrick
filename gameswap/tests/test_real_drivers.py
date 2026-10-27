@@ -55,7 +55,13 @@ def world(tmp_path, monkeypatch):
     monkeypatch.setattr(steam, "find_steam_dir", lambda configured="": steam_dir)
     monkeypatch.setattr(RealGameDriver, "POLL", 0.02)
 
+    saves = tmp_path / "Saves"
+    (saves / "76561198000000000" / "SaveGame_1").mkdir(parents=True)
+    (saves / "76561198000000000" / "SaveGame_1" / "Game.json").write_text('{"OrganisationName": "Krew Co"}')
     cfg = Config()
+    cfg.games["schedule1"].save_folder = str(saves)
+    cfg.games["schedule1"].save_name = "SaveGame_1"
+    cfg.games["schedule1"].backup_before_start = False
     cfg.games["minecraft"].launch_path = str(launcher_exe)
     cfg.games["minecraft"].auto_click_play = False  # you click PLAY in these tests
     mon = system.monitor()
@@ -134,14 +140,6 @@ def test_schedule1_not_installed_is_reported(world, monkeypatch):
     assert problems and "isn't installed" in problems[0]
 
 
-def test_unautomated_schedule1_steps_stop_and_explain(world):
-    d = world.drivers["schedule1"]
-    r = d.load_save(threading.Event())
-    assert not r.ok and "Phase 4" in r.detail and "Continue" in r.detail
-    assert not d.check_ready().ready
-    assert not d.save(threading.Event()).ok
-
-
 def test_test_load_reports_launch_and_detection(world):
     runner = TestRunner(world.cfg, world.drivers)
     assert runner.test_load("schedule1")
@@ -159,31 +157,6 @@ def run_until(m: Machine, cond, timeout=10.0):
             return
         time.sleep(0.02)
     raise AssertionError(f"timed out in {m.state} ({m.error})")
-
-
-def test_schedule1_manual_steps_round_trip(world):
-    """Schedule I (Phase 4 not built yet): launched by Steam, you load + Continue,
-    then you save/quit + Continue, and GameSwap checks it really closed."""
-    cfg = world.cfg
-    cfg.rotation = ["schedule1", "minecraft"]
-    cfg.play_seconds = 20
-    cfg.warning_seconds = [10, 5]
-    m = Machine(cfg, world.drivers)
-    m.on_sound = lambda k: None
-    m._enter(State.LAUNCHING)
-    run_until(m, lambda: m.state == State.ERROR)
-    assert m._error_from == State.LOADING and "by hand" in m.error
-    m.continue_manual()
-    assert m.state == State.PLAYING
-    m.switch_now()
-    run_until(m, lambda: m.state == State.ERROR)
-    assert m._error_from == State.SAVING
-    m.continue_manual()
-    assert m.state == State.ERROR, "must not switch while Schedule I is still running"
-    world.system.remove(next(p for p in world.system.procs if p.info["name"] == "Schedule I.exe"))
-    m.continue_manual()
-    assert m.state == State.SWITCHING
-    m.shutdown()
 
 
 def test_switching_refuses_while_previous_game_still_running(world):

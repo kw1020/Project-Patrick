@@ -82,6 +82,8 @@ class Snapshot:
     turn: int
     continue_label: str  # text for the Continue button in ERROR, "" if not allowed
     busy: bool  # a Start check is running
+    prompt: str = ""  # e.g. "SAVE NOW: sleep in your bed..." for games you save yourself
+    can_confirm_ready: bool = False  # the Ready button applies right now
 
 
 class Machine:
@@ -107,6 +109,8 @@ class Machine:
         self.message = "Press Start when OBS is open."
         self.error = ""
         self.unverified = False
+        self.prompt = ""
+        self._prompted = False
 
         self._job: Future | None = None
         self._preflight: Future | None = None
@@ -169,6 +173,21 @@ class Machine:
 
     def toggle_pause(self) -> None:
         self.resume() if self.paused else self.pause()
+
+    def confirm_ready(self) -> None:
+        """You say you're in the game (for games whose gameplay can't be detected)."""
+        d = self.driver
+        if self.state != State.VERIFYING_GAMEPLAY or self.paused or not getattr(d, "manual_ready", False):
+            return
+        d.refresh()
+        if not d.is_running():
+            log.error("Ready ignored: %s isn't running.", d.name)
+            return
+        hook = getattr(d, "on_manual_ready", None)
+        if hook:
+            hook()
+        log.info("You confirmed %s is in gameplay.", d.name)
+        self._start_playing(self.cfg.play_seconds, verified_by="you")
 
     def switch_now(self) -> None:
         if self.state == State.PLAYING and not self.paused:
@@ -356,6 +375,13 @@ class Machine:
                 final = w == min(self.cfg.warning_seconds)
                 log.info("%d-second warning for %s.", w, self.driver.name)
                 self._sound("final" if final else "warning")
+        prompt_at = self.driver.cfg.save_prompt_seconds
+        if prompt_at and not self._prompted and 0 < self._remaining <= prompt_at:
+            self._prompted = True
+            hint = getattr(self.driver, "save_hint", "save your game")
+            self.prompt = f"SAVE NOW: {hint}"
+            log.info("Save prompt for %s (%d s left): %s.", self.driver.name, secs, hint)
+            self._sound("save")
         if 0 < secs <= 3 and secs != self._last_tick_sound:
             self._last_tick_sound = secs
             self._sound("tick")
@@ -374,9 +400,10 @@ class Machine:
     def _tick_saving(self, dt):
         result = self._job_result()
         if result is None:
-            if self._state_time > self.cfg.save_timeout:
-                self._fail(f"Saving {self.driver.name} didn't finish within {self.cfg.save_timeout} s. "
-                           "Check the game - it was NOT closed.")
+            limit = self.driver.cfg.save_wait_seconds or self.cfg.save_timeout
+            if self._state_time > limit:
+                self._fail(f"Saving {self.driver.name} wasn't confirmed within {limit} s. "
+                           "Check the game - it was NOT closed. Save it, then press Retry.")
             return
         if result.ok:
             log.info("%s saved: %s", self.driver.name, result.detail)
@@ -439,10 +466,14 @@ class Machine:
             self.message = f"Waiting for {driver.name} gameplay..."
         elif state == State.SAVING:
             self.message = f"Saving {driver.name}..."
-            self.obs.set_scene(self.cfg.obs.switching_scene)
+            if getattr(driver, "save_needs_player", False):
+                self._sound("save")  # you save in-game, so the game stays on screen
+            else:
+                self.obs.set_scene(self.cfg.obs.switching_scene)
             self._job = self._executor.submit(self._safe_step, driver.save, self._step_abort)
         elif state == State.EXITING:
             self.message = f"Closing {driver.name}..."
+            self.obs.set_scene(self.cfg.obs.switching_scene)
             self._job = self._executor.submit(self._safe_step, driver.exit, self._step_abort)
         elif state == State.SWITCHING:
             if advance:
@@ -458,6 +489,8 @@ class Machine:
         self._enter(State.PLAYING)
         self._remaining = float(seconds)
         self._warned = {w for w in self.cfg.warning_seconds if w >= seconds}
+        self._prompted = False
+        self.prompt = ""
         self._last_tick_sound = None
         self.unverified = verified_by is None
         self.turn += 1
@@ -585,6 +618,9 @@ class Machine:
             turn=self.turn,
             continue_label=self.continue_label(),
             busy=self._preflight is not None,
+            prompt=self.prompt if self.state in (State.PLAYING, State.SAVING) else "",
+            can_confirm_ready=(self.state == State.VERIFYING_GAMEPLAY and not self.paused
+                               and bool(getattr(self.driver, "manual_ready", False))),
         )
 
     def shutdown(self) -> None:

@@ -108,9 +108,23 @@ class TestRunner:
         return StepResult(False, f"gameplay not verified within the {self.cfg.load_timeout} s load timeout")
 
     def _save(self, driver: GameDriver) -> StepResult:
+        driver.refresh()
         if not driver.is_running():
             return StepResult(False, f"{driver.name} isn't running. Run Test Load first.")
-        check = driver.check_ready()
-        if not check.ready:
-            return StepResult(False, f"{driver.name} isn't in verified gameplay ({check.detail}).")
-        return driver.save(self._abort)
+        if getattr(driver, "save_needs_player", False):
+            log.info("Test Save: save in %s now (%s). GameSwap will verify it on disk.",
+                     driver.name, getattr(driver, "save_hint", "use the game's save"))
+        else:
+            check = driver.check_ready()
+            if not check.ready:
+                return StepResult(False, f"{driver.name} isn't in verified gameplay ({check.detail}).")
+        limit = driver.cfg.save_wait_seconds or self.cfg.save_timeout
+        timer = threading.Timer(limit, self._abort.set)
+        timer.start()
+        try:
+            result = driver.save(self._abort)
+        finally:
+            timer.cancel()
+        if not result.ok and self._abort.is_set():
+            return StepResult(False, f"no save confirmed within {limit} s ({result.detail})")
+        return result

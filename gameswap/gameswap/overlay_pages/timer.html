@@ -24,6 +24,7 @@
   .final { border-color: #ff3b3b; background: rgba(60, 0, 0, 0.8); animation: pulse 1s infinite; }
   .final .clock { color: #ff5252; }
   .paused .clock { color: #9aa3b2; }
+  .sub.prompt { opacity: 1; color: #7dffb0; font-weight: 700; max-width: 440px; }
   @keyframes pulse { 50% { transform: scale(1.04); } }
 </style>
 </head>
@@ -44,14 +45,17 @@ async function refresh() {
       $('game').textContent = s.game;
       $('clock').textContent = s.clock;
       $('sub').textContent = s.paused ? 'PAUSED'
+        : s.prompt ? s.prompt
         : s.level === 'final' ? 'Switching to ' + s.next + '!'
         : s.level === 'warning' ? 'Next up: ' + s.next
         : 'Next: ' + s.next;
+      $('sub').className = s.prompt && !s.paused ? 'sub prompt' : 'sub';
     } else if (s.state && s.state !== 'IDLE' && s.state !== 'STOPPED') {
       card.className = 'card';
       $('game').textContent = s.state === 'SWITCHING' ? s.next : s.game;
       $('clock').textContent = s.label + '…';
       $('sub').textContent = s.message || '';
+      $('sub').className = 'sub';
     } else {
       card.className = 'card hidden';
     }

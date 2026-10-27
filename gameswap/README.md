@@ -9,8 +9,8 @@ Each game gets 10 minutes of verified gameplay. Only one game runs at a time, an
 |---|---|---|
 | 1 | App window, timer, state machine, OBS scene switching, overlay, sounds, logs | Built (checklist in section 7) |
 | 2 | Launching each game and detecting its process and window; Diagnostics | Built (checklist in section 8) |
-| **3** | Minecraft: open your world, verify gameplay, verified save, normal exit, world backups | **Built: test it with the checklist in section 9** |
-| 4 | Schedule I: load your save, verify gameplay, verified save, normal exit | Not started |
+| 3 | Minecraft: open your world, verify gameplay, verified save, normal exit, world backups | Built (checklist in section 9) |
+| **4** | Schedule I: Steam launch, save prompt, save verified on disk, normal exit, save backups | **Built: test it with the checklist in section 10** |
 | 5 | Full automatic run, error recovery polish, one-file `.exe` | Not started |
 
 **What GameSwap does with the real games now:**
@@ -28,7 +28,20 @@ Each game gets 10 minutes of verified gameplay. Only one game runs at a time, an
 
 GameSwap doesn't click Minecraft's "Save and Quit to Title" button. Its position changes with Minecraft version, GUI scale and window size, and GameSwap can't see the screen to confirm it, which would break the no-blind-input rule. Closing the window makes Minecraft run its own save-and-unload, and the log confirms it.
 
-**Schedule I (until Phase 4).** GameSwap asks Steam to start it (`steam.exe -applaunch 3164500`, Steam's own command) and detects its process and window. **Loading, saving and quitting are still done by you:** GameSwap stops and tells you what to do; you do it and press **Continue**. It refuses to move on until Schedule I has really exited.
+**Schedule I (Phase 4).** Schedule I has **no save key and no pause-menu save**. It saves only when you **sleep in your bed** or use the **save device** by a property's door, and **quitting does not save**. So GameSwap never pretends it can save for you; it makes sure *your* save really happened:
+
+| Step | Who does it | How GameSwap knows it worked |
+|---|---|---|
+| Launch | GameSwap, through Steam (`steam.exe -applaunch 3164500`) | The game's process and window appear. |
+| Load your save | **You:** Continue → your save. The status shows which save to pick. | (see Ready) |
+| Ready | **You** press **I'm in the game (Ready)** or **Ctrl+Shift+F10** once you can play. | Schedule I has no known reliable "loaded" signal yet, so GameSwap asks instead of guessing. Each time you press Ready it records the game's `Player.log` lines, so we can make this automatic later (section 11). |
+| Save | **You**, when **SAVE NOW** appears (60 s before the end, with a sound and in the OBS overlay). The game stays on screen in OBS while you walk to save. | GameSwap watches your save slot on disk. The files must be **newly written** (within the last 90 s), **stop changing**, and **read back as valid save data**. |
+| Quit | GameSwap, **only after a verified save**: it closes the window, the same as clicking its X. | The process exits. If Schedule I asks "are you sure?", you confirm it; GameSwap never clicks it for you. |
+| Backup | GameSwap zips your save slot before every Start. | The zip appears in `C:\GameSwap\backups\`. |
+
+If no save is verified when the turn ends, GameSwap **keeps waiting** (up to 5 minutes) with SAVE NOW showing. After that it stops and asks you, and it **never closes Schedule I without a verified save**.
+
+> **Important:** anything you do in Schedule I *after* your save isn't kept, because quitting doesn't save. Save near the end of the turn, then just wait out the last seconds.
 
 Each game can also be set to **Simulated** (Settings → Games → Game driver), a pretend game for testing the timer, buttons and OBS without starting anything.
 
@@ -73,7 +86,7 @@ If Windows shows *"Windows protected your PC"*, click **More info** and then **R
 
 ## 4. Run the automatic tests
 
-Double-click **`run_tests.bat`**. Expected result: **every line says PASSED**, ending with something like `80 passed`.
+Double-click **`run_tests.bat`**. Expected result: **every line says PASSED**, ending with something like `90 passed`.
 These tests check the timer, every state change, warnings, pause, stop, Emergency Stop, the error handling, and OBS control. The OBS tests use a fake OBS, so your real OBS isn't affected.
 
 ## 5. Set up OBS (one time)
@@ -209,12 +222,40 @@ After testing, send me:
 3. a **Diagnostics** report made with the launcher open;
 4. your answer to M2 (how long after you could move did the timer start).
 
-## 10. What I still need from you for Phase 4 (Schedule I)
+## 10. Phase 4 test checklist: Schedule I (do this on your PC)
 
-**Schedule I**
-1. Which **save slot** to load, and what the main menu shows (Continue? Load Game? slot names?).
-2. **What you see when you save.** Pause the game and tell me exactly which buttons exist, what happens when you press the save button (any message or icon?), and how you quit to the desktop. I won't assume any keyboard shortcut saves. A screenshot of the pause menu helps a lot.
-3. Display mode (fullscreen / borderless / windowed) and resolution.
+**Before you start:** copy your Schedule I save folder somewhere safe. Press **Win+R**, paste `%USERPROFILE%\AppData\LocalLow\TVGS\Schedule I\Saves`, press Enter, and copy the folder you see to your Desktop. GameSwap also zips the save before every Start.
+
+Setup: **Settings → Games → Schedule I**:
+- Game driver **Real game**.
+- **Save to load:** pick your save from the list.
+- Leave **Show SAVE NOW at 60 s**, **A save this recent counts 90 s** and **Wait for your save up to 300 s**.
+
+Set Minecraft to **Simulated** for S1–S10. Play time **2 min**.
+
+| # | Do this | It PASSES if |
+|---|---|---|
+| S1 | Click **Diagnostics** | The Schedule I part lists your saves with their names and "last saved" times, shows **Save to load** = your save, and finds `Player.log`. |
+| S2 | Press **Start**. The pretend Minecraft turn runs first; press **Switch Now** to skip it. | The log shows "Backing up Schedule I save" and a new zip appears in `backups\`. Steam starts Schedule I **by itself**, and the status says which save to load. |
+| S3 | Load your save. While it loads, **don't** press anything | The timer stays at `--:--`. It never starts by itself. |
+| S4 | Once you can move, press **Ctrl+Shift+F10** (or the Ready button) | The timer starts at **2:00**, OBS switches to **Schedule I**, and the log shows "Player.log lines just before you pressed Ready". |
+| S5 | Wait for **1:00** | A three-note sound plays, and **SAVE NOW: sleep in bed or use the save device** appears in GameSwap and the OBS overlay (green text). |
+| S6 | **Don't** save; let it reach 0:00 | OBS **stays on Schedule I**. The status says SAVE NOW (no save yet). The game is **not** closed. |
+| S7 | Now use the save device (or sleep) | Within a few seconds the log says **"save '...' verified on disk"**. Then OBS shows Switching, the log says Schedule I **exited normally after a verified save**, and the game closes by itself. |
+| S8 | Next turn: save **right at** SAVE NOW, then wait | At 0:00 the save already counts, so it quits straight away. |
+| S9 | Next turn: settings **Wait for your save up to 20 s**. Don't save. | After 20 s a red box says the save wasn't confirmed and the game was NOT closed. Save in-game, press **Retry**, and it continues. |
+| S10 | During S7, if Schedule I shows a "quit?" box | Confirm it yourself; GameSwap notices the exit. *Tell me whether a box appeared.* |
+| S11 | Turn Minecraft back to **Real** and run **4 turns** at 10 min | Minecraft ↔ Schedule I alternate, only one game runs at a time, and OBS records the whole time. Afterwards, load both games by hand: **all progress up to each save is there**. |
+| S12 | Check `C:\GameSwap\backups\` | It has `minecraft-...` and `schedule1-...` folders with at most 5 zips each. |
+
+After testing, send me:
+1. which S-tests passed or failed;
+2. today's log file. It contains the Player.log lines from S4, which I can use to make Ready automatic;
+3. your answer to S10.
+
+## 11. Making Schedule I's Ready automatic (optional, later)
+
+If the log lines from S4 show a line Schedule I always writes once a save has loaded, put a pattern for it in **Settings → Schedule I → Ready log line**. The timer then starts by itself (after the terrain wait) instead of waiting for Ready. Send me the log and I'll tell you the exact pattern. Don't guess one: a wrong pattern could start the timer during a loading screen.
 
 ---
 
@@ -238,6 +279,8 @@ gameswap/
     mclog.py           reads Minecraft's log to confirm joins, saves and world unloads
     mcworld.py         reads world names from level.dat
     backup.py          zips worlds/saves before each Start
+    s1saves.py         Schedule I save slots, and the on-disk save check
+    logfollow.py       follows a game's log file as it's written
   backups/             your world backups (newest 5 per world)
     obs.py             OBS WebSocket control (scenes, recording check)
     overlay.py         local web server for the OBS overlays
@@ -269,6 +312,8 @@ gameswap/
 | Minecraft's window appears but GameSwap keeps waiting | Run Diagnostics while it's open and send me the "Game processes" part. |
 | "Couldn't press PLAY automatically" | Click PLAY yourself; GameSwap carries on. Send me a Diagnostics report made with the launcher open, so I can fix the automatic press. |
 | "there is no world called ..." | Pick the world from the list in Settings. If your launcher installation uses its own game folder, set **.minecraft folder** to that folder. |
+| Schedule I: "no Schedule I saves found" | Set **Saves folder** in Settings to the folder that has your `SaveGame_...` folders inside a Steam-ID folder. |
+| Schedule I: SAVE NOW stays even though you saved | Make sure **Save to load** is the save you're playing. GameSwap only watches that slot. Diagnostics shows each slot's "last saved" time. |
 | "pressed Esc twice but Minecraft didn't report saving" | Is the world opened to LAN? Close LAN, then press Retry. GameSwap never closes a game whose save it couldn't confirm. |
 | "Python 3.12 was not found" | Do step 1 again and make sure **Add python.exe to PATH** is ticked. |
 | "OBS isn't answering" | Open OBS and check step 5a. |

@@ -92,3 +92,26 @@ def test_settings_world_picker_lists_worlds_and_saves_the_folder(app, tmp_path):
     assert dlg.cfg.games["minecraft"].save_name == "New World (2)"
     assert dlg.cfg.games["minecraft"].ready_settle_seconds == 4.5
     assert cfg.games["minecraft"].save_name == "", "the original settings change only when you press Save"
+
+
+def test_settings_save_slot_picker(app, tmp_path):
+    import json
+
+    from gameswap.config import Config
+    from gameswap.s1saves import resolve_slot
+    from gameswap.ui.settings_dialog import SettingsDialog
+
+    saves = tmp_path / "Saves"
+    for sid in ("111", "222"):
+        slot = saves / sid / "SaveGame_1"
+        slot.mkdir(parents=True)
+        (slot / "Game.json").write_text(json.dumps({"OrganisationName": "Krew Co"}))
+    cfg = Config()
+    cfg.games["schedule1"].save_folder = str(saves)
+    dlg = SettingsDialog(cfg)
+    picker = dlg._game_widgets["schedule1"]["save"]
+    assert picker.count() == 2 and all("Krew Co (SaveGame_1)" in picker.itemText(i) for i in range(2))
+    picker.setCurrentIndex(1)
+    assert dlg._collect() == []
+    chosen = dlg.cfg.games["schedule1"].save_name
+    assert resolve_slot(saves, chosen).steam_id == "222", "two accounts with the same name stay apart"

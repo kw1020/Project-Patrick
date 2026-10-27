@@ -176,14 +176,17 @@ class MainWindow(QMainWindow):
         self.resume_btn = QPushButton("Resume")
         self.stop_btn = QPushButton("Stop")
         self.switch_btn = QPushButton("Switch Now")
+        self.ready_btn = QPushButton("I'm in the game (Ready)")
+        self.ready_btn.setToolTip("For Schedule I: press once your save has loaded and you can play")
         self.emergency_btn = QPushButton("EMERGENCY STOP", objectName="emergency")
         self.start_btn.clicked.connect(lambda: self.machine.start())
         self.pause_btn.clicked.connect(lambda: self.machine.pause())
         self.resume_btn.clicked.connect(lambda: self.machine.resume())
         self.stop_btn.clicked.connect(lambda: self.machine.stop())
         self.switch_btn.clicked.connect(lambda: self.machine.switch_now())
+        self.ready_btn.clicked.connect(lambda: self.machine.confirm_ready())
         self.emergency_btn.clicked.connect(self._emergency)
-        for b in (self.start_btn, self.pause_btn, self.resume_btn, self.stop_btn, self.switch_btn):
+        for b in (self.start_btn, self.pause_btn, self.resume_btn, self.stop_btn, self.switch_btn, self.ready_btn):
             buttons.addWidget(b)
         buttons.addStretch(1)
         self.emergency_btn.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
@@ -282,12 +285,13 @@ class MainWindow(QMainWindow):
             h.pause: lambda: self.bridge.hotkey.emit("pause"),
             h.stop: lambda: self.bridge.hotkey.emit("stop"),
             h.emergency: lambda: self.bridge.hotkey.emit("emergency"),
+            h.ready: lambda: self.bridge.hotkey.emit("ready"),
         }
         self.hotkeys = HotkeyListener(bindings, lambda msg: log.warning(msg))
         self.hotkeys.start()
         self.hotkey_label.setText(
             f"Hotkeys (work in-game):  Start/Resume {h.start}   ·   Pause/Resume {h.pause}   ·   "
-            f"Stop {h.stop}   ·   Emergency Stop {h.emergency}"
+            f"Stop {h.stop}   ·   Emergency Stop {h.emergency}   ·   Ready {h.ready}"
         )
         self._build_games_rows()
 
@@ -323,7 +327,7 @@ class MainWindow(QMainWindow):
             state_text = self.tests.current + "..."
         self.state_label.setText(state_text)
         self.next_label.setText(f"Next: {s.next_name}")
-        self.message_label.setText(s.message)
+        self.message_label.setText(f"⚠ {s.prompt}" if s.prompt and s.state == State.PLAYING else s.message)
         if s.remaining is not None:
             self.clock_label.setText(f"{s.remaining // 60:02d}:{s.remaining % 60:02d}")
             color = {"final": "#ff5252", "warning": "#ffb020"}.get(s.warning_level, "#ffffff")
@@ -348,6 +352,7 @@ class MainWindow(QMainWindow):
         self.resume_btn.setEnabled(active and s.paused)
         self.stop_btn.setEnabled(active or in_error)
         self.switch_btn.setEnabled(s.state == State.PLAYING and not s.paused)
+        self.ready_btn.setEnabled(s.can_confirm_ready)
         self.settings_btn.setEnabled(idle and not testing)
         for key, (running, load_btn, save_btn) in self.game_rows.items():
             d = m.drivers[key]
@@ -389,6 +394,8 @@ class MainWindow(QMainWindow):
             self.machine.stop()
         elif action == "emergency":
             self._emergency()
+        elif action == "ready":
+            self.machine.confirm_ready()
 
     def _test(self, kind: str, key: str) -> None:
         if kind == "load":

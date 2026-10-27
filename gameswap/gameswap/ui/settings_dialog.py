@@ -135,8 +135,17 @@ class SettingsDialog(QDialog):
             wd["steam"] = QLineEdit(g.steam_app_id)
             if key == "minecraft":
                 wd["save"] = self._world_picker(g)
+            elif key == "schedule1":
+                wd["save"] = self._slot_picker(g)
             else:
                 wd["save"] = QLineEdit(g.save_name)
+            wd["saves_folder"] = QLineEdit(g.save_folder)
+            wd["saves_folder"].setPlaceholderText("blank = AppData\\LocalLow\\TVGS\\Schedule I\\Saves")
+            wd["prompt"] = _spin(g.save_prompt_seconds, 0, 3600)
+            wd["max_age"] = _spin(g.save_max_age_seconds, 10, 3600)
+            wd["save_wait"] = _spin(g.save_wait_seconds, 0, 3600)
+            wd["ready_re"] = QLineEdit(g.ready_log_pattern)
+            wd["ready_re"].setPlaceholderText("blank = I press Ready myself")
             wd["auto_play"] = QCheckBox("Press Quick Play / PLAY in the launcher for me")
             wd["auto_play"].setChecked(g.auto_click_play)
             wd["settle"] = _dspin(g.ready_settle_seconds, 0, 60)
@@ -159,8 +168,15 @@ class SettingsDialog(QDialog):
                 form.addRow("Steam App ID", wd["steam"])
             form.addRow("Save to load" if is_steam else "World to open", wd["save"])
             if is_steam:
-                form.addRow("", _hint("Schedule I (until Phase 4): GameSwap launches it through Steam and "
-                                      "detects it. You load, save and quit by hand, then press Continue."))
+                form.addRow("Saves folder", wd["saves_folder"])
+                form.addRow("Show SAVE NOW at", wd["prompt"])
+                form.addRow("A save this recent counts", wd["max_age"])
+                form.addRow("Wait for your save up to", wd["save_wait"])
+                form.addRow("Ready log line (advanced)", wd["ready_re"])
+                form.addRow("", _hint("Schedule I (Phase 4): GameSwap launches it through Steam. You load your "
+                                      "save and press Ready. At SAVE NOW you sleep or use the save device; GameSwap "
+                                      "checks the save files on disk, then closes the game normally. It never "
+                                      "closes Schedule I without a verified save."))
             else:
                 form.addRow(wd["auto_play"])
                 form.addRow("Wait for terrain after joining", wd["settle"])
@@ -242,12 +258,14 @@ class SettingsDialog(QDialog):
         self.hk = {
             "start": QLineEdit(h.start), "pause": QLineEdit(h.pause),
             "stop": QLineEdit(h.stop), "emergency": QLineEdit(h.emergency),
+            "ready": QLineEdit(h.ready),
         }
         form.addRow(_hint("Hotkeys work while a game is in front. Example: ctrl+shift+F9"))
         form.addRow("Start / Resume", self.hk["start"])
         form.addRow("Pause / Resume", self.hk["pause"])
         form.addRow("Stop", self.hk["stop"])
         form.addRow("Emergency Stop", self.hk["emergency"])
+        form.addRow("I'm in the game (Ready)", self.hk["ready"])
         return w
 
     # ---- actions ---------------------------------------------------------
@@ -272,6 +290,29 @@ class SettingsDialog(QDialog):
             shown = level_name(game_dir / "saves" / folder / "level.dat") or folder
             box.addItem(shown if shown == folder else f"{shown}   [{folder}]", folder)
             if g.save_name in (folder, shown):
+                current = box.count() - 1
+        if current >= 0:
+            box.setCurrentIndex(current)
+        else:
+            box.setEditText(g.save_name)
+        return box
+
+    def _slot_picker(self, g) -> QComboBox:
+        """Dropdown of Schedule I save slots (you can also type a name)."""
+        from pathlib import Path
+
+        from ..s1saves import default_saves_root, list_slots
+
+        box = QComboBox()
+        box.setEditable(True)
+        root = Path(g.save_folder) if g.save_folder else default_saves_root()
+        current = -1
+        slots = list_slots(root)
+        several_accounts = len({s.steam_id for s in slots}) > 1
+        for slot in slots:
+            label = f"{slot.label}  [Steam {slot.steam_id}]" if several_accounts else slot.label
+            box.addItem(label, str(slot.path))  # the full path can't be mixed up between accounts
+            if g.save_name and g.save_name.lower() in (slot.folder.lower(), slot.name.lower(), str(slot.path).lower()):
                 current = box.count() - 1
         if current >= 0:
             box.setCurrentIndex(current)
@@ -336,11 +377,19 @@ class SettingsDialog(QDialog):
             g.game_folder = wd["folder"].text().strip()
             g.steam_app_id = wd["steam"].text().strip()
             if isinstance(wd["save"], QComboBox):
-                i = wd["save"].findText(wd["save"].currentText())
-                g.save_name = (wd["save"].itemData(i) if i >= 0 else wd["save"].currentText()).strip()
+                box = wd["save"]
+                i = box.currentIndex()
+                if i < 0 or box.currentText() != box.itemText(i):  # you typed something instead
+                    i = box.findText(box.currentText())
+                g.save_name = (box.itemData(i) if i >= 0 else box.currentText()).strip()
             else:
                 g.save_name = wd["save"].text().strip()
             g.auto_click_play = wd["auto_play"].isChecked()
+            g.save_folder = wd["saves_folder"].text().strip()
+            g.save_prompt_seconds = wd["prompt"].value()
+            g.save_max_age_seconds = wd["max_age"].value()
+            g.save_wait_seconds = wd["save_wait"].value()
+            g.ready_log_pattern = wd["ready_re"].text().strip()
             g.ready_settle_seconds = wd["settle"].value()
             g.backup_before_start = wd["backup"].isChecked()
             g.backups_keep = wd["keep"].value()

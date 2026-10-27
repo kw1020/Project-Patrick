@@ -13,13 +13,12 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import platform
 import sys
 import time
 from pathlib import Path
 
-from . import __version__, steam, winapi
+from . import __version__, s1saves, steam, winapi
 from .config import LOG_DIR, Config
 from .drivers.minecraft import MinecraftDriver, default_game_dir, find_launcher, list_worlds, start_menu_shortcuts
 from .mcworld import level_name
@@ -150,18 +149,20 @@ def build_report(cfg: Config, drivers: dict) -> str:
         s1.refresh()
         out.append("  Game processes:")
         out += ["  " + x for x in _windows(s1.processes())]
-    locallow = Path(os.environ.get("USERPROFILE", "")) / "AppData" / "LocalLow"
+    saves_root = Path(g.save_folder) if g.save_folder else s1saves.default_saves_root()
+    slots = s1saves.list_slots(saves_root)
+    out.append(f"  Saves folder: {saves_root} {'(exists)' if saves_root.is_dir() else '(MISSING)'}")
+    for slot in slots:
+        out.append(f"    Steam {slot.steam_id}: {slot.label}")
+    chosen = s1saves.resolve_slot(saves_root, g.save_name)
+    out.append(f"  Save to load: {chosen.label if not isinstance(chosen, str) else chosen}")
+    player_log = s1saves.default_player_log()
+    out.append(f"  Player.log: {player_log} {'(exists)' if player_log.exists() else '(not found)'}")
     try:
-        save_roots = [p for p in locallow.glob("*/Schedule I") if p.is_dir()]
+        tail = player_log.read_text(encoding="utf-8", errors="replace").splitlines()[-30:]
     except OSError:
-        save_roots = []
-    for root in save_roots:
-        out.append(f"  Data folder: {root}")
-        for child in sorted(root.rglob("*"))[:60]:
-            if child.is_dir():
-                out.append(f"    {child.relative_to(root)}\\")
-    if not save_roots:
-        out.append(r"  Data folder: not found under AppData\LocalLow\*\Schedule I")
+        tail = []
+    out += [f"    | {line}" for line in tail]
     out.append("")
     return "\n".join(out)
 

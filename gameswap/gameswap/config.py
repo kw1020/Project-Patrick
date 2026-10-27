@@ -48,6 +48,17 @@ class GameConfig:
     # Zip the world/save before every Start, keeping this many backups.
     backup_before_start: bool = True
     backups_keep: int = 5
+    # Schedule I: where its save slots are. Blank = AppData\LocalLow\TVGS\Schedule I\Saves.
+    save_folder: str = ""
+    # Show "SAVE NOW" this many seconds before the turn ends (0 = never; for games you save yourself).
+    save_prompt_seconds: int = 0
+    # A save this recent (or newer) counts as the end-of-turn save.
+    save_max_age_seconds: int = 90
+    # How long the save step may wait (0 = the general Save timeout).
+    save_wait_seconds: int = 0
+    # Schedule I: a Player.log line (regular expression) that means "in the game".
+    # Blank = you press Ready.
+    ready_log_pattern: str = ""
     simulation: SimulationConfig = field(default_factory=SimulationConfig)
 
 
@@ -73,6 +84,7 @@ class HotkeyConfig:
     pause: str = "ctrl+shift+F7"
     stop: str = "ctrl+shift+F8"
     emergency: str = "ctrl+shift+F9"
+    ready: str = "ctrl+shift+F10"  # "I'm in the game" (Schedule I)
 
 
 @dataclass
@@ -82,7 +94,8 @@ class Config:
         default_factory=lambda: {
             "minecraft": GameConfig("Minecraft", "Minecraft", driver="minecraft"),
             # 3164500 is Schedule I's Steam app ID.
-            "schedule1": GameConfig("Schedule I", "Schedule I", driver="schedule1", steam_app_id="3164500"),
+            "schedule1": GameConfig("Schedule I", "Schedule I", driver="schedule1", steam_app_id="3164500",
+                                    save_prompt_seconds=60, save_wait_seconds=300),
         }
     )
 
@@ -138,6 +151,10 @@ class Config:
         for key, g in self.games.items():
             if g.driver not in DRIVERS.get(key, ("simulated",)):
                 problems.append(f"{g.name}: unknown game driver '{g.driver}'.")
+            if g.save_prompt_seconds and not 0 < g.save_prompt_seconds < self.play_seconds:
+                problems.append(f"{g.name}: the save prompt must be shorter than the play time.")
+            if g.save_max_age_seconds < 10:
+                problems.append(f"{g.name}: 'a save this recent counts' must be at least 10 seconds.")
             if g.simulation.fail_step not in SIM_FAIL_STEPS:
                 problems.append(f"{g.name}: unknown simulated failure '{g.simulation.fail_step}'.")
         if self.obs.enabled:

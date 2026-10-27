@@ -17,11 +17,12 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from .logfollow import LogFollower
+
 SERVER = re.compile(r"\[Server thread/INFO\][^:]*: (.*)$")
 JOINED = re.compile(r"^(\S+) joined the game$")
 LOGGED_IN = re.compile(r"^(\S+?)\[.*\] logged in with entity id")
 CRASH_MARKERS = ("---- Minecraft Crash Report ----", "Game crashed!", "This crash report has been saved to")
-HEAD_BYTES = 256
 
 
 @dataclass
@@ -37,57 +38,15 @@ class LogEvents:
     lines: list[str] = field(default_factory=list)  # the newest lines, for error messages
 
 
-class MinecraftLog:
+class MinecraftLog(LogFollower):
     def __init__(self, path: Path, clock=time.monotonic):
-        self.path = Path(path)
         self._clock = clock
-        self._offset = 0
-        self._head = b""
-        self._partial = ""
+        super().__init__(path)
+
+    def reset_events(self) -> None:
         self.events = LogEvents()
 
-    def forget_current_file(self) -> None:
-        """Ignore what's in the file now; only a NEW log (a new Minecraft start) will be read."""
-        head = self._read_head()
-        self._head = head
-        self._offset = self._size()
-        self._partial = ""
-        self.events = LogEvents()
-
-    def read_from_start(self) -> None:
-        """Read the current file from the top (Minecraft is already running)."""
-        self._head = b""
-        self._offset = 0
-        self._partial = ""
-        self.events = LogEvents()
-
-    def poll(self) -> list[str]:
-        """Read new complete lines and update events. Returns the new lines."""
-        head = self._read_head()
-        n = min(len(head), len(self._head))
-        replaced = (n > 0 and head[:n] != self._head[:n]) or self._size() < self._offset
-        if replaced:
-            # A different file: Minecraft started again and began a new log.
-            self._offset = 0
-            self._partial = ""
-            self.events = LogEvents()
-        if replaced or len(head) > len(self._head):
-            self._head = head
-        try:
-            with self.path.open("rb") as f:
-                f.seek(self._offset)
-                data = f.read()
-        except OSError:
-            return []
-        self._offset += len(data)
-        text = self._partial + data.decode("utf-8", errors="replace")
-        *complete, self._partial = text.split("\n")
-        lines = [line.rstrip("\r") for line in complete]
-        for line in lines:
-            self._handle(line)
-        return lines
-
-    def _handle(self, line: str) -> None:
+    def handle(self, line: str) -> None:
         ev = self.events
         ev.lines = (ev.lines + [line])[-12:]
         now = self._clock()
@@ -112,16 +71,3 @@ class MinecraftLog:
             ev.stopping = now
         elif msg == "Saving worlds" or "All dimensions are saved" in msg:
             ev.saving_worlds = ev.saving_worlds or now
-
-    def _size(self) -> int:
-        try:
-            return self.path.stat().st_size
-        except OSError:
-            return 0
-
-    def _read_head(self) -> bytes:
-        try:
-            with self.path.open("rb") as f:
-                return f.read(HEAD_BYTES)
-        except OSError:
-            return b""

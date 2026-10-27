@@ -1,1 +1,1 @@
-__version__ = "0.3.0"  # Phase 3: Minecraft world loading, verified save, normal exit
+__version__ = "0.4.0"  # Phase 4: Schedule I launch, verified save, normal exit

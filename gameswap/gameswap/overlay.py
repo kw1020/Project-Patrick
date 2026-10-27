@@ -52,6 +52,7 @@ def overlay_state(snap) -> dict:
         "unverified": snap.unverified,
         "message": snap.message,
         "turn": snap.turn,
+        "prompt": snap.prompt,
     }
 
 
