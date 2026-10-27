@@ -1,1 +1,1 @@
-__version__ = "0.7.1"  # Minecraft start fixes: Store launcher, auto world, start-problem pop-up
+__version__ = "0.7.2"  # start while already in Minecraft

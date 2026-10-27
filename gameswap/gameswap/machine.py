@@ -580,12 +580,18 @@ class Machine:
 
     def _run_preflight(self) -> list[str]:
         problems = []
+        first = self.cfg.rotation[(self.resume_point or (0, 0))[0] % len(self.cfg.rotation)]
         for key in self.cfg.rotation:
             d = self.drivers[key]
             problems += d.preflight()
             d.refresh()
             if d.is_running():
-                problems.append(f"{d.name} is already running. Save and close it, then press Start.")
+                if key == first:
+                    # You're already in the first game: GameSwap picks it up from here.
+                    log.info("%s is already running - GameSwap will use it.", d.name)
+                else:
+                    problems.append(f"{d.name} is already running, but it isn't first. Save and close it, "
+                                    "then press Start.")
         scenes = [self.cfg.obs.switching_scene] + [self.drivers[k].obs_scene for k in self.cfg.rotation]
         if not self.test_run:
             problems += self.obs.preflight(list(dict.fromkeys(scenes)))

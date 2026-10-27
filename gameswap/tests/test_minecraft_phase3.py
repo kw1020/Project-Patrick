@@ -288,3 +288,63 @@ def test_full_machine_cycle_minecraft_then_next_game_and_back(pc):
     tick_until(lambda: m.state == State.PLAYING and m.driver.key == "minecraft")
     assert m.turn == 3
     m.shutdown()
+
+
+def _already_playing(pc):
+    """You opened Minecraft yourself and are standing in your world."""
+    pc.start_game(quick_play=None)
+    end = time.monotonic() + 5
+    while pc.game is None and time.monotonic() < end:
+        time.sleep(0.02)
+    pc.game.open_world("Challenge World")
+    pc.actions.fg = pc.game.hwnd
+
+
+def _run_machine_until(m, cond, timeout=20):
+    end = time.monotonic() + timeout
+    while time.monotonic() < end:
+        m.tick()
+        if cond():
+            return
+        time.sleep(0.01)
+    raise AssertionError(f"stuck in {m.state}: {m.error or m.message}")
+
+
+@pytest.mark.parametrize("lock_check_works", [True, False])
+def test_start_while_already_in_minecraft_then_switch(pc, lock_check_works):
+    cfg, d, drivers = make(pc, save_name="")  # nothing picked in Settings
+    cfg.play_seconds = 20
+    cfg.warning_seconds = [10, 5]
+    cfg.switch_delay_seconds = 0.1
+    cfg.ready_poll_seconds = 0.05
+    cfg.ready_stable_checks = 2
+    cfg.backup_before_start = False
+    if not lock_check_works:
+        pc.actions.world_in_use = lambda path: False  # only Minecraft's log can tell
+    _already_playing(pc)
+    m = Machine(cfg, drivers)
+    m.on_sound = lambda k: None
+    m.start(test_run=True)
+    _run_machine_until(m, lambda: m.state == State.PLAYING)
+    assert pc.launcher is None and pc.actions.invoked == [], "nothing was launched: it used your Minecraft"
+    m.switch_now()
+    _run_machine_until(m, lambda: m.state == State.PLAYING and m.driver.key == "schedule1")
+    assert pc.actions.escapes >= 1 and pc.actions.closes == 1
+    assert not d.is_running()
+    m.shutdown()
+
+
+def test_ready_hotkey_works_for_minecraft_as_a_backup(pc):
+    cfg, d, drivers = make(pc)
+    cfg.backup_before_start = False
+    _already_playing(pc)
+    pc.log.write_text("[12:00:00] fresh log with no join line\n")  # the automatic check can't fire
+    m = Machine(cfg, drivers)
+    m.on_sound = lambda k: None
+    m.start(test_run=True)
+    _run_machine_until(m, lambda: m.state == State.VERIFYING_GAMEPLAY or m.state == State.PLAYING)
+    if m.state == State.VERIFYING_GAMEPLAY:
+        assert m.snapshot().can_confirm_ready
+        m.confirm_ready()  # Ctrl+Shift+F10
+    assert m.state == State.PLAYING
+    m.shutdown()

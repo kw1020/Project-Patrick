@@ -175,7 +175,13 @@ class MinecraftGameMatcher:
         return name in JAVA_NAMES
 
     def inspect(self, proc) -> dict | None:
-        return minecraft_args(proc.cmdline())
+        try:
+            return minecraft_args(proc.cmdline())
+        except Exception:
+            # Windows wouldn't show this java's command line. Accept it only if it
+            # runs from a Minecraft folder (the launcher's own Java lives there).
+            exe = proc.exe().lower()
+            return {"version": "", "game_dir": ""} if "minecraft" in exe else None
 
     def pick_window(self, windows):
         return pick_minecraft_window(windows)
@@ -266,9 +272,20 @@ class MinecraftDriver(RealGameDriver):
                 return Path(p.extra["game_dir"])
         return default_game_dir()
 
+    @property
+    def manual_ready(self) -> bool:
+        """Ctrl+Shift+F10 also works for Minecraft, as a backup if the automatic
+        'you're in the world' check doesn't fire on your PC."""
+        return True
+
     def world(self) -> tuple[Path, str, str] | str:
         """(world folder path, folder name, shown name), or an error message."""
-        found = resolve_world(self.game_dir, self.cfg.save_name)
+        wanted = self.cfg.save_name
+        if not wanted.strip() and self.is_running():
+            # Nothing picked and you're already playing: use the world that's open.
+            wanted = next((f for f in list_worlds(self.game_dir)
+                           if self.actions.world_in_use(self.game_dir / "saves" / f)), "")
+        found = resolve_world(self.game_dir, wanted)
         if isinstance(found, str):
             return found
         folder, shown = found
@@ -284,6 +301,12 @@ class MinecraftDriver(RealGameDriver):
                 return w
         return None
 
+    def _world_open(self, world_dir: Path) -> bool:
+        """The world is loaded: Minecraft holds its lock, or its log says you joined
+        (and it hasn't started closing). The log is the backup check."""
+        ev = self.game_log.events
+        return self.actions.world_in_use(world_dir) or bool(ev.joined and not ev.stopping)
+
     def _point_log_at_running_game(self) -> None:
         path = self.game_dir / "logs" / "latest.log"
         if path != self.game_log.path:
@@ -296,7 +319,8 @@ class MinecraftDriver(RealGameDriver):
         problems = []
         cmd, how = find_launcher(self.cfg.launch_path)
         if cmd is None:
-            problems.append(f"Minecraft: {how}.")
+            # Not a reason to refuse: you can open Minecraft yourself and GameSwap picks it up.
+            log.warning("Minecraft: %s. When it's Minecraft's turn, open it yourself.", how)
         world = self.world()
         if isinstance(world, str):
             problems.append(f"Minecraft: {world}.")
@@ -335,12 +359,18 @@ class MinecraftDriver(RealGameDriver):
     def start_game(self, abort: threading.Event) -> StepResult:
         if not self.monitor.get(self.LAUNCHER_KEY):
             cmd, how = find_launcher(self.cfg.launch_path)
-            if cmd is None:
-                return StepResult(False, how)
-            try:
-                winapi.open_target(cmd)
-            except OSError as e:
-                return StepResult(False, f"couldn't open the Minecraft Launcher ({how}): {e}")
+            opened = False
+            if cmd is not None:
+                try:
+                    winapi.open_target(cmd)
+                    opened = True
+                except OSError as e:
+                    how = f"couldn't open it ({e})"
+            if not opened:
+                # Keep going: open Minecraft yourself and GameSwap picks it up.
+                log.warning("Minecraft Launcher: %s. Waiting for you to open Minecraft.", how)
+                self.status = "Open Minecraft yourself and load your world - GameSwap will pick it up"
+                return StepResult(True, "waiting for you to open Minecraft")
             self.status = "Opening the Minecraft Launcher..."
             log.info("Opening the Minecraft Launcher (%s).", how)
             deadline = time.monotonic() + LAUNCHER_OPEN_WAIT
@@ -419,9 +449,9 @@ class MinecraftDriver(RealGameDriver):
             self.game_log.poll()
             if self.game_log.events.crashed:
                 return StepResult(False, f"Minecraft crashed: {self.game_log.events.crashed}")
-            if self.actions.world_in_use(world_dir):
-                return StepResult(True, f"world '{shown}' is open" + (" (Quick Play)" if quick else ""))
             wrong = [f for f in others if self.actions.world_in_use(self.game_dir / "saves" / f)]
+            if not wrong and self._world_open(world_dir):
+                return StepResult(True, f"world '{shown}' is open" + (" (Quick Play)" if quick else ""))
             if wrong:
                 return StepResult(False, f"world '{wrong[0]}' was opened instead of '{shown}'. Save and quit "
                                          "it, then open the right world and press Retry")
@@ -441,7 +471,7 @@ class MinecraftDriver(RealGameDriver):
         ev = self.game_log.events
         if ev.crashed:
             return ReadyCheck(False, f"Minecraft crashed: {ev.crashed}")
-        if not self.actions.world_in_use(world_dir):
+        if not self._world_open(world_dir):
             return ReadyCheck(False, f"world '{shown}' isn't open")
         if not ev.joined:
             return ReadyCheck(False, "loading the world")
@@ -467,7 +497,8 @@ class MinecraftDriver(RealGameDriver):
         w = self.game_window()
         if w is None:
             return StepResult(False, "Minecraft's window wasn't found")
-        if not self.actions.world_in_use(world_dir):
+        self.game_log.poll()
+        if not self._world_open(world_dir):
             return StepResult(False, f"world '{shown}' isn't open, so there is nothing to save")
         if self.actions.foreground() != w.hwnd and not self.actions.bring_to_front(w.hwnd):
             return StepResult(False, "couldn't bring Minecraft to the front, so no keys were sent")
@@ -503,7 +534,8 @@ class MinecraftDriver(RealGameDriver):
             return StepResult(True, "Minecraft was already closed")
         world = self.world()
         world_dir = world[0] if not isinstance(world, str) else None
-        world_was_open = bool(world_dir) and self.actions.world_in_use(world_dir)
+        self.game_log.poll()
+        world_was_open = bool(world_dir) and self._world_open(world_dir)
         w = self.game_window()
         if w is None or not self.actions.close_window(w.hwnd):
             return StepResult(False, "couldn't ask Minecraft's window to close")

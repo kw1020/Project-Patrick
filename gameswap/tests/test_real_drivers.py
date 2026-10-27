@@ -119,10 +119,13 @@ def test_minecraft_already_running_is_not_launched_twice(world):
     assert world.opened == []
 
 
-def test_missing_launcher_path_is_reported(world):
+def test_missing_launcher_only_warns_because_you_can_open_minecraft_yourself(world, caplog):
     world.cfg.games["minecraft"].launch_path = r"C:\nope\MinecraftLauncher.exe"
     problems = world.drivers["minecraft"].preflight()
-    assert problems and "doesn't exist" in problems[0]
+    assert not any("launcher" in p.lower() for p in problems)
+    assert "open it yourself" in caplog.text
+    r = world.drivers["minecraft"].start_game(threading.Event())
+    assert r.ok and "Open Minecraft yourself" in world.drivers["minecraft"].status
 
 
 def test_schedule1_launches_through_steam_applaunch(world):
