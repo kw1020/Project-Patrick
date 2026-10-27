@@ -1,0 +1,312 @@
+"""Settings window. Changes are saved to config.json when you press Save."""
+
+from __future__ import annotations
+
+import copy
+import threading
+
+from PySide6.QtCore import QObject, Signal
+from PySide6.QtWidgets import (
+    QCheckBox, QComboBox, QDialog, QDialogButtonBox, QDoubleSpinBox, QFileDialog, QFormLayout,
+    QGroupBox, QHBoxLayout, QLabel, QLineEdit, QMessageBox, QPushButton, QScrollArea, QSpinBox,
+    QTabWidget, QVBoxLayout, QWidget,
+)
+
+from ..config import SIM_FAIL_STEPS, Config
+from ..hotkeys import parse_hotkey
+from ..obs import ObsController
+
+
+def _spin(value: int, lo: int, hi: int, suffix: str = " s") -> QSpinBox:
+    s = QSpinBox()
+    s.setRange(lo, hi)
+    s.setValue(int(value))
+    s.setSuffix(suffix)
+    return s
+
+
+def _dspin(value: float, lo: float, hi: float, step: float = 0.5, suffix: str = " s") -> QDoubleSpinBox:
+    s = QDoubleSpinBox()
+    s.setRange(lo, hi)
+    s.setDecimals(1)
+    s.setSingleStep(step)
+    s.setValue(float(value))
+    s.setSuffix(suffix)
+    return s
+
+
+def _hint(text: str) -> QLabel:
+    label = QLabel(text)
+    label.setWordWrap(True)
+    label.setStyleSheet("color: #8a93a6; font-size: 11px;")
+    return label
+
+
+class _ObsTestSignal(QObject):
+    done = Signal(str)
+
+
+class SettingsDialog(QDialog):
+    def __init__(self, cfg: Config, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("GameSwap Settings")
+        self.resize(620, 640)
+        self.cfg = copy.deepcopy(cfg)
+        self._game_widgets: dict[str, dict] = {}
+
+        tabs = QTabWidget()
+        tabs.addTab(self._timer_tab(), "Timer")
+        tabs.addTab(self._games_tab(), "Games")
+        tabs.addTab(self._obs_tab(), "OBS")
+        tabs.addTab(self._overlay_tab(), "Overlay && Hotkeys")
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
+        buttons.accepted.connect(self._save)
+        buttons.rejected.connect(self.reject)
+
+        layout = QVBoxLayout(self)
+        layout.addWidget(tabs)
+        layout.addWidget(buttons)
+
+    # ---- tabs ------------------------------------------------------------
+
+    def _timer_tab(self) -> QWidget:
+        c = self.cfg
+        w = QWidget()
+        form = QFormLayout(w)
+        self.play_min = _spin(c.play_seconds // 60, 0, 180, " min")
+        self.play_sec = _spin(c.play_seconds % 60, 0, 59, " s")
+        row = QHBoxLayout()
+        row.addWidget(self.play_min)
+        row.addWidget(self.play_sec)
+        form.addRow("Play time per game", row)
+        form.addRow("", _hint("Counts only verified gameplay. Loading screens are never counted."))
+        self.warnings = QLineEdit(", ".join(str(x) for x in c.warning_seconds))
+        form.addRow("Warnings (seconds left)", self.warnings)
+        self.launch_timeout = _spin(c.launch_timeout, 5, 1800)
+        self.load_timeout = _spin(c.load_timeout, 5, 1800)
+        self.save_timeout = _spin(c.save_timeout, 5, 1800)
+        self.exit_timeout = _spin(c.exit_timeout, 5, 1800)
+        form.addRow("Launch timeout", self.launch_timeout)
+        form.addRow("Loading timeout", self.load_timeout)
+        form.addRow("", _hint("How long a game may take from launch to verified gameplay before GameSwap stops and asks you."))
+        form.addRow("Save timeout", self.save_timeout)
+        form.addRow("Exit timeout", self.exit_timeout)
+        self.ready_checks = _spin(c.ready_stable_checks, 1, 30, "")
+        self.ready_poll = _dspin(c.ready_poll_seconds, 0.2, 10)
+        form.addRow("Ready checks in a row", self.ready_checks)
+        form.addRow("Time between ready checks", self.ready_poll)
+        self.switch_delay = _dspin(c.switch_delay_seconds, 0, 60)
+        form.addRow("Pause between games", self.switch_delay)
+        self.fallback = QCheckBox("Use a 12-minute fallback cycle if gameplay can't be verified")
+        self.fallback.setChecked(c.fallback_cycle_enabled)
+        self.fallback_min = _dspin(c.fallback_cycle_seconds / 60, 1, 120, 0.5, " min")
+        form.addRow(self.fallback)
+        form.addRow("Fallback cycle length", self.fallback_min)
+        form.addRow("", _hint("Off = stop and ask you (safest). On = the turn ends this long after launch. "
+                              "Saving and closing are verified either way."))
+        self.sounds = QCheckBox("Play warning sounds")
+        self.sounds.setChecked(c.sounds)
+        form.addRow(self.sounds)
+        return w
+
+    def _games_tab(self) -> QWidget:
+        inner = QWidget()
+        col = QVBoxLayout(inner)
+        for key in self.cfg.rotation:
+            g = self.cfg.games[key]
+            box = QGroupBox(g.name)
+            form = QFormLayout(box)
+            wd = {}
+            wd["name"] = QLineEdit(g.name)
+            wd["scene"] = QLineEdit(g.obs_scene)
+            wd["path"] = QLineEdit(g.launch_path)
+            browse = QPushButton("Browse...")
+            browse.clicked.connect(lambda _=False, e=wd["path"]: self._browse(e))
+            path_row = QHBoxLayout()
+            path_row.addWidget(wd["path"])
+            path_row.addWidget(browse)
+            wd["steam"] = QLineEdit(g.steam_app_id)
+            wd["save"] = QLineEdit(g.save_name)
+            wd["driver"] = QComboBox()
+            wd["driver"].addItem("Simulated (Phase 1)", "simulated")
+            wd["driver"].setEnabled(False)
+            form.addRow("Name", wd["name"])
+            form.addRow("OBS scene", wd["scene"])
+            form.addRow("Launcher / Steam .exe", path_row)
+            form.addRow("Steam App ID", wd["steam"])
+            form.addRow("World / save to load", wd["save"])
+            form.addRow("Game driver", wd["driver"])
+            form.addRow("", _hint("Real launching arrives in Phase 2, loading and saving in Phases 3-4. "
+                                  "Paths and saves are stored now so they're ready."))
+            sim = g.simulation
+            wd["sim_launch"] = _dspin(sim.launch_seconds, 0, 120)
+            wd["sim_load"] = _dspin(sim.load_seconds, 0, 120)
+            wd["sim_ready"] = _dspin(sim.ready_after_seconds, 0, 120)
+            wd["sim_save"] = _dspin(sim.save_seconds, 0, 120)
+            wd["sim_exit"] = _dspin(sim.exit_seconds, 0, 120)
+            wd["sim_fail"] = QComboBox()
+            for step in SIM_FAIL_STEPS:
+                wd["sim_fail"].addItem("Nothing (normal)" if not step else f"Fail at: {step}", step)
+            wd["sim_fail"].setCurrentIndex(SIM_FAIL_STEPS.index(sim.fail_step))
+            sim_box = QGroupBox("Simulation (testing only)")
+            sim_form = QFormLayout(sim_box)
+            sim_form.addRow("Launch takes", wd["sim_launch"])
+            sim_form.addRow("Loading the save takes", wd["sim_load"])
+            sim_form.addRow("Loading screen after that", wd["sim_ready"])
+            sim_form.addRow("Saving takes", wd["sim_save"])
+            sim_form.addRow("Closing takes", wd["sim_exit"])
+            sim_form.addRow("Make a step fail", wd["sim_fail"])
+            form.addRow(sim_box)
+            self._game_widgets[key] = wd
+            col.addWidget(box)
+        col.addStretch(1)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setWidget(inner)
+        return scroll
+
+    def _obs_tab(self) -> QWidget:
+        o = self.cfg.obs
+        w = QWidget()
+        form = QFormLayout(w)
+        self.obs_enabled = QCheckBox("Control OBS (switch scenes, check recording)")
+        self.obs_enabled.setChecked(o.enabled)
+        self.obs_host = QLineEdit(o.host)
+        self.obs_port = _spin(o.port, 1, 65535, "")
+        self.obs_password = QLineEdit(o.password)
+        self.obs_password.setEchoMode(QLineEdit.Password)
+        show = QCheckBox("Show")
+        show.toggled.connect(lambda on: self.obs_password.setEchoMode(QLineEdit.Normal if on else QLineEdit.Password))
+        pw_row = QHBoxLayout()
+        pw_row.addWidget(self.obs_password)
+        pw_row.addWidget(show)
+        self.obs_switching = QLineEdit(o.switching_scene)
+        self.obs_record = QCheckBox("Start recording when I press Start (it is never stopped)")
+        self.obs_record.setChecked(o.start_recording_on_start)
+        self.obs_test = QPushButton("Test OBS connection")
+        self.obs_result = _hint("")
+        self.obs_signal = _ObsTestSignal()
+        self.obs_signal.done.connect(self._obs_test_done)
+        self.obs_test.clicked.connect(self._test_obs)
+        form.addRow(self.obs_enabled)
+        form.addRow("Host", self.obs_host)
+        form.addRow("Port", self.obs_port)
+        form.addRow("Password", pw_row)
+        form.addRow("", _hint("In OBS: Tools > WebSocket Server Settings > Show Connect Info."))
+        form.addRow("Switching scene", self.obs_switching)
+        form.addRow(self.obs_record)
+        form.addRow(self.obs_test)
+        form.addRow(self.obs_result)
+        return w
+
+    def _overlay_tab(self) -> QWidget:
+        w = QWidget()
+        form = QFormLayout(w)
+        self.overlay_port = _spin(self.cfg.overlay.port, 1024, 65535, "")
+        self.overlay_text = QCheckBox("Also write overlay/timer.txt (for an OBS Text source)")
+        self.overlay_text.setChecked(self.cfg.overlay.write_text_file)
+        form.addRow("Overlay port", self.overlay_port)
+        form.addRow(self.overlay_text)
+        h = self.cfg.hotkeys
+        self.hk = {
+            "start": QLineEdit(h.start), "pause": QLineEdit(h.pause),
+            "stop": QLineEdit(h.stop), "emergency": QLineEdit(h.emergency),
+        }
+        form.addRow(_hint("Hotkeys work while a game is in front. Example: ctrl+shift+F9"))
+        form.addRow("Start / Resume", self.hk["start"])
+        form.addRow("Pause / Resume", self.hk["pause"])
+        form.addRow("Stop", self.hk["stop"])
+        form.addRow("Emergency Stop", self.hk["emergency"])
+        return w
+
+    # ---- actions ---------------------------------------------------------
+
+    def _browse(self, edit: QLineEdit) -> None:
+        path, _ = QFileDialog.getOpenFileName(self, "Choose the program", edit.text(), "Programs (*.exe);;All files (*)")
+        if path:
+            edit.setText(path.replace("/", "\\"))
+
+    def _test_obs(self) -> None:
+        self._collect()
+        self.obs_test.setEnabled(False)
+        self.obs_result.setText("Connecting...")
+        cfg = copy.deepcopy(self.cfg.obs)
+        cfg.start_recording_on_start = False  # a test must not start recording
+        scenes = [cfg.switching_scene] + [self.cfg.games[k].obs_scene for k in self.cfg.rotation]
+
+        def run():
+            ctl = ObsController(cfg)
+            problems = ctl.preflight(scenes)
+            ctl.close()
+            not_recording = [p for p in problems if "isn't recording" in p]
+            real = [p for p in problems if p not in not_recording]
+            if real:
+                text = "Problem: " + " | ".join(real)
+            else:
+                text = "Connected. All scenes found." + (" (OBS isn't recording right now.)" if not_recording else "")
+            self.obs_signal.done.emit(text)
+
+        threading.Thread(target=run, daemon=True).start()
+
+    def _obs_test_done(self, text: str) -> None:
+        self.obs_test.setEnabled(True)
+        self.obs_result.setText(text)
+
+    def _collect(self) -> list[str]:
+        """Copy every widget into self.cfg. Returns problems found while reading."""
+        c, problems = self.cfg, []
+        c.play_seconds = self.play_min.value() * 60 + self.play_sec.value()
+        try:
+            c.warning_seconds = sorted({int(x) for x in self.warnings.text().replace(" ", "").split(",") if x}, reverse=True)
+        except ValueError:
+            problems.append("Warnings must be whole numbers separated by commas, like: 30, 10")
+        c.launch_timeout = self.launch_timeout.value()
+        c.load_timeout = self.load_timeout.value()
+        c.save_timeout = self.save_timeout.value()
+        c.exit_timeout = self.exit_timeout.value()
+        c.ready_stable_checks = self.ready_checks.value()
+        c.ready_poll_seconds = self.ready_poll.value()
+        c.switch_delay_seconds = self.switch_delay.value()
+        c.fallback_cycle_enabled = self.fallback.isChecked()
+        c.fallback_cycle_seconds = round(self.fallback_min.value() * 60)
+        c.sounds = self.sounds.isChecked()
+        for key, wd in self._game_widgets.items():
+            g = c.games[key]
+            g.name = wd["name"].text().strip() or g.name
+            g.obs_scene = wd["scene"].text().strip()
+            g.launch_path = wd["path"].text().strip()
+            g.steam_app_id = wd["steam"].text().strip()
+            g.save_name = wd["save"].text().strip()
+            g.driver = wd["driver"].currentData()
+            s = g.simulation
+            s.launch_seconds = wd["sim_launch"].value()
+            s.load_seconds = wd["sim_load"].value()
+            s.ready_after_seconds = wd["sim_ready"].value()
+            s.save_seconds = wd["sim_save"].value()
+            s.exit_seconds = wd["sim_exit"].value()
+            s.fail_step = wd["sim_fail"].currentData()
+        o = c.obs
+        o.enabled = self.obs_enabled.isChecked()
+        o.host = self.obs_host.text().strip() or "localhost"
+        o.port = self.obs_port.value()
+        o.password = self.obs_password.text()
+        o.switching_scene = self.obs_switching.text().strip()
+        o.start_recording_on_start = self.obs_record.isChecked()
+        c.overlay.port = self.overlay_port.value()
+        c.overlay.write_text_file = self.overlay_text.isChecked()
+        for name, edit in self.hk.items():
+            text = edit.text().strip()
+            try:
+                parse_hotkey(text)
+            except ValueError as e:
+                problems.append(f"Hotkey '{text}': {e}")
+            setattr(c.hotkeys, name, text)
+        return problems
+
+    def _save(self) -> None:
+        problems = self._collect() + self.cfg.validate()
+        if problems:
+            QMessageBox.warning(self, "Please fix these settings", "\n\n".join(problems))
+            return
+        self.accept()

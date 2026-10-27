@@ -1,0 +1,64 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>GameSwap Timer</title>
+<style>
+  /* OBS Browser Source: 520 x 160. The background is transparent. */
+  html, body { margin: 0; background: transparent; overflow: hidden; }
+  body { font-family: "Segoe UI", system-ui, sans-serif; }
+  .card {
+    display: inline-flex; flex-direction: column; gap: 2px;
+    margin: 12px; padding: 12px 22px 14px;
+    background: rgba(12, 14, 20, 0.78); border-radius: 16px;
+    border: 2px solid rgba(255, 255, 255, 0.12);
+    color: #fff; min-width: 230px;
+    transition: border-color .2s, background .2s, opacity .3s;
+  }
+  .hidden { opacity: 0; }
+  .game { font-size: 20px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; opacity: .85; }
+  .clock { font-size: 64px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+  .sub { font-size: 16px; opacity: .75; }
+  .warning { border-color: #ffb020; }
+  .warning .clock { color: #ffb020; }
+  .final { border-color: #ff3b3b; background: rgba(60, 0, 0, 0.8); animation: pulse 1s infinite; }
+  .final .clock { color: #ff5252; }
+  .paused .clock { color: #9aa3b2; }
+  @keyframes pulse { 50% { transform: scale(1.04); } }
+</style>
+</head>
+<body>
+<div id="card" class="card hidden">
+  <div class="game" id="game"></div>
+  <div class="clock" id="clock"></div>
+  <div class="sub" id="sub"></div>
+</div>
+<script>
+const $ = id => document.getElementById(id);
+async function refresh() {
+  try {
+    const s = await (await fetch('/state', { cache: 'no-store' })).json();
+    const card = $('card');
+    if (s.state === 'PLAYING') {
+      card.className = 'card ' + (s.paused ? 'paused' : s.level);
+      $('game').textContent = s.game;
+      $('clock').textContent = s.clock;
+      $('sub').textContent = s.paused ? 'PAUSED'
+        : s.level === 'final' ? 'Switching to ' + s.next + '!'
+        : s.level === 'warning' ? 'Next up: ' + s.next
+        : 'Next: ' + s.next;
+    } else if (s.state && s.state !== 'IDLE' && s.state !== 'STOPPED') {
+      card.className = 'card';
+      $('game').textContent = s.state === 'SWITCHING' ? s.next : s.game;
+      $('clock').textContent = s.label + '…';
+      $('sub').textContent = s.message || '';
+    } else {
+      card.className = 'card hidden';
+    }
+  } catch (e) { /* GameSwap closed; keep the last frame */ }
+}
+setInterval(refresh, 250);
+refresh();
+</script>
+</body>
+</html>

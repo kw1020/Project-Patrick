@@ -1,0 +1,47 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>GameSwap Switching</title>
+<style>
+  /* OBS Browser Source: 1920 x 1080, in the "Switching" scene. */
+  html, body { margin: 0; height: 100%; overflow: hidden; }
+  body {
+    font-family: "Segoe UI", system-ui, sans-serif; color: #fff;
+    background: radial-gradient(circle at 50% 40%, #1d2440 0%, #0a0c14 70%);
+    display: flex; align-items: center; justify-content: center; text-align: center;
+  }
+  .kicker { font-size: 34px; letter-spacing: .3em; text-transform: uppercase; opacity: .6; }
+  .title { font-size: 130px; font-weight: 800; margin: 10px 0 30px; }
+  .bar { width: 760px; height: 14px; margin: 0 auto; border-radius: 7px; background: rgba(255,255,255,.12); overflow: hidden; }
+  .bar i { display: block; width: 35%; height: 100%; border-radius: 7px; background: linear-gradient(90deg, #5b8cff, #b45bff); animation: slide 1.4s ease-in-out infinite; }
+  .status { margin-top: 26px; font-size: 32px; opacity: .8; min-height: 44px; }
+  .turn { margin-top: 10px; font-size: 24px; opacity: .45; }
+  @keyframes slide { 0% { transform: translateX(-110%); } 100% { transform: translateX(300%); } }
+</style>
+</head>
+<body>
+<div>
+  <div class="kicker" id="kicker">Up next</div>
+  <div class="title" id="title">GameSwap</div>
+  <div class="bar"><i></i></div>
+  <div class="status" id="status"></div>
+  <div class="turn" id="turn"></div>
+</div>
+<script>
+const $ = id => document.getElementById(id);
+async function refresh() {
+  try {
+    const s = await (await fetch('/state', { cache: 'no-store' })).json();
+    const leaving = s.state === 'SAVING' || s.state === 'EXITING' || s.state === 'PLAYING';
+    $('kicker').textContent = leaving ? 'Wrapping up' : 'Up next';
+    $('title').textContent = (leaving ? s.game : (s.state === 'SWITCHING' ? s.next : s.game)) || 'GameSwap';
+    $('status').textContent = s.paused ? 'Paused' : (s.message || '');
+    $('turn').textContent = s.turn ? 'Turns played: ' + s.turn : '';
+  } catch (e) { }
+}
+setInterval(refresh, 300);
+refresh();
+</script>
+</body>
+</html>

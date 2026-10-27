@@ -1,0 +1,167 @@
+"""GameSwap settings, stored in config.json next to the app."""
+
+from __future__ import annotations
+
+import json
+from dataclasses import asdict, dataclass, field, fields, is_dataclass
+from pathlib import Path
+from typing import get_type_hints
+
+APP_DIR = Path(__file__).resolve().parent.parent
+CONFIG_PATH = APP_DIR / "config.json"
+LOG_DIR = APP_DIR / "logs"
+
+SIM_FAIL_STEPS = ("", "launch", "load", "ready", "save", "exit")
+
+
+@dataclass
+class SimulationConfig:
+    """Fake-game timings, used until the real game drivers exist (Phases 2-3)."""
+
+    launch_seconds: float = 3.0
+    load_seconds: float = 4.0
+    ready_after_seconds: float = 3.0
+    save_seconds: float = 2.0
+    exit_seconds: float = 2.0
+    # Make one step fail on purpose to test the error handling.
+    fail_step: str = ""
+
+
+@dataclass
+class GameConfig:
+    name: str = "Game"
+    obs_scene: str = "Game"
+    # "simulated" in Phase 1. The real Minecraft and Schedule I drivers arrive in Phases 2-4.
+    driver: str = "simulated"
+    # Minecraft Launcher .exe, or Steam.exe for Schedule I. Used from Phase 2.
+    launch_path: str = ""
+    steam_app_id: str = ""
+    # Minecraft world name / Schedule I save slot to load. Used from Phases 3-4.
+    save_name: str = ""
+    simulation: SimulationConfig = field(default_factory=SimulationConfig)
+
+
+@dataclass
+class ObsConfig:
+    enabled: bool = True
+    host: str = "localhost"
+    port: int = 4455
+    password: str = ""
+    switching_scene: str = "Switching"
+    start_recording_on_start: bool = True
+
+
+@dataclass
+class OverlayConfig:
+    port: int = 8765
+    write_text_file: bool = True
+
+
+@dataclass
+class HotkeyConfig:
+    start: str = "ctrl+shift+F6"
+    pause: str = "ctrl+shift+F7"
+    stop: str = "ctrl+shift+F8"
+    emergency: str = "ctrl+shift+F9"
+
+
+@dataclass
+class Config:
+    rotation: list[str] = field(default_factory=lambda: ["minecraft", "schedule1"])
+    games: dict[str, GameConfig] = field(
+        default_factory=lambda: {
+            "minecraft": GameConfig("Minecraft", "Minecraft"),
+            # 3164500 is Schedule I's Steam store ID; Phase 2 verifies it on your PC.
+            "schedule1": GameConfig("Schedule I", "Schedule I", steam_app_id="3164500"),
+        }
+    )
+
+    play_seconds: int = 600
+    warning_seconds: list[int] = field(default_factory=lambda: [30, 10])
+
+    launch_timeout: int = 120  # start pressed -> game process running
+    load_timeout: int = 240  # game launched -> gameplay verified
+    save_timeout: int = 90
+    exit_timeout: int = 120
+    switch_delay_seconds: float = 3.0
+    ready_poll_seconds: float = 1.0
+    ready_stable_checks: int = 3  # this many "ready" checks in a row before the timer starts
+
+    # Off by default. When on and gameplay can't be verified before the load
+    # timeout, the turn ends 12 minutes after launch instead of stopping.
+    # Saving and exiting are still verified either way.
+    fallback_cycle_enabled: bool = False
+    fallback_cycle_seconds: int = 720
+
+    sounds: bool = True
+    obs: ObsConfig = field(default_factory=ObsConfig)
+    overlay: OverlayConfig = field(default_factory=OverlayConfig)
+    hotkeys: HotkeyConfig = field(default_factory=HotkeyConfig)
+
+    def game(self, key: str) -> GameConfig:
+        return self.games[key]
+
+    def validate(self) -> list[str]:
+        """Problems in plain English; empty list means the settings are usable."""
+        problems = []
+        if self.play_seconds < 20:
+            problems.append("Play time must be at least 20 seconds.")
+        if any(w <= 0 or w >= self.play_seconds for w in self.warning_seconds):
+            problems.append("Each warning must be above 0 and shorter than the play time.")
+        if len(self.rotation) < 2:
+            problems.append("The rotation needs at least two games.")
+        for key in self.rotation:
+            if key not in self.games:
+                problems.append(f"Rotation lists '{key}', but there are no settings for it.")
+        for name, value in (
+            ("Launch timeout", self.launch_timeout),
+            ("Load timeout", self.load_timeout),
+            ("Save timeout", self.save_timeout),
+            ("Exit timeout", self.exit_timeout),
+        ):
+            if value < 5:
+                problems.append(f"{name} must be at least 5 seconds.")
+        if self.ready_stable_checks < 1:
+            problems.append("Ready checks in a row must be at least 1.")
+        if self.fallback_cycle_enabled and self.fallback_cycle_seconds <= self.play_seconds:
+            problems.append("The fallback cycle must be longer than the play time.")
+        for g in self.games.values():
+            if g.simulation.fail_step not in SIM_FAIL_STEPS:
+                problems.append(f"{g.name}: unknown simulated failure '{g.simulation.fail_step}'.")
+        if self.obs.enabled:
+            scenes = [self.obs.switching_scene] + [self.games[k].obs_scene for k in self.rotation if k in self.games]
+            if any(not s.strip() for s in scenes):
+                problems.append("Every OBS scene name must be filled in.")
+        return problems
+
+
+def _build(cls, data):
+    """Turn parsed JSON into dataclasses, ignoring unknown keys."""
+    hints = get_type_hints(cls)
+    kwargs = {}
+    for f in fields(cls):
+        if f.name not in data:
+            continue
+        value, hint = data[f.name], hints[f.name]
+        if is_dataclass(hint) and isinstance(value, dict):
+            value = _build(hint, value)
+        elif f.name == "games" and isinstance(value, dict):
+            value = {k: _build(GameConfig, v) for k, v in value.items()}
+        kwargs[f.name] = value
+    return cls(**kwargs)
+
+
+def load(path: Path = CONFIG_PATH) -> Config:
+    if not path.exists():
+        cfg = Config()
+        save(cfg, path)
+        return cfg
+    with path.open(encoding="utf-8") as f:
+        return _build(Config, json.load(f))
+
+
+def save(cfg: Config, path: Path = CONFIG_PATH) -> None:
+    tmp = path.with_suffix(".tmp")
+    with tmp.open("w", encoding="utf-8") as f:
+        json.dump(asdict(cfg), f, indent=2)
+    tmp.replace(path)

@@ -1,0 +1,8 @@
+# Your settings (contains your OBS password)
+config.json
+config.tmp
+logs/
+overlay/
+.venv/
+__pycache__/
+.pytest_cache/
