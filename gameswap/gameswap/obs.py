@@ -88,6 +88,10 @@ class ObsController:
             ]
             if problems:
                 return problems
+            if self.cfg.test_run_no_recording:
+                log.info("Test run: OBS scenes will switch, but GameSwap won't start or require a recording.")
+                self._expect_recording = False
+                return []
             try:
                 recording = client.get_record_status().output_active
                 if not recording and self.cfg.start_recording_on_start:

@@ -73,6 +73,8 @@ class ObsConfig:
     password: str = ""
     switching_scene: str = "Switching"
     start_recording_on_start: bool = True
+    # Test run: switch scenes but don't require (or start) a recording.
+    test_run_no_recording: bool = False
 
 
 @dataclass

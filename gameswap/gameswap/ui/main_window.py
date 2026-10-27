@@ -384,7 +384,8 @@ class MainWindow(QMainWindow):
                 self.obs_label.setToolTip(st.error)
                 _set_style(self.obs_label, "color: #ffb020;")
             else:
-                rec = "● REC" if st.recording else "○ not recording"
+                rec = "● REC" if st.recording else ("○ test run, not recording" if self.cfg.obs.test_run_no_recording
+                                                    else "○ not recording")
                 self.obs_label.setText(f"OBS: connected  {rec}  ·  {st.scene}")
                 self.obs_label.setToolTip("")
                 _set_style(self.obs_label, f"color: {'#4cd27a' if st.recording else '#ffb020'};")

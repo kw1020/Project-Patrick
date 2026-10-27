@@ -237,6 +237,10 @@ class SettingsDialog(QDialog):
         self.obs_switching = QLineEdit(o.switching_scene)
         self.obs_record = QCheckBox("Start recording when I press Start (it is never stopped)")
         self.obs_record.setChecked(o.start_recording_on_start)
+        self.obs_test_run = QCheckBox("Test run: switch scenes but DON'T record")
+        self.obs_test_run.setChecked(o.test_run_no_recording)
+        self.obs_test_run.toggled.connect(lambda on: self.obs_record.setEnabled(not on))
+        self.obs_record.setEnabled(not o.test_run_no_recording)
         self.obs_test = QPushButton("Test OBS connection")
         self.obs_result = _hint("")
         self.obs_signal = _ObsTestSignal()
@@ -249,6 +253,8 @@ class SettingsDialog(QDialog):
         form.addRow("", _hint("In OBS: Tools > WebSocket Server Settings > Show Connect Info."))
         form.addRow("Switching scene", self.obs_switching)
         form.addRow(self.obs_record)
+        form.addRow(self.obs_test_run)
+        form.addRow("", _hint("Tick for practice runs. Untick before recording for real."))
         form.addRow(self.obs_test)
         form.addRow(self.obs_result)
         return w
@@ -418,6 +424,7 @@ class SettingsDialog(QDialog):
         o.password = self.obs_password.text()
         o.switching_scene = self.obs_switching.text().strip()
         o.start_recording_on_start = self.obs_record.isChecked()
+        o.test_run_no_recording = self.obs_test_run.isChecked()
         c.overlay.port = self.overlay_port.value()
         c.overlay.write_text_file = self.overlay_text.isChecked()
         for name, edit in self.hk.items():

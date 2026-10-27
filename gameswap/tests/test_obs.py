@@ -111,3 +111,13 @@ def test_recording_clock_for_youtube_chapters(server):
     assert wait_for(lambda: ctl.recording_seconds() is not None)
     assert 61.4 <= ctl.recording_seconds() < 64
     ctl.close()
+
+
+def test_test_run_switches_scenes_without_recording(server):
+    ctl = controller(server, test_run_no_recording=True)
+    ctl.start()
+    assert ctl.preflight(SCENES) == []
+    ctl.set_scene("Switching")
+    assert wait_for(lambda: server.current == "Switching")
+    assert not server.recording and "StartRecord" not in server.requests
+    ctl.close()
