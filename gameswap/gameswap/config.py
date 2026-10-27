@@ -12,6 +12,7 @@ CONFIG_PATH = APP_DIR / "config.json"
 LOG_DIR = APP_DIR / "logs"
 
 SIM_FAIL_STEPS = ("", "launch", "load", "ready", "save", "exit")
+DRIVERS = {"minecraft": ("minecraft", "simulated"), "schedule1": ("schedule1", "simulated")}
 
 
 @dataclass
@@ -31,10 +32,12 @@ class SimulationConfig:
 class GameConfig:
     name: str = "Game"
     obs_scene: str = "Game"
-    # "simulated" in Phase 1. The real Minecraft and Schedule I drivers arrive in Phases 2-4.
+    # "simulated" (pretend game, for testing) or the real driver: "minecraft" / "schedule1".
     driver: str = "simulated"
-    # Minecraft Launcher .exe, or Steam.exe for Schedule I. Used from Phase 2.
+    # Minecraft Launcher .exe, or steam.exe for Schedule I. Blank = find it automatically.
     launch_path: str = ""
+    # .minecraft folder, or Schedule I's install folder. Blank = find it automatically.
+    game_folder: str = ""
     steam_app_id: str = ""
     # Minecraft world name / Schedule I save slot to load. Used from Phases 3-4.
     save_name: str = ""
@@ -70,9 +73,9 @@ class Config:
     rotation: list[str] = field(default_factory=lambda: ["minecraft", "schedule1"])
     games: dict[str, GameConfig] = field(
         default_factory=lambda: {
-            "minecraft": GameConfig("Minecraft", "Minecraft"),
-            # 3164500 is Schedule I's Steam store ID; Phase 2 verifies it on your PC.
-            "schedule1": GameConfig("Schedule I", "Schedule I", steam_app_id="3164500"),
+            "minecraft": GameConfig("Minecraft", "Minecraft", driver="minecraft"),
+            # 3164500 is Schedule I's Steam app ID.
+            "schedule1": GameConfig("Schedule I", "Schedule I", driver="schedule1", steam_app_id="3164500"),
         }
     )
 
@@ -125,7 +128,9 @@ class Config:
             problems.append("Ready checks in a row must be at least 1.")
         if self.fallback_cycle_enabled and self.fallback_cycle_seconds <= self.play_seconds:
             problems.append("The fallback cycle must be longer than the play time.")
-        for g in self.games.values():
+        for key, g in self.games.items():
+            if g.driver not in DRIVERS.get(key, ("simulated",)):
+                problems.append(f"{g.name}: unknown game driver '{g.driver}'.")
             if g.simulation.fail_step not in SIM_FAIL_STEPS:
                 problems.append(f"{g.name}: unknown simulated failure '{g.simulation.fail_step}'.")
         if self.obs.enabled:

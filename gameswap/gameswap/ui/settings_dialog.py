@@ -12,7 +12,7 @@ from PySide6.QtWidgets import (
     QTabWidget, QVBoxLayout, QWidget,
 )
 
-from ..config import SIM_FAIL_STEPS, Config
+from ..config import DRIVERS, SIM_FAIL_STEPS, Config
 from ..hotkeys import parse_hotkey
 from ..obs import ObsController
 
@@ -126,19 +126,31 @@ class SettingsDialog(QDialog):
             path_row = QHBoxLayout()
             path_row.addWidget(wd["path"])
             path_row.addWidget(browse)
+            wd["folder"] = QLineEdit(g.game_folder)
+            folder_btn = QPushButton("Browse...")
+            folder_btn.clicked.connect(lambda _=False, e=wd["folder"]: self._browse_folder(e))
+            folder_row = QHBoxLayout()
+            folder_row.addWidget(wd["folder"])
+            folder_row.addWidget(folder_btn)
             wd["steam"] = QLineEdit(g.steam_app_id)
             wd["save"] = QLineEdit(g.save_name)
             wd["driver"] = QComboBox()
-            wd["driver"].addItem("Simulated (Phase 1)", "simulated")
-            wd["driver"].setEnabled(False)
+            if key in DRIVERS:
+                wd["driver"].addItem("Real game", DRIVERS[key][0])
+            wd["driver"].addItem("Simulated (pretend game, for testing)", "simulated")
+            wd["driver"].setCurrentIndex(max(0, wd["driver"].findData(g.driver)))
+            is_steam = key == "schedule1"
             form.addRow("Name", wd["name"])
-            form.addRow("OBS scene", wd["scene"])
-            form.addRow("Launcher / Steam .exe", path_row)
-            form.addRow("Steam App ID", wd["steam"])
-            form.addRow("World / save to load", wd["save"])
             form.addRow("Game driver", wd["driver"])
-            form.addRow("", _hint("Real launching arrives in Phase 2, loading and saving in Phases 3-4. "
-                                  "Paths and saves are stored now so they're ready."))
+            form.addRow("OBS scene", wd["scene"])
+            form.addRow("steam.exe" if is_steam else "Minecraft Launcher", path_row)
+            form.addRow("Install folder" if is_steam else ".minecraft folder", folder_row)
+            form.addRow("", _hint("Leave both blank to find them automatically. Diagnostics shows what was found."))
+            if is_steam:
+                form.addRow("Steam App ID", wd["steam"])
+            form.addRow("Save to load" if is_steam else "World to open", wd["save"])
+            form.addRow("", _hint("Real driver (Phase 2): launches the game and detects it. You load the save, "
+                                  "save and quit by hand, then press Continue; Phases 3-4 automate those steps."))
             sim = g.simulation
             wd["sim_launch"] = _dspin(sim.launch_seconds, 0, 120)
             wd["sim_load"] = _dspin(sim.load_seconds, 0, 120)
@@ -227,6 +239,11 @@ class SettingsDialog(QDialog):
         if path:
             edit.setText(path.replace("/", "\\"))
 
+    def _browse_folder(self, edit: QLineEdit) -> None:
+        path = QFileDialog.getExistingDirectory(self, "Choose the folder", edit.text())
+        if path:
+            edit.setText(path.replace("/", "\\"))
+
     def _test_obs(self) -> None:
         self._collect()
         self.obs_test.setEnabled(False)
@@ -276,6 +293,7 @@ class SettingsDialog(QDialog):
             g.name = wd["name"].text().strip() or g.name
             g.obs_scene = wd["scene"].text().strip()
             g.launch_path = wd["path"].text().strip()
+            g.game_folder = wd["folder"].text().strip()
             g.steam_app_id = wd["steam"].text().strip()
             g.save_name = wd["save"].text().strip()
             g.driver = wd["driver"].currentData()

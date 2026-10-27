@@ -37,6 +37,8 @@ class GameDriver:
     def __init__(self, key: str, cfg: GameConfig):
         self.key = key
         self.cfg = cfg
+        # A short live message for the window, e.g. "Click PLAY in the launcher".
+        self.status = ""
 
     @property
     def name(self) -> str:
@@ -51,7 +53,15 @@ class GameDriver:
         return []
 
     def is_running(self) -> bool:
+        """Fast (cached) answer; safe to call many times a second."""
         raise NotImplementedError
+
+    def refresh(self) -> None:
+        """Re-check processes right now (slower; called from worker threads)."""
+
+    def describe(self) -> str:
+        """One line for the Games box, e.g. 'running (pid 1234) - window ...'."""
+        return "running" if self.is_running() else "not running"
 
     def launch(self, abort: threading.Event) -> StepResult:
         """Start the game. Return once its process and main window exist."""

@@ -82,6 +82,7 @@ def make_cfg(**overrides) -> Config:
     cfg = Config()
     cfg.switch_delay_seconds = 2.0
     for g in cfg.games.values():
+        g.driver = "simulated"
         s = g.simulation
         s.launch_seconds = s.load_seconds = s.save_seconds = s.exit_seconds = 0
         s.ready_after_seconds = 20  # a 20 s loading screen after the world opens

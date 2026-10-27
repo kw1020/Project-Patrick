@@ -220,6 +220,7 @@ class Machine:
         """You fixed the problem yourself; check that's true, then move on."""
         if self.state != State.ERROR or self._error_from is None:
             return
+        self.driver.refresh()  # check what's really running, not a second-old answer
         frm = self._error_from
         if frm in LOADING_STATES:
             if not self.driver.is_running():
@@ -265,6 +266,9 @@ class Machine:
         self._cycle_time += dt
         if self.state in (State.LOADING, State.VERIFYING_GAMEPLAY):
             self._load_time += dt
+
+        if self.driver.status and self.state in (State.LAUNCHING, State.LOADING, State.SAVING, State.EXITING):
+            self.message = self.driver.status
 
         handler = {
             State.LAUNCHING: self._tick_launching,
@@ -412,6 +416,7 @@ class Machine:
     def _enter(self, state: State, advance: bool = True) -> None:
         prev = self.state
         self._cancel_step()
+        self.driver.status = ""
         self.state = state
         self._state_time = 0.0
         self._last_health = 0.0
@@ -490,6 +495,7 @@ class Machine:
         for key in self.cfg.rotation:
             d = self.drivers[key]
             problems += d.preflight()
+            d.refresh()
             if d.is_running():
                 problems.append(f"{d.name} is already running. Save and close it, then press Start.")
         scenes = [self.cfg.obs.switching_scene] + [self.drivers[k].obs_scene for k in self.cfg.rotation]

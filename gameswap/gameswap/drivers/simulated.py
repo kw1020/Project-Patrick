@@ -45,6 +45,9 @@ class SimulatedGame(GameDriver):
             self._running = True
         return StepResult(True, "process and window found (simulated)")
 
+    def describe(self) -> str:
+        return "running (simulated)" if self.is_running() else "not running"
+
     def load_save(self, abort):
         if not self.is_running():
             return StepResult(False, "the game isn't running")

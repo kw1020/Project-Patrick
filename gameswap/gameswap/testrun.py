@@ -74,10 +74,23 @@ class TestRunner:
     def _load(self, driver: GameDriver) -> StepResult:
         start = time.monotonic()
         if not driver.is_running():
-            r = driver.launch(self._abort)
+            timer = threading.Timer(self.cfg.launch_timeout, self._abort.set)
+            timer.start()
+            try:
+                r = driver.launch(self._abort)
+            finally:
+                timer.cancel()
             if not r.ok:
+                if self._abort.is_set():
+                    return StepResult(False, f"{driver.name} didn't start within the {self.cfg.launch_timeout} s "
+                                             "launch timeout (or Emergency Stop was pressed)")
                 return StepResult(False, f"launch: {r.detail}")
             log.info("Test Load: %s launched after %.1f s (%s).", driver.name, time.monotonic() - start, r.detail)
+        else:
+            driver.refresh()
+        if not getattr(driver, "automates_load", True):
+            return StepResult(True, f"launch and detection passed - {driver.describe()}. "
+                                    f"Opening the save is automated in {driver.phase_for_load}.")
         loaded_at = time.monotonic()
         r = driver.load_save(self._abort)
         if not r.ok:

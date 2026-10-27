@@ -1,1 +1,1 @@
-__version__ = "0.1.0"  # Phase 1: GUI, timer, state machine, OBS scenes
+__version__ = "0.2.0"  # Phase 2: game launching and process detection

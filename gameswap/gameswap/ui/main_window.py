@@ -7,6 +7,7 @@ import logging
 import os
 import subprocess
 import sys
+import threading
 
 from PySide6.QtCore import QObject, Qt, QTimer, Signal
 from PySide6.QtGui import QGuiApplication
@@ -16,13 +17,14 @@ from PySide6.QtWidgets import (
 )
 
 from .. import config as config_mod
-from .. import sound
+from .. import diagnostics, sound
 from ..config import LOG_DIR, Config
 from ..drivers import make_drivers
 from ..hotkeys import HotkeyListener
 from ..machine import ACTIVE_STATES, Machine, State
 from ..obs import ObsController
 from ..overlay import OverlayServer, overlay_state
+from ..procmon import ProcessMonitor
 from ..testrun import TestRunner
 from .settings_dialog import SettingsDialog
 
@@ -75,6 +77,7 @@ class _Bridge(QObject):
 
     log_line = Signal(int, str)
     hotkey = Signal(str)
+    diag_done = Signal(str)
 
 
 class _QtLogHandler(logging.Handler):
@@ -102,6 +105,7 @@ class MainWindow(QMainWindow):
         self.bridge = _Bridge()
         self.bridge.log_line.connect(self._append_log)
         self.bridge.hotkey.connect(self._on_hotkey)
+        self.bridge.diag_done.connect(self._diagnostics_done)
         self._log_handler = _QtLogHandler(self.bridge)
         logging.getLogger().addHandler(self._log_handler)
 
@@ -110,6 +114,7 @@ class MainWindow(QMainWindow):
         self.hotkeys: HotkeyListener | None = None
         self.machine: Machine | None = None
         self.tests: TestRunner | None = None
+        self.monitor: ProcessMonitor | None = None
 
         self._build_ui()
         self._build_services()
@@ -191,12 +196,16 @@ class MainWindow(QMainWindow):
         self.overlay_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
         copy_btn = QPushButton("Copy overlay URL")
         copy_btn.clicked.connect(lambda: QGuiApplication.clipboard().setText(self.overlay.url if self.overlay else ""))
+        self.diag_btn = QPushButton("Diagnostics")
+        self.diag_btn.setToolTip("Write a report of what GameSwap can find on this PC")
+        self.diag_btn.clicked.connect(self._run_diagnostics)
         self.settings_btn = QPushButton("Settings")
         self.settings_btn.clicked.connect(self._open_settings)
         status.addWidget(self.obs_label)
         status.addSpacing(20)
         status.addWidget(self.overlay_label, 1)
         status.addWidget(copy_btn)
+        status.addWidget(self.diag_btn)
         status.addWidget(self.settings_btn)
         col.addLayout(status)
 
@@ -231,6 +240,7 @@ class MainWindow(QMainWindow):
             mode = QLabel(d.mode_label)
             mode.setStyleSheet("color: #9aa3b2;")
             running = QLabel("-")
+            running.setWordWrap(True)
             test_load = QPushButton("Test Load")
             test_save = QPushButton("Test Save")
             test_load.clicked.connect(lambda _=False, k=key: self._test("load", k))
@@ -244,7 +254,15 @@ class MainWindow(QMainWindow):
 
     def _build_services(self) -> None:
         self._stop_services()
-        drivers = make_drivers(self.cfg)
+        self.monitor = ProcessMonitor()
+        try:
+            drivers = make_drivers(self.cfg, self.monitor)
+        except Exception as e:  # a broken setting must not stop the app opening
+            log.error("Couldn't set up the games (%s). Using simulated games until Settings are fixed.", e)
+            for g in self.cfg.games.values():
+                g.driver = "simulated"
+            drivers = make_drivers(self.cfg, self.monitor)
+        self.monitor.start()
         if self.cfg.obs.enabled:
             self.obs = ObsController(self.cfg.obs)
             self.obs.start()
@@ -285,6 +303,8 @@ class MainWindow(QMainWindow):
             self.obs = None
         if self.overlay:
             self.overlay.close()
+        if self.monitor:
+            self.monitor.stop()
 
     # ---- every 100 ms ------------------------------------------------------------
 
@@ -332,7 +352,7 @@ class MainWindow(QMainWindow):
         for key, (running, load_btn, save_btn) in self.game_rows.items():
             d = m.drivers[key]
             is_running = d.is_running()
-            running.setText("● running" if is_running else "○ not running")
+            running.setText(("● " if is_running else "○ ") + d.describe())
             _set_style(running, f"color: {'#4cd27a' if is_running else '#6c7489'};")
             load_btn.setEnabled(idle and not testing)
             save_btn.setEnabled(idle and not testing and is_running)
@@ -384,6 +404,31 @@ class MainWindow(QMainWindow):
         config_mod.save(self.cfg, self.config_path)
         log.info("Settings saved.")
         self._build_services()
+
+    def _run_diagnostics(self) -> None:
+        self.diag_btn.setEnabled(False)
+        self.diag_btn.setText("Diagnostics...")
+        log.info("Running diagnostics (takes a few seconds)...")
+        cfg, drivers = self.cfg, self.machine.drivers
+
+        def work():
+            try:
+                path = str(diagnostics.write_report(cfg, drivers))
+            except Exception as e:
+                log.exception("Diagnostics failed")
+                path = f"ERROR: {e}"
+            self.bridge.diag_done.emit(path)
+
+        threading.Thread(target=work, name="diagnostics", daemon=True).start()
+
+    def _diagnostics_done(self, path: str) -> None:
+        self.diag_btn.setEnabled(True)
+        self.diag_btn.setText("Diagnostics")
+        if path.startswith("ERROR"):
+            return
+        log.info("Diagnostics saved: %s", path)
+        if sys.platform == "win32":
+            os.startfile(path)
 
     def _open_logs(self) -> None:
         LOG_DIR.mkdir(parents=True, exist_ok=True)

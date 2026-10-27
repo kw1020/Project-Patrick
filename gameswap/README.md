@@ -7,13 +7,18 @@ Each game gets 10 minutes of verified gameplay. Only one game runs at a time, an
 
 | Phase | What it adds | Status |
 |---|---|---|
-| **1** | App window, timer, state machine, OBS scene switching, overlay, sounds, logs | **Built: test it with the checklist below** |
-| 2 | Launching each game and detecting its process and window | Not started |
+| 1 | App window, timer, state machine, OBS scene switching, overlay, sounds, logs | Built (checklist in section 7) |
+| **2** | Launching each game and detecting its process and window; Diagnostics | **Built: test it with the checklist in section 8** |
 | 3 | Minecraft: open your world, verify gameplay, Save and Quit, normal exit | Not started |
 | 4 | Schedule I: load your save, verify gameplay, verified save, normal exit | Not started |
 | 5 | Full automatic run, error recovery polish, one-file `.exe` | Not started |
 
-**In Phase 1 the two games are *simulated*.** GameSwap pretends to launch, load, save and close them, so you can test the timer, buttons, OBS scenes, overlay and error handling before any real game is involved. Phase 1 does not touch Minecraft or Schedule I.
+**What Phase 2 does with the real games:**
+- **Schedule I:** GameSwap asks Steam to start it (`steam.exe -applaunch 3164500`, Steam's own command), then detects the game's process and window.
+- **Minecraft:** GameSwap opens the Minecraft Launcher, **you click PLAY**, and GameSwap detects the game and its window. The official launcher has no supported way to press Play from outside, so Phase 3 will automate that click only after Diagnostics shows how its buttons look on your PC.
+- **Loading your save, saving, and quitting are still done by you.** When GameSwap reaches one of those steps, it stops and tells you what to do. You do it, then press **Continue**. GameSwap checks your answer where it can: it refuses to move on until the game's process has really exited. Phases 3–4 automate these steps.
+
+Each game can also be set to **Simulated** (Settings → Games → Game driver), a pretend game for testing the timer, buttons and OBS without starting anything.
 
 The real automation **will not be called working until it has been tested on your PC with both games.**
 
@@ -46,7 +51,9 @@ xcopy /E /I C:\Project-Patrick\gameswap C:\GameSwap
 ## 3. Install GameSwap's libraries (one time)
 
 Double-click **`C:\GameSwap\install.bat`**. It sets up a private Python environment in `C:\GameSwap\.venv` and installs:
-PySide6 (the window), obsws-python (OBS control), psutil and pywin32 (for Phase 2), pytest and websockets (for the tests).
+PySide6 (the window), obsws-python (OBS control), psutil and pywin32 (finding the games), uiautomation (Diagnostics), pytest and websockets (for the tests).
+
+**Updating from an earlier phase:** download the ZIP again (step 2), copy the new `gameswap` folder over `C:\GameSwap` and choose **Replace the files**, then run `install.bat` again. Your `config.json` isn't in the download, so your settings are kept.
 
 When it says **Done!**, press a key to close it.
 
@@ -54,7 +61,7 @@ If Windows shows *"Windows protected your PC"*, click **More info** and then **R
 
 ## 4. Run the automatic tests
 
-Double-click **`run_tests.bat`**. Expected result: **every line says PASSED**, ending with something like `41 passed`.
+Double-click **`run_tests.bat`**. Expected result: **every line says PASSED**, ending with something like `62 passed`.
 These tests check the timer, every state change, warnings, pause, stop, Emergency Stop, the error handling, and OBS control. The OBS tests use a fake OBS, so your real OBS isn't affected.
 
 ## 5. Set up OBS (one time)
@@ -100,6 +107,7 @@ Your settings live in `C:\GameSwap\config.json`. It includes your OBS password, 
 
 ## 7. Phase 1 test checklist (do this on your PC)
 
+These tests use the pretend games: **Settings → Games → Game driver → Simulated** for both games.
 Set up for quick testing: **Settings → Timer → Play time 1 min 0 s**, Warnings `30, 10`. Then **Save**.
 Keep OBS open, with the Switching scene visible in OBS's preview.
 
@@ -129,22 +137,45 @@ After testing, send me:
 
 ---
 
-## 8. What I need from you for Phases 2–4
+## 8. Phase 2 test checklist (do this on your PC)
+
+First: **Settings → Games**, set **Game driver → Real game** for both, and leave the paths blank. Keep Play time at **1 min** for now. Close both games and the Minecraft Launcher.
+
+| # | Do this | It PASSES if |
+|---|---|---|
+| P1 | Click **Diagnostics** | A report opens. **Launcher** shows a path (not NOT FOUND), and Steam shows `App 3164500 installed in: ...` with `Game program: ....exe`. Your worlds are listed. |
+| P2 | Press **Start** | The log says "Checks passed". The Minecraft Launcher opens. The status says **"Click PLAY in the Minecraft Launcher"**. OBS shows **Switching**. |
+| P3 | Click **PLAY** in the launcher | When Minecraft's window appears, the log says `Minecraft launched: pid ..., window "Minecraft* 1.21..."` with its size. Then a red box says to load your world by hand. The Games box shows `● running v1.21...`. |
+| P4 | Open your world, then press **"Minecraft is in gameplay - start timer"** | The 1:00 timer starts and OBS switches to **Minecraft**. |
+| P5 | Wait for 0:00 | OBS shows **Switching** and the red box asks you to save and quit by hand. |
+| P6 | **Before** quitting, press **"I saved and closed Minecraft - continue"** | It **refuses**: "Minecraft is still running". Nothing else happens. |
+| P7 | Use **Save and Quit to Title**, then **Quit Game**. Press Continue. | The log says "Switching to Schedule I", and **Steam starts Schedule I by itself**. Once its window appears, the log shows its pid and window, and the red box asks you to load your save. |
+| P8 | Watch the Games box during P7 | Minecraft shows **○ not running** before Schedule I starts. Never two games at once. |
+| P9 | Load your save, press Continue, wait for 0:00, then quit Schedule I normally and press Continue | It goes back to Minecraft and opens the launcher again. |
+| P10 | During any "Click PLAY" wait, press **EMERGENCY STOP** | It stops at once. Nothing is closed. |
+| P11 | Settings → Timer → Launch timeout **20 s**. Start, but **don't** click PLAY. | After 20 s a red box says Minecraft didn't start in time. Retry waits again. |
+| P12 | With both games closed, press **Test Load** on Schedule I | Steam starts it, and the log says `Test Load PASSED ... launch and detection passed`. |
+| P13 | Start a game yourself, then press **Start** | Start is refused: "... is already running. Save and close it, then press Start." |
+| P14 | Open the Minecraft Launcher, then click **Diagnostics** again | The report's **"Launcher accessibility tree"** section is filled in. **Send me this report**; Phase 3's automatic PLAY click is built from it. |
+
+After testing, send me:
+1. which P-tests passed or failed;
+2. the **Diagnostics report from P14** (in `C:\GameSwap\logs\`). It contains folder paths with your Windows user name, but no passwords or login tokens;
+3. today's log file from the same folder.
+
+## 9. What I still need from you for Phases 3–4
+
+Diagnostics answers most setup questions automatically: launcher, version, worlds, Minecraft options, Steam folders, monitors. Please tell me:
 
 **Minecraft**
-1. Which launcher: the one from **minecraft.net**, or the **Xbox app**? Where is it installed (right-click its shortcut → Open file location)?
-2. Minecraft version (e.g. 1.21.4) and whether it's vanilla or modded (Fabric, Forge, etc.).
-3. The exact **world name** as shown in Singleplayer, and whether it's at the top of the list.
-4. In Minecraft **Options → Video**: GUI Scale, Fullscreen on/off, and Resolution. Also your Windows **display scale** (Settings → Display → Scale).
-5. Your Minecraft language.
+1. Which world GameSwap should open (as shown in the Diagnostics world list).
+2. Is the game modded (Fabric, Forge, etc.) or vanilla?
+3. Your Windows **display scale** (Settings → System → Display → Scale), e.g. 100% or 125%.
 
 **Schedule I**
-1. Where Steam is installed (usually `C:\Program Files (x86)\Steam\steam.exe`).
-2. Which **save slot** you want, and what the main menu shows (Continue / Load Game?).
-3. **What you see when you save.** Pause the game and tell me exactly which buttons exist, what happens when you press the save button (any message or icon?), and how you quit. I won't assume any keyboard shortcut saves.
-4. Display mode (fullscreen / borderless / windowed) and resolution.
-
-**Both:** how many monitors you have, and which one the games run on.
+1. Which **save slot** to load, and what the main menu shows (Continue? Load Game? slot names?).
+2. **What you see when you save.** Pause the game and tell me exactly which buttons exist, what happens when you press the save button (any message or icon?), and how you quit to the desktop. I won't assume any keyboard shortcut saves. A screenshot of the pause menu helps a lot.
+3. Display mode (fullscreen / borderless / windowed) and resolution.
 
 ---
 
@@ -159,7 +190,11 @@ gameswap/
   overlay/timer.txt                      plain-text timer for OBS
   gameswap/
     machine.py         the state machine (IDLE, LAUNCHING ... SWITCHING, ERROR, STOPPED)
-    drivers/           one driver per game; Phase 1 has the simulated driver
+    drivers/           one driver per game: minecraft.py, schedule1.py, simulated.py
+    procmon.py         finds the games' processes and windows (once a second, in the background)
+    steam.py           finds Steam, its libraries, and Schedule I's folder from Steam's own files
+    winapi.py          small Windows helpers (windows, registry, shortcuts)
+    diagnostics.py     the Diagnostics report
     obs.py             OBS WebSocket control (scenes, recording check)
     overlay.py         local web server for the OBS overlays
     overlay_pages/     the overlay pages (timer + switching screen)
@@ -184,6 +219,10 @@ gameswap/
 
 | Problem | Fix |
 |---|---|
+| "the Minecraft Launcher wasn't found" | Settings → Games → Minecraft Launcher → Browse to `MinecraftLauncher.exe` (or `C:\XboxGames\Minecraft Launcher\Content\Minecraft.exe`). |
+| "Steam wasn't found" / "isn't installed in any Steam library" | Browse to `steam.exe` in Settings, or set Schedule I's Install folder (Steam → Schedule I → Manage → Browse local files). |
+| Steam shows a "choose launch option" box | Pick the normal option. Tell me about it, and Phase 4 will handle it. |
+| Minecraft's window appears but GameSwap keeps waiting | Run Diagnostics while it's open and send me the "Game processes" part. |
 | "Python 3.12 was not found" | Do step 1 again and make sure **Add python.exe to PATH** is ticked. |
 | "OBS isn't answering" | Open OBS and check step 5a. |
 | "OBS rejected the password" | Copy it again from **Show Connect Info** into Settings → OBS. |
