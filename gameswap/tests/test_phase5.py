@@ -151,8 +151,8 @@ def test_selftest_passes(tmp_path, monkeypatch):
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     monkeypatch.setattr(selftest, "APP_DIR", tmp_path)
     result = tmp_path / "selftest-result.txt"
-    assert selftest.run(result) == 0, result.read_text()
-    assert "ALL PASSED" in result.read_text()
+    assert selftest.run(result) == 0, result.read_text(encoding="utf-8")
+    assert "ALL PASSED" in result.read_text(encoding="utf-8")
 
 
 def test_packaged_app_keeps_its_files_next_to_the_exe(tmp_path, monkeypatch):

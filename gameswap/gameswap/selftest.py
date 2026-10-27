@@ -55,7 +55,7 @@ def run(result_file: Path | None = None) -> int:
 
     def writable():
         probe = APP_DIR / ".gameswap-write-test"
-        probe.write_text("ok")
+        probe.write_text("ok", encoding="utf-8")
         probe.unlink()
         return str(APP_DIR)
 

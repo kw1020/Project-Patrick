@@ -246,7 +246,7 @@ def test_exit_that_never_happens_is_not_forced(pc):
 
 
 def test_no_code_path_can_kill_a_game():
-    src = "\n".join(p.read_text() for p in Path(mc.__file__).parent.parent.rglob("*.py"))
+    src = "\n".join(p.read_text(encoding="utf-8") for p in Path(mc.__file__).parent.parent.rglob("*.py"))
     for forbidden in ("TerminateProcess", ".kill(", "taskkill", "os.kill", ".terminate("):
         assert forbidden not in src, f"found {forbidden!r} in GameSwap's code"
 
