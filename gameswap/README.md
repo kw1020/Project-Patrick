@@ -277,7 +277,16 @@ If the log lines from S4 show a line Schedule I always writes once a save has lo
   The times come from **OBS's own recording clock**, so they line up with the video file.
 - **`GameSwap.exe`**: a normal Windows app, no Python window needed.
 
-**Make GameSwap.exe**
+**Get GameSwap.exe: download it (easiest)**
+
+Every update is automatically tested on a Windows PC by GitHub, which then builds `GameSwap.exe`:
+1. Open <https://github.com/kw1020/Project-Patrick/actions/workflows/gameswap-windows.yml> (signed in).
+2. Click the newest run with a **green tick**, scroll to **Artifacts**, and download **GameSwap-windows** (about 60 MB).
+3. Unzip it to e.g. `C:\GameSwap-App`, copy your `config.json` from `C:\GameSwap` into that folder, and double-click `GameSwap.exe`.
+
+Downloads stay available for 30 days after each build.
+
+**Or build GameSwap.exe yourself**
 1. Run `install.bat` once (if you haven't since updating).
 2. Double-click **`build_exe.bat`**. It builds the app, runs its self-test, and must end with **ALL PASSED**.
 3. Your app is the folder `C:\GameSwap\dist\GameSwap`. Keep the **whole folder** together (the `.exe` needs the `_internal` folder next to it). Your `config.json` is copied in for you.
