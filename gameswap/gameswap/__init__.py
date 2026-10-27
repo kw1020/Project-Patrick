@@ -1,1 +1,1 @@
-__version__ = "0.6.0"  # pop-up panel, app icon, Windows installer
+__version__ = "0.6.1"  # corner timer, pop-up panel, app icon, Windows installer

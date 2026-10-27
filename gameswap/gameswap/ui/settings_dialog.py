@@ -276,7 +276,10 @@ class SettingsDialog(QDialog):
         self.popup_corner.setCurrentIndex(max(0, self.popup_corner.findData(p.corner)))
         self.popup_alerts = QLineEdit(", ".join(str(x) for x in p.alert_seconds))
         self.countdown = _spin(self.cfg.countdown_seconds, 0, 60)
+        self.popup_mini = QCheckBox("Always show a small timer in the corner while playing")
+        self.popup_mini.setChecked(p.always_show_timer)
         form.addRow(self.popup_on)
+        form.addRow(self.popup_mini)
         form.addRow("Pop-up position", self.popup_corner)
         form.addRow("Pop up by itself at (seconds left)", self.popup_alerts)
         form.addRow("Big final countdown from", self.countdown)
@@ -446,6 +449,7 @@ class SettingsDialog(QDialog):
         c.overlay.write_text_file = self.overlay_text.isChecked()
         c.popup.enabled = self.popup_on.isChecked()
         c.popup.corner = self.popup_corner.currentData()
+        c.popup.always_show_timer = self.popup_mini.isChecked()
         try:
             c.popup.alert_seconds = sorted({int(x) for x in self.popup_alerts.text().replace(" ", "").split(",") if x},
                                            reverse=True)

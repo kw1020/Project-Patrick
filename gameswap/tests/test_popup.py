@@ -65,11 +65,11 @@ def test_alerts_at_one_minute_and_30_seconds_then_big_countdown(setup):
     rig.m.tick()
     rig.run_until(State.PLAYING)
     step(rig, popup, 3.5)  # the "GO!" moment passes
-    assert not popup.isVisible(), "tucked away during normal play"
+    assert popup.compact, "only the small corner timer during normal play"
     step(rig, popup, 120 - 3.5 - 60)
     assert popup.isVisible() and "1 minute left" in popup.headline.text()
     step(rig, popup, 6)
-    assert not popup.isVisible(), "an alert tucks itself away again"
+    assert popup.compact, "an alert shrinks back to the small timer"
     step(rig, popup, 60 - 6 - 30)
     assert popup.isVisible() and "30 seconds left" in popup.headline.text()
     step(rig, popup, 30 - 9.95)
@@ -99,7 +99,7 @@ def test_stays_up_while_switching_then_says_go(setup):
     popup.update_from(rig.m.snapshot())
     assert popup.isVisible() and popup.headline.text().startswith("GO!")
     step(rig, popup, 3.5)
-    assert not popup.isVisible()
+    assert popup.compact
 
 
 def test_ready_button_shows_for_games_you_confirm(setup, monkeypatch):
@@ -122,4 +122,36 @@ def test_disabled_popup_never_shows(setup):
     rig.m.tick()
     rig.run_until(State.PLAYING)
     step(rig, popup, 1)
+    assert not popup.isVisible()
+
+
+def test_small_timer_stays_in_the_top_left_while_playing(setup, app):
+    rig, popup = setup
+    assert rig.cfg.popup.corner == "top-left" and rig.cfg.popup.always_show_timer
+    rig.m.start()
+    rig.m.tick()
+    rig.run_until(State.PLAYING)
+    step(rig, popup, 4)  # past the GO! moment
+    assert popup.isVisible() and popup.compact, "the small timer is always there while playing"
+    assert popup.mini.isVisible() and not popup.panel.isVisible()
+    assert popup.mini_clock.text() == "1:56" and popup.mini_game.text() == "MINECRAFT  ·  TURN 1"
+    assert popup.mini_next.text() == "Next: Schedule I"
+    assert popup.windowFlags() & Qt.WindowTransparentForInput, "clicks pass through to the game"
+    area = app.primaryScreen().availableGeometry()
+    assert popup.x() == area.left() + 16 and popup.y() == area.top() + 16
+    step(rig, popup, 120 - 4 - 59.5)  # 1 minute left: grows into the full panel
+    assert not popup.compact and popup.panel.isVisible() and "1 minute left" in popup.headline.text()
+    assert not popup.windowFlags() & Qt.WindowTransparentForInput
+    step(rig, popup, 6)
+    assert popup.isVisible() and popup.compact, "back to the small timer after the alert"
+    assert popup.mini_next.text().endswith("left  ·  then Schedule I") and popup.mini.property("level") == "warning"
+
+
+def test_small_timer_can_be_turned_off(setup):
+    rig, popup = setup
+    rig.cfg.popup.always_show_timer = False
+    rig.m.start()
+    rig.m.tick()
+    rig.run_until(State.PLAYING)
+    step(rig, popup, 4)
     assert not popup.isVisible()

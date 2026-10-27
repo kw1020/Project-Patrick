@@ -15,7 +15,7 @@ CONFIG_PATH = APP_DIR / "config.json"
 LOG_DIR = APP_DIR / "logs"
 
 SIM_FAIL_STEPS = ("", "launch", "load", "ready", "save", "exit")
-POPUP_CORNERS = ("top-right", "top-left", "top-center")
+POPUP_CORNERS = ("top-left", "top-right", "top-center")
 DRIVERS = {"minecraft": ("minecraft", "simulated"), "schedule1": ("schedule1", "simulated")}
 
 
@@ -99,7 +99,9 @@ class PopupConfig:
     """The small always-on-top panel at the top of your screen."""
 
     enabled: bool = True
-    corner: str = "top-right"  # or "top-left", "top-center"
+    corner: str = "top-left"  # or "top-right", "top-center"
+    # While you play, keep a small timer (game + time left) in that corner.
+    always_show_timer: bool = True
     # Pop up by itself with this many seconds left.
     alert_seconds: list[int] = field(default_factory=lambda: [60, 30])
     # How long an alert stays up before tucking itself away again.

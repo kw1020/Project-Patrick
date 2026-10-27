@@ -64,9 +64,11 @@ GameSwap is installed in `%LOCALAPPDATA%\Programs\GameSwap`, and your settings, 
 
 Already set up GameSwap before? Copy your old `config.json` (from `C:\GameSwap` or `C:\GameSwap-App`) into the new folder: press **Win+R**, paste `%LOCALAPPDATA%\Programs\GameSwap`, press Enter, and paste the file in.
 
-### The pop-up panel
+### The corner timer and pop-up panel
 
-Press **Ctrl+Shift+G** at any time, even in a game, to show or hide a small panel at the top-right of your screen:
+**While you play, a small timer sits in the top-left corner of your screen.** It shows the game, the turn number, the time left and what's next. Below 1 minute it turns **amber** and says "44 seconds left · then Schedule I". Clicks pass straight through it to your game. *(Turn it off, or move it to another corner, in Settings → Overlay & Hotkeys.)*
+
+Press **Ctrl+Shift+G** at any time, even in a game, to open the full panel in the same corner:
 
 - Before a run it has a **Start timer** button.
 - During a turn: **Pause**, **Switch now**, **Stop**, and **I'm in** (when Schedule I is waiting for you).
@@ -114,7 +116,7 @@ If Windows shows *"Windows protected your PC"*, click **More info** and then **R
 
 ## 4. Run the automatic tests
 
-Double-click **`run_tests.bat`**. Expected result: **every line says PASSED**, ending with something like `111 passed`.
+Double-click **`run_tests.bat`**. Expected result: **every line says PASSED**, ending with something like `113 passed`.
 These tests check the timer, every state change, warnings, pause, stop, Emergency Stop, the error handling, and OBS control. The OBS tests use a fake OBS, so your real OBS isn't affected.
 
 ## 5. Set up OBS (one time)

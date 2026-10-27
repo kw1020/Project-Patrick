@@ -1,5 +1,8 @@
 """The pop-up panel: a small always-on-top card at the top of your screen.
 
+- While you play, a small timer (game + time left) sits in the corner.
+  Clicks pass straight through it to the game.
+
 - Show / hide it any time with its hotkey (Ctrl+Shift+G by default).
 - It pops up by itself at 1 minute and 30 seconds left, then stays up for
   the final countdown (10, 9, 8 ...) and while the games switch, and
@@ -31,6 +34,14 @@ QFrame#panel { background: rgba(14, 16, 24, 235); border: 2px solid #343b4d; bor
 QFrame#panel[level="warning"] { border-color: #ffb020; }
 QFrame#panel[level="final"] { border-color: #ff3b3b; background: rgba(48, 6, 8, 240); }
 QFrame#panel[level="go"] { border-color: #2fd27a; }
+QFrame#mini { background: rgba(14, 16, 24, 200); border: 1px solid #343b4d; border-radius: 12px; }
+QFrame#mini[level="warning"] { border-color: #ffb020; }
+QLabel#miniGame { color: #aeb5c4; font-size: 11px; font-weight: 700; letter-spacing: 1px; }
+QLabel#miniClock { font-family: Consolas, "DejaVu Sans Mono", monospace; font-size: 26px; font-weight: 800; }
+QLabel#miniClock[level="warning"] { color: #ffb020; }
+QLabel#miniClock[level="paused"] { color: #7a8296; }
+QLabel#miniNext { color: #8a93a6; font-size: 11px; }
+QLabel#miniNext[level="warning"] { color: #ffb020; font-weight: 700; }
 QLabel { color: #e6e9ef; background: transparent; font-family: "Segoe UI"; }
 QLabel#brand { color: #8a93a6; font-size: 11px; font-weight: 700; letter-spacing: 2px; }
 QLabel#headline { font-size: 15px; font-weight: 700; }
@@ -73,9 +84,22 @@ class PopupPanel(QWidget):
         self._fade.setDuration(160)
 
         self.panel = QFrame(objectName="panel")
+        self.mini = QFrame(objectName="mini")
+        mini_col = QVBoxLayout(self.mini)
+        mini_col.setContentsMargins(12, 6, 12, 6)
+        mini_col.setSpacing(0)
+        self.mini_game = QLabel("", objectName="miniGame")
+        self.mini_clock = QLabel("--:--", objectName="miniClock")
+        self.mini_next = QLabel("", objectName="miniNext")
+        mini_col.addWidget(self.mini_game)
+        mini_col.addWidget(self.mini_clock)
+        mini_col.addWidget(self.mini_next)
+        self.compact = False
+        self.mini.hide()
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
         outer.addWidget(self.panel)
+        outer.addWidget(self.mini)
         col = QVBoxLayout(self.panel)
         col.setContentsMargins(16, 10, 16, 12)
         col.setSpacing(2)
@@ -193,9 +217,29 @@ class PopupPanel(QWidget):
 
         self._render(s, now)
         if want_auto or self.pinned:
+            self._set_compact(False)
+            self._appear()
+        elif self.cfg.popup.always_show_timer and s.state == State.PLAYING:
+            self._set_compact(True)
             self._appear()
         elif self.isVisible():
             self.hide()
+
+    def _set_compact(self, on: bool) -> None:
+        """Switch between the small corner timer and the full panel."""
+        if on == self.compact:
+            return
+        self.compact = on
+        was_visible = self.isVisible()
+        self.panel.setVisible(not on)
+        self.mini.setVisible(on)
+        self.setFixedWidth(210 if on else 400)
+        # The small timer lets clicks pass through to the game; the full panel has buttons.
+        self.setWindowFlag(Qt.WindowTransparentForInput, on)
+        self.adjustSize()
+        self._place()
+        if was_visible:
+            self.show()  # changing window flags hides the window; show it again (without focus)
 
     def _render(self, s: Snapshot, now: float) -> None:
         rem = s.remaining
@@ -249,6 +293,22 @@ class PopupPanel(QWidget):
 
         self._set_prop(self.panel, "level", level)
         self._set_prop(self.clock_label, "big", "true" if big else "false")
+
+        if s.state == State.PLAYING and rem is not None:
+            self.mini_game.setText(s.game_name.upper() + (f"  ·  TURN {s.turn}" if s.turn else "")
+                                   + ("  ·  PAUSED" if s.paused else ""))
+            self.mini_clock.setText(f"{rem // 60}:{rem % 60:02d}")
+            alert = rem <= max(self.cfg.popup.alert_seconds, default=0)
+            mini_level = "paused" if s.paused else ("warning" if alert else "")
+            if s.prompt:
+                self.mini_next.setText("SAVE NOW!")
+            elif alert and not s.paused:
+                self.mini_next.setText(f"{_left(rem)} left  ·  then {s.next_name}")
+            else:
+                self.mini_next.setText(f"Next: {s.next_name}")
+            self._set_prop(self.mini_clock, "level", mini_level)
+            self._set_prop(self.mini_next, "level", "warning" if (alert or s.prompt) and not s.paused else "")
+            self._set_prop(self.mini, "level", "warning" if alert and not s.paused else "")
 
     @staticmethod
     def _set_prop(widget, name, value) -> None:
