@@ -1,0 +1,48 @@
+# Runs GameSwap's tests on real Windows and builds GameSwap.exe.
+# The finished app can be downloaded from the run's "Artifacts" section.
+name: GameSwap (Windows)
+
+on:
+  push:
+    paths:
+      - "gameswap/**"
+      - ".github/workflows/gameswap-windows.yml"
+  workflow_dispatch:
+
+jobs:
+  test-and-build:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: gameswap
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install
+        run: python -m pip install -r requirements-dev.txt "pyinstaller>=6.6"
+
+      - name: Tests
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: python -m pytest -v
+
+      - name: Build GameSwap.exe
+        run: python -m PyInstaller --noconfirm --clean GameSwap.spec
+
+      - name: Self-test GameSwap.exe
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath "dist\GameSwap\GameSwap.exe" -ArgumentList "--selftest" -Wait -PassThru
+          Get-Content "dist\GameSwap\selftest-result.txt"
+          if ($p.ExitCode -ne 0) { throw "self-test failed (exit $($p.ExitCode))" }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: GameSwap-windows
+          path: gameswap/dist/GameSwap
+          retention-days: 30

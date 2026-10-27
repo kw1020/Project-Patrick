@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import json
+import sys
 from dataclasses import asdict, dataclass, field, fields, is_dataclass
 from pathlib import Path
 from typing import get_type_hints
 
-APP_DIR = Path(__file__).resolve().parent.parent
+# Where config.json, logs and backups live: next to GameSwap.exe when packaged,
+# otherwise the project folder.
+APP_DIR = Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else Path(__file__).resolve().parent.parent
 CONFIG_PATH = APP_DIR / "config.json"
 LOG_DIR = APP_DIR / "logs"
 
@@ -116,6 +119,13 @@ class Config:
     fallback_cycle_enabled: bool = False
     fallback_cycle_seconds: int = 720
 
+    # If a game fails to start, try once more by itself after this delay.
+    # A retry never starts a second copy: it first checks the game isn't already starting.
+    launch_retries: int = 1
+    launch_retry_delay: int = 20
+    # Stop by itself (saving and closing the game) after this many turns. 0 = never.
+    stop_after_turns: int = 0
+
     sounds: bool = True
     obs: ObsConfig = field(default_factory=ObsConfig)
     overlay: OverlayConfig = field(default_factory=OverlayConfig)
@@ -144,6 +154,10 @@ class Config:
         ):
             if value < 5:
                 problems.append(f"{name} must be at least 5 seconds.")
+        if self.launch_retries < 0 or self.launch_retry_delay < 1:
+            problems.append("Launch retries can't be negative, and the retry delay must be at least 1 second.")
+        if self.stop_after_turns < 0:
+            problems.append("'Stop after turns' can't be negative.")
         if self.ready_stable_checks < 1:
             problems.append("Ready checks in a row must be at least 1.")
         if self.fallback_cycle_enabled and self.fallback_cycle_seconds <= self.play_seconds:

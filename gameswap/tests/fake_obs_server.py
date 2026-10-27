@@ -64,7 +64,8 @@ class FakeObsServer:
         if kind == "GetCurrentProgramScene":
             return True, {"sceneName": self.current, "currentProgramSceneName": self.current}
         if kind == "GetRecordStatus":
-            return True, {"outputActive": self.recording, "outputPaused": False}
+            return True, {"outputActive": self.recording, "outputPaused": False,
+                          "outputDuration": 61500 if self.recording else 0, "outputTimecode": "00:01:01.500"}
         if kind == "StartRecord":
             self.recording = True
             return True, {}

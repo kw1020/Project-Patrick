@@ -7,3 +7,8 @@ overlay/
 __pycache__/
 .pytest_cache/
 backups/
+session.json
+session.tmp
+build/
+dist/
+selftest-result.txt

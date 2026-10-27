@@ -32,6 +32,8 @@ class ObsStatus:
     recording: bool = False
     scene: str = ""
     error: str = ""
+    record_ms: float = 0.0  # how long OBS has been recording, at the last check
+    record_checked_at: float = 0.0  # time.monotonic() of that check
 
 
 class ObsController:
@@ -108,6 +110,13 @@ class ObsController:
             self.status.recording = True
             return []
 
+    def recording_seconds(self) -> float | None:
+        """Where the OBS recording is right now (seconds), or None if not recording."""
+        st = self.status
+        if not (st.connected and st.recording and st.record_checked_at):
+            return None
+        return st.record_ms / 1000 + (time.monotonic() - st.record_checked_at)
+
     # ---- background thread -------------------------------------------------
 
     def _run(self) -> None:
@@ -157,7 +166,9 @@ class ObsController:
             if client is None:
                 return
             try:
-                recording = client.get_record_status().output_active
+                rec = client.get_record_status()
+                recording = rec.output_active
+                record_ms = float(getattr(rec, "output_duration", 0) or 0)
                 resp = client.get_current_program_scene()
                 scene = getattr(resp, "scene_name", None) or getattr(resp, "current_program_scene_name", "")
             except Exception as e:
@@ -167,6 +178,9 @@ class ObsController:
                 log.error("OBS RECORDING STOPPED! GameSwap didn't stop it. Restart recording in OBS.")
             if self._expect_recording and recording and not self.status.recording:
                 log.info("OBS is recording again.")
+            self.status.record_ms = record_ms
+            # Only a reading taken while recording can place chapters on the video.
+            self.status.record_checked_at = time.monotonic() if recording else 0.0
             self.status.recording = recording
             self.status.scene = scene
 

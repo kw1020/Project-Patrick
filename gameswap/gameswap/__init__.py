@@ -1,1 +1,1 @@
-__version__ = "0.4.0"  # Phase 4: Schedule I launch, verified save, normal exit
+__version__ = "0.5.0"  # Phase 5: recovery, session log + chapters, EXE packaging

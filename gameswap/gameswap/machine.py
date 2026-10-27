@@ -101,6 +101,9 @@ class Machine:
         self._clock = clock
         self._executor = executor or ThreadPoolExecutor(max_workers=2, thread_name_prefix="game-step")
         self.on_sound: Callable[[str], None] = lambda kind: None
+        # Notified about turns, errors and stops (the session log and YouTube chapters listen).
+        self.on_event: Callable[[str, dict], None] = lambda kind, info: None
+        self.resume_point: tuple[int, int] | None = None  # (next game index, turns played) to continue from
 
         self.state = State.IDLE
         self.paused = False
@@ -125,6 +128,9 @@ class Machine:
         self._next_poll = 0.0
         self._last_health = 0.0
         self._stop_requested = False
+        self._launch_retries_left = cfg.launch_retries
+        self._retry_at = 0.0
+        self._played = 0.0  # seconds actually played this turn
         self._error_from: State | None = None
         self._last_tick_sound = None
 
@@ -202,6 +208,7 @@ class Machine:
         if self.state == State.PLAYING:
             log.info("Stop pressed - saving and closing %s first.", self.driver.name)
             self._stop_requested = True
+            self._end_turn()
             self._enter(State.SAVING)
         elif self.state in (State.SAVING, State.EXITING):
             log.info("Stop pressed - finishing the save/exit first.")
@@ -223,6 +230,7 @@ class Machine:
         self._enter(State.STOPPED)
         self.message = "EMERGENCY STOP - nothing else will be sent to the games."
         log.warning("EMERGENCY STOP. Automation halted; games and OBS left exactly as they are.")
+        self._event("stopped", {"turns": self.turn, "how": "emergency"})
 
     def retry(self) -> None:
         if self.state != State.ERROR or self._error_from is None:
@@ -301,16 +309,35 @@ class Machine:
         handler(dt)
 
     def _tick_launching(self, dt):
+        if self._retry_at:
+            if self._state_time >= self._retry_at:
+                self._retry_at = 0.0
+                log.info("Retrying the launch of %s.", self.driver.name)
+                self._enter(State.LAUNCHING, advance=False)
+            return
         result = self._job_result()
         if result is None:
             if self._state_time > self.cfg.launch_timeout:
-                self._fail(f"{self.driver.name} didn't start within {self.cfg.launch_timeout} s.")
+                self._launch_failed(f"{self.driver.name} didn't start within {self.cfg.launch_timeout} s.")
             return
         if result.ok:
             log.info("%s launched: %s", self.driver.name, result.detail)
             self._enter(State.LOADING)
         else:
-            self._fail(f"Launching {self.driver.name} failed: {result.detail}")
+            self._launch_failed(f"Launching {self.driver.name} failed: {result.detail}")
+
+    def _launch_failed(self, text: str) -> None:
+        """One automatic retry (by default), then ask you."""
+        if self._launch_retries_left > 0:
+            self._launch_retries_left -= 1
+            delay = self.cfg.launch_retry_delay
+            self._cancel_step()
+            self._retry_at = self._state_time + delay
+            self.message = f"Launch problem - trying again in {delay} s"
+            log.warning("%s Trying again by itself in %d s.", text, delay)
+            self._event("retry", {"step": "launch", "reason": text})
+            return
+        self._fail(text)
 
     def _tick_loading(self, dt):
         result = self._job_result()
@@ -366,6 +393,7 @@ class Machine:
         return True
 
     def _tick_playing(self, dt):
+        self._played += dt
         self._remaining = max(0.0, self._remaining - dt)
         secs = _whole_seconds(self._remaining)
 
@@ -395,6 +423,10 @@ class Machine:
 
         if self._remaining <= 0:
             log.info("%s's time is up.", self.driver.name)
+            if self.cfg.stop_after_turns and self.turn >= self.cfg.stop_after_turns and not self._stop_requested:
+                log.info("That was turn %d of %d: GameSwap will stop after saving.", self.turn, self.cfg.stop_after_turns)
+                self._stop_requested = True
+            self._end_turn()
             self._enter(State.SAVING)
 
     def _tick_saving(self, dt):
@@ -443,6 +475,7 @@ class Machine:
     def _enter(self, state: State, advance: bool = True) -> None:
         prev = self.state
         self._cancel_step()
+        self._retry_at = 0.0
         self.driver.status = ""
         self.state = state
         self._state_time = 0.0
@@ -476,6 +509,7 @@ class Machine:
             self.obs.set_scene(self.cfg.obs.switching_scene)
             self._job = self._executor.submit(self._safe_step, driver.exit, self._step_abort)
         elif state == State.SWITCHING:
+            self._launch_retries_left = self.cfg.launch_retries
             if advance:
                 self.index = (self.index + 1) % len(self.cfg.rotation)
             self.message = f"Up next: {self.driver.name}"
@@ -494,13 +528,21 @@ class Machine:
         self._last_tick_sound = None
         self.unverified = verified_by is None
         self.turn += 1
+        self._played = 0.0
         self.message = f"Playing {self.driver.name}"
         self.obs.set_scene(self.driver.obs_scene)
         self._sound("go")
         log.info("Turn %d: %s - %s on the clock%s.", self.turn, self.driver.name,
                  _mmss(seconds), "" if verified_by else " (FALLBACK, gameplay not verified)")
+        self._event("turn_start", {"turn": self.turn, "game": self.driver.name, "key": self.game_key,
+                                   "seconds": seconds, "verified_by": verified_by or "fallback"})
+
+    def _end_turn(self) -> None:
+        self._event("turn_end", {"turn": self.turn, "game": self.driver.name, "key": self.game_key,
+                                 "played": round(self._played, 1)})
 
     def _after_exit(self) -> None:
+        self._event("game_closed", {"turn": self.turn, "game": self.driver.name, "key": self.game_key})
         if self._stop_requested:
             self._finish(f"Stopped. {self.driver.name} was saved and closed normally.")
         else:
@@ -510,6 +552,7 @@ class Machine:
         self._enter(State.STOPPED)
         self.message = text
         log.info(text)
+        self._event("stopped", {"turns": self.turn, "how": "stop"})
 
     def _fail(self, text: str) -> None:
         self._error_from = self.state
@@ -520,6 +563,7 @@ class Machine:
         self.paused = False
         log.error("[%s] %s", self._error_from.value, text)
         self._sound("error")
+        self._event("error", {"step": self._error_from.value, "game": self.driver.name, "text": text})
 
     # ---- Start checks --------------------------------------------------------
 
@@ -548,11 +592,17 @@ class Machine:
             self.message = "Can't start yet - see the log."
             self._sound("error")
             return
-        self.index = 0
-        self.turn = 0
+        self.index, self.turn = self.resume_point or (0, 0)
+        self.index %= len(self.cfg.rotation)
+        self.resume_point = None
         self.error = ""
         self._stop_requested = False
+        self._launch_retries_left = self.cfg.launch_retries
+        self._retry_at = 0.0
         log.info("Checks passed. Rotation: %s.", " -> ".join(self.drivers[k].name for k in self.cfg.rotation))
+        if self.turn:
+            log.info("Continuing the previous session: %d turns played, next up %s.", self.turn, self.driver.name)
+        self._event("session_start", {"turn": self.turn, "next": self.driver.name})
         self._enter(State.LAUNCHING)
 
     # ---- worker helpers ------------------------------------------------------
@@ -584,6 +634,12 @@ class Machine:
         except Exception as e:
             log.exception("Ready check crashed")
             return ReadyCheck(False, f"check crashed: {e}")
+
+    def _event(self, kind: str, info: dict) -> None:
+        try:
+            self.on_event(kind, info)
+        except Exception:
+            log.exception("Session event handler failed")
 
     def _sound(self, kind: str) -> None:
         if self.cfg.sounds:

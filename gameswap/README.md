@@ -10,8 +10,8 @@ Each game gets 10 minutes of verified gameplay. Only one game runs at a time, an
 | 1 | App window, timer, state machine, OBS scene switching, overlay, sounds, logs | Built (checklist in section 7) |
 | 2 | Launching each game and detecting its process and window; Diagnostics | Built (checklist in section 8) |
 | 3 | Minecraft: open your world, verify gameplay, verified save, normal exit, world backups | Built (checklist in section 9) |
-| **4** | Schedule I: Steam launch, save prompt, save verified on disk, normal exit, save backups | **Built: test it with the checklist in section 10** |
-| 5 | Full automatic run, error recovery polish, one-file `.exe` | Not started |
+| 4 | Schedule I: Steam launch, save prompt, save verified on disk, normal exit, save backups | Built (checklist in section 10) |
+| **5** | Automatic launch retry, stop after N turns, resume after a crash, session log + YouTube chapters, `GameSwap.exe`, Windows test run | **Built: test it with the checklist in section 12** |
 
 **What GameSwap does with the real games now:**
 
@@ -86,7 +86,7 @@ If Windows shows *"Windows protected your PC"*, click **More info** and then **R
 
 ## 4. Run the automatic tests
 
-Double-click **`run_tests.bat`**. Expected result: **every line says PASSED**, ending with something like `90 passed`.
+Double-click **`run_tests.bat`**. Expected result: **every line says PASSED**, ending with something like `104 passed`.
 These tests check the timer, every state change, warnings, pause, stop, Emergency Stop, the error handling, and OBS control. The OBS tests use a fake OBS, so your real OBS isn't affected.
 
 ## 5. Set up OBS (one time)
@@ -259,6 +259,62 @@ If the log lines from S4 show a line Schedule I always writes once a save has lo
 
 ---
 
+## 12. Phase 5: recovery, YouTube chapters, and GameSwap.exe
+
+**What's new**
+- **Automatic launch retry.** If a game doesn't start (Steam busy, slow PC), GameSwap waits 20 s and tries **once** more by itself, then asks you. A retry never starts a second copy: if the game is already starting, GameSwap just waits for it. *(Settings → Timer.)*
+- **Stop by itself after N turns.** Set **Stop by itself after** in Settings → Timer for an unattended recording; it saves and closes the last game first.
+- **Resume after a crash.** If GameSwap or the PC stops mid-challenge, the next time you open GameSwap it asks **"Continue the last challenge?"**. Yes = the next Start continues with the game that was being played (a turn only counts as done once its game was saved and closed).
+- **Session log for editing.** Every session writes `logs\session-<date-time>.csv` (opens in Excel): each turn, switch, retry and problem, with the **video time**.
+- **YouTube chapters.** `logs\chapters-<date-time>.txt` is ready to paste into your video description, for example:
+
+  ```
+  00:00 Turn 1 - Minecraft
+  10:52 Turn 2 - Schedule I
+  21:40 Turn 3 - Minecraft
+  ```
+
+  The times come from **OBS's own recording clock**, so they line up with the video file.
+- **`GameSwap.exe`**: a normal Windows app, no Python window needed.
+
+**Make GameSwap.exe**
+1. Run `install.bat` once (if you haven't since updating).
+2. Double-click **`build_exe.bat`**. It builds the app, runs its self-test, and must end with **ALL PASSED**.
+3. Your app is the folder `C:\GameSwap\dist\GameSwap`. Keep the **whole folder** together (the `.exe` needs the `_internal` folder next to it). Your `config.json` is copied in for you.
+4. Optional: right-click `GameSwap.exe` → **Show more options** → **Send to → Desktop (create shortcut)**.
+
+The EXE keeps its settings, logs, backups and chapters **in its own folder**. If Windows SmartScreen warns about an unknown app, click **More info → Run anyway** (the EXE isn't code-signed).
+
+You can check any copy of the app with **`GameSwap.exe --selftest`** (or `run.bat` users: `.venv\Scripts\python -m gameswap --selftest`). It writes `selftest-result.txt` and never touches your games or OBS.
+
+**Phase 5 checklist**
+
+| # | Do this | It PASSES if |
+|---|---|---|
+| F1 | Double-click `build_exe.bat` | It ends with **ALL PASSED** and `dist\GameSwap\GameSwap.exe` opens the normal GameSwap window. |
+| F2 | Quit Steam completely. Settings → Launch timeout **20 s**. Start, and let it reach Schedule I. | Steam is slow to start, so the first launch times out. The log says **"Trying again by itself in 20 s"**, and the second try starts the game. **Only one** copy runs (Games box). |
+| F3 | Settings → **Stop by itself after 2 turns**. Start. | After turn 2 it saves and closes the game and says Stopped. OBS keeps recording. |
+| F4 | During turn 2, close GameSwap with Task Manager (**End task** on GameSwap). Close the game normally yourself. Open GameSwap again. | It asks **"Continue the last challenge?"** and names the game that was being played. Press Yes, then Start: it continues with that game, and turns keep counting from where they were. |
+| F5 | After a session, open `logs\chapters-....txt` | It starts with `00:00`. Each turn's time matches where that turn starts in your OBS recording (check in a video player, ±2 s). |
+| F6 | Open `logs\session-....csv` in Excel | One row per turn, game closed, retry and problem, with video times. |
+| F7 | Task Manager → Details while running | GameSwap uses about 150–250 MB of RAM and almost no CPU. |
+
+## 13. Full rehearsal (do this last, before recording for real)
+
+Both games **Real**, Play time **10 min**, OBS recording, **Stop by itself after 6 turns** (one hour).
+
+| # | It PASSES if |
+|---|---|
+| R1 | 6 turns alternate Minecraft → Schedule I → … with **no** red error boxes. If one appears, note what it said. |
+| R2 | Each turn's countdown starts only when you can actually play, and lasts 10:00 (spot-check one turn with a stopwatch). |
+| R3 | Every Minecraft turn opens the right world by itself, and every Minecraft save and exit says *confirmed* in the log. |
+| R4 | Every Schedule I save is **verified on disk** before the game closes. |
+| R5 | OBS recorded continuously for the whole hour (one file, or OBS's own file splitting), and never showed a game during loading. |
+| R6 | Afterwards, both games' progress up to each save is there when you load them by hand. |
+| R7 | `chapters-....txt` has 6 turns and matches the video. |
+
+**Only when R1–R7 pass is GameSwap ready for a real recording.** Until then, keep your own copies of your world and save.
+
 ## Files
 
 ```
@@ -281,6 +337,11 @@ gameswap/
     backup.py          zips worlds/saves before each Start
     s1saves.py         Schedule I save slots, and the on-disk save check
     logfollow.py       follows a game's log file as it's written
+    session.py         session log (CSV), YouTube chapters, resume after a crash
+    selftest.py        GameSwap.exe --selftest
+  GameSwap.spec        recipe for building GameSwap.exe (build_exe.bat uses it)
+  build_exe.bat        builds dist\GameSwap\GameSwap.exe and self-tests it
+  session.json         where the current challenge is (for "Continue the last challenge?")
   backups/             your world backups (newest 5 per world)
     obs.py             OBS WebSocket control (scenes, recording check)
     overlay.py         local web server for the OBS overlays

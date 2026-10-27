@@ -7,6 +7,10 @@ import sys
 
 
 def main() -> int:
+    if "--selftest" in sys.argv:
+        from .selftest import run
+
+        return run()
     if sys.version_info < (3, 12):
         print("GameSwap needs Python 3.12 or newer. See README, step 1.")
         return 1

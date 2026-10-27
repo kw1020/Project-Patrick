@@ -40,7 +40,8 @@ def test_window_runs_a_short_cycle(app, tmp_path, monkeypatch):
         s.launch_seconds = s.load_seconds = s.save_seconds = s.exit_seconds = 0.3
         s.ready_after_seconds = 0.5
 
-    win = main_window.MainWindow(cfg, config_path=tmp_path / "config.json")
+    win = main_window.MainWindow(cfg, config_path=tmp_path / "config.json", session_file=tmp_path / "session.json",
+                                 log_dir=tmp_path / "logs", ask_resume=False)
     win.show()
     pump(app, 0.3)
     assert win.start_btn.isEnabled()

@@ -105,6 +105,13 @@ class SettingsDialog(QDialog):
         form.addRow("Fallback cycle length", self.fallback_min)
         form.addRow("", _hint("Off = stop and ask you (safest). On = the turn ends this long after launch. "
                               "Saving and closing are verified either way."))
+        self.retries = _spin(c.launch_retries, 0, 5, "")
+        self.retry_delay = _spin(c.launch_retry_delay, 1, 600)
+        form.addRow("Automatic launch retries", self.retries)
+        form.addRow("Wait before retrying", self.retry_delay)
+        self.stop_after = _spin(c.stop_after_turns, 0, 1000, " turns")
+        form.addRow("Stop by itself after", self.stop_after)
+        form.addRow("", _hint("0 = keep going until you press Stop. It always saves and closes the game first."))
         self.sounds = QCheckBox("Play warning sounds")
         self.sounds.setChecked(c.sounds)
         form.addRow(self.sounds)
@@ -369,6 +376,9 @@ class SettingsDialog(QDialog):
         c.fallback_cycle_enabled = self.fallback.isChecked()
         c.fallback_cycle_seconds = round(self.fallback_min.value() * 60)
         c.sounds = self.sounds.isChecked()
+        c.launch_retries = self.retries.value()
+        c.launch_retry_delay = self.retry_delay.value()
+        c.stop_after_turns = self.stop_after.value()
         for key, wd in self._game_widgets.items():
             g = c.games[key]
             g.name = wd["name"].text().strip() or g.name

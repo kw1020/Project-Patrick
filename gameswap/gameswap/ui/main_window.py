@@ -25,6 +25,7 @@ from ..machine import ACTIVE_STATES, Machine, State
 from ..obs import ObsController
 from ..overlay import OverlayServer, overlay_state
 from ..procmon import ProcessMonitor
+from ..session import STATE_FILE, SessionRecorder, load_unfinished
 from ..testrun import TestRunner
 from .settings_dialog import SettingsDialog
 
@@ -94,10 +95,13 @@ class _QtLogHandler(logging.Handler):
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, cfg: Config, config_path=config_mod.CONFIG_PATH):
+    def __init__(self, cfg: Config, config_path=config_mod.CONFIG_PATH, session_file=STATE_FILE,
+                 log_dir=LOG_DIR, ask_resume: bool = True):
         super().__init__()
         self.cfg = cfg
         self.config_path = config_path
+        self.session_file = session_file
+        self.session_log_dir = log_dir
         self.setWindowTitle("GameSwap")
         self.resize(900, 820)
         self.setStyleSheet(STYLE)
@@ -123,6 +127,8 @@ class MainWindow(QMainWindow):
         self.timer.setTimerType(Qt.PreciseTimer)
         self.timer.timeout.connect(self._tick)
         self.timer.start(100)
+        if ask_resume:
+            QTimer.singleShot(400, self._offer_resume)
 
     # ---- layout ------------------------------------------------------------
 
@@ -271,6 +277,12 @@ class MainWindow(QMainWindow):
             self.obs.start()
         self.machine = Machine(self.cfg, drivers, self.obs)
         self.machine.on_sound = sound.play
+        self.recorder = SessionRecorder(
+            self.cfg.rotation,
+            recording_seconds=lambda: self.obs.recording_seconds() if self.obs else None,
+            log_dir=self.session_log_dir, state_file=self.session_file,
+        )
+        self.machine.on_event = self.recorder.handle
         self.tests = TestRunner(self.cfg, drivers)
 
         self.overlay = OverlayServer(self.cfg.overlay.port, self.cfg.overlay.write_text_file)
@@ -320,7 +332,7 @@ class MainWindow(QMainWindow):
             self.overlay.update(overlay_state(s))
 
         self.game_label.setText(s.game_name)
-        state_text = STATE_TEXT[s.state] + ("  (PAUSED)" if s.paused else "")
+        state_text = STATE_TEXT[s.state] + (f"  ·  turn {s.turn}" if s.turn else "") + ("  (PAUSED)" if s.paused else "")
         if s.unverified:
             state_text += "  - FALLBACK, gameplay not verified"
         if self.tests.busy:
@@ -411,6 +423,27 @@ class MainWindow(QMainWindow):
         config_mod.save(self.cfg, self.config_path)
         log.info("Settings saved.")
         self._build_services()
+
+    def _offer_resume(self) -> None:
+        """If the last challenge ended unexpectedly (crash, power cut), offer to carry on."""
+        last = load_unfinished(self.session_file)
+        if not last:
+            return
+        index = last.get("next_index", 0)
+        if index >= len(self.cfg.rotation):
+            return
+        nxt = self.machine.drivers[self.cfg.rotation[index]].name
+        answer = QMessageBox.question(
+            self, "Continue the last challenge?",
+            f"The last challenge didn't finish (last update {last.get('updated', '?')}).\n\n"
+            f"Turns played: {last.get('turns', 0)}\nNext up: {nxt}\n\n"
+            "Yes = the next Start continues from there.\nNo = the next Start begins a new challenge.",
+        )
+        if answer == QMessageBox.Yes:
+            self.machine.resume_point = (index, int(last.get("turns", 0)))
+            log.info("The next Start continues the last challenge (next up: %s).", nxt)
+        else:
+            self.recorder._save_state(finished=True)
 
     def _run_diagnostics(self) -> None:
         self.diag_btn.setEnabled(False)

@@ -101,3 +101,13 @@ def test_password_never_written_to_logs(server, caplog):
     ctl.preflight(SCENES)
     ctl.close()
     assert "secret" not in caplog.text
+
+
+def test_recording_clock_for_youtube_chapters(server):
+    ctl = controller(server)
+    ctl.POLL_SECONDS = 0.1
+    ctl.start()
+    assert ctl.preflight(SCENES) == []
+    assert wait_for(lambda: ctl.recording_seconds() is not None)
+    assert 61.4 <= ctl.recording_seconds() < 64
+    ctl.close()

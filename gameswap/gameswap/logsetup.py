@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import sys
 import time
 from pathlib import Path
 
@@ -19,7 +20,8 @@ def setup(log_dir: Path = LOG_DIR) -> Path:
     file_handler = logging.FileHandler(path, encoding="utf-8")
     file_handler.setFormatter(logging.Formatter(FORMAT, "%H:%M:%S"))
     root.addHandler(file_handler)
-    console = logging.StreamHandler()
-    console.setFormatter(logging.Formatter(FORMAT, "%H:%M:%S"))
-    root.addHandler(console)
+    if sys.stderr is not None:  # the packaged GameSwap.exe has no console
+        console = logging.StreamHandler()
+        console.setFormatter(logging.Formatter(FORMAT, "%H:%M:%S"))
+        root.addHandler(console)
     return path
