@@ -66,7 +66,15 @@ Already set up GameSwap before? Copy your old `config.json` (from `C:\GameSwap` 
 
 ### The corner timer and pop-up panel
 
-**While you play, a small timer sits in the top-left corner of your screen.** It shows the game, the turn number, the time left and what's next. Below 1 minute it turns **amber** and says "44 seconds left · then Schedule I". Clicks pass straight through it to your game. *(Turn it off, or move it to another corner, in Settings → Overlay & Hotkeys.)*
+**A small timer is always in the top-left corner of your screen** while GameSwap is open. You don't need to press anything. It's slightly see-through, and clicks pass straight through it to your game:
+- **Before a run:** "READY 10:00" and the Start hotkey.
+- **While a game loads:** "LOADING", plus anything you need to do (e.g. "In the game? Press Ctrl+Shift+F10").
+- **While playing:** the game, turn, **time left** and what's next. Below 1 minute it turns **amber**: "44 seconds left · then Schedule I".
+- **While switching:** "SWITCHING · Up next: …".
+
+It only grows big for the 1-minute and 30-second alerts, the final 10…1 countdown, SAVE NOW, and if something needs you. *(Change its corner, how see-through it is, or turn it off in Settings → Overlay & Hotkeys.)*
+
+**Test Start (no OBS).** The **Test Start** button next to Start runs everything exactly like a real run, but leaves OBS completely alone. No connection is needed, so it works even with OBS closed. Use it for practice; the timer shows **TEST**.
 
 Press **Ctrl+Shift+G** at any time, even in a game, to open the full panel in the same corner:
 
@@ -116,7 +124,7 @@ If Windows shows *"Windows protected your PC"*, click **More info** and then **R
 
 ## 4. Run the automatic tests
 
-Double-click **`run_tests.bat`**. Expected result: **every line says PASSED**, ending with something like `113 passed`.
+Double-click **`run_tests.bat`**. Expected result: **every line says PASSED**, ending with something like `115 passed`.
 These tests check the timer, every state change, warnings, pause, stop, Emergency Stop, the error handling, and OBS control. The OBS tests use a fake OBS, so your real OBS isn't affected.
 
 ## 5. Set up OBS (one time)

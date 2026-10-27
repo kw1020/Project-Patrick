@@ -83,6 +83,7 @@ class Snapshot:
     continue_label: str  # text for the Continue button in ERROR, "" if not allowed
     busy: bool  # a Start check is running
     prompt: str = ""  # e.g. "SAVE NOW: sleep in your bed..." for games you save yourself
+    test_run: bool = False  # a Test Start run (OBS left alone)
     can_confirm_ready: bool = False  # the Ready button applies right now
 
 
@@ -98,6 +99,7 @@ class Machine:
         self.cfg = cfg
         self.drivers = drivers
         self.obs = obs or NoObs()
+        self.test_run = False  # a Test Start: OBS is left alone for the whole run
         self._clock = clock
         self._executor = executor or ThreadPoolExecutor(max_workers=2, thread_name_prefix="game-step")
         self.on_sound: Callable[[str], None] = lambda kind: None
@@ -150,20 +152,26 @@ class Machine:
 
     # ---- buttons -------------------------------------------------------------
 
-    def start(self) -> None:
+    def start(self, test_run: bool = False) -> None:
+        """Start the challenge. test_run=True: a practice run that ignores OBS
+        completely (no connection, no scene changes, no recording)."""
         if self.paused and self.state in ACTIVE_STATES:
             self.resume()
             return
         if self.state not in (State.IDLE, State.STOPPED) or self._preflight:
             return
+        self.test_run = test_run
         problems = self.cfg.validate()
         if problems:
             for p in problems:
                 log.error("Can't start: %s", p)
             self.message = "Fix the settings shown in the log, then press Start."
             return
-        self.message = "Checking OBS and the games..."
-        log.info("Start pressed - running checks.")
+        self.message = "Checking the games..." if test_run else "Checking OBS and the games..."
+        if test_run:
+            log.info("TEST START pressed - a practice run without OBS. Running checks.")
+        else:
+            log.info("Start pressed - running checks.")
         self._preflight = self._executor.submit(self._run_preflight)
 
     def pause(self) -> None:
@@ -488,7 +496,7 @@ class Machine:
             self._load_time = 0.0
             self.unverified = False
             self.message = f"Launching {driver.name}..."
-            self.obs.set_scene(self.cfg.obs.switching_scene)
+            self._scene(self.cfg.obs.switching_scene)
             self._job = self._executor.submit(self._safe_step, driver.launch, self._step_abort)
         elif state == State.LOADING:
             self._load_time = 0.0
@@ -503,11 +511,11 @@ class Machine:
             if getattr(driver, "save_needs_player", False):
                 self._sound("save")  # you save in-game, so the game stays on screen
             else:
-                self.obs.set_scene(self.cfg.obs.switching_scene)
+                self._scene(self.cfg.obs.switching_scene)
             self._job = self._executor.submit(self._safe_step, driver.save, self._step_abort)
         elif state == State.EXITING:
             self.message = f"Closing {driver.name}..."
-            self.obs.set_scene(self.cfg.obs.switching_scene)
+            self._scene(self.cfg.obs.switching_scene)
             self._job = self._executor.submit(self._safe_step, driver.exit, self._step_abort)
         elif state == State.SWITCHING:
             self._launch_retries_left = self.cfg.launch_retries
@@ -531,7 +539,7 @@ class Machine:
         self.turn += 1
         self._played = 0.0
         self.message = f"Playing {self.driver.name}"
-        self.obs.set_scene(self.driver.obs_scene)
+        self._scene(self.driver.obs_scene)
         self._sound("go")
         log.info("Turn %d: %s - %s on the clock%s.", self.turn, self.driver.name,
                  _mmss(seconds), "" if verified_by else " (FALLBACK, gameplay not verified)")
@@ -577,7 +585,8 @@ class Machine:
             if d.is_running():
                 problems.append(f"{d.name} is already running. Save and close it, then press Start.")
         scenes = [self.cfg.obs.switching_scene] + [self.drivers[k].obs_scene for k in self.cfg.rotation]
-        problems += self.obs.preflight(list(dict.fromkeys(scenes)))
+        if not self.test_run:
+            problems += self.obs.preflight(list(dict.fromkeys(scenes)))
         return problems
 
     def _finish_preflight(self) -> None:
@@ -636,6 +645,10 @@ class Machine:
             log.exception("Ready check crashed")
             return ReadyCheck(False, f"check crashed: {e}")
 
+    def _scene(self, name: str) -> None:
+        if not self.test_run:
+            self.obs.set_scene(name)
+
     def _event(self, kind: str, info: dict) -> None:
         try:
             self.on_event(kind, info)
@@ -676,6 +689,7 @@ class Machine:
             continue_label=self.continue_label(),
             busy=self._preflight is not None,
             prompt=self.prompt if self.state in (State.PLAYING, State.SAVING) else "",
+            test_run=self.test_run and self.state != State.IDLE,
             can_confirm_ready=(self.state == State.VERIFYING_GAMEPLAY and not self.paused
                                and bool(getattr(self.driver, "manual_ready", False))),
         )

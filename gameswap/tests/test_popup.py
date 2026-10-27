@@ -45,18 +45,22 @@ def test_never_takes_focus(setup):
         assert b.focusPolicy() == Qt.NoFocus
 
 
-def test_hotkey_toggle_and_start_button(setup):
+def test_corner_timer_is_on_from_the_start_and_hotkey_opens_the_panel(setup):
     rig, popup = setup
     popup.update_from(rig.m.snapshot())
-    assert not popup.isVisible()
+    assert popup.isVisible() and popup.compact, "always on, no button needed"
+    assert popup.mini_game.text() == "GAMESWAP  ·  READY" and popup.mini_clock.text() == "2:00"
+    assert "Ctrl+Shift+F6 to start" in popup.mini_next.text()
     popup.toggle()
-    assert popup.isVisible() and popup.start_btn.isVisible() and popup.start_btn.text() == "Start timer"
+    assert popup.isVisible() and not popup.compact
+    assert popup.start_btn.isVisible() and popup.start_btn.text() == "Start timer"
     started = []
     popup.start_clicked.connect(lambda: started.append(True))
     popup.start_btn.click()
     assert started
     popup.toggle()
-    assert not popup.isVisible()
+    popup.update_from(rig.m.snapshot())
+    assert popup.isVisible() and popup.compact, "closing the panel goes back to the small timer"
 
 
 def test_alerts_at_one_minute_and_30_seconds_then_big_countdown(setup):
@@ -111,7 +115,10 @@ def test_ready_button_shows_for_games_you_confirm(setup, monkeypatch):
     rig.m.tick()
     rig.run_until(State.VERIFYING_GAMEPLAY)
     popup.update_from(rig.m.snapshot())
-    assert popup.isVisible() and popup.ready_btn.isVisible()
+    assert popup.compact and popup.mini_next.text() == "In the game? Press Ctrl+Shift+F10"
+    popup.toggle()
+    popup.update_from(rig.m.snapshot())
+    assert popup.ready_btn.isVisible()
 
 
 def test_disabled_popup_never_shows(setup):
@@ -155,3 +162,33 @@ def test_small_timer_can_be_turned_off(setup):
     rig.run_until(State.PLAYING)
     step(rig, popup, 4)
     assert not popup.isVisible()
+
+
+def test_loading_and_switching_stay_small(setup):
+    rig, popup = setup
+    rig.m.start()
+    rig.m.tick()
+    for _ in range(50):
+        rig.advance(0.1)
+        popup.update_from(rig.m.snapshot())
+        if rig.m.state in (State.LAUNCHING, State.LOADING, State.VERIFYING_GAMEPLAY):
+            assert popup.compact and "LOADING" in popup.mini_game.text()
+    rig.run_until(State.PLAYING)
+    rig.m.switch_now()
+    while rig.m.state != State.SWITCHING:
+        rig.advance(0.1)
+        popup.update_from(rig.m.snapshot())
+    assert popup.compact and popup.mini_game.text() == "SWITCHING"
+    assert popup.mini_next.text() == "Up next: Schedule I"
+
+
+def test_test_run_is_marked_and_skips_obs(setup):
+    rig, popup = setup
+    rig.obs.problems = ["OBS isn't answering."]  # OBS closed: a normal Start would refuse
+    rig.m.start(test_run=True)
+    rig.m.tick()
+    rig.run_until(State.PLAYING)
+    assert rig.obs.scenes == [], "a test run never touches OBS"
+    popup.update_from(rig.m.snapshot())
+    step(rig, popup, 4)
+    assert popup.mini_game.text() == "MINECRAFT  ·  TURN 1  ·  TEST"

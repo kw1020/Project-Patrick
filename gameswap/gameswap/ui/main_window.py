@@ -182,6 +182,9 @@ class MainWindow(QMainWindow):
 
         buttons = QHBoxLayout()
         self.start_btn = QPushButton("Start", objectName="start")
+        self.test_btn = QPushButton("Test Start (no OBS)")
+        self.test_btn.setToolTip("A practice run: everything works the same, but OBS is left completely alone")
+        self.test_btn.clicked.connect(lambda: self.machine.start(test_run=True))
         self.pause_btn = QPushButton("Pause")
         self.resume_btn = QPushButton("Resume")
         self.stop_btn = QPushButton("Stop")
@@ -196,7 +199,8 @@ class MainWindow(QMainWindow):
         self.switch_btn.clicked.connect(lambda: self.machine.switch_now())
         self.ready_btn.clicked.connect(lambda: self.machine.confirm_ready())
         self.emergency_btn.clicked.connect(self._emergency)
-        for b in (self.start_btn, self.pause_btn, self.resume_btn, self.stop_btn, self.switch_btn, self.ready_btn):
+        for b in (self.start_btn, self.test_btn, self.pause_btn, self.resume_btn, self.stop_btn, self.switch_btn,
+                  self.ready_btn):
             buttons.addWidget(b)
         buttons.addStretch(1)
         self.emergency_btn.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
@@ -352,6 +356,8 @@ class MainWindow(QMainWindow):
 
         self.game_label.setText(s.game_name)
         state_text = STATE_TEXT[s.state] + (f"  ·  turn {s.turn}" if s.turn else "") + ("  (PAUSED)" if s.paused else "")
+        if s.test_run:
+            state_text += "  ·  TEST RUN (no OBS)"
         if s.unverified:
             state_text += "  - FALLBACK, gameplay not verified"
         if self.tests.busy:
@@ -379,6 +385,7 @@ class MainWindow(QMainWindow):
         idle = s.state in (State.IDLE, State.STOPPED) and not s.busy
         testing = self.tests.busy
         self.start_btn.setEnabled(idle and not testing)
+        self.test_btn.setEnabled(idle and not testing)
         self.pause_btn.setEnabled(active and not s.paused)
         self.resume_btn.setEnabled(active and s.paused)
         self.stop_btn.setEnabled(active or in_error)

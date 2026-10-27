@@ -81,6 +81,17 @@ def bring_to_front(hwnd: int) -> bool:
         return False
 
 
+def keep_on_top(hwnd: int) -> None:
+    """Re-assert 'always on top' without taking focus (some games push themselves up)."""
+    if not available() or not hwnd:
+        return
+    try:
+        win32gui.SetWindowPos(hwnd, win32con.HWND_TOPMOST, 0, 0, 0, 0,
+                              win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_NOACTIVATE)
+    except Exception:
+        pass
+
+
 def monitors() -> list[dict]:
     if not available():
         return []

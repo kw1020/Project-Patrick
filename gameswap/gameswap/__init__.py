@@ -1,1 +1,1 @@
-__version__ = "0.6.1"  # corner timer, pop-up panel, app icon, Windows installer
+__version__ = "0.7.0"  # Test Start (no OBS), always-on corner timer

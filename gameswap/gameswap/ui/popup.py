@@ -22,6 +22,7 @@ from PySide6.QtCore import QPropertyAnimation, Qt, Signal
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 
+from .. import winapi
 from ..config import Config
 from ..machine import ACTIVE_STATES, Snapshot, State
 
@@ -34,13 +35,13 @@ QFrame#panel { background: rgba(14, 16, 24, 235); border: 2px solid #343b4d; bor
 QFrame#panel[level="warning"] { border-color: #ffb020; }
 QFrame#panel[level="final"] { border-color: #ff3b3b; background: rgba(48, 6, 8, 240); }
 QFrame#panel[level="go"] { border-color: #2fd27a; }
-QFrame#mini { background: rgba(14, 16, 24, 200); border: 1px solid #343b4d; border-radius: 12px; }
+QFrame#mini { background: rgba(14, 16, 24, 175); border: 1px solid rgba(255, 255, 255, 30); border-radius: 10px; }
 QFrame#mini[level="warning"] { border-color: #ffb020; }
-QLabel#miniGame { color: #aeb5c4; font-size: 11px; font-weight: 700; letter-spacing: 1px; }
-QLabel#miniClock { font-family: Consolas, "DejaVu Sans Mono", monospace; font-size: 26px; font-weight: 800; }
+QLabel#miniGame { color: #aeb5c4; font-size: 10px; font-weight: 700; letter-spacing: 1px; }
+QLabel#miniClock { font-family: Consolas, "DejaVu Sans Mono", monospace; font-size: 22px; font-weight: 800; }
 QLabel#miniClock[level="warning"] { color: #ffb020; }
 QLabel#miniClock[level="paused"] { color: #7a8296; }
-QLabel#miniNext { color: #8a93a6; font-size: 11px; }
+QLabel#miniNext { color: #8a93a6; font-size: 10px; }
 QLabel#miniNext[level="warning"] { color: #ffb020; font-weight: 700; }
 QLabel { color: #e6e9ef; background: transparent; font-family: "Segoe UI"; }
 QLabel#brand { color: #8a93a6; font-size: 11px; font-weight: 700; letter-spacing: 2px; }
@@ -80,17 +81,20 @@ class PopupPanel(QWidget):
         self._last_remaining: int | None = None
         self._last_state: State | None = None
         self._go_until = 0.0
+        self._last_prompt = ""
+        self._last_raise = 0.0
         self._fade = QPropertyAnimation(self, b"windowOpacity", self)
         self._fade.setDuration(160)
 
         self.panel = QFrame(objectName="panel")
         self.mini = QFrame(objectName="mini")
         mini_col = QVBoxLayout(self.mini)
-        mini_col.setContentsMargins(12, 6, 12, 6)
+        mini_col.setContentsMargins(10, 5, 10, 6)
         mini_col.setSpacing(0)
         self.mini_game = QLabel("", objectName="miniGame")
         self.mini_clock = QLabel("--:--", objectName="miniClock")
         self.mini_next = QLabel("", objectName="miniNext")
+        self.mini_next.setWordWrap(True)
         mini_col.addWidget(self.mini_game)
         mini_col.addWidget(self.mini_clock)
         mini_col.addWidget(self.mini_next)
@@ -149,10 +153,12 @@ class PopupPanel(QWidget):
     # ---- showing / hiding ---------------------------------------------------
 
     def toggle(self) -> None:
+        """The show/hide hotkey: opens the full panel, or closes it back to the small timer."""
         if self.isVisible() and self.pinned:
             self.hide_now()
         else:
             self.pinned = True
+            self._set_compact(False)
             self._appear()
 
     def hide_now(self) -> None:
@@ -170,8 +176,11 @@ class PopupPanel(QWidget):
             self.show()
             self._fade.stop()
             self._fade.setStartValue(0.0)
-            self._fade.setEndValue(1.0)
+            self._fade.setEndValue(self._target_opacity())
             self._fade.start()
+
+    def _target_opacity(self) -> float:
+        return self.cfg.popup.timer_opacity if self.compact else 1.0
 
     def _place(self) -> None:
         screen = QGuiApplication.primaryScreen()
@@ -192,7 +201,7 @@ class PopupPanel(QWidget):
     def update_from(self, s: Snapshot, testing: bool = False) -> None:
         now = self._clock()
         rem = s.remaining
-        want_auto = False
+        want_full = False
 
         if s.state == State.PLAYING and rem is not None and not s.paused:
             prev = self._last_remaining
@@ -200,30 +209,33 @@ class PopupPanel(QWidget):
                 if prev is not None and prev > a >= rem:
                     self._auto_until = now + self.cfg.popup.alert_show_seconds
             if rem <= self.cfg.countdown_seconds:
-                want_auto = True
-        if s.state in SWITCH_STATES:
-            want_auto = True  # stay up through loading and the whole switch
+                want_full = True  # the big 10, 9, 8 ... countdown
         if s.state == State.ERROR:
-            want_auto = True
+            want_full = True  # something needs you
+        if s.prompt and not self._last_prompt:
+            self._auto_until = now + self.cfg.popup.alert_show_seconds  # SAVE NOW
         if s.state == State.PLAYING and self._last_state in SWITCH_STATES:
-            self._go_until = now + 3.0  # "GO!" for a moment, then tuck away
-        if s.prompt and s.state in (State.PLAYING, State.SAVING):
-            want_auto = True
-        if now < self._go_until or now < self._auto_until:
-            want_auto = True
+            self._go_until = now + 3.0  # "GO!" in the small timer for a moment
+        if now < self._auto_until:
+            want_full = True
 
+        self._last_prompt = s.prompt
         self._last_remaining = rem if s.state == State.PLAYING else None
         self._last_state = s.state if s.state in ACTIVE_STATES or s.state == State.ERROR else None
 
         self._render(s, now)
-        if want_auto or self.pinned:
+        self._render_mini(s, now)
+        if want_full or self.pinned:
             self._set_compact(False)
             self._appear()
-        elif self.cfg.popup.always_show_timer and s.state == State.PLAYING:
-            self._set_compact(True)
+        elif self.cfg.popup.always_show_timer:
+            self._set_compact(True)  # the small, always-on corner timer
             self._appear()
         elif self.isVisible():
             self.hide()
+        if self.isVisible() and now - self._last_raise > 2.0:
+            self._last_raise = now
+            winapi.keep_on_top(int(self.winId()))  # stay above games that grab the top spot
 
     def _set_compact(self, on: bool) -> None:
         """Switch between the small corner timer and the full panel."""
@@ -233,11 +245,12 @@ class PopupPanel(QWidget):
         was_visible = self.isVisible()
         self.panel.setVisible(not on)
         self.mini.setVisible(on)
-        self.setFixedWidth(210 if on else 400)
+        self.setFixedWidth(228 if on else 400)
         # The small timer lets clicks pass through to the game; the full panel has buttons.
         self.setWindowFlag(Qt.WindowTransparentForInput, on)
         self.adjustSize()
         self._place()
+        self.setWindowOpacity(self._target_opacity())
         if was_visible:
             self.show()  # changing window flags hides the window; show it again (without focus)
 
@@ -294,21 +307,48 @@ class PopupPanel(QWidget):
         self._set_prop(self.panel, "level", level)
         self._set_prop(self.clock_label, "big", "true" if big else "false")
 
+
+    def _render_mini(self, s: Snapshot, now: float) -> None:
+        """The small corner timer: always shows where things are."""
+        h = self.cfg.hotkeys
+        rem = s.remaining
+        test = "  ·  TEST" if s.test_run else ""
+        level = ""
         if s.state == State.PLAYING and rem is not None:
-            self.mini_game.setText(s.game_name.upper() + (f"  ·  TURN {s.turn}" if s.turn else "")
-                                   + ("  ·  PAUSED" if s.paused else ""))
-            self.mini_clock.setText(f"{rem // 60}:{rem % 60:02d}")
             alert = rem <= max(self.cfg.popup.alert_seconds, default=0)
-            mini_level = "paused" if s.paused else ("warning" if alert else "")
-            if s.prompt:
-                self.mini_next.setText("SAVE NOW!")
-            elif alert and not s.paused:
-                self.mini_next.setText(f"{_left(rem)} left  ·  then {s.next_name}")
+            game = s.game_name.upper() + (f"  ·  TURN {s.turn}" if s.turn else "") + test
+            clock = f"{rem // 60}:{rem % 60:02d}"
+            if s.paused:
+                game += "  ·  PAUSED"
+                nxt, level = f"Paused  ·  {pretty(h.pause)} to resume", "paused"
+            elif s.prompt:
+                nxt, level = "SAVE NOW!", "warning"
+            elif now < self._go_until:
+                nxt = f"GO!  ·  next: {s.next_name}"
+            elif alert:
+                nxt, level = f"{_left(rem)} left  ·  then {s.next_name}", "warning"
             else:
-                self.mini_next.setText(f"Next: {s.next_name}")
-            self._set_prop(self.mini_clock, "level", mini_level)
-            self._set_prop(self.mini_next, "level", "warning" if (alert or s.prompt) and not s.paused else "")
-            self._set_prop(self.mini, "level", "warning" if alert and not s.paused else "")
+                nxt = f"Next: {s.next_name}"
+        elif s.state in (State.LAUNCHING, State.LOADING, State.VERIFYING_GAMEPLAY):
+            game, clock = f"{s.game_name.upper()}  ·  LOADING{test}", "…"
+            nxt = (f"In the game? Press {pretty(h.ready)}" if s.can_confirm_ready
+                   else _short(s.message))
+        elif s.state in (State.SAVING, State.EXITING, State.SWITCHING):
+            game, clock = f"SWITCHING{test}", "⇄"
+            nxt = "SAVE NOW!" if s.prompt else f"Up next: {s.next_name}"
+            level = "warning" if s.prompt else ""
+        elif s.state == State.ERROR:
+            game, clock, nxt, level = "NEEDS YOU", "!", _short(s.error), "warning"
+        else:
+            game = "GAMESWAP  ·  " + ("STOPPED" if s.state == State.STOPPED else "READY")
+            clock = f"{s.play_seconds // 60}:{s.play_seconds % 60:02d}"
+            nxt = "Checking..." if s.busy else f"First: {s.game_name}  ·  {pretty(h.start)} to start"
+        self.mini_game.setText(game)
+        self.mini_clock.setText(clock)
+        self.mini_next.setText(nxt)
+        self._set_prop(self.mini_clock, "level", level)
+        self._set_prop(self.mini_next, "level", "warning" if level == "warning" else "")
+        self._set_prop(self.mini, "level", "warning" if level == "warning" else "")
 
     @staticmethod
     def _set_prop(widget, name, value) -> None:
@@ -316,6 +356,11 @@ class PopupPanel(QWidget):
             widget.setProperty(name, value)
             widget.style().unpolish(widget)
             widget.style().polish(widget)
+
+
+def _short(text: str, limit: int = 60) -> str:
+    text = " ".join((text or "").split())
+    return text if len(text) <= limit else text[: limit - 1] + "…"
 
 
 def pretty(hotkey: str) -> str:

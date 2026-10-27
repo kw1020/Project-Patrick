@@ -100,8 +100,10 @@ class PopupConfig:
 
     enabled: bool = True
     corner: str = "top-left"  # or "top-right", "top-center"
-    # While you play, keep a small timer (game + time left) in that corner.
+    # Keep a small timer in that corner the whole time GameSwap is open.
     always_show_timer: bool = True
+    # How see-through the small timer is (1.0 = solid).
+    timer_opacity: float = 0.85
     # Pop up by itself with this many seconds left.
     alert_seconds: list[int] = field(default_factory=lambda: [60, 30])
     # How long an alert stays up before tucking itself away again.
@@ -181,6 +183,8 @@ class Config:
             problems.append("The final countdown must be shorter than the play time.")
         if self.popup.corner not in POPUP_CORNERS:
             problems.append(f"Pop-up position must be one of: {', '.join(POPUP_CORNERS)}.")
+        if not 0.3 <= self.popup.timer_opacity <= 1.0:
+            problems.append("The small timer's visibility must be between 30% and 100%.")
         if any(a <= 0 for a in self.popup.alert_seconds):
             problems.append("Each pop-up alert must be above 0 seconds.")  # longer than a turn = just skipped
         if self.stop_after_turns < 0:
