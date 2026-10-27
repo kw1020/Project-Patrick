@@ -90,7 +90,7 @@ class HotkeyConfig:
     pause: str = "ctrl+shift+F7"
     stop: str = "ctrl+shift+F8"
     emergency: str = "ctrl+shift+F9"
-    ready: str = "ctrl+shift+F10"  # "I'm in the game" (Schedule I)
+    ready: str = "ctrl+shift+F10"  # "Start timer now": you're in the game
     popup: str = "ctrl+shift+G"  # show / hide the pop-up panel
 
 
@@ -145,6 +145,9 @@ class Config:
     launch_retry_delay: int = 20
     # Stop by itself (saving and closing the game) after this many turns. 0 = never.
     stop_after_turns: int = 0
+    # The Start hotkey and the pop-up's Start do what you last clicked:
+    # Start (with OBS) or Test Start (no OBS).
+    hotkey_start_is_test: bool = False
 
     sounds: bool = True
     obs: ObsConfig = field(default_factory=ObsConfig)

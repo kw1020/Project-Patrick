@@ -137,3 +137,28 @@ def test_refused_start_explains_why_in_a_popup(app, tmp_path, monkeypatch):
     for b in boxes:
         b.close()
     win.close()
+
+
+def test_start_hotkey_repeats_the_last_start_button(app, tmp_path, monkeypatch):
+    from gameswap import config as config_mod
+    from gameswap.ui import main_window
+
+    monkeypatch.setattr(main_window.sound, "play", lambda kind: None)
+    cfg = make_cfg()
+    cfg.overlay.port = 0
+    cfg.overlay.write_text_file = False
+    path = tmp_path / "config.json"
+    win = main_window.MainWindow(cfg, config_path=path, session_file=tmp_path / "session.json",
+                                 log_dir=tmp_path / "logs", ask_resume=False)
+    calls = []
+    monkeypatch.setattr(win.machine, "start", lambda test_run=False: calls.append(test_run))
+    win._on_hotkey("start")
+    win.test_btn.click()
+    win._on_hotkey("start")
+    win.popup.start_clicked.emit()
+    assert calls == [False, True, True, True]
+    assert config_mod.load(path).hotkey_start_is_test, "remembered after a restart"
+    win.start_btn.click()
+    win._on_hotkey("start")
+    assert calls[-2:] == [False, False]
+    win.close()

@@ -191,18 +191,22 @@ class Machine:
         self.resume() if self.paused else self.pause()
 
     def confirm_ready(self) -> None:
-        """You say you're in the game (for games whose gameplay can't be detected)."""
+        """"Start timer now": you say you're in the game. Works while the game
+        is starting, loading or being checked, for every game, so the timer can
+        always be started even when GameSwap can't see the gameplay itself."""
         d = self.driver
-        if self.state != State.VERIFYING_GAMEPLAY or self.paused or not getattr(d, "manual_ready", False):
+        if self.state not in LOADING_STATES or self.paused:
             return
         d.refresh()
         if not d.is_running():
-            log.error("Ready ignored: %s isn't running.", d.name)
+            log.error("Start timer ignored: %s isn't running yet.", d.name)
+            self.message = f"{d.name} isn't running yet - open it, then press Start timer again"
             return
+        self._cancel_step()
         hook = getattr(d, "on_manual_ready", None)
         if hook:
             hook()
-        log.info("You confirmed %s is in gameplay.", d.name)
+        log.info("You started the timer: %s is in gameplay.", d.name)
         self._start_playing(self.cfg.play_seconds, verified_by="you")
 
     def switch_now(self) -> None:
@@ -700,8 +704,7 @@ class Machine:
             busy=self._preflight is not None,
             prompt=self.prompt if self.state in (State.PLAYING, State.SAVING) else "",
             test_run=self.test_run and self.state != State.IDLE,
-            can_confirm_ready=(self.state == State.VERIFYING_GAMEPLAY and not self.paused
-                               and bool(getattr(self.driver, "manual_ready", False))),
+            can_confirm_ready=self.state in LOADING_STATES and not self.paused,
         )
 
     def shutdown(self) -> None:

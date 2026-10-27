@@ -477,9 +477,6 @@ class MinecraftDriver(RealGameDriver):
             return ReadyCheck(False, "loading the world")
         if self._clock() - ev.joined < self.cfg.ready_settle_seconds:
             return ReadyCheck(False, "loading terrain")
-        if ev.last_pause > ev.joined:
-            return ReadyCheck(False, "Minecraft paused itself while loading. Click into it and press Esc, "
-                                     "then press Continue")
         w = self.game_window()
         if w is None or w.minimized:
             return ReadyCheck(False, "Minecraft's window is minimized or missing")

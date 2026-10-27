@@ -1,1 +1,1 @@
-__version__ = "0.7.2"  # start while already in Minecraft
+__version__ = "0.7.3"  # timer always startable; Start hotkey repeats Test Start

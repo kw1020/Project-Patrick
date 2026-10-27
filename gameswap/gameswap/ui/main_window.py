@@ -184,15 +184,16 @@ class MainWindow(QMainWindow):
         self.start_btn = QPushButton("Start", objectName="start")
         self.test_btn = QPushButton("Test Start (no OBS)")
         self.test_btn.setToolTip("A practice run: everything works the same, but OBS is left completely alone")
-        self.test_btn.clicked.connect(lambda: self.machine.start(test_run=True))
+        self.test_btn.clicked.connect(lambda: self._start(test_run=True, remember=True))
         self.pause_btn = QPushButton("Pause")
         self.resume_btn = QPushButton("Resume")
         self.stop_btn = QPushButton("Stop")
         self.switch_btn = QPushButton("Switch Now")
-        self.ready_btn = QPushButton("I'm in the game (Ready)")
-        self.ready_btn.setToolTip("For Schedule I: press once your save has loaded and you can play")
+        self.ready_btn = QPushButton("Start timer now (I'm in)")
+        self.ready_btn.setToolTip("You're in the game and playing: start the clock now, without waiting "
+                                  "for GameSwap to detect it")
         self.emergency_btn = QPushButton("EMERGENCY STOP", objectName="emergency")
-        self.start_btn.clicked.connect(lambda: self.machine.start())
+        self.start_btn.clicked.connect(lambda: self._start(test_run=False, remember=True))
         self.pause_btn.clicked.connect(lambda: self.machine.pause())
         self.resume_btn.clicked.connect(lambda: self.machine.resume())
         self.stop_btn.clicked.connect(lambda: self.machine.stop())
@@ -322,7 +323,7 @@ class MainWindow(QMainWindow):
             self.popup.hide_now()
             self.popup.deleteLater()
         self.popup = PopupPanel(self.cfg)
-        self.popup.start_clicked.connect(lambda: self.machine.start())
+        self.popup.start_clicked.connect(lambda: self._start())
         self.popup.pause_clicked.connect(lambda: self.machine.toggle_pause())
         self.popup.ready_clicked.connect(lambda: self.machine.confirm_ready())
         self.popup.switch_clicked.connect(lambda: self.machine.switch_now())
@@ -427,9 +428,22 @@ class MainWindow(QMainWindow):
             self.tests.abort()
             log.warning("EMERGENCY STOP: test aborted.")
 
+    def _start(self, test_run: bool | None = None, remember: bool = False) -> None:
+        """Start or Test Start. The hotkey and the pop-up (test_run=None) repeat
+        whichever of the two buttons you clicked last, even after a restart."""
+        if test_run is None:
+            test_run = self.cfg.hotkey_start_is_test
+        elif remember and test_run != self.cfg.hotkey_start_is_test:
+            self.cfg.hotkey_start_is_test = test_run
+            try:
+                config_mod.save(self.cfg, self.config_path)
+            except OSError as e:
+                log.warning("Couldn't remember the Start mode: %s", e)
+        self.machine.start(test_run=test_run)
+
     def _on_hotkey(self, action: str) -> None:
         if action == "start":
-            self.machine.start()
+            self._start()
         elif action == "pause":
             self.machine.toggle_pause()
         elif action == "stop":

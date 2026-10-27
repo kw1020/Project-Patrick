@@ -299,7 +299,7 @@ class SettingsDialog(QDialog):
         form.addRow("Pause / Resume", self.hk["pause"])
         form.addRow("Stop", self.hk["stop"])
         form.addRow("Emergency Stop", self.hk["emergency"])
-        form.addRow("I'm in the game (Ready)", self.hk["ready"])
+        form.addRow("Start timer now (I'm in)", self.hk["ready"])
         form.addRow("Show / hide the pop-up", self.hk["popup"])
         return w
 

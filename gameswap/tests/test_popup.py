@@ -53,7 +53,7 @@ def test_corner_timer_is_on_from_the_start_and_hotkey_opens_the_panel(setup):
     assert "Ctrl+Shift+F6 to start" in popup.mini_next.text()
     popup.toggle()
     assert popup.isVisible() and not popup.compact
-    assert popup.start_btn.isVisible() and popup.start_btn.text() == "Start timer"
+    assert popup.start_btn.isVisible() and popup.start_btn.text() == "Start"
     started = []
     popup.start_clicked.connect(lambda: started.append(True))
     popup.start_btn.click()
@@ -115,7 +115,7 @@ def test_ready_button_shows_for_games_you_confirm(setup, monkeypatch):
     rig.m.tick()
     rig.run_until(State.VERIFYING_GAMEPLAY)
     popup.update_from(rig.m.snapshot())
-    assert popup.compact and popup.mini_next.text() == "In the game? Press Ctrl+Shift+F10"
+    assert popup.compact and popup.mini_next.text() == "Playing? Ctrl+Shift+F10 starts the timer"
     popup.toggle()
     popup.update_from(rig.m.snapshot())
     assert popup.ready_btn.isVisible()

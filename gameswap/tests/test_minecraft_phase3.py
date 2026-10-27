@@ -348,3 +348,47 @@ def test_ready_hotkey_works_for_minecraft_as_a_backup(pc):
         m.confirm_ready()  # Ctrl+Shift+F10
     assert m.state == State.PLAYING
     m.shutdown()
+
+
+def test_minecraft_pausing_itself_when_you_click_gameswap_doesnt_stop_the_timer(pc):
+    """Clicking Test Start in GameSwap makes Minecraft lose focus and pause
+    itself. The timer must still start, and the switch must still work."""
+    cfg, d, drivers = make(pc, save_name="")
+    cfg.play_seconds = 20
+    cfg.warning_seconds = [10, 5]
+    cfg.switch_delay_seconds = 0.1
+    cfg.ready_poll_seconds = 0.05
+    cfg.ready_stable_checks = 2
+    cfg.backup_before_start = False
+    _already_playing(pc)
+    m = Machine(cfg, drivers)
+    m.on_sound = lambda k: None
+    m.start(test_run=True)
+    _run_machine_until(m, lambda: m.state in (State.LOADING, State.VERIFYING_GAMEPLAY))
+    pc.game.escape()  # Minecraft pauses itself: "Saving and pausing game..."
+    assert pc.game.paused
+    _run_machine_until(m, lambda: m.state == State.PLAYING)
+    m.switch_now()  # the pause menu is still open: Esc closes it, the next Esc saves
+    _run_machine_until(m, lambda: m.state == State.PLAYING and m.driver.key == "schedule1")
+    assert not d.is_running()
+    m.shutdown()
+
+
+def test_start_timer_now_works_even_when_gameswap_cant_see_the_world(pc):
+    cfg, d, drivers = make(pc)
+    cfg.backup_before_start = False
+    _already_playing(pc)
+    pc.actions.world_in_use = lambda path: False  # no lock check...
+    pc.log.write_text("[12:00:00] fresh log with no join line\n")  # ...and nothing in the log
+    m = Machine(cfg, drivers)
+    m.on_sound = lambda k: None
+    m.start(test_run=True)
+    _run_machine_until(m, lambda: m.state == State.LOADING)
+    for _ in range(20):
+        m.tick()
+        time.sleep(0.01)
+    assert m.state == State.LOADING, "GameSwap can't tell you're in the world"
+    assert m.snapshot().can_confirm_ready
+    m.confirm_ready()  # Ctrl+Shift+F10 / "Start timer now"
+    assert m.state == State.PLAYING and m.snapshot().remaining == cfg.play_seconds
+    m.shutdown()

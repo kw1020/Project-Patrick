@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import time
 
-from PySide6.QtCore import QPropertyAnimation, Qt, Signal
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 
@@ -83,8 +83,6 @@ class PopupPanel(QWidget):
         self._go_until = 0.0
         self._last_prompt = ""
         self._last_raise = 0.0
-        self._fade = QPropertyAnimation(self, b"windowOpacity", self)
-        self._fade.setDuration(160)
 
         self.panel = QFrame(objectName="panel")
         self.mini = QFrame(objectName="mini")
@@ -128,9 +126,9 @@ class PopupPanel(QWidget):
 
         row = QHBoxLayout()
         row.setSpacing(6)
-        self.start_btn = self._button("Start timer", self.start_clicked, primary=True)
+        self.start_btn = self._button("Start", self.start_clicked, primary=True)
         self.pause_btn = self._button("Pause", self.pause_clicked)
-        self.ready_btn = self._button("I'm in", self.ready_clicked)
+        self.ready_btn = self._button("Start timer now", self.ready_clicked, primary=True)
         self.switch_btn = self._button("Switch now", self.switch_clicked)
         self.stop_btn = self._button("Stop", self.stop_clicked)
         for b in (self.start_btn, self.pause_btn, self.ready_btn, self.switch_btn, self.stop_btn):
@@ -139,7 +137,7 @@ class PopupPanel(QWidget):
 
         h = cfg.hotkeys
         self.hint = QLabel(f"{pretty(h.popup)} show/hide  ·  {pretty(h.start)} start  ·  {pretty(h.pause)} pause  ·  "
-                           f"{pretty(h.ready)} I'm in", objectName="hint")
+                           f"{pretty(h.ready)} start timer now", objectName="hint")
         self.hint.setWordWrap(True)
         col.addWidget(self.hint)
         self.setFixedWidth(400)
@@ -172,12 +170,8 @@ class PopupPanel(QWidget):
         if not self.isVisible():
             self.adjustSize()
             self._place()
-            self.setWindowOpacity(0.0)
+            self.setWindowOpacity(self._target_opacity())
             self.show()
-            self._fade.stop()
-            self._fade.setStartValue(0.0)
-            self._fade.setEndValue(self._target_opacity())
-            self._fade.start()
 
     def _target_opacity(self) -> float:
         return self.cfg.popup.timer_opacity if self.compact else 1.0
@@ -298,7 +292,7 @@ class PopupPanel(QWidget):
         active = s.state in ACTIVE_STATES
         idle = s.state in (State.IDLE, State.STOPPED) and not s.busy
         self.start_btn.setVisible(idle or (active and s.paused))
-        self.start_btn.setText("Resume" if active and s.paused else "Start timer")
+        self.start_btn.setText("Resume" if active and s.paused else "Start")
         self.pause_btn.setVisible(active and not s.paused)
         self.ready_btn.setVisible(s.can_confirm_ready)
         self.switch_btn.setVisible(s.state == State.PLAYING and not s.paused)
@@ -331,7 +325,7 @@ class PopupPanel(QWidget):
                 nxt = f"Next: {s.next_name}"
         elif s.state in (State.LAUNCHING, State.LOADING, State.VERIFYING_GAMEPLAY):
             game, clock = f"{s.game_name.upper()}  ·  LOADING{test}", "…"
-            nxt = (f"In the game? Press {pretty(h.ready)}" if s.can_confirm_ready
+            nxt = (f"Playing? {pretty(h.ready)} starts the timer" if s.can_confirm_ready
                    else _short(s.message))
         elif s.state in (State.SAVING, State.EXITING, State.SWITCHING):
             game, clock = f"SWITCHING{test}", "⇄"

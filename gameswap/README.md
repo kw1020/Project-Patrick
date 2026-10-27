@@ -34,7 +34,7 @@ GameSwap doesn't click Minecraft's "Save and Quit to Title" button. Its position
 |---|---|---|
 | Launch | GameSwap, through Steam (`steam.exe -applaunch 3164500`) | The game's process and window appear. |
 | Load your save | **You:** Continue → your save. The status shows which save to pick. | (see Ready) |
-| Ready | **You** press **I'm in the game (Ready)** or **Ctrl+Shift+F10** once you can play. | Schedule I has no known reliable "loaded" signal yet, so GameSwap asks instead of guessing. Each time you press Ready it records the game's `Player.log` lines, so we can make this automatic later (section 11). |
+| Ready | **You** press **Start timer now (I'm in)** or **Ctrl+Shift+F10** once you can play. | Schedule I has no known reliable "loaded" signal yet, so GameSwap asks instead of guessing. Each time you press Ready it records the game's `Player.log` lines, so we can make this automatic later (section 11). |
 | Save | **You**, when **SAVE NOW** appears (60 s before the end, with a sound and in the OBS overlay). The game stays on screen in OBS while you walk to save. | GameSwap watches your save slot on disk. The files must be **newly written** (within the last 90 s), **stop changing**, and **read back as valid save data**. |
 | Quit | GameSwap, **only after a verified save**: it closes the window, the same as clicking its X. | The process exits. If Schedule I asks "are you sure?", you confirm it; GameSwap never clicks it for you. |
 | Backup | GameSwap zips your save slot before every Start. | The zip appears in `C:\GameSwap\backups\`. |
@@ -68,21 +68,23 @@ Already set up GameSwap before? Copy your old `config.json` (from `C:\GameSwap` 
 
 **A small timer is always in the top-left corner of your screen** while GameSwap is open. You don't need to press anything. It's slightly see-through, and clicks pass straight through it to your game:
 - **Before a run:** "READY 10:00" and the Start hotkey.
-- **While a game loads:** "LOADING", plus anything you need to do (e.g. "In the game? Press Ctrl+Shift+F10").
+- **While a game loads:** "LOADING", plus anything you need to do (e.g. "Playing? Ctrl+Shift+F10 starts the timer").
 - **While playing:** the game, turn, **time left** and what's next. Below 1 minute it turns **amber**: "44 seconds left · then Schedule I".
 - **While switching:** "SWITCHING · Up next: …".
 
 It only grows big for the 1-minute and 30-second alerts, the final 10…1 countdown, SAVE NOW, and if something needs you. *(Change its corner, how see-through it is, or turn it off in Settings → Overlay & Hotkeys.)*
 
-**Test Start (no OBS).** The **Test Start** button next to Start runs everything exactly like a real run, but leaves OBS completely alone. No connection is needed, so it works even with OBS closed. Use it for practice; the timer shows **TEST**.
+**Test Start (no OBS).** The **Test Start** button next to Start runs everything exactly like a real run, but leaves OBS completely alone. No connection is needed, so it works even with OBS closed. Use it for practice; the timer shows **TEST**. The **Ctrl+Shift+F6** hotkey and the pop-up's Start do whichever of the two buttons you clicked last.
+
+**The timer won't start?** Press **Ctrl+Shift+F10** (or **Start timer now**). It starts the clock straight away whenever a game is loading, in case GameSwap can't see that you're in the game.
 
 Press **Ctrl+Shift+G** at any time, even in a game, to open the full panel in the same corner:
 
-- Before a run it has a **Start timer** button.
-- During a turn: **Pause**, **Switch now**, **Stop**, and **I'm in** (when Schedule I is waiting for you).
+- Before a run it has a **Start** button.
+- While a game loads: **Start timer now**. During a turn: **Pause**, **Switch now** and **Stop**.
 - **It pops up by itself** at **1 minute** and **30 seconds** left, then shows a **big 10, 9, 8 … countdown** with a tick each second. It stays up while the games switch, says **GO!**, and tucks itself away.
 - **It never takes focus**, so popping up can't pause Minecraft. Clicking its buttons doesn't steal focus either. In-game it's easier to use the hotkeys shown on it.
-- **Play your games in borderless or windowed fullscreen** so the panel can appear on top. (Exclusive fullscreen can hide it.)
+- **Play your games in borderless or windowed fullscreen** so the panel can appear on top. (Exclusive fullscreen can hide it.) **Minecraft's F11 fullscreen hides it:** press F11 to leave fullscreen, then maximise the Minecraft window instead.
 - Change its position, the alert times and the countdown length in **Settings → Overlay & Hotkeys**.
 
 The rest of this README is for running GameSwap from source, building it yourself, and the test checklists.

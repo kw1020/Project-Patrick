@@ -125,6 +125,8 @@ def _window_run() -> str:
         win.machine.start()
         if not pump_until(lambda: win.machine.state == State.PLAYING, 15):
             raise RuntimeError(f"never reached PLAYING (stuck in {win.machine.state.value})")
+        pump_until(lambda: False, 0.5)
+        corner = _corner_timer_check(app, win.popup)
         win.machine.switch_now()
         if not pump_until(lambda: win.machine.state == State.PLAYING and win.machine.turn == 2, 15):
             raise RuntimeError(f"the switch didn't finish (stuck in {win.machine.state.value})")
@@ -138,4 +140,39 @@ def _window_run() -> str:
     finally:
         win.machine.state = State.IDLE
         win.close()
-    return " -> ".join(s.value for s in seen)
+    return " -> ".join(s.value for s in seen) + f"; corner timer: {corner}"
+
+
+def _corner_timer_check(app, popup) -> str:
+    """The small corner timer is really on the screen, in the corner, not see-through."""
+    if popup is None or not popup.isVisible() or not popup.compact:
+        raise RuntimeError("the corner timer isn't showing during a turn")
+    if popup.windowOpacity() < 0.5:
+        raise RuntimeError(f"the corner timer is almost invisible (opacity {popup.windowOpacity():.2f})")
+    if ":" not in popup.mini_clock.text():
+        raise RuntimeError(f"the corner timer shows '{popup.mini_clock.text()}' instead of the time")
+    g = popup.frameGeometry()
+    screen = popup.screen().geometry()
+    if not screen.contains(g.topLeft()) or g.width() < 50 or g.height() < 20:
+        raise RuntimeError(f"the corner timer is off screen ({g.x()},{g.y()} {g.width()}x{g.height()})")
+    detail = f"'{popup.mini_clock.text()}' at {g.x()},{g.y()} {g.width()}x{g.height()}"
+    if sys.platform != "win32":
+        return detail
+    import win32gui
+
+    hwnd = int(popup.winId())
+    if not win32gui.IsWindowVisible(hwnd):
+        raise RuntimeError("Windows says the corner timer window is hidden")
+    left, top, right, bottom = win32gui.GetWindowRect(hwnd)
+    detail += f", Windows rect {left},{top},{right},{bottom}"
+    # Is it actually drawn? Compare the screen there with and without it.
+    shown = popup.screen().grabWindow(0, g.x(), g.y(), g.width(), g.height()).toImage()
+    popup.hide()
+    end = time.monotonic() + 0.4
+    while time.monotonic() < end:
+        app.processEvents()
+        time.sleep(0.01)
+    hidden = popup.screen().grabWindow(0, g.x(), g.y(), g.width(), g.height()).toImage()
+    popup.show()
+    drawn = shown != hidden
+    return detail + (", drawn on screen" if drawn else ", screen capture couldn't confirm it's drawn")
