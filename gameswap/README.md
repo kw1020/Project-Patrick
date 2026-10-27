@@ -49,6 +49,34 @@ The real automation **will not be called working until it has been tested on you
 
 ---
 
+## Quick install (recommended): the GameSwap installer
+
+You don't need Python or any of the steps below to *use* GameSwap:
+1. Open <https://github.com/kw1020/Project-Patrick/actions/workflows/gameswap-windows.yml> (signed in), click the newest run with a **green tick**, and under **Artifacts** download **GameSwap-Setup**.
+2. Unzip it and double-click **`GameSwap-Setup-<version>.exe`**. If SmartScreen warns, click **More info → Run anyway** (the app isn't code-signed).
+3. Click through the installer. Tick **"Put a GameSwap icon on the desktop"** if you want one. No administrator password is needed.
+
+You get:
+- **GameSwap in the Start menu** with its own icon. Right-click it → **Pin to taskbar** if you like.
+- **An entry in Settings → Apps → Installed apps**, with an Uninstall button.
+
+GameSwap is installed in `%LOCALAPPDATA%\Programs\GameSwap`, and your settings, logs, backups and chapters live there too. **Updating** = running a newer installer. **Uninstalling** keeps your settings and backups.
+
+Already set up GameSwap before? Copy your old `config.json` (from `C:\GameSwap` or `C:\GameSwap-App`) into the new folder: press **Win+R**, paste `%LOCALAPPDATA%\Programs\GameSwap`, press Enter, and paste the file in.
+
+### The pop-up panel
+
+Press **Ctrl+Shift+G** at any time, even in a game, to show or hide a small panel at the top-right of your screen:
+
+- Before a run it has a **Start timer** button.
+- During a turn: **Pause**, **Switch now**, **Stop**, and **I'm in** (when Schedule I is waiting for you).
+- **It pops up by itself** at **1 minute** and **30 seconds** left, then shows a **big 10, 9, 8 … countdown** with a tick each second. It stays up while the games switch, says **GO!**, and tucks itself away.
+- **It never takes focus**, so popping up can't pause Minecraft. Clicking its buttons doesn't steal focus either. In-game it's easier to use the hotkeys shown on it.
+- **Play your games in borderless or windowed fullscreen** so the panel can appear on top. (Exclusive fullscreen can hide it.)
+- Change its position, the alert times and the countdown length in **Settings → Overlay & Hotkeys**.
+
+The rest of this README is for running GameSwap from source, building it yourself, and the test checklists.
+
 ## 1. Install Python (one time)
 
 1. Go to <https://www.python.org/downloads/windows/>.
@@ -86,7 +114,7 @@ If Windows shows *"Windows protected your PC"*, click **More info** and then **R
 
 ## 4. Run the automatic tests
 
-Double-click **`run_tests.bat`**. Expected result: **every line says PASSED**, ending with something like `104 passed`.
+Double-click **`run_tests.bat`**. Expected result: **every line says PASSED**, ending with something like `111 passed`.
 These tests check the timer, every state change, warnings, pause, stop, Emergency Stop, the error handling, and OBS control. The OBS tests use a fake OBS, so your real OBS isn't affected.
 
 ## 5. Set up OBS (one time)
@@ -348,6 +376,9 @@ gameswap/
     logfollow.py       follows a game's log file as it's written
     session.py         session log (CSV), YouTube chapters, resume after a crash
     selftest.py        GameSwap.exe --selftest
+    ui/popup.py        the pop-up panel (Ctrl+Shift+G)
+    assets/            the app icon (made by tools/make_icon.py)
+  installer/           Inno Setup recipe for GameSwap-Setup.exe (build_installer.bat)
   GameSwap.spec        recipe for building GameSwap.exe (build_exe.bat uses it)
   build_exe.bat        builds dist\GameSwap\GameSwap.exe and self-tests it
   session.json         where the current challenge is (for "Continue the last challenge?")

@@ -53,6 +53,14 @@ def run(result_file: Path | None = None) -> int:
 
     check("overlay pages", pages)
 
+    def icon():
+        from .ui import ICON_PATH
+
+        if not ICON_PATH.is_file():
+            raise FileNotFoundError(ICON_PATH)
+
+    check("app icon", icon)
+
     def writable():
         probe = APP_DIR / ".gameswap-write-test"
         probe.write_text("ok", encoding="utf-8")

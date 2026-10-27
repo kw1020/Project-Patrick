@@ -24,8 +24,18 @@ def main() -> int:
 
     log_path = logsetup.setup()
     log = logging.getLogger("gameswap")
+    if sys.platform == "win32":
+        # Its own taskbar identity, so Windows shows GameSwap's icon instead of Python's.
+        import ctypes
+
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("GameSwap.App")
     app = QApplication(sys.argv)
     app.setApplicationName("GameSwap")
+    from PySide6.QtGui import QIcon
+
+    from .ui import ICON_PATH
+
+    app.setWindowIcon(QIcon(str(ICON_PATH)))
 
     try:
         cfg = config.load()

@@ -2,7 +2,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.hooks import collect_all
 
-datas = [("gameswap/overlay_pages", "gameswap/overlay_pages")]
+datas = [("gameswap/overlay_pages", "gameswap/overlay_pages"), ("gameswap/assets", "gameswap/assets")]
 binaries = []
 hiddenimports = ["win32timezone"]
 # uiautomation / comtypes load parts of themselves at runtime; take all of them.
@@ -31,6 +31,7 @@ exe = EXE(
     exclude_binaries=True,
     name="GameSwap",
     console=False,  # a normal window app, no black console window
+    icon="gameswap/assets/gameswap.ico",
     upx=False,
 )
 coll = COLLECT(exe, a.binaries, a.datas, name="GameSwap", upx=False)

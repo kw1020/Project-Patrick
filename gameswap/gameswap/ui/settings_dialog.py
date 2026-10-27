@@ -12,7 +12,7 @@ from PySide6.QtWidgets import (
     QTabWidget, QVBoxLayout, QWidget,
 )
 
-from ..config import DRIVERS, SIM_FAIL_STEPS, Config
+from ..config import DRIVERS, POPUP_CORNERS, SIM_FAIL_STEPS, Config
 from ..hotkeys import parse_hotkey
 from ..obs import ObsController
 
@@ -267,11 +267,27 @@ class SettingsDialog(QDialog):
         self.overlay_text.setChecked(self.cfg.overlay.write_text_file)
         form.addRow("Overlay port", self.overlay_port)
         form.addRow(self.overlay_text)
+        p = self.cfg.popup
+        self.popup_on = QCheckBox("Pop-up panel at the top of the screen")
+        self.popup_on.setChecked(p.enabled)
+        self.popup_corner = QComboBox()
+        for corner in POPUP_CORNERS:
+            self.popup_corner.addItem(corner.replace("-", " ").capitalize(), corner)
+        self.popup_corner.setCurrentIndex(max(0, self.popup_corner.findData(p.corner)))
+        self.popup_alerts = QLineEdit(", ".join(str(x) for x in p.alert_seconds))
+        self.countdown = _spin(self.cfg.countdown_seconds, 0, 60)
+        form.addRow(self.popup_on)
+        form.addRow("Pop-up position", self.popup_corner)
+        form.addRow("Pop up by itself at (seconds left)", self.popup_alerts)
+        form.addRow("Big final countdown from", self.countdown)
+        form.addRow("", _hint("The pop-up never takes focus, so it can't pause your game. For it to show over "
+                              "a game, play in borderless or windowed fullscreen."))
         h = self.cfg.hotkeys
         self.hk = {
             "start": QLineEdit(h.start), "pause": QLineEdit(h.pause),
             "stop": QLineEdit(h.stop), "emergency": QLineEdit(h.emergency),
             "ready": QLineEdit(h.ready),
+            "popup": QLineEdit(h.popup),
         }
         form.addRow(_hint("Hotkeys work while a game is in front. Example: ctrl+shift+F9"))
         form.addRow("Start / Resume", self.hk["start"])
@@ -279,6 +295,7 @@ class SettingsDialog(QDialog):
         form.addRow("Stop", self.hk["stop"])
         form.addRow("Emergency Stop", self.hk["emergency"])
         form.addRow("I'm in the game (Ready)", self.hk["ready"])
+        form.addRow("Show / hide the pop-up", self.hk["popup"])
         return w
 
     # ---- actions ---------------------------------------------------------
@@ -427,6 +444,14 @@ class SettingsDialog(QDialog):
         o.test_run_no_recording = self.obs_test_run.isChecked()
         c.overlay.port = self.overlay_port.value()
         c.overlay.write_text_file = self.overlay_text.isChecked()
+        c.popup.enabled = self.popup_on.isChecked()
+        c.popup.corner = self.popup_corner.currentData()
+        try:
+            c.popup.alert_seconds = sorted({int(x) for x in self.popup_alerts.text().replace(" ", "").split(",") if x},
+                                           reverse=True)
+        except ValueError:
+            problems.append("Pop-up alerts must be whole numbers separated by commas, like: 60, 30")
+        c.countdown_seconds = self.countdown.value()
         for name, edit in self.hk.items():
             text = edit.text().strip()
             try:

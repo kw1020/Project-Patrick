@@ -41,8 +41,42 @@ jobs:
           Get-Content "dist\GameSwap\selftest-result.txt"
           if ($p.ExitCode -ne 0) { throw "self-test failed (exit $($p.ExitCode))" }
 
+      - name: Build the installer
+        shell: pwsh
+        run: |
+          choco install innosetup --no-progress -y | Out-Null
+          $iscc = Get-ChildItem "${env:ProgramFiles(x86)}\Inno Setup*\ISCC.exe", "$env:ProgramFiles\Inno Setup*\ISCC.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $iscc) { throw "Inno Setup's ISCC.exe wasn't found" }
+          $version = python -c "import gameswap; print(gameswap.__version__)"
+          & $iscc.FullName "/DAppVersion=$version" installer\GameSwap.iss
+          if ($LASTEXITCODE -ne 0) { throw "ISCC failed" }
+          Get-ChildItem dist\installer
+
+      - name: Test the installer (install, self-test, uninstall)
+        shell: pwsh
+        run: |
+          $setup = Get-ChildItem dist\installer\GameSwap-Setup-*.exe | Select-Object -First 1
+          $p = Start-Process $setup.FullName -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "install failed ($($p.ExitCode))" }
+          $app = Join-Path $env:LOCALAPPDATA "Programs\GameSwap"
+          if (-not (Test-Path "$app\GameSwap.exe")) { throw "GameSwap.exe wasn't installed" }
+          if (-not (Test-Path (Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\GameSwap.lnk"))) { throw "no Start menu shortcut" }
+          $t = Start-Process "$app\GameSwap.exe" -ArgumentList "--selftest" -Wait -PassThru
+          Get-Content "$app\selftest-result.txt"
+          if ($t.ExitCode -ne 0) { throw "installed self-test failed" }
+          $u = Start-Process "$app\unins000.exe" -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES" -Wait -PassThru
+          Start-Sleep -Seconds 3
+          if (Test-Path "$app\GameSwap.exe") { throw "uninstall left GameSwap.exe behind" }
+          Write-Host "Installer OK: installs, runs, uninstalls."
+
       - uses: actions/upload-artifact@v4
         with:
           name: GameSwap-windows
           path: gameswap/dist/GameSwap
+          retention-days: 30
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: GameSwap-Setup
+          path: gameswap/dist/installer/*.exe
           retention-days: 30

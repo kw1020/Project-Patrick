@@ -15,6 +15,7 @@ CONFIG_PATH = APP_DIR / "config.json"
 LOG_DIR = APP_DIR / "logs"
 
 SIM_FAIL_STEPS = ("", "launch", "load", "ready", "save", "exit")
+POPUP_CORNERS = ("top-right", "top-left", "top-center")
 DRIVERS = {"minecraft": ("minecraft", "simulated"), "schedule1": ("schedule1", "simulated")}
 
 
@@ -90,6 +91,19 @@ class HotkeyConfig:
     stop: str = "ctrl+shift+F8"
     emergency: str = "ctrl+shift+F9"
     ready: str = "ctrl+shift+F10"  # "I'm in the game" (Schedule I)
+    popup: str = "ctrl+shift+G"  # show / hide the pop-up panel
+
+
+@dataclass
+class PopupConfig:
+    """The small always-on-top panel at the top of your screen."""
+
+    enabled: bool = True
+    corner: str = "top-right"  # or "top-left", "top-center"
+    # Pop up by itself with this many seconds left.
+    alert_seconds: list[int] = field(default_factory=lambda: [60, 30])
+    # How long an alert stays up before tucking itself away again.
+    alert_show_seconds: float = 5.0
 
 
 @dataclass
@@ -132,6 +146,9 @@ class Config:
     obs: ObsConfig = field(default_factory=ObsConfig)
     overlay: OverlayConfig = field(default_factory=OverlayConfig)
     hotkeys: HotkeyConfig = field(default_factory=HotkeyConfig)
+    popup: PopupConfig = field(default_factory=PopupConfig)
+    # The last this-many seconds count down out loud (a tick each second) and big on screen.
+    countdown_seconds: int = 10
 
     def game(self, key: str) -> GameConfig:
         return self.games[key]
@@ -158,6 +175,12 @@ class Config:
                 problems.append(f"{name} must be at least 5 seconds.")
         if self.launch_retries < 0 or self.launch_retry_delay < 1:
             problems.append("Launch retries can't be negative, and the retry delay must be at least 1 second.")
+        if not 0 <= self.countdown_seconds < self.play_seconds:
+            problems.append("The final countdown must be shorter than the play time.")
+        if self.popup.corner not in POPUP_CORNERS:
+            problems.append(f"Pop-up position must be one of: {', '.join(POPUP_CORNERS)}.")
+        if any(a <= 0 for a in self.popup.alert_seconds):
+            problems.append("Each pop-up alert must be above 0 seconds.")  # longer than a turn = just skipped
         if self.stop_after_turns < 0:
             problems.append("'Stop after turns' can't be negative.")
         if self.ready_stable_checks < 1:

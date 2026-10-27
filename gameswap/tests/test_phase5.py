@@ -175,6 +175,7 @@ def test_spec_bundles_the_overlay_pages():
     spec = (selftest.Path(__file__).resolve().parent.parent / "GameSwap.spec").read_text()
     assert '("gameswap/overlay_pages", "gameswap/overlay_pages")' in spec
     assert "gameswap_launcher.py" in spec and "console=False" in spec
+    assert '("gameswap/assets", "gameswap/assets")' in spec and 'icon="gameswap/assets/gameswap.ico"' in spec
 
 
 def test_config_validation_for_phase5_settings():

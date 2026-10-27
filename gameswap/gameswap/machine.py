@@ -410,9 +410,10 @@ class Machine:
             self.prompt = f"SAVE NOW: {hint}"
             log.info("Save prompt for %s (%d s left): %s.", self.driver.name, secs, hint)
             self._sound("save")
-        if 0 < secs <= 3 and secs != self._last_tick_sound:
+        if 0 < secs <= self.cfg.countdown_seconds and secs != self._last_tick_sound:
             self._last_tick_sound = secs
-            self._sound("tick")
+            if secs not in self.cfg.warning_seconds:  # that second already has its warning sound
+                self._sound("tick")
 
         if self._state_time - self._last_health >= 1.0:
             self._last_health = self._state_time

@@ -10,7 +10,7 @@ import sys
 import threading
 
 from PySide6.QtCore import QObject, Qt, QTimer, Signal
-from PySide6.QtGui import QGuiApplication
+from PySide6.QtGui import QGuiApplication, QIcon
 from PySide6.QtWidgets import (
     QDialog, QFrame, QGridLayout, QGroupBox, QHBoxLayout, QLabel, QMainWindow, QMessageBox,
     QPlainTextEdit, QPushButton, QSizePolicy, QVBoxLayout, QWidget,
@@ -27,6 +27,8 @@ from ..overlay import OverlayServer, overlay_state
 from ..procmon import ProcessMonitor
 from ..session import STATE_FILE, SessionRecorder, load_unfinished
 from ..testrun import TestRunner
+from . import ICON_PATH
+from .popup import PopupPanel
 from .settings_dialog import SettingsDialog
 
 log = logging.getLogger("gameswap")
@@ -103,6 +105,7 @@ class MainWindow(QMainWindow):
         self.session_file = session_file
         self.session_log_dir = log_dir
         self.setWindowTitle("GameSwap")
+        self.setWindowIcon(QIcon(str(ICON_PATH)))
         self.resize(900, 820)
         self.setStyleSheet(STYLE)
 
@@ -113,6 +116,7 @@ class MainWindow(QMainWindow):
         self._log_handler = _QtLogHandler(self.bridge)
         logging.getLogger().addHandler(self._log_handler)
 
+        self.popup: PopupPanel | None = None
         self.obs: ObsController | None = None
         self.overlay: OverlayServer | None = None
         self.hotkeys: HotkeyListener | None = None
@@ -298,14 +302,27 @@ class MainWindow(QMainWindow):
             h.stop: lambda: self.bridge.hotkey.emit("stop"),
             h.emergency: lambda: self.bridge.hotkey.emit("emergency"),
             h.ready: lambda: self.bridge.hotkey.emit("ready"),
+            h.popup: lambda: self.bridge.hotkey.emit("popup"),
         }
         self.hotkeys = HotkeyListener(bindings, lambda msg: log.warning(msg))
         self.hotkeys.start()
         self.hotkey_label.setText(
             f"Hotkeys (work in-game):  Start/Resume {h.start}   ·   Pause/Resume {h.pause}   ·   "
-            f"Stop {h.stop}   ·   Emergency Stop {h.emergency}   ·   Ready {h.ready}"
+            f"Stop {h.stop}   ·   Emergency Stop {h.emergency}   ·   Ready {h.ready}   ·   Pop-up {h.popup}"
         )
         self._build_games_rows()
+        self._build_popup()
+
+    def _build_popup(self) -> None:
+        if self.popup:
+            self.popup.hide_now()
+            self.popup.deleteLater()
+        self.popup = PopupPanel(self.cfg)
+        self.popup.start_clicked.connect(lambda: self.machine.start())
+        self.popup.pause_clicked.connect(lambda: self.machine.toggle_pause())
+        self.popup.ready_clicked.connect(lambda: self.machine.confirm_ready())
+        self.popup.switch_clicked.connect(lambda: self.machine.switch_now())
+        self.popup.stop_clicked.connect(lambda: self.machine.stop())
 
     def _stop_services(self) -> None:
         if self.hotkeys:
@@ -330,6 +347,8 @@ class MainWindow(QMainWindow):
         s = m.snapshot()
         if self.overlay:
             self.overlay.update(overlay_state(s))
+        if self.popup:
+            self.popup.update_from(s)
 
         self.game_label.setText(s.game_name)
         state_text = STATE_TEXT[s.state] + (f"  ·  turn {s.turn}" if s.turn else "") + ("  (PAUSED)" if s.paused else "")
@@ -409,6 +428,8 @@ class MainWindow(QMainWindow):
             self._emergency()
         elif action == "ready":
             self.machine.confirm_ready()
+        elif action == "popup" and self.popup:
+            self.popup.toggle()
 
     def _test(self, kind: str, key: str) -> None:
         if kind == "load":
@@ -493,6 +514,9 @@ class MainWindow(QMainWindow):
                 event.ignore()
                 return
         self.timer.stop()
+        if self.popup:
+            self.popup.hide_now()
+            self.popup.close()
         self._stop_services()
         logging.getLogger().removeHandler(self._log_handler)
         event.accept()

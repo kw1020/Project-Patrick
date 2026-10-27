@@ -1,1 +1,1 @@
-__version__ = "0.5.0"  # Phase 5: recovery, session log + chapters, EXE packaging
+__version__ = "0.6.0"  # pop-up panel, app icon, Windows installer
