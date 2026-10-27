@@ -124,7 +124,7 @@ If Windows shows *"Windows protected your PC"*, click **More info** and then **R
 
 ## 4. Run the automatic tests
 
-Double-click **`run_tests.bat`**. Expected result: **every line says PASSED**, ending with something like `115 passed`.
+Double-click **`run_tests.bat`**. Expected result: **every line says PASSED**, ending with something like `117 passed`.
 These tests check the timer, every state change, warnings, pause, stop, Emergency Stop, the error handling, and OBS control. The OBS tests use a fake OBS, so your real OBS isn't affected.
 
 ## 5. Set up OBS (one time)
@@ -421,6 +421,8 @@ gameswap/
 | "Steam wasn't found" / "isn't installed in any Steam library" | Browse to `steam.exe` in Settings, or set Schedule I's Install folder (Steam → Schedule I → Manage → Browse local files). |
 | Steam shows a "choose launch option" box | Pick the normal option. Tell me about it, and Phase 4 will handle it. |
 | Minecraft's window appears but GameSwap keeps waiting | Run Diagnostics while it's open and send me the "Game processes" part. |
+| "GameSwap can't start yet" window | It lists exactly what to fix. Send me the text if it isn't clear. |
+| Minecraft doesn't open | Open the Minecraft Launcher once yourself from the Start menu, then try again. If it still doesn't, set **Settings → Games → Minecraft Launcher** to the launcher's `.exe` and click **Diagnostics**. |
 | "Couldn't press PLAY automatically" | Click PLAY yourself; GameSwap carries on. Send me a Diagnostics report made with the launcher open, so I can fix the automatic press. |
 | "there is no world called ..." | Pick the world from the list in Settings. If your launcher installation uses its own game folder, set **.minecraft folder** to that folder. |
 | Schedule I: "no Schedule I saves found" | Set **Saves folder** in Settings to the folder that has your `SaveGame_...` folders inside a Steam-ID folder. |

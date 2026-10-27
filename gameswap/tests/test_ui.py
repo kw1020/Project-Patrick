@@ -116,3 +116,24 @@ def test_settings_save_slot_picker(app, tmp_path):
     assert dlg._collect() == []
     chosen = dlg.cfg.games["schedule1"].save_name
     assert resolve_slot(saves, chosen).steam_id == "222", "two accounts with the same name stay apart"
+
+
+def test_refused_start_explains_why_in_a_popup(app, tmp_path, monkeypatch):
+    from PySide6.QtWidgets import QMessageBox
+
+    from gameswap.ui import main_window
+
+    monkeypatch.setattr(main_window.sound, "play", lambda kind: None)
+    cfg = make_cfg(play_seconds=5)  # too short: Start must refuse and say why
+    cfg.obs.enabled = False
+    cfg.overlay.port = 0
+    win = main_window.MainWindow(cfg, config_path=tmp_path / "config.json", session_file=tmp_path / "session.json",
+                                 log_dir=tmp_path / "logs", ask_resume=False)
+    win.show()
+    win.start_btn.click()
+    pump(app, 0.4)
+    boxes = [b for b in win.findChildren(QMessageBox) if b.isVisible()]
+    assert boxes and "Play time must be at least 20 seconds" in boxes[0].informativeText()
+    for b in boxes:
+        b.close()
+    win.close()

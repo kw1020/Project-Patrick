@@ -100,6 +100,7 @@ class Machine:
         self.drivers = drivers
         self.obs = obs or NoObs()
         self.test_run = False  # a Test Start: OBS is left alone for the whole run
+        self.start_problems: list[str] = []  # why the last Start was refused (shown in a pop-up)
         self._clock = clock
         self._executor = executor or ThreadPoolExecutor(max_workers=2, thread_name_prefix="game-step")
         self.on_sound: Callable[[str], None] = lambda kind: None
@@ -166,6 +167,7 @@ class Machine:
             for p in problems:
                 log.error("Can't start: %s", p)
             self.message = "Fix the settings shown in the log, then press Start."
+            self.start_problems = list(problems)
             return
         self.message = "Checking the games..." if test_run else "Checking OBS and the games..."
         if test_run:
@@ -600,8 +602,10 @@ class Machine:
             for p in problems:
                 log.error("Can't start: %s", p)
             self.message = "Can't start yet - see the log."
+            self.start_problems = list(problems)
             self._sound("error")
             return
+        self.start_problems = []
         self.index, self.turn = self.resume_point or (0, 0)
         self.index %= len(self.cfg.rotation)
         self.resume_point = None

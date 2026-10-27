@@ -50,10 +50,9 @@ LAUNCHER_PATHS = [
     r"C:\Program Files\Minecraft Launcher\MinecraftLauncher.exe",
     r"C:\Program Files (x86)\Minecraft\MinecraftLauncher.exe",
 ]
-# Microsoft Store / Xbox app copy of the launcher, started by its app ID.
-STORE_LAUNCHER = r"shell:AppsFolder\Microsoft.4297127D64EC6_8wekyb3d8bbwe!Minecraft"
 LAUNCHER_UI_WAIT = 15.0  # seconds to wait for the launcher's buttons to appear
-PRESS_START_WAIT = 30.0  # after pressing, how long Minecraft gets to start before you're asked
+PRESS_START_WAIT = 30.0
+LAUNCHER_OPEN_WAIT = 25.0  # stop waiting for the launcher's window after this; you can still click PLAY  # after pressing, how long Minecraft gets to start before you're asked
 SAVE_CONFIRM_WAIT = 2.5  # Minecraft logs the pause-save within a fraction of a second
 
 
@@ -117,9 +116,58 @@ def find_launcher(configured: str = "") -> tuple[list[str] | None, str]:
         target = winapi.shortcut_target(str(lnk))
         if target and os.path.exists(target):
             return [target], f"found via Start menu shortcut {lnk.name}"
-    if winapi.IS_WINDOWS:
-        return [STORE_LAUNCHER], "using the Microsoft Store / Xbox app launcher (not confirmed)"
-    return None, "the Minecraft Launcher wasn't found. Set its path in Settings > Games"
+    app_id = store_launcher_app_id()
+    if app_id:
+        return [f"shell:AppsFolder\\{app_id}"], "found in the Start menu (Microsoft Store / Xbox app version)"
+    return None, ("the Minecraft Launcher wasn't found. Open it once from the Start menu, or set its path in "
+                  "Settings > Games > Minecraft Launcher")
+
+
+_store_app_id_cache: list[str] = []
+
+
+def store_launcher_app_id() -> str:
+    """The Minecraft Launcher's app ID from Windows' own Start menu list. That's
+    how Microsoft Store / Xbox app installs (which have no normal .exe path)
+    are found and started."""
+    if _store_app_id_cache:
+        return _store_app_id_cache[0]
+    if not winapi.IS_WINDOWS:
+        return ""
+    import subprocess
+
+    try:
+        out = subprocess.run(
+            ["powershell", "-NoProfile", "-NonInteractive", "-Command",
+             "Get-StartApps | Where-Object { $_.Name -like '*Minecraft*' } | ConvertTo-Json -Compress"],
+            capture_output=True, text=True, timeout=15, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        ).stdout
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    app_id = pick_launcher_app_id(out)
+    if app_id:
+        _store_app_id_cache.append(app_id)
+    return app_id
+
+
+def pick_launcher_app_id(get_start_apps_json: str) -> str:
+    """From Get-StartApps output, the entry that is the Minecraft Launcher (not
+    Bedrock 'Minecraft', not Minecraft Education)."""
+    import json
+
+    try:
+        data = json.loads(get_start_apps_json or "[]")
+    except ValueError:
+        return ""
+    apps = data if isinstance(data, list) else [data]
+    for app in apps:
+        name = str(app.get("Name", "")).lower()
+        if "launcher" in name and "minecraft" in name:
+            return str(app.get("AppID", ""))
+    for app in apps:  # older Store installs list the launcher's package by its ID
+        if "4297127d64ec6" in str(app.get("AppID", "")).lower():
+            return str(app.get("AppID", ""))
+    return ""
 
 
 class MinecraftGameMatcher:
@@ -164,13 +212,24 @@ def _area(w: WindowInfo) -> int:
     return max(0, r - l) * max(0, b - t)
 
 
+def most_recent_world(game_dir: Path) -> str:
+    """The world folder you played last (its level.dat was saved most recently)."""
+    worlds = list_worlds(game_dir)
+    try:
+        return max(worlds, key=lambda f: (game_dir / "saves" / f / "level.dat").stat().st_mtime) if worlds else ""
+    except OSError:
+        return ""
+
+
 def resolve_world(game_dir: Path, wanted: str) -> tuple[str, str] | str:
     """Turn the 'World to open' setting into (folder name, shown name).
-    Accepts the folder name or the name shown in Minecraft's world list.
+    Accepts the folder name or the name shown in Minecraft's world list;
+    blank means the world you played most recently.
     Returns an error message instead if it doesn't match exactly one world."""
-    wanted = wanted.strip()
+    wanted = wanted.strip() or most_recent_world(game_dir)
     if not wanted:
-        return "no world is chosen. Pick one in Settings > Games > World to open"
+        return (f"no Minecraft worlds were found in {game_dir / 'saves'}. Play a world once, or set the "
+                ".minecraft folder in Settings > Games")
     folders = list_worlds(game_dir)
     if wanted in folders:
         return wanted, level_name(game_dir / "saves" / wanted / "level.dat") or wanted
@@ -243,6 +302,8 @@ class MinecraftDriver(RealGameDriver):
             problems.append(f"Minecraft: {world}.")
             return problems
         world_dir, folder, shown = world
+        if not self.cfg.save_name.strip():
+            log.info("No world picked in Settings, so GameSwap will open the one you played last: '%s'.", shown)
         self.refresh()
         if not problems and self.cfg.backup_before_start and not self.is_running():
             log.info("Backing up Minecraft world '%s'...", shown)
@@ -281,11 +342,15 @@ class MinecraftDriver(RealGameDriver):
             except OSError as e:
                 return StepResult(False, f"couldn't open the Minecraft Launcher ({how}): {e}")
             self.status = "Opening the Minecraft Launcher..."
-            while not abort.is_set():
+            log.info("Opening the Minecraft Launcher (%s).", how)
+            deadline = time.monotonic() + LAUNCHER_OPEN_WAIT
+            while not abort.is_set() and time.monotonic() < deadline:
                 self.refresh()
                 if self.launcher_window() is not None or self.is_running():
                     break
                 abort.wait(self.POLL)
+            if self.launcher_window() is None and not self.is_running():
+                log.warning("The Minecraft Launcher's window wasn't recognised; waiting for you to press PLAY.")
         if self.is_running():
             return StepResult(True, "the game is starting")
         w = self.launcher_window()

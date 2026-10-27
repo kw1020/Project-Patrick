@@ -353,6 +353,9 @@ class MainWindow(QMainWindow):
             self.overlay.update(overlay_state(s))
         if self.popup:
             self.popup.update_from(s)
+        if m.start_problems:
+            self._show_start_problems(m.start_problems)
+            m.start_problems = []
 
         self.game_label.setText(s.game_name)
         state_text = STATE_TEXT[s.state] + (f"  ·  turn {s.turn}" if s.turn else "") + ("  (PAUSED)" if s.paused else "")
@@ -452,6 +455,17 @@ class MainWindow(QMainWindow):
         config_mod.save(self.cfg, self.config_path)
         log.info("Settings saved.")
         self._build_services()
+
+    def _show_start_problems(self, problems: list[str]) -> None:
+        """Start was refused: say why in a window you can't miss (not only in the log)."""
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Warning)
+        box.setWindowTitle("GameSwap can't start yet")
+        box.setText("GameSwap didn't start because:")
+        box.setInformativeText("\n\n".join(f"• {p}" for p in problems))
+        box.setStandardButtons(QMessageBox.Ok)
+        box.open()  # doesn't block the timer
+        self.raise_()
 
     def _offer_resume(self) -> None:
         """If the last challenge ended unexpectedly (crash, power cut), offer to carry on."""

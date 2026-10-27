@@ -134,3 +134,15 @@ def test_list_worlds(tmp_path):
         (tmp_path / "saves" / name / "level.dat").write_bytes(b"")
     (tmp_path / "saves" / "not a world").mkdir()
     assert list_worlds(tmp_path) == ["Challenge World", "Old"]
+
+
+def test_store_launcher_found_from_windows_start_apps_list():
+    from gameswap.drivers.minecraft import pick_launcher_app_id
+
+    out = ('[{"Name":"Minecraft","AppID":"Microsoft.MinecraftUWP_8wekyb3d8bbwe!App"},'
+           '{"Name":"Minecraft Launcher","AppID":"Microsoft.4297127D64EC6_8wekyb3d8bbwe!Minecraft"}]')
+    assert pick_launcher_app_id(out) == "Microsoft.4297127D64EC6_8wekyb3d8bbwe!Minecraft"
+    single = '{"Name":"Minecraft Launcher","AppID":"Some.Package_abc!Launcher"}'
+    assert pick_launcher_app_id(single) == "Some.Package_abc!Launcher"
+    assert pick_launcher_app_id('{"Name":"Minecraft","AppID":"Microsoft.MinecraftUWP!App"}') == "", "not Bedrock"
+    assert pick_launcher_app_id("") == "" and pick_launcher_app_id("not json") == ""

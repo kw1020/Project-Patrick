@@ -100,7 +100,9 @@ def test_resolve_world_by_folder_or_shown_name(pc):
     assert resolve_world(pc.game_dir, "Challenge World") == ("Challenge World", "Krew's Challenge")
     assert resolve_world(pc.game_dir, "Krew's Challenge") == ("Challenge World", "Krew's Challenge")
     assert "no world called" in resolve_world(pc.game_dir, "Nope")
-    assert "no world is chosen" in resolve_world(pc.game_dir, "")
+    import os
+    os.utime(pc.saves / "Other World" / "level.dat", (9e9, 9e9))  # played most recently
+    assert resolve_world(pc.game_dir, "") == ("Other World", "Other"), "blank = the world you played last"
 
 
 def test_launcher_target_choice_is_strict():
