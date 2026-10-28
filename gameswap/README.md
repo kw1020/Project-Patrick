@@ -79,13 +79,9 @@ Already set up GameSwap before? Copy your old `config.json` (from `C:\GameSwap` 
 
 **Settings → Timer → Start the clock by itself.** Off (the default): the clock starts once you're in the game, detected by GameSwap or when you press Start timer now. Set it to e.g. **10 s** and the clock starts 10 seconds after the previous game has closed (for the first game: 10 s after Start) and keeps running while the next game loads, so you never press anything. Loading time then counts as play time, so set **Play time** to include it (e.g. **10 min 20 s**). If the game finishes loading, nothing changes; if GameSwap never sees you're in the game, the turn still ends on time and the save is still verified before the game is closed. Pause stops this clock too.
 
-### When OBS changes scenes
+### When OBS shows the next game
 
-**Settings → OBS → Change scenes** (default **+5 s**):
-- **+5 (later):** the game stays on screen for 5 s after its time runs out, then OBS shows **Switching** (if the game has already closed, Switching shows straight away). The next game's scene shows 5 s after its clock starts.
-- **-5 (earlier):** Switching shows at 0:05 left, and - with *Start the clock by itself* - the next game's scene shows 5 s before its clock starts.
-- **0:** right when the clock ends / starts.
-(Schedule I without a save key stays on screen while you walk to save.)
+**Settings → OBS → Show the next game's scene** (default **+5 s**): OBS switches *into* the next game's scene 5 s after its clock starts, so its loading isn't shown. **-5** shows it 5 s before its clock starts (with *Start the clock by itself*); **0** right then. At **0:00** OBS always switches to **Switching** straight away.
 
 ### Updates install themselves
 

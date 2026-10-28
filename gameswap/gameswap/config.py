@@ -84,10 +84,9 @@ class ObsConfig:
     start_recording_on_start: bool = True
     # Test run: switch scenes but don't require (or start) a recording.
     test_run_no_recording: bool = False
-    # When OBS changes scenes, relative to the clock: +5 = 5 s later (the game stays
-    # on screen 5 s past 0:00; the next game's scene shows 5 s after its clock
-    # starts), -5 = 5 s earlier (the next game's scene early only with 'Start the
-    # clock by itself'), 0 = right when the clock ends / starts.
+    # When OBS shows the next game's scene, relative to its clock starting:
+    # +5 = 5 s after, -5 = 5 s before (only with 'Start the clock by itself'),
+    # 0 = right then. (At 0:00 OBS always switches to 'Switching' straight away.)
     scene_offset_seconds: int = 5
 
 

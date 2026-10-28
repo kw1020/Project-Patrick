@@ -448,12 +448,6 @@ class Machine:
         self._remaining = max(0.0, self._remaining - dt)
         secs = _whole_seconds(self._remaining)
 
-        early = -self.cfg.obs.scene_offset_seconds  # e.g. -5: Switching shows at 0:05 left
-        if (early > 0 and not self._end_scene and self._remaining <= early
-                and not getattr(self.driver, "save_needs_player", False)):  # (you walk to save on camera)
-            self._end_scene = True
-            self._scene_at(self.cfg.obs.switching_scene, 0)
-
         for w in sorted(self.cfg.warning_seconds, reverse=True):
             if w not in self._warned and self._remaining <= w and self._remaining > 0:
                 self._warned.add(w)
@@ -575,13 +569,13 @@ class Machine:
                 self._sound("save")  # you save in-game, so the game stays on screen
             elif not self._end_scene:
                 self._end_scene = True
-                self._scene_at(self.cfg.obs.switching_scene, max(0, self.cfg.obs.scene_offset_seconds))
+                self._scene_at(self.cfg.obs.switching_scene, 0)  # at 0:00
             self._job = self._executor.submit(self._safe_step, driver.save, self._step_abort)
         elif state == State.EXITING:
             self.message = f"Closing {driver.name}..."
             if not self._end_scene:
                 self._end_scene = True
-                self._scene_at(self.cfg.obs.switching_scene, max(0, self.cfg.obs.scene_offset_seconds))
+                self._scene_at(self.cfg.obs.switching_scene, 0)
             self._job = self._executor.submit(self._safe_step, driver.exit, self._step_abort)
         elif state == State.SWITCHING:
             self._since_close = 0.0  # the previous game has closed

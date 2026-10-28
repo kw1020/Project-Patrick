@@ -1,1 +1,1 @@
-__version__ = "0.12.1"  # OBS scene changes: +N s later or -N s earlier
+__version__ = "0.12.2"  # scene delay only when going into a game

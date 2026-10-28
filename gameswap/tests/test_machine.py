@@ -323,18 +323,6 @@ def test_scenes_minus_5_next_games_scene_5_seconds_before_its_clock_starts():
     assert r.obs.scenes == ["Switching", "Schedule I"], "no flicker back to Switching"
 
 
-def test_scenes_minus_5_switching_shows_5_seconds_before_the_time_runs_out():
-    r = _auto_rig()
-    r.cfg.obs.scene_offset_seconds = -5
-    start(r)
-    r.run_until(State.PLAYING)
-    while r.m.snapshot().remaining > 6:
-        r.advance(0.1)
-    assert r.obs.scenes[-1] == "Minecraft"
-    r.advance(1.1)  # 5 s left
-    assert r.m.state == State.PLAYING and r.obs.scenes[-1] == "Switching", "Switching shows at 0:05"
-
-
 class _SlowSaveExecutor:
     """Runs jobs at once, except saving and closing, which finish when the test says."""
 
@@ -361,8 +349,8 @@ class _SlowSaveExecutor:
         pass
 
 
-def test_scenes_plus_5_game_stays_5_seconds_after_time_up_and_next_scene_5_seconds_after_clock():
-    """Krew's setting: +5. Each scene change comes 5 s after the clock event."""
+def test_scenes_plus_5_only_when_going_into_a_game():
+    """Krew's setting: +5 only on the way in. At 0:00 Switching shows straight away."""
     r = _auto_rig()
     r.cfg.obs.scene_offset_seconds = 5
     ex = _SlowSaveExecutor()
@@ -373,12 +361,9 @@ def test_scenes_plus_5_game_stays_5_seconds_after_time_up_and_next_scene_5_secon
     r.advance(0.2)
     assert r.obs.scenes[-1] == "Minecraft", "Minecraft's scene 5 s after its clock started"
     r.run_until(State.SAVING)  # 0:00
-    r.advance(3)
-    ex.finish_next()  # saved after 3 s
-    r.advance(1.9)
-    assert r.m.state == State.EXITING and r.obs.scenes[-1] == "Minecraft", "on screen 5 s after 0:00"
-    r.advance(0.2)
-    assert r.obs.scenes[-1] == "Switching"
+    assert r.obs.scenes[-1] == "Switching", "out of the game: straight away at 0:00"
+    ex.finish_next()  # saved
+    r.advance(0.1)
     ex.finish_next()  # closed
     r.run_until(State.SWITCHING)
     r.advance(14.9)
@@ -414,12 +399,3 @@ def test_no_early_switching_scene_when_you_walk_to_save_on_camera():
     r.run_until(State.PLAYING)
     r.run_until(State.SAVING)
     assert r.obs.scenes[-1] == "Minecraft", "the game stays on screen while you save"
-
-
-def test_scenes_plus_5_switching_shows_at_once_if_the_game_already_closed():
-    r = _auto_rig()  # saves and closes instantly
-    r.cfg.obs.scene_offset_seconds = 5
-    start(r)
-    r.run_until(State.SAVING)
-    r.run_until(State.LAUNCHING)
-    assert r.obs.scenes[-1] == "Switching", "no empty game capture once the game is gone"

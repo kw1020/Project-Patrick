@@ -270,10 +270,10 @@ class SettingsDialog(QDialog):
         form.addRow("", _hint("In OBS: Tools > WebSocket Server Settings > Show Connect Info."))
         form.addRow("Switching scene", self.obs_switching)
         self.obs_offset = _spin(o.scene_offset_seconds, -60, 60, " s")
-        form.addRow("Change scenes", self.obs_offset)
-        form.addRow("", _hint("+5 = 5 s LATER: the game stays on screen 5 s after its time runs out, and the "
-                              "next game's scene shows 5 s after its clock starts. -5 = 5 s EARLIER (the next "
-                              "game's scene early only with 'Start the clock by itself'). 0 = right on time."))
+        form.addRow("Show the next game's scene", self.obs_offset)
+        form.addRow("", _hint("When OBS switches INTO the next game, compared with its clock starting: +5 = 5 s "
+                              "after, -5 = 5 s before (with 'Start the clock by itself'), 0 = right then. At 0:00 "
+                              "OBS always shows Switching straight away."))
         form.addRow(self.obs_record)
         form.addRow(self.obs_test_run)
         form.addRow("", _hint("Tick for practice runs. Untick before recording for real."))
