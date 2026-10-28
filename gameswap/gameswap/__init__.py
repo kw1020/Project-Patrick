@@ -1,1 +1,1 @@
-__version__ = "0.8.0"  # Schedule I save key; smoother in the background
+__version__ = "0.8.1"  # launcher: Java Edition page, then Quick Play your world

@@ -37,6 +37,9 @@ KEYEVENTF_KEYUP = 0x0002
 # Left/right Shift, Ctrl, Alt, Windows keys.
 MODIFIERS = (0xA0, 0xA1, 0xA2, 0xA3, 0xA4, 0xA5, 0x5B, 0x5C)
 INVOKABLE_TYPES = {"ButtonControl", "HyperlinkControl", "ListItemControl", "MenuItemControl", "TabItemControl"}
+# Named text/groups are read too: the launcher's Quick Play entry can be a
+# clickable box whose only name is the world's name in a text inside it.
+LABEL_TYPES = {"TextControl", "GroupControl"}
 
 
 @dataclass
@@ -47,6 +50,8 @@ class UiControl:
     name: str
     automation_id: str = ""
     handle: object = None  # the real uiautomation control (None in tests)
+    parents: tuple = ()  # enclosing controls, nearest first
+    selected: bool | None = None  # tabs: is this the page that's showing? (None = unknown)
 
 
 def world_in_use(world_dir: Path) -> bool:
@@ -147,10 +152,36 @@ class Actions:
             # Chromium-style apps only build their accessibility tree once asked.
             list(auto.WalkControl(root, maxDepth=3))
             time.sleep(1.0)
-            for ctrl, _depth in auto.WalkControl(root, includeTop=False, maxDepth=40):
-                if ctrl.ControlTypeName in INVOKABLE_TYPES and ctrl.Name:
-                    found.append(UiControl(ctrl.ControlTypeName, ctrl.Name, ctrl.AutomationId, ctrl))
+            stack: list[tuple[int, UiControl]] = []  # the controls enclosing the current one
+            for ctrl, depth in auto.WalkControl(root, includeTop=False, maxDepth=40):
+                while stack and stack[-1][0] >= depth:
+                    stack.pop()
+                kind = ctrl.ControlTypeName
+                c = UiControl(kind, ctrl.Name or "", ctrl.AutomationId or "", ctrl,
+                              parents=tuple(p for _, p in reversed(stack[-6:])))
+                if kind == "TabItemControl":
+                    try:
+                        c.selected = bool(ctrl.GetSelectionItemPattern().IsSelected)
+                    except Exception:
+                        c.selected = None
+                stack.append((depth, c))
+                if c.name and (kind in INVOKABLE_TYPES or kind in LABEL_TYPES):
+                    found.append(c)
         return found
+
+    def select(self, control: UiControl) -> bool:
+        """Switch to a tab/page (no mouse, no keys); falls back to pressing it."""
+        try:
+            import uiautomation as auto
+        except ImportError:
+            return False
+        with auto.UIAutomationInitializerInThread():
+            try:
+                control.handle.GetSelectionItemPattern().Select()
+                return True
+            except Exception:
+                pass
+        return self.invoke(control)
 
     def invoke(self, control: UiControl) -> bool:
         """Press a control the way a screen reader does (no mouse, no keys)."""
@@ -173,6 +204,17 @@ class Actions:
                 return False
 
 
+def _norm(s: str) -> str:
+    return " ".join(s.split()).casefold()
+
+
+def find_java_tab(controls: list[UiControl]) -> UiControl | None:
+    """The launcher's 'MINECRAFT: JAVA EDITION' page link, if there's exactly one."""
+    tabs = [c for c in controls if c.kind in INVOKABLE_TYPES
+            and (c.automation_id == "Java Edition-menulink" or "java edition" in _norm(c.name))]
+    return tabs[0] if len(tabs) == 1 else None
+
+
 def choose_launcher_target(controls: list[UiControl], world_name: str) -> tuple[UiControl | None, str]:
     """Pick what to press in the Minecraft Launcher.
 
@@ -181,17 +223,23 @@ def choose_launcher_target(controls: list[UiControl], world_name: str) -> tuple[
     Only presses something that matches exactly once; if anything is
     ambiguous it returns None and you click yourself.
     """
-    def norm(s):
-        return " ".join(s.split()).casefold()
-
     if world_name:
-        w = norm(world_name)
-        quick = [c for c in controls if norm(c.name) == w or norm(c.name).startswith(w + ",")]
-        if len(quick) == 1:
-            return quick[0], "quick play"
-        if len(quick) > 1:
-            return None, f"{len(quick)} launcher entries are called '{world_name}'"
-    play = [c for c in controls if norm(c.name) == "play"]
+        w = _norm(world_name)
+        targets: list[UiControl] = []
+        for c in controls:
+            n = _norm(c.name)
+            if not (n == w or (n.startswith(w) and not n[len(w)].isalnum())):
+                continue
+            # A text inside the entry: press the entry around it.
+            t = c if c.kind in INVOKABLE_TYPES else next(
+                (p for p in c.parents[:4] if p.kind in INVOKABLE_TYPES), c)
+            if not any(t is x for x in targets):
+                targets.append(t)
+        if len(targets) == 1:
+            return targets[0], "quick play"
+        if len(targets) > 1:
+            return None, f"{len(targets)} launcher entries are called '{world_name}'"
+    play = [c for c in controls if c.kind in INVOKABLE_TYPES and _norm(c.name) == "play"]
     if len(play) == 1:
         return play[0], "play button"
     if len(play) > 1:

@@ -75,6 +75,12 @@ class FakeActions:
     def ui_controls(self, hwnd):
         return list(self.pc.launcher_controls)
 
+    def select(self, control: UiControl):
+        self.invoked.append(f"select {control.name}")
+        if self.pc.launcher_pages:
+            self.pc.launcher_controls = self.pc.launcher_pages.pop(0)
+        return True
+
     def invoke(self, control: UiControl):
         self.invoked.append(control.name)
         if control.name.lower() == "play":
@@ -160,6 +166,7 @@ class FakePC:
         self.launcher_exe.write_bytes(b"MZ")
         self.launcher_controls = [UiControl("ButtonControl", "PLAY"), UiControl("ListItemControl", shown),
                                   UiControl("ButtonControl", "Settings")]
+        self.launcher_pages: list = []  # what the launcher shows after each page switch
         self.game: FakeGame | None = None
         self.launcher = None
         self.start_delay = 0.2

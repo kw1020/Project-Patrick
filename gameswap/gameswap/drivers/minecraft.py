@@ -31,7 +31,7 @@ import time
 from pathlib import Path
 
 from .. import backup, winapi
-from ..actions import Actions, choose_launcher_target
+from ..actions import Actions, choose_launcher_target, find_java_tab
 from ..mclog import MinecraftLog
 from ..mcworld import level_name
 from ..procmon import ProcessMonitor, WindowInfo
@@ -418,19 +418,43 @@ class MinecraftDriver(RealGameDriver):
         self.status = "Looking for PLAY in the launcher..."
         deadline = time.monotonic() + LAUNCHER_UI_WAIT
         why = ""
+        java_clicked = False
+        controls = []
         while not abort.is_set() and time.monotonic() < deadline:
             try:
                 controls = self.actions.ui_controls(w.hwnd)
             except Exception as e:
                 why = f"couldn't read the launcher's buttons: {e}"
                 controls = []
+            # The launcher can open on HOME (other games live there too): go to
+            # MINECRAFT: JAVA EDITION first, and press nothing until it's showing.
+            tab = find_java_tab(controls)
+            if tab is not None and tab.selected is not True:
+                if java_clicked and tab.selected is False:
+                    why = "the launcher didn't switch to MINECRAFT: JAVA EDITION"
+                    abort.wait(1.0)
+                    continue
+                if not java_clicked:
+                    self.status = "Opening MINECRAFT: JAVA EDITION in the launcher..."
+                    log.info("Launcher: switching to MINECRAFT: JAVA EDITION.")
+                    if not self.actions.select(tab):
+                        why = "couldn't open MINECRAFT: JAVA EDITION in the launcher"
+                        break
+                    java_clicked = True
+                    abort.wait(1.5)
+                    deadline = time.monotonic() + LAUNCHER_UI_WAIT  # the Java page gets the full wait
+                    continue
             target, why = choose_launcher_target(controls, shown) if controls else (None, why or "no buttons yet")
             if target is not None:
                 if self.actions.invoke(target):
-                    return f"Quick Play '{target.name}'" if why == "quick play" else "PLAY"
-                why = f"pressing '{target.name}' didn't work"
+                    pressed = f"Quick Play '{shown}'" if why == "quick play" else "PLAY"
+                    log.info("Launcher: pressed %s.", pressed)
+                    return pressed
+                why = f"pressing '{target.name or shown}' didn't work"
                 break
             abort.wait(1.0)
+        named = [f"{c.kind[:-7]} '{c.name}'" for c in controls if c.name][:60]
+        log.warning("Launcher: couldn't press PLAY (%s). It showed: %s", why, ", ".join(named) or "nothing readable")
         self.status = f"Couldn't press PLAY automatically ({why}). Click PLAY in the launcher"
         return ""
 

@@ -394,3 +394,34 @@ def test_start_timer_now_works_even_when_gameswap_cant_see_the_world(pc):
     m.confirm_ready()  # Ctrl+Shift+F10 / "Start timer now"
     assert m.state == State.PLAYING and m.snapshot().remaining == cfg.play_seconds
     m.shutdown()
+
+
+def test_quick_play_entry_named_only_by_a_text_inside_it():
+    """The new launcher: a clickable entry with no name, holding the world's name as text."""
+    entry = UiControl("ListItemControl", "")
+    text = UiControl("TextControl", "This 1", parents=(UiControl("GroupControl", ""), entry))
+    other = UiControl("TextControl", "This 10", parents=(UiControl("ListItemControl", ""),))
+    target, why = choose_launcher_target([UiControl("ButtonControl", "PLAY"), text, other], "This 1")
+    assert why == "quick play" and target is entry
+    # The same entry reached twice (its name and a text inside it) is still one entry.
+    named = UiControl("ListItemControl", "This 1, Singleplayer")
+    inner = UiControl("TextControl", "This 1", parents=(named,))
+    assert choose_launcher_target([named, inner], "This 1") == (named, "quick play")
+
+
+def test_launcher_on_home_page_switches_to_java_edition_first(pc):
+    """Xbox-app launcher: it opens on HOME, where a PLAY button could start another game.
+    GameSwap goes to MINECRAFT: JAVA EDITION and only then presses your world."""
+    home = UiControl("TabItemControl", "HOME", "Home-menulink", selected=True)
+    java_off = UiControl("TabItemControl", "MINECRAFT: JAVA EDITION", "Java Edition-menulink", selected=False)
+    java_on = UiControl("TabItemControl", "MINECRAFT: JAVA EDITION", "Java Edition-menulink", selected=True)
+    entry = UiControl("ButtonControl", "Quick Play entry")
+    pc.launcher_controls = [home, java_off, UiControl("ButtonControl", "PLAY")]  # e.g. a Bedrock card
+    pc.launcher_pages = [[home, java_on, UiControl("ButtonControl", "PLAY"),
+                          UiControl("TextControl", "Krew's Challenge", parents=(UiControl("GroupControl", ""), entry))]]
+    cfg, d, _ = make(pc)
+    r = run(d.launch, threading.Event())
+    assert r.ok, r.detail
+    assert pc.actions.invoked == ["select MINECRAFT: JAVA EDITION", "Quick Play entry"]
+    r = run(d.load_save, threading.Event())
+    assert r.ok and "Quick Play" in r.detail
