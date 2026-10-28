@@ -136,6 +136,8 @@ class Machine:
         self._retry_at = 0.0
         self._played = 0.0  # seconds actually played this turn
         self._since_close = 0.0  # auto-start: since the previous game closed (or Start), pauses excluded
+        self._early_scene = False  # auto-start: the next game's scene is already showing
+        self._end_scene = False  # this turn's last seconds: the Switching scene is already showing
         self._error_from: State | None = None
         self._last_tick_sound = None
 
@@ -311,6 +313,11 @@ class Machine:
             self._load_time += dt
         if self.state in LOADING_STATES or self.state == State.SWITCHING:
             self._since_close += dt
+            auto = self.cfg.auto_start_seconds
+            if (auto and not self._early_scene
+                    and self._since_close >= max(0, auto - self.cfg.obs.scene_lead_seconds)):
+                self._early_scene = True  # OBS gets a head start on capturing the next game
+                self._scene(self.driver.obs_scene)
 
         if self.driver.status and self.state in (State.LAUNCHING, State.LOADING, State.SAVING, State.EXITING):
             self.message = self.driver.status
@@ -434,6 +441,12 @@ class Machine:
         self._remaining = max(0.0, self._remaining - dt)
         secs = _whole_seconds(self._remaining)
 
+        lead = self.cfg.obs.scene_lead_seconds
+        if (lead and not self._end_scene and self._remaining <= lead
+                and not getattr(self.driver, "save_needs_player", False)):  # (you walk to save on camera)
+            self._end_scene = True
+            self._scene(self.cfg.obs.switching_scene)
+
         for w in sorted(self.cfg.warning_seconds, reverse=True):
             if w not in self._warned and self._remaining <= w and self._remaining > 0:
                 self._warned.add(w)
@@ -534,7 +547,8 @@ class Machine:
             self._load_time = 0.0
             self.unverified = False
             self.message = f"Launching {driver.name}..."
-            self._scene(self.cfg.obs.switching_scene)
+            if not self._early_scene:
+                self._scene(self.cfg.obs.switching_scene)
             self._job = self._executor.submit(self._safe_step, driver.launch, self._step_abort)
         elif state == State.LOADING:
             self._load_time = 0.0
@@ -561,6 +575,7 @@ class Machine:
             self._job = self._executor.submit(self._safe_step, driver.exit, self._step_abort)
         elif state == State.SWITCHING:
             self._since_close = 0.0  # the previous game has closed
+            self._early_scene = False
             self._launch_retries_left = self.cfg.launch_retries
             if advance:
                 self.index = (self.index + 1) % len(self.cfg.rotation)
@@ -581,6 +596,7 @@ class Machine:
         self.unverified = verified_by is None
         self.turn += 1
         self._played = 0.0
+        self._end_scene = False
         self.message = f"Playing {self.driver.name}"
         self._scene(self.driver.obs_scene)
         self._sound("go")
@@ -665,6 +681,7 @@ class Machine:
             log.info("Continuing the previous session: %d turns played, next up %s.", self.turn, self.driver.name)
         self._event("session_start", {"turn": self.turn, "next": self.driver.name})
         self._since_close = 0.0
+        self._early_scene = False
         self._enter(State.LAUNCHING)
 
     # ---- worker helpers ------------------------------------------------------

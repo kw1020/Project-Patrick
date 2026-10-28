@@ -305,3 +305,51 @@ def test_auto_start_clock_stops_while_paused():
 def test_auto_start_must_be_sensible():
     assert any("Start the clock after" in p for p in make_cfg(auto_start_seconds=-1).validate())
     assert not make_cfg(auto_start_seconds=10).validate()
+
+
+def test_obs_shows_the_next_games_scene_5_seconds_before_its_clock_starts():
+    r = _auto_rig()  # clock 10 s after the close; scene lead 5 s (default)
+    start(r)
+    r.run_until(State.SWITCHING)
+    r.obs.scenes.clear()
+    r.advance(4.9)
+    assert r.obs.scenes == ["Switching"], "the gap between games shows the Switching scene"
+    r.advance(0.2)
+    assert r.obs.scenes[-1] == "Schedule I", "5 s after the close: Schedule I's scene, while it loads"
+    r.advance(5)
+    assert r.m.snapshot().remaining == 620, "and 5 s later its clock starts"
+    r.run_until(State.PLAYING)
+    assert r.obs.scenes == ["Switching", "Schedule I"], "no flicker back to Switching"
+
+
+def test_scene_lead_only_with_auto_start(rig):
+    start(rig)
+    rig.run_until(State.SWITCHING)
+    rig.obs.scenes.clear()
+    rig.advance(15)
+    assert rig.obs.scenes == ["Switching"], "without auto-start the scene changes when you're in the game"
+
+
+def test_obs_shows_switching_5_seconds_before_the_time_runs_out():
+    r = _auto_rig()
+    start(r)
+    r.run_until(State.PLAYING)
+    assert r.obs.scenes[-1] == "Minecraft"
+    while r.m.snapshot().remaining > 6:
+        r.advance(0.1)
+    assert r.obs.scenes[-1] == "Minecraft"
+    r.advance(1.1)  # 5 s left
+    assert r.m.state == State.PLAYING and r.obs.scenes[-1] == "Switching", "Switching shows at 0:05"
+    r.run_until(State.SWITCHING)
+    r.advance(5.1)
+    assert r.obs.scenes[-1] == "Schedule I", "then the next game's scene 5 s before its clock"
+
+
+def test_no_early_switching_scene_when_you_walk_to_save_on_camera():
+    cfg = make_cfg(play_seconds=60)
+    r = Rig(cfg)
+    r.drivers["minecraft"].save_needs_player = True  # like Schedule I without a save key
+    start(r)
+    r.run_until(State.PLAYING)
+    r.run_until(State.SAVING)
+    assert r.obs.scenes[-1] == "Minecraft", "the game stays on screen while you save"

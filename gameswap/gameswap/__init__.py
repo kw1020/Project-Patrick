@@ -1,1 +1,1 @@
-__version__ = "0.11.1"  # helper mod: finds the save list, runs before other mods
+__version__ = "0.12.0"  # OBS changes scenes 5 s early at both ends

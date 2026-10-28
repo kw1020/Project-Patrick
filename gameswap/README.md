@@ -79,6 +79,10 @@ Already set up GameSwap before? Copy your old `config.json` (from `C:\GameSwap` 
 
 **Settings → Timer → Start the clock by itself.** Off (the default): the clock starts once you're in the game, detected by GameSwap or when you press Start timer now. Set it to e.g. **10 s** and the clock starts 10 seconds after the previous game has closed (for the first game: 10 s after Start) and keeps running while the next game loads, so you never press anything. Loading time then counts as play time, so set **Play time** to include it (e.g. **10 min 20 s**). If the game finishes loading, nothing changes; if GameSwap never sees you're in the game, the turn still ends on time and the save is still verified before the game is closed. Pause stops this clock too.
 
+### OBS changes scenes 5 seconds early
+
+**Settings → OBS → Change scenes early by** (default **5 s**): OBS shows the **Switching** scene 5 seconds before a game's time runs out (the save and close happen behind it), and - with *Start the clock by itself* - shows the **next game's scene** 5 seconds before its clock starts, so OBS has already picked up the game when the clock starts. (Schedule I without a save key stays on screen while you walk to save.) 0 turns this off.
+
 ### Updates install themselves
 
 When GameSwap opens, it checks GitHub for a newer version. If there is one, it asks **"Update now?"**; there's also an **Update to X** button next to Diagnostics. Say yes and GameSwap downloads the new installer, **checks it against the release's SHA-256 checksum** (a broken or tampered download is never run), installs it over the old version, and opens again. Your settings, logs and backups are kept. It never updates during a run. (Turn the check off with `"check_for_updates": false` in config.json.)

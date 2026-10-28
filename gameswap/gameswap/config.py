@@ -84,6 +84,10 @@ class ObsConfig:
     start_recording_on_start: bool = True
     # Test run: switch scenes but don't require (or start) a recording.
     test_run_no_recording: bool = False
+    # Change OBS scenes this many seconds early: to 'Switching' before a game's
+    # clock runs out, and (with 'Start the clock by itself') to the next game's
+    # scene before its clock starts, so the capture has hooked the game by then.
+    scene_lead_seconds: int = 5
 
 
 @dataclass
