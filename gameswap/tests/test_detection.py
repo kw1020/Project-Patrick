@@ -105,6 +105,10 @@ def test_unity_matcher_needs_the_exact_exe(tmp_path):
 
 def test_window_picking():
     mc = pick_minecraft_window([window("", "GLFW30"), window("Minecraft* 1.21.4 - Singleplayer", "GLFW30")])
+    # Minecraft 26.3 and later make their window with SDL3 instead of GLFW.
+    assert pick_minecraft_window([window("Minecraft* 26.3 - Singleplayer", "SDL_app")]).class_name == "SDL_app"
+    assert pick_minecraft_window([window("", "SunAwtFrame", w=50, h=50),
+                                  window("", "SDL_app")]).class_name == "SDL_app"
     assert mc.title.startswith("Minecraft")
     assert pick_minecraft_window([window("Minecraft Launcher", "Chrome_WidgetWin_1")]) is None
     assert pick_unity_window([window("Schedule I", "UnityWndClass")]).class_name == "UnityWndClass"

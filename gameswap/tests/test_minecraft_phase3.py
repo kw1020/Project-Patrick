@@ -310,8 +310,10 @@ def _run_machine_until(m, cond, timeout=20):
     raise AssertionError(f"stuck in {m.state}: {m.error or m.message}")
 
 
-@pytest.mark.parametrize("lock_check_works", [True, False])
-def test_start_while_already_in_minecraft_then_switch(pc, lock_check_works):
+@pytest.mark.parametrize("lock_check_works,window_class", [(True, "GLFW30"), (False, "GLFW30"), (True, "SDL_app")])
+def test_start_while_already_in_minecraft_then_switch(pc, lock_check_works, window_class):
+    if window_class == "SDL_app":  # Minecraft 26.3 and later
+        pc.window_title, pc.window_class = "Minecraft* 26.3 - Singleplayer", "SDL_app"
     cfg, d, drivers = make(pc, save_name="")  # nothing picked in Settings
     cfg.play_seconds = 20
     cfg.warning_seconds = [10, 5]

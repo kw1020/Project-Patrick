@@ -207,10 +207,18 @@ class LauncherMatcher:
 
 
 def pick_minecraft_window(windows: list[WindowInfo]) -> WindowInfo | None:
-    """Minecraft's window is made by GLFW (class GLFW30) and titled 'Minecraft ...'."""
-    glfw = [w for w in windows if w.class_name.startswith("GLFW")]
-    titled = [w for w in glfw if w.title.lower().startswith("minecraft")]
-    return (titled or glfw or [None])[0]
+    """Minecraft's window, titled 'Minecraft ...'. Up to 1.21 / 26.2 it's made by
+    GLFW (class GLFW30); from 26.3 by SDL3 (class SDL_app). Only the game's own
+    java process is searched, so its biggest window is the game as a last resort."""
+    windows = [w for w in windows if "launcher" not in w.title.lower()
+               and not w.class_name.startswith("Chrome_WidgetWin")]  # never the launcher
+    game = [w for w in windows if w.class_name.upper().startswith(("GLFW", "SDL"))]
+    titled = [w for w in windows if w.title.lower().startswith("minecraft")]
+    titled_game = [w for w in titled if w in game]
+    if titled_game or titled or game:
+        return (titled_game or titled or game)[0]
+    sized = [w for w in windows if _area(w) >= 200 * 150]
+    return max(sized, key=_area, default=None)
 
 
 def _area(w: WindowInfo) -> int:

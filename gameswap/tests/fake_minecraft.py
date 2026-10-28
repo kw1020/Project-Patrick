@@ -90,7 +90,7 @@ class FakeGame:
     def __init__(self, pc: "FakePC", quick_play):
         self.pc = pc
         self.proc = FakeProc("javaw.exe", MC_CMDLINE + (["--quickPlaySingleplayer", quick_play] if quick_play else []),
-                             windows=[window("Minecraft* 1.21.4", "GLFW30")])
+                             windows=[window(pc.window_title, pc.window_class)])
         self.hwnd = self.proc.windows[0].hwnd
         self.locked: Path | None = None
         self.paused = False
@@ -163,6 +163,7 @@ class FakePC:
         self.game: FakeGame | None = None
         self.launcher = None
         self.start_delay = 0.2
+        self.window_title, self.window_class = "Minecraft* 1.21.4", "GLFW30"  # 26.3+: SDL_app
         self.join_delay = 0.2
         self.auto_open_world_after_play = None  # "You" opening a world from the title screen
         self.actions = FakeActions(self)
