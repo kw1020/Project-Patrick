@@ -84,10 +84,11 @@ class ObsConfig:
     start_recording_on_start: bool = True
     # Test run: switch scenes but don't require (or start) a recording.
     test_run_no_recording: bool = False
-    # Change OBS scenes this many seconds early: to 'Switching' before a game's
-    # clock runs out, and (with 'Start the clock by itself') to the next game's
-    # scene before its clock starts, so the capture has hooked the game by then.
-    scene_lead_seconds: int = 5
+    # When OBS changes scenes, relative to the clock: +5 = 5 s later (the game stays
+    # on screen 5 s past 0:00; the next game's scene shows 5 s after its clock
+    # starts), -5 = 5 s earlier (the next game's scene early only with 'Start the
+    # clock by itself'), 0 = right when the clock ends / starts.
+    scene_offset_seconds: int = 5
 
 
 @dataclass
@@ -208,6 +209,8 @@ class Config:
             problems.append("The small timer's visibility must be between 30% and 100%.")
         if any(a <= 0 for a in self.popup.alert_seconds):
             problems.append("Each pop-up alert must be above 0 seconds.")  # longer than a turn = just skipped
+        if not -60 <= self.obs.scene_offset_seconds <= 60:
+            problems.append("OBS 'Change scenes' must be between -60 and 60 seconds.")
         if not 0 <= self.auto_start_seconds <= 600:
             problems.append("'Start the clock after' must be between 0 and 600 seconds.")
         if self.stop_after_turns < 0:

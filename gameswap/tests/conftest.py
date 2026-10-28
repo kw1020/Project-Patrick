@@ -81,6 +81,7 @@ def make_cfg(**overrides) -> Config:
     """Real defaults, but with zero-second simulated steps and no sounds/OBS waits."""
     cfg = Config()
     cfg.switch_delay_seconds = 2.0
+    cfg.obs.scene_offset_seconds = 0  # scenes change right when the clock ends / starts
     for g in cfg.games.values():
         g.driver = "simulated"
         g.save_prompt_seconds = 0

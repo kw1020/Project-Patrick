@@ -136,8 +136,10 @@ class Machine:
         self._retry_at = 0.0
         self._played = 0.0  # seconds actually played this turn
         self._since_close = 0.0  # auto-start: since the previous game closed (or Start), pauses excluded
-        self._early_scene = False  # auto-start: the next game's scene is already showing
+        self._early_scene = False  # this turn's game scene is already showing (auto-start timing)
         self._end_scene = False  # this turn's last seconds: the Switching scene is already showing
+        self._active_time = 0.0  # pauses excluded; drives scene changes that come a few seconds later
+        self._pending_scene: tuple[str, float] | None = None  # (scene, when on _active_time)
         self._error_from: State | None = None
         self._last_tick_sound = None
 
@@ -309,15 +311,20 @@ class Machine:
 
         self._state_time += dt
         self._cycle_time += dt
+        self._active_time += dt
         if self.state in (State.LOADING, State.VERIFYING_GAMEPLAY):
             self._load_time += dt
-        if self.state in LOADING_STATES or self.state == State.SWITCHING:
+        if self.state in LOADING_STATES or self.state in (State.SWITCHING, State.PLAYING):
             self._since_close += dt
             auto = self.cfg.auto_start_seconds
             if (auto and not self._early_scene
-                    and self._since_close >= max(0, auto - self.cfg.obs.scene_lead_seconds)):
-                self._early_scene = True  # OBS gets a head start on capturing the next game
-                self._scene(self.driver.obs_scene)
+                    and self._since_close >= max(0, auto + self.cfg.obs.scene_offset_seconds)):
+                # The game's scene, N s before (-N) or after (+N) its clock starts.
+                self._early_scene = True
+                self._scene_at(self.driver.obs_scene, 0)
+        if self._pending_scene and self._active_time >= self._pending_scene[1]:
+            name, self._pending_scene = self._pending_scene[0], None
+            self._scene(name)
 
         if self.driver.status and self.state in (State.LAUNCHING, State.LOADING, State.SAVING, State.EXITING):
             self.message = self.driver.status
@@ -441,11 +448,11 @@ class Machine:
         self._remaining = max(0.0, self._remaining - dt)
         secs = _whole_seconds(self._remaining)
 
-        lead = self.cfg.obs.scene_lead_seconds
-        if (lead and not self._end_scene and self._remaining <= lead
+        early = -self.cfg.obs.scene_offset_seconds  # e.g. -5: Switching shows at 0:05 left
+        if (early > 0 and not self._end_scene and self._remaining <= early
                 and not getattr(self.driver, "save_needs_player", False)):  # (you walk to save on camera)
             self._end_scene = True
-            self._scene(self.cfg.obs.switching_scene)
+            self._scene_at(self.cfg.obs.switching_scene, 0)
 
         for w in sorted(self.cfg.warning_seconds, reverse=True):
             if w not in self._warned and self._remaining <= w and self._remaining > 0:
@@ -488,7 +495,7 @@ class Machine:
             hint = getattr(self.driver, "save_hint", "save your game")
             self.prompt = f"SAVE NOW: {hint}"
             log.info("Save prompt for %s: %s.", self.driver.name, hint)
-            self._scene(self.driver.obs_scene)
+            self._scene_at(self.driver.obs_scene, 0)
             self._sound("save")
         result = self._job_result()
         if result is None:
@@ -548,7 +555,7 @@ class Machine:
             self.unverified = False
             self.message = f"Launching {driver.name}..."
             if not self._early_scene:
-                self._scene(self.cfg.obs.switching_scene)
+                self._scene_at(self.cfg.obs.switching_scene, 0)
             self._job = self._executor.submit(self._safe_step, driver.launch, self._step_abort)
         elif state == State.LOADING:
             self._load_time = 0.0
@@ -566,12 +573,15 @@ class Machine:
             self.message = f"Saving {driver.name}..."
             if getattr(driver, "save_needs_player", False):
                 self._sound("save")  # you save in-game, so the game stays on screen
-            else:
-                self._scene(self.cfg.obs.switching_scene)
+            elif not self._end_scene:
+                self._end_scene = True
+                self._scene_at(self.cfg.obs.switching_scene, max(0, self.cfg.obs.scene_offset_seconds))
             self._job = self._executor.submit(self._safe_step, driver.save, self._step_abort)
         elif state == State.EXITING:
             self.message = f"Closing {driver.name}..."
-            self._scene(self.cfg.obs.switching_scene)
+            if not self._end_scene:
+                self._end_scene = True
+                self._scene_at(self.cfg.obs.switching_scene, max(0, self.cfg.obs.scene_offset_seconds))
             self._job = self._executor.submit(self._safe_step, driver.exit, self._step_abort)
         elif state == State.SWITCHING:
             self._since_close = 0.0  # the previous game has closed
@@ -598,7 +608,12 @@ class Machine:
         self._played = 0.0
         self._end_scene = False
         self.message = f"Playing {self.driver.name}"
-        self._scene(self.driver.obs_scene)
+        if not self.cfg.auto_start_seconds:  # (with auto-start, the clock's own timing decides)
+            self._early_scene = True
+            self._scene_at(self.driver.obs_scene, max(0, self.cfg.obs.scene_offset_seconds))
+        elif not self._early_scene and self._since_close >= self.cfg.auto_start_seconds + self.cfg.obs.scene_offset_seconds:
+            self._early_scene = True
+            self._scene_at(self.driver.obs_scene, 0)
         self._sound("go")
         log.info("Turn %d: %s - %s on the clock%s.", self.turn, self.driver.name,
                  _mmss(seconds), "" if verified_by else " (FALLBACK, gameplay not verified)")
@@ -682,6 +697,7 @@ class Machine:
         self._event("session_start", {"turn": self.turn, "next": self.driver.name})
         self._since_close = 0.0
         self._early_scene = False
+        self._pending_scene = None
         self._enter(State.LAUNCHING)
 
     # ---- worker helpers ------------------------------------------------------
@@ -713,6 +729,15 @@ class Machine:
         except Exception as e:
             log.exception("Ready check crashed")
             return ReadyCheck(False, f"check crashed: {e}")
+
+    def _scene_at(self, name: str, delay: float) -> None:
+        """Show an OBS scene now, or `delay` seconds from now (pauses excluded).
+        A newer request replaces one that's still waiting."""
+        if delay <= 0:
+            self._pending_scene = None
+            self._scene(name)
+        else:
+            self._pending_scene = (name, self._active_time + delay)
 
     def _scene(self, name: str) -> None:
         if not self.test_run:

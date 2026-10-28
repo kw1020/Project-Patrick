@@ -269,11 +269,11 @@ class SettingsDialog(QDialog):
         form.addRow("Password", pw_row)
         form.addRow("", _hint("In OBS: Tools > WebSocket Server Settings > Show Connect Info."))
         form.addRow("Switching scene", self.obs_switching)
-        self.obs_lead = _spin(o.scene_lead_seconds, 0, 60, " s")
-        form.addRow("Change scenes early by", self.obs_lead)
-        form.addRow("", _hint("OBS shows the Switching scene this long before a game's time runs out, and - "
-                              "with 'Start the clock by itself' (Timer tab) - the next game's scene this long "
-                              "before its clock starts, so the capture is ready in time. 0 = off."))
+        self.obs_offset = _spin(o.scene_offset_seconds, -60, 60, " s")
+        form.addRow("Change scenes", self.obs_offset)
+        form.addRow("", _hint("+5 = 5 s LATER: the game stays on screen 5 s after its time runs out, and the "
+                              "next game's scene shows 5 s after its clock starts. -5 = 5 s EARLIER (the next "
+                              "game's scene early only with 'Start the clock by itself'). 0 = right on time."))
         form.addRow(self.obs_record)
         form.addRow(self.obs_test_run)
         form.addRow("", _hint("Tick for practice runs. Untick before recording for real."))
@@ -472,7 +472,7 @@ class SettingsDialog(QDialog):
         o.switching_scene = self.obs_switching.text().strip()
         o.start_recording_on_start = self.obs_record.isChecked()
         o.test_run_no_recording = self.obs_test_run.isChecked()
-        o.scene_lead_seconds = self.obs_lead.value()
+        o.scene_offset_seconds = self.obs_offset.value()
         c.overlay.port = self.overlay_port.value()
         c.overlay.write_text_file = self.overlay_text.isChecked()
         c.popup.enabled = self.popup_on.isChecked()
