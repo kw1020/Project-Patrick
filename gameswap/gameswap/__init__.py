@@ -1,1 +1,1 @@
-__version__ = "0.9.0"  # updates itself from GitHub Releases
+__version__ = "0.10.0"  # Schedule I helper mod: loads your save, starts the timer

@@ -428,3 +428,60 @@ def test_save_key_must_be_a_simple_key():
     assert any("save key" in p for p in cfg.validate())
     cfg.games["schedule1"].save_key = "f2"
     assert not any("save key" in p for p in cfg.validate())
+
+
+# ---- the helper mod (MelonLoader) loads your save ------------------------------------
+
+def _with_melonloader(rig, monkeypatch, tmp_path):
+    (rig.game.install / "MelonLoader").mkdir()
+    (rig.game.install / "version.dll").write_bytes(b"MZ")
+    dll = tmp_path / "GameSwapHelper.dll"
+    dll.write_bytes(b"MZ helper mod")
+    monkeypatch.setattr(s1, "HELPER_DLL", dll)
+    return rig.game.install / "UserData" / "GameSwap"
+
+
+def _mod_says(folder, text):
+    """What the helper mod writes inside the game."""
+    (folder / "status.txt").write_text(f"{text}\n2026-10-28T00:00:00Z\n")
+
+
+def test_helper_mod_is_installed_loads_the_save_and_starts_the_timer(rig, monkeypatch, tmp_path):
+    folder = _with_melonloader(rig, monkeypatch, tmp_path)
+    (rig.game.install / "Mods").mkdir()
+    (rig.game.install / "Mods" / "LoadToSave.dll").write_bytes(b"MZ")  # the broken Fast Load
+    m = _machine(rig)
+    m.cfg.rotation = ["schedule1", "minecraft"]
+    m._enter(State.LAUNCHING)
+    _tick_until(m, lambda: m.state == State.VERIFYING_GAMEPLAY)
+    assert (rig.game.install / "Mods" / "GameSwapHelper.dll").read_bytes() == b"MZ helper mod"
+    assert (folder / "load-request.txt").read_text() == "SaveGame_2", "asks for your save by its folder"
+    assert not m.snapshot().waiting_for_you and "warning" not in m.sounds, "nothing for you to do yet"
+    for _ in range(10):
+        m.tick()
+        time.sleep(0.01)
+    assert m.state == State.VERIFYING_GAMEPLAY, "no timer until the mod says you're in"
+    _mod_says(folder, "in-game SaveGame_2")
+    _tick_until(m, lambda: m.state == State.PLAYING, timeout=5)
+    assert m.unverified is False
+    m.shutdown()
+
+
+def test_helper_mod_failure_falls_back_to_you(rig, monkeypatch, tmp_path):
+    folder = _with_melonloader(rig, monkeypatch, tmp_path)
+    d = rig.d
+    assert run(d.launch, threading.Event()).ok
+    assert d.helper_active and not d.asks_ready
+    _mod_says(folder, "failed no StartGame(SaveInfo, ...) method found")
+    assert not d.check_ready().ready
+    assert not d.helper_active and d.asks_ready, "you load it yourself and press Start timer now"
+
+
+def test_no_melonloader_means_no_helper_and_no_files_in_the_game(rig, monkeypatch, tmp_path):
+    dll = tmp_path / "GameSwapHelper.dll"
+    dll.write_bytes(b"MZ")
+    monkeypatch.setattr(s1, "HELPER_DLL", dll)
+    d = rig.d
+    assert run(d.launch, threading.Event()).ok
+    assert not d.helper_active and d.asks_ready
+    assert not (rig.game.install / "Mods").exists() and not (rig.game.install / "UserData").exists()

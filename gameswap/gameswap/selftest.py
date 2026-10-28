@@ -61,6 +61,17 @@ def run(result_file: Path | None = None) -> int:
 
     check("app icon", icon)
 
+    def helper_mod():
+        from .drivers.schedule1 import HELPER_DLL
+
+        if HELPER_DLL.is_file():
+            return f"{HELPER_DLL.stat().st_size} bytes"
+        if getattr(sys, "frozen", False):
+            raise FileNotFoundError(HELPER_DLL)
+        return "not built (running from source)"
+
+    check("Schedule I helper mod", helper_mod)
+
     def writable():
         probe = APP_DIR / ".gameswap-write-test"
         probe.write_text("ok", encoding="utf-8")

@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- GameSwap's helper mod for Schedule I (MelonLoader). Built by GitHub automatically:
+       the build downloads MelonLoader and points MelonLoaderDir at its net6 folder. -->
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <AssemblyName>GameSwapHelper</AssemblyName>
+    <RootNamespace>GameSwapHelper</RootNamespace>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <MelonLoaderDir Condition="'$(MelonLoaderDir)' == ''">$(MSBuildProjectDirectory)/../build/melonloader/MelonLoader/net6</MelonLoaderDir>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="MelonLoader">
+      <HintPath>$(MelonLoaderDir)/MelonLoader.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="0Harmony">
+      <HintPath>$(MelonLoaderDir)/0Harmony.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+</Project>

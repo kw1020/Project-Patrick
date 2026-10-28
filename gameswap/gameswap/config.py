@@ -68,6 +68,9 @@ class GameConfig:
     # only with the game's window in front, then checks the save on disk. Blank =
     # you save yourself when SAVE NOW appears.
     save_key: str = ""
+    # Schedule I with MelonLoader: GameSwap's helper mod loads your save by itself
+    # and tells GameSwap when you're in, so the timer starts on its own.
+    auto_load_save: bool = True
     simulation: SimulationConfig = field(default_factory=SimulationConfig)
 
 

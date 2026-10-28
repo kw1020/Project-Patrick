@@ -7,8 +7,14 @@ NOT save. So GameSwap never pretends it can save for you. Instead:
 (With a save-key mod - e.g. "Save Key Binds", F2 - set Save key in Settings.
 GameSwap then presses that key itself, only with Schedule I in front, and
 still verifies the save on disk exactly as below. If the key doesn't produce
-a verified save, it falls back to SAVE NOW for you. A mod that loads your
-save at launch, e.g. "Fast Load", removes the Continue step.)
+a verified save, it falls back to SAVE NOW for you.)
+
+(With MelonLoader installed, GameSwap puts its own small helper mod,
+GameSwapHelper.dll, into the game's Mods folder. Before each launch it asks
+the mod - through UserData/GameSwap/load-request.txt - to load your save; the
+mod writes UserData/GameSwap/status.txt once you're in, and the timer starts.
+If that doesn't happen within HELPER_GRACE_SECONDS, you're asked to load the
+save yourself and press Start timer now, as without the mod.)
 
 Launch   Steam's own command (steam.exe -applaunch 3164500).
          Verified: the game's process and window appear.
@@ -27,6 +33,7 @@ from __future__ import annotations
 
 import logging
 import re
+import shutil
 import threading
 import time
 from pathlib import Path
@@ -43,6 +50,14 @@ log = logging.getLogger("gameswap.schedule1")
 SAVE_QUIET_SECONDS = 3.0  # no file changes for this long = the game finished writing
 SAVE_HINT = "sleep in bed or use the save device"
 KEY_SAVE_WAIT = 15.0  # how long a save-key press gets to show up on disk
+HELPER_DLL = Path(__file__).resolve().parent.parent / "assets" / "GameSwapHelper.dll"
+HELPER_GRACE_SECONDS = 120.0  # after launch, the helper mod gets this long to load your save
+BROKEN_MODS = {"LoadToSave.dll": "Fast Load (LoadToSave.dll) doesn't work with this Schedule I version; "
+                                 "GameSwap's helper mod loads your save instead. Delete it from the Mods folder"}
+
+
+def melonloader_installed(install_dir: Path | None) -> bool:
+    return bool(install_dir) and (install_dir / "MelonLoader").is_dir() and (install_dir / "version.dll").is_file()
 
 
 class PlayerLog(LogFollower):
@@ -103,6 +118,10 @@ class Schedule1Driver(RealGameDriver):
         self.exes: list[Path] = []
         self.player_log = PlayerLog(s1saves.default_player_log(), cfg.ready_log_pattern, clock)
         self.verified_save_at = 0.0
+        self.helper_active = False  # the helper mod was asked to load the save this launch
+        self._launch_wall = 0.0
+        self._launched_at = 0.0
+        self._helper_note = ""
         self.locate()
 
     @property
@@ -122,7 +141,10 @@ class Schedule1Driver(RealGameDriver):
 
     @property
     def asks_ready(self) -> bool:
-        """You tell GameSwap when you're in your save (no ready log line set)."""
+        """You tell GameSwap when you're in your save (no ready log line set),
+        unless the helper mod is still loading it for you."""
+        if self.helper_active and self._clock() - self._launched_at < HELPER_GRACE_SECONDS:
+            return False
         return self.manual_ready
 
     @property
@@ -185,7 +207,66 @@ class Schedule1Driver(RealGameDriver):
 
     # ---- launch / load / ready -------------------------------------------------------
 
+    # ---- the helper mod (MelonLoader) ---------------------------------------------------
+
+    def helper_folder(self) -> Path | None:
+        return self.install_dir / "UserData" / "GameSwap" if self.install_dir else None
+
+    def setup_helper(self) -> str:
+        """Put GameSwap's helper mod into the game's Mods folder. Returns '' when
+        it's ready, otherwise why it isn't used."""
+        if not self.cfg.auto_load_save:
+            return "turned off in Settings"
+        if not melonloader_installed(self.install_dir):
+            return "MelonLoader isn't installed in Schedule I"
+        if not HELPER_DLL.is_file():
+            return "this GameSwap doesn't include the helper mod"
+        mods = self.install_dir / "Mods"
+        target = mods / HELPER_DLL.name
+        try:
+            mods.mkdir(exist_ok=True)
+            if not target.is_file() or target.read_bytes() != HELPER_DLL.read_bytes():
+                shutil.copyfile(HELPER_DLL, target)
+                log.info("Installed GameSwap's helper mod: %s", target)
+            for name, why in BROKEN_MODS.items():
+                if (mods / name).exists():
+                    log.warning("Schedule I: %s.", why)
+        except OSError as e:
+            return f"couldn't copy the helper mod into {mods} ({e})"
+        return ""
+
+    def helper_status(self) -> str:
+        """What the helper mod last reported for this launch ('' = nothing yet)."""
+        folder = self.helper_folder()
+        f = folder / "status.txt" if folder else None
+        try:
+            if f is None or f.stat().st_mtime < self._launch_wall - 2:
+                return ""
+            return f.read_text(encoding="utf-8", errors="replace").splitlines()[0].strip()
+        except (OSError, IndexError):
+            return ""
+
+    def _ask_helper_to_load(self, slot: s1saves.Slot) -> None:
+        why = self.setup_helper()
+        self.helper_active = False
+        if why:
+            if why != self._helper_note:
+                log.info("Schedule I: not loading the save automatically (%s).", why)
+                self._helper_note = why
+            return
+        folder = self.helper_folder()
+        try:
+            folder.mkdir(parents=True, exist_ok=True)
+            (folder / "status.txt").unlink(missing_ok=True)
+            (folder / "load-request.txt").write_text(slot.folder, encoding="utf-8")
+        except OSError as e:
+            log.warning("Schedule I: couldn't ask the helper mod to load the save (%s).", e)
+            return
+        self.helper_active = True
+        log.info("Schedule I: the helper mod will load save '%s' (%s).", slot.name, slot.folder)
+
     def launch(self, abort: threading.Event) -> StepResult:
+        self.helper_active = False
         self.refresh()
         self.player_log = PlayerLog(s1saves.default_player_log(), self.cfg.ready_log_pattern, self._clock)
         if self.is_running():
@@ -201,6 +282,11 @@ class Schedule1Driver(RealGameDriver):
         return result
 
     def start_game(self, abort: threading.Event) -> StepResult:
+        slot = self.slot()
+        self._launch_wall = self._wall()
+        self._launched_at = self._clock()
+        if not isinstance(slot, str):
+            self._ask_helper_to_load(slot)
         exe = steam.steam_exe(self.steam_dir) if self.steam_dir else None
         target = [str(exe), "-applaunch", self.cfg.steam_app_id] if exe else [f"steam://rungameid/{self.cfg.steam_app_id}"]
         try:
@@ -214,6 +300,9 @@ class Schedule1Driver(RealGameDriver):
         slot = self.slot()
         if isinstance(slot, str):
             return StepResult(False, slot)
+        if self.helper_active:
+            self.status = f"Loading your save '{slot.name}' by itself (GameSwap helper mod)..."
+            return StepResult(True, f"the helper mod is loading '{slot.name}'")
         how = "then press Start timer now (Ctrl+Shift+F10) once you're in it" if self.manual_ready else \
             "the timer starts by itself once it has loaded"
         self.status = f"Load your save '{slot.name}' ({slot.folder}): Continue > {slot.name}, {how}"
@@ -225,6 +314,18 @@ class Schedule1Driver(RealGameDriver):
         w = self.game_window()
         if w is None or w.minimized:
             return ReadyCheck(False, "Schedule I's window is minimized or missing")
+        if self.helper_active:
+            status = self.helper_status()
+            if status.startswith("in-game"):
+                if self.actions.foreground() != w.hwnd and not self.actions.bring_to_front(w.hwnd):
+                    return ReadyCheck(False, "Schedule I isn't the active window. Click on it")
+                return ReadyCheck(True, "the helper mod saw your save finish loading")
+            if status.startswith("failed"):
+                log.warning("Schedule I: the helper mod couldn't load the save (%s). Load it yourself and "
+                            "press Start timer now.", status[len("failed"):].strip())
+                self.helper_active = False
+            elif self._clock() - self._launched_at < HELPER_GRACE_SECONDS:
+                return ReadyCheck(False, "loading your save by itself")
         if self.manual_ready:
             return ReadyCheck(False, "in your save? Press Start timer now (Ctrl+Shift+F10)")
         self.player_log.poll()

@@ -145,6 +145,16 @@ def build_report(cfg: Config, drivers: dict) -> str:
         if install:
             for exe in steam.unity_game_exes(install):
                 out.append(f"  Game program: {exe.name}")
+            from .drivers.schedule1 import HELPER_DLL, melonloader_installed
+            out.append(f"  MelonLoader: {'installed' if melonloader_installed(install) else 'not installed'}")
+            mods = install / "Mods"
+            if mods.is_dir():
+                out.append("  Mods: " + (", ".join(sorted(p.name for p in mods.iterdir())) or "(empty)"))
+            out.append(f"  Helper mod in this GameSwap: {'yes' if HELPER_DLL.is_file() else 'no'};"
+                       f" auto-load save: {'on' if g.auto_load_save else 'off'}")
+            status = install / "UserData" / "GameSwap" / "status.txt"
+            if status.is_file():
+                out.append("  Helper mod last said: " + " | ".join(status.read_text(errors="replace").split("\n")[:2]))
     if isinstance(s1, Schedule1Driver):
         s1.refresh()
         out.append("  Game processes:")

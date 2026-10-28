@@ -34,6 +34,19 @@ jobs:
           QT_QPA_PLATFORM: offscreen
         run: python -m pytest -v
 
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Build the Schedule I helper mod
+        shell: pwsh
+        run: |
+          Invoke-WebRequest "https://github.com/LavaGang/MelonLoader/releases/download/v0.7.3/MelonLoader.x64.zip" -OutFile ml.zip
+          Expand-Archive ml.zip -DestinationPath build\melonloader -Force
+          dotnet build helper_mod\GameSwapHelper.csproj -c Release -nologo
+          if ($LASTEXITCODE -ne 0) { throw "the helper mod didn't build" }
+          Copy-Item helper_mod\bin\Release\net6.0\GameSwapHelper.dll gameswap\assets\
+
       - name: Build GameSwap.exe
         run: python -m PyInstaller --noconfirm --clean GameSwap.spec
 

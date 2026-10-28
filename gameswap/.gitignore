@@ -12,3 +12,7 @@ session.tmp
 build/
 dist/
 selftest-result.txt
+helper_mod/bin/
+helper_mod/obj/
+# built by GitHub from helper_mod/
+gameswap/assets/GameSwapHelper.dll

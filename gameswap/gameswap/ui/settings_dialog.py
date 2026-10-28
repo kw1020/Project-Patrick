@@ -153,6 +153,8 @@ class SettingsDialog(QDialog):
             wd["save_wait"] = _spin(g.save_wait_seconds, 0, 3600)
             wd["ready_re"] = QLineEdit(g.ready_log_pattern)
             wd["save_key"] = QLineEdit(g.save_key)
+            wd["auto_load"] = QCheckBox("Load my save by itself (needs MelonLoader; GameSwap adds its helper mod)")
+            wd["auto_load"].setChecked(g.auto_load_save)
             wd["save_key"].setPlaceholderText("blank = I save myself at SAVE NOW   (e.g. F2 with a save-key mod)")
             wd["ready_re"].setPlaceholderText("blank = I press Ready myself")
             wd["auto_play"] = QCheckBox("Press Quick Play / PLAY in the launcher for me")
@@ -178,6 +180,7 @@ class SettingsDialog(QDialog):
             form.addRow("Save to load" if is_steam else "World to open", wd["save"])
             if is_steam:
                 form.addRow("Saves folder", wd["saves_folder"])
+                form.addRow(wd["auto_load"])
                 form.addRow("Save key", wd["save_key"])
                 form.addRow("", _hint("Schedule I has no save key of its own. With a save-key mod (e.g. Save Key "
                                       "Binds: F2), type the key here: GameSwap presses it at the end of the turn "
@@ -436,6 +439,7 @@ class SettingsDialog(QDialog):
             g.save_wait_seconds = wd["save_wait"].value()
             g.ready_log_pattern = wd["ready_re"].text().strip()
             g.save_key = wd["save_key"].text().strip().upper()
+            g.auto_load_save = wd["auto_load"].isChecked()
             g.ready_settle_seconds = wd["settle"].value()
             g.backup_before_start = wd["backup"].isChecked()
             g.backups_keep = wd["keep"].value()
