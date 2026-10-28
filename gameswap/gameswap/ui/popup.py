@@ -327,6 +327,8 @@ class PopupPanel(QWidget):
                 nxt = f"Next: {s.next_name}"
         elif s.state in (State.LAUNCHING, State.LOADING, State.VERIFYING_GAMEPLAY):
             game, clock = f"{s.game_name.upper()}  ·  LOADING{test}", "…"
+            if rem is not None:  # auto-start: the clock is already running
+                clock = f"{rem // 60}:{rem % 60:02d}"
             nxt = (f"Playing? {pretty(h.ready)} starts the timer" if s.can_confirm_ready
                    else _short(s.message))
             if s.waiting_for_you:

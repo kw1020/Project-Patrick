@@ -75,6 +75,10 @@ GameSwap is installed in `%LOCALAPPDATA%\Programs\GameSwap`, and your settings, 
 
 Already set up GameSwap before? Copy your old `config.json` (from `C:\GameSwap` or `C:\GameSwap-App`) into the new folder: press **Win+R**, paste `%LOCALAPPDATA%\Programs\GameSwap`, press Enter, and paste the file in.
 
+### Start the clock by itself
+
+**Settings → Timer → Start the clock by itself.** Off (the default): the clock starts once you're in the game, detected by GameSwap or when you press Start timer now. Set it to e.g. **10 s** and the clock starts 10 seconds after the previous game has closed (for the first game: 10 s after Start) and keeps running while the next game loads, so you never press anything. Loading time then counts as play time, so set **Play time** to include it (e.g. **10 min 20 s**). If the game finishes loading, nothing changes; if GameSwap never sees you're in the game, the turn still ends on time and the save is still verified before the game is closed. Pause stops this clock too.
+
 ### Updates install themselves
 
 When GameSwap opens, it checks GitHub for a newer version. If there is one, it asks **"Update now?"**; there's also an **Update to X** button next to Diagnostics. Say yes and GameSwap downloads the new installer, **checks it against the release's SHA-256 checksum** (a broken or tampered download is never run), installs it over the old version, and opens again. Your settings, logs and backups are kept. It never updates during a run. (Turn the check off with `"check_for_updates": false` in config.json.)

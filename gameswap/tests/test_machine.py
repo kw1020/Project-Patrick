@@ -246,3 +246,62 @@ def test_timeout_on_a_hanging_step():
     t = r.run_until(State.ERROR)
     assert t == pytest.approx(30, abs=0.3)
     assert r.drivers["minecraft"].is_running()
+
+
+# ---- auto-start: the clock starts N seconds after the previous game closed --------
+
+def _auto_rig(**sim):
+    cfg = make_cfg(play_seconds=620, auto_start_seconds=10)  # Krew's 10:20, clock 10 s after the close
+    for g in cfg.games.values():
+        for k, v in sim.items():
+            setattr(g.simulation, k, v)
+    return Rig(cfg)
+
+
+def test_auto_start_clock_runs_from_ten_seconds_after_the_last_game_closed():
+    r = _auto_rig()
+    start(r)
+    r.run_until(State.SWITCHING)  # Minecraft's turn is over and it has closed
+    r.advance(9.9)
+    assert r.m.snapshot().remaining is None, "not yet: 10 s after the close"
+    r.advance(0.2)
+    assert r.m.state in (State.LAUNCHING, State.LOADING, State.VERIFYING_GAMEPLAY)
+    assert r.m.snapshot().remaining == 620, "the clock is running while Schedule I loads"
+    r.advance(15)
+    assert r.m.snapshot().remaining == 605, "loading time counts"
+    t = r.run_until(State.SAVING)
+    assert r.m.driver.name == "Schedule I"
+    assert 10.1 + 15 + t == pytest.approx(630, abs=0.3), "10 s + 10:20 after Minecraft closed, loading included"
+    assert r.m.unverified is False, "gameplay was still detected; only the clock's start moved"
+
+
+def test_auto_start_first_turn_counts_from_start():
+    r = _auto_rig()
+    start(r)
+    t = r.run_until(State.SAVING)
+    assert t == pytest.approx(630, abs=0.3)
+
+
+def test_auto_start_ends_the_turn_even_if_gameplay_is_never_detected():
+    r = _auto_rig(ready_after_seconds=100000)  # GameSwap can never see you're in
+    start(r)
+    t = r.run_until(State.SAVING)
+    assert t == pytest.approx(630, abs=0.3)
+    assert r.m.state == State.SAVING and r.m.error == "", "no load-timeout error: the clock decides"
+
+
+def test_auto_start_clock_stops_while_paused():
+    r = _auto_rig()
+    start(r)
+    r.advance(12)
+    r.m.pause()
+    r.advance(60)
+    assert r.m.snapshot().remaining == 618
+    r.m.resume()
+    t = r.run_until(State.SAVING)
+    assert 12 + t == pytest.approx(630, abs=0.3)
+
+
+def test_auto_start_must_be_sensible():
+    assert any("Start the clock after" in p for p in make_cfg(auto_start_seconds=-1).validate())
+    assert not make_cfg(auto_start_seconds=10).validate()

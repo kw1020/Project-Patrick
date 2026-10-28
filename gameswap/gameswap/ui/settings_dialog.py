@@ -98,6 +98,13 @@ class SettingsDialog(QDialog):
         form.addRow("Time between ready checks", self.ready_poll)
         self.switch_delay = _dspin(c.switch_delay_seconds, 0, 60)
         form.addRow("Pause between games", self.switch_delay)
+        self.auto_start = _spin(c.auto_start_seconds, 0, 600, " s")
+        self.auto_start.setSpecialValueText("off - when I'm in the game")
+        form.addRow("Start the clock by itself", self.auto_start)
+        form.addRow("", _hint("Off: the clock starts once you're in the game (detected, or Start timer now). "
+                              "A number: the clock starts that many seconds after the last game closed (or "
+                              "after Start) and keeps running while the next game loads - set Play time to "
+                              "include loading, e.g. 10:20."))
         self.fallback = QCheckBox("Use a 12-minute fallback cycle if gameplay can't be verified")
         self.fallback.setChecked(c.fallback_cycle_enabled)
         self.fallback_min = _dspin(c.fallback_cycle_seconds / 60, 1, 120, 0.5, " min")
@@ -411,6 +418,7 @@ class SettingsDialog(QDialog):
         c.ready_stable_checks = self.ready_checks.value()
         c.ready_poll_seconds = self.ready_poll.value()
         c.switch_delay_seconds = self.switch_delay.value()
+        c.auto_start_seconds = self.auto_start.value()
         c.fallback_cycle_enabled = self.fallback.isChecked()
         c.fallback_cycle_seconds = round(self.fallback_min.value() * 60)
         c.sounds = self.sounds.isChecked()

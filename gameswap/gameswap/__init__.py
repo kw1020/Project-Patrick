@@ -1,1 +1,1 @@
-__version__ = "0.10.1"  # launcher: newest Quick Play entry; Play tab is not a PLAY button
+__version__ = "0.11.0"  # clock can start by itself N s after the last game closed

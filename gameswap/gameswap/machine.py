@@ -135,6 +135,7 @@ class Machine:
         self._launch_retries_left = cfg.launch_retries
         self._retry_at = 0.0
         self._played = 0.0  # seconds actually played this turn
+        self._since_close = 0.0  # auto-start: since the previous game closed (or Start), pauses excluded
         self._error_from: State | None = None
         self._last_tick_sound = None
 
@@ -208,7 +209,7 @@ class Machine:
         if hook:
             hook()
         log.info("You started the timer: %s is in gameplay.", d.name)
-        self._start_playing(self.cfg.play_seconds, verified_by="you")
+        self._start_playing(self._turn_seconds(), verified_by="you")
 
     def switch_now(self) -> None:
         if self.state == State.PLAYING and not self.paused:
@@ -270,7 +271,7 @@ class Machine:
                 return
             log.info("Continue: you confirmed %s is in gameplay. Starting its timer.", self.driver.name)
             self.error = ""
-            self._start_playing(self.cfg.play_seconds, verified_by="you")
+            self._start_playing(self._turn_seconds(), verified_by="you")
         elif frm in (State.SAVING, State.EXITING, State.PLAYING):
             if self.driver.is_running():
                 log.error("Can't continue: %s is still running. Save and quit it yourself first.",
@@ -308,6 +309,8 @@ class Machine:
         self._cycle_time += dt
         if self.state in (State.LOADING, State.VERIFYING_GAMEPLAY):
             self._load_time += dt
+        if self.state in LOADING_STATES or self.state == State.SWITCHING:
+            self._since_close += dt
 
         if self.driver.status and self.state in (State.LAUNCHING, State.LOADING, State.SAVING, State.EXITING):
             self.message = self.driver.status
@@ -365,7 +368,23 @@ class Machine:
         else:
             self._fail(f"Loading the save in {self.driver.name} failed: {result.detail}")
 
+    def _auto_clock_running(self) -> bool:
+        return bool(self.cfg.auto_start_seconds) and self._since_close >= self.cfg.auto_start_seconds
+
+    def _turn_seconds(self) -> float:
+        """Play time for the turn that's starting: all of it, or - with auto-start -
+        what's left of the clock that's been running since it started."""
+        if not self.cfg.auto_start_seconds:
+            return float(self.cfg.play_seconds)
+        used = max(0.0, self._since_close - self.cfg.auto_start_seconds)
+        return max(0.0, self.cfg.play_seconds - used)
+
     def _tick_verifying(self, dt):
+        if self._auto_clock_running() and self._turn_seconds() <= 0:
+            log.warning("%s's time ran out while it was still loading. Saving and switching now.", self.driver.name)
+            self._cancel_step()
+            self._start_playing(0.0, verified_by=None)
+            return
         if self._job is not None:
             check = self._job_result()
             if check is not None:
@@ -374,7 +393,7 @@ class Machine:
                     if self._ready_streak >= self.cfg.ready_stable_checks:
                         log.info("%s gameplay verified (%s, %d checks in a row).",
                                  self.driver.name, check.detail, self._ready_streak)
-                        self._start_playing(self.cfg.play_seconds, verified_by="the game")
+                        self._start_playing(self._turn_seconds(), verified_by="the game")
                         return
                 else:
                     if self._ready_streak:
@@ -392,8 +411,8 @@ class Machine:
             self._job = self._executor.submit(self._safe_ready_check, self.driver)
 
     def _check_load_timeout(self) -> bool:
-        if self._load_time <= self.cfg.load_timeout:
-            return False
+        if self._load_time <= self.cfg.load_timeout or self._auto_clock_running():
+            return False  # (with auto-start, the running clock decides when the turn ends)
         if self.cfg.fallback_cycle_enabled:
             left = self.cfg.fallback_cycle_seconds - self._cycle_time
             log.warning(
@@ -541,6 +560,7 @@ class Machine:
             self._scene(self.cfg.obs.switching_scene)
             self._job = self._executor.submit(self._safe_step, driver.exit, self._step_abort)
         elif state == State.SWITCHING:
+            self._since_close = 0.0  # the previous game has closed
             self._launch_retries_left = self.cfg.launch_retries
             if advance:
                 self.index = (self.index + 1) % len(self.cfg.rotation)
@@ -644,6 +664,7 @@ class Machine:
         if self.turn:
             log.info("Continuing the previous session: %d turns played, next up %s.", self.turn, self.driver.name)
         self._event("session_start", {"turn": self.turn, "next": self.driver.name})
+        self._since_close = 0.0
         self._enter(State.LAUNCHING)
 
     # ---- worker helpers ------------------------------------------------------
@@ -697,6 +718,8 @@ class Machine:
 
     def snapshot(self) -> Snapshot:
         remaining = _whole_seconds(self._remaining) if self.state == State.PLAYING else None
+        if remaining is None and self.state in LOADING_STATES and self._auto_clock_running():
+            remaining = _whole_seconds(self._turn_seconds())  # auto-start: the clock runs while it loads
         level = ""
         if remaining is not None and self.cfg.warning_seconds:
             if remaining <= min(self.cfg.warning_seconds):

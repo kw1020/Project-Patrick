@@ -153,6 +153,10 @@ class Config:
     launch_retry_delay: int = 20
     # Stop by itself (saving and closing the game) after this many turns. 0 = never.
     stop_after_turns: int = 0
+    # 0: the clock starts once you're in the game (detected, or Start timer now).
+    # N: the clock starts N seconds after the previous game has closed (or after
+    # Start, for the first game) and runs while the next game loads.
+    auto_start_seconds: int = 0
     # The Start hotkey and the pop-up's Start do what you last clicked:
     # Start (with OBS) or Test Start (no OBS).
     hotkey_start_is_test: bool = False
@@ -200,6 +204,8 @@ class Config:
             problems.append("The small timer's visibility must be between 30% and 100%.")
         if any(a <= 0 for a in self.popup.alert_seconds):
             problems.append("Each pop-up alert must be above 0 seconds.")  # longer than a turn = just skipped
+        if not 0 <= self.auto_start_seconds <= 600:
+            problems.append("'Start the clock after' must be between 0 and 600 seconds.")
         if self.stop_after_turns < 0:
             problems.append("'Stop after turns' can't be negative.")
         if self.ready_stable_checks < 1:
