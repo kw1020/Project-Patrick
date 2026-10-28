@@ -85,6 +85,7 @@ class Snapshot:
     prompt: str = ""  # e.g. "SAVE NOW: sleep in your bed..." for games you save yourself
     test_run: bool = False  # a Test Start run (OBS left alone)
     can_confirm_ready: bool = False  # the Ready button applies right now
+    waiting_for_you: bool = False  # the game is waiting for YOU to say you're in (Schedule I)
 
 
 class Machine:
@@ -381,6 +382,9 @@ class Machine:
                                  self.driver.name, check.detail)
                     self._ready_streak = 0
                     self.message = f"Waiting for {self.driver.name} gameplay ({check.detail})"
+                    if getattr(self.driver, "asks_ready", False):
+                        self.message = (f"In your {self.driver.name} save? Press {_pretty(self.cfg.hotkeys.ready)} "
+                                        "(Start timer now) to start the clock")
         if self._check_load_timeout():
             return
         if self._job is None and self._state_time >= self._next_poll:
@@ -418,6 +422,8 @@ class Machine:
                 log.info("%d-second warning for %s.", w, self.driver.name)
                 self._sound("final" if final else "warning")
         prompt_at = self.driver.cfg.save_prompt_seconds
+        if getattr(self.driver, "auto_save", False):
+            prompt_at = 0  # GameSwap presses the save key; you're only asked if that fails
         if prompt_at and not self._prompted and 0 < self._remaining <= prompt_at:
             self._prompted = True
             hint = getattr(self.driver, "save_hint", "save your game")
@@ -445,6 +451,13 @@ class Machine:
             self._enter(State.SAVING)
 
     def _tick_saving(self, dt):
+        if self.driver.status.startswith("SAVE NOW") and not self.prompt:
+            # The save key didn't work: you save in-game, with the game back on OBS.
+            hint = getattr(self.driver, "save_hint", "save your game")
+            self.prompt = f"SAVE NOW: {hint}"
+            log.info("Save prompt for %s: %s.", self.driver.name, hint)
+            self._scene(self.driver.obs_scene)
+            self._sound("save")
         result = self._job_result()
         if result is None:
             limit = self.driver.cfg.save_wait_seconds or self.cfg.save_timeout
@@ -512,6 +525,10 @@ class Machine:
             self._ready_streak = 0
             self._next_poll = 0.0
             self.message = f"Waiting for {driver.name} gameplay..."
+            if getattr(driver, "asks_ready", False):
+                self.message = (f"In your {driver.name} save? Press {_pretty(self.cfg.hotkeys.ready)} "
+                                "(Start timer now) to start the clock")
+                self._sound("warning")  # your turn: load your save, then press Start timer now
         elif state == State.SAVING:
             self.message = f"Saving {driver.name}..."
             if getattr(driver, "save_needs_player", False):
@@ -705,11 +722,18 @@ class Machine:
             prompt=self.prompt if self.state in (State.PLAYING, State.SAVING) else "",
             test_run=self.test_run and self.state != State.IDLE,
             can_confirm_ready=self.state in LOADING_STATES and not self.paused,
+            waiting_for_you=(self.state == State.VERIFYING_GAMEPLAY and not self.paused
+                             and bool(getattr(self.driver, "asks_ready", False))),
         )
 
     def shutdown(self) -> None:
         self._cancel_step()
         self._executor.shutdown(wait=False, cancel_futures=True)
+
+
+def _pretty(hotkey: str) -> str:
+    """'ctrl+shift+F10' -> 'Ctrl+Shift+F10'."""
+    return "+".join(p[:1].upper() + p[1:] for p in hotkey.split("+"))
 
 
 def _whole_seconds(seconds: float) -> int:

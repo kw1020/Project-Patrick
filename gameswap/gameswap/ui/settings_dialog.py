@@ -152,6 +152,8 @@ class SettingsDialog(QDialog):
             wd["max_age"] = _spin(g.save_max_age_seconds, 10, 3600)
             wd["save_wait"] = _spin(g.save_wait_seconds, 0, 3600)
             wd["ready_re"] = QLineEdit(g.ready_log_pattern)
+            wd["save_key"] = QLineEdit(g.save_key)
+            wd["save_key"].setPlaceholderText("blank = I save myself at SAVE NOW   (e.g. F2 with a save-key mod)")
             wd["ready_re"].setPlaceholderText("blank = I press Ready myself")
             wd["auto_play"] = QCheckBox("Press Quick Play / PLAY in the launcher for me")
             wd["auto_play"].setChecked(g.auto_click_play)
@@ -176,6 +178,11 @@ class SettingsDialog(QDialog):
             form.addRow("Save to load" if is_steam else "World to open", wd["save"])
             if is_steam:
                 form.addRow("Saves folder", wd["saves_folder"])
+                form.addRow("Save key", wd["save_key"])
+                form.addRow("", _hint("Schedule I has no save key of its own. With a save-key mod (e.g. Save Key "
+                                      "Binds: F2), type the key here: GameSwap presses it at the end of the turn "
+                                      "with Schedule I in front, and checks the save on disk. If no save shows up, "
+                                      "it asks you to save instead."))
                 form.addRow("Show SAVE NOW at", wd["prompt"])
                 form.addRow("A save this recent counts", wd["max_age"])
                 form.addRow("Wait for your save up to", wd["save_wait"])
@@ -428,6 +435,7 @@ class SettingsDialog(QDialog):
             g.save_max_age_seconds = wd["max_age"].value()
             g.save_wait_seconds = wd["save_wait"].value()
             g.ready_log_pattern = wd["ready_re"].text().strip()
+            g.save_key = wd["save_key"].text().strip().upper()
             g.ready_settle_seconds = wd["settle"].value()
             g.backup_before_start = wd["backup"].isChecked()
             g.backups_keep = wd["keep"].value()

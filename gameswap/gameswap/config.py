@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import sys
 from dataclasses import asdict, dataclass, field, fields, is_dataclass
 from pathlib import Path
@@ -63,6 +64,10 @@ class GameConfig:
     # Schedule I: a Player.log line (regular expression) that means "in the game".
     # Blank = you press Ready.
     ready_log_pattern: str = ""
+    # A key that saves the game (e.g. F2 from a save-key mod). GameSwap presses it
+    # only with the game's window in front, then checks the save on disk. Blank =
+    # you save yourself when SAVE NOW appears.
+    save_key: str = ""
     simulation: SimulationConfig = field(default_factory=SimulationConfig)
 
 
@@ -201,6 +206,8 @@ class Config:
                 problems.append(f"{g.name}: unknown game driver '{g.driver}'.")
             if g.save_prompt_seconds and not 0 < g.save_prompt_seconds < self.play_seconds:
                 problems.append(f"{g.name}: the save prompt must be shorter than the play time.")
+            if g.save_key and not re.fullmatch(r"(?i)F([1-9]|1[0-2])|[A-Z0-9]", g.save_key.strip()):
+                problems.append(f"{g.name}: the save key must be F1-F12, a letter or a digit (not '{g.save_key}').")
             if g.save_max_age_seconds < 10:
                 problems.append(f"{g.name}: 'a save this recent counts' must be at least 10 seconds.")
             if g.simulation.fail_step not in SIM_FAIL_STEPS:

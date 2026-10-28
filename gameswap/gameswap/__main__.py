@@ -6,6 +6,18 @@ import logging
 import sys
 
 
+def lower_priority() -> None:
+    """Run GameSwap at 'below normal' priority, so your games and OBS always get
+    the CPU first. Its work is tiny, so its timer stays accurate."""
+    try:
+        import psutil
+
+        p = psutil.Process()
+        p.nice(psutil.BELOW_NORMAL_PRIORITY_CLASS if sys.platform == "win32" else 10)
+    except Exception as e:  # not allowed / not supported: run at normal priority
+        logging.getLogger("gameswap").debug("Couldn't lower GameSwap's priority: %s", e)
+
+
 def main() -> int:
     if "--selftest" in sys.argv:
         from .selftest import run
@@ -29,6 +41,7 @@ def main() -> int:
         import ctypes
 
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("GameSwap.App")
+    lower_priority()
     app = QApplication(sys.argv)
     app.setApplicationName("GameSwap")
     from PySide6.QtGui import QIcon

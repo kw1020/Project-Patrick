@@ -4,6 +4,12 @@ Schedule I has no save key or pause-menu save. It saves only when you sleep
 in your bed or use the save device by a property's door, and quitting does
 NOT save. So GameSwap never pretends it can save for you. Instead:
 
+(With a save-key mod - e.g. "Save Key Binds", F2 - set Save key in Settings.
+GameSwap then presses that key itself, only with Schedule I in front, and
+still verifies the save on disk exactly as below. If the key doesn't produce
+a verified save, it falls back to SAVE NOW for you. A mod that loads your
+save at launch, e.g. "Fast Load", removes the Continue step.)
+
 Launch   Steam's own command (steam.exe -applaunch 3164500).
          Verified: the game's process and window appear.
 Load     You pick your save (Continue > your save). GameSwap shows which one.
@@ -36,6 +42,7 @@ log = logging.getLogger("gameswap.schedule1")
 
 SAVE_QUIET_SECONDS = 3.0  # no file changes for this long = the game finished writing
 SAVE_HINT = "sleep in bed or use the save device"
+KEY_SAVE_WAIT = 15.0  # how long a save-key press gets to show up on disk
 
 
 class PlayerLog(LogFollower):
@@ -84,7 +91,6 @@ def pick_unity_window(windows: list[WindowInfo]) -> WindowInfo | None:
 class Schedule1Driver(RealGameDriver):
     mode_label = "Real - Phase 4 (you save, GameSwap verifies)"
     automates_load = False
-    save_needs_player = True  # keep the game scene on OBS while you walk to save
 
     def __init__(self, key, cfg, monitor: ProcessMonitor, actions: Actions | None = None,
                  wall_clock=time.time, clock=time.monotonic):
@@ -103,6 +109,21 @@ class Schedule1Driver(RealGameDriver):
     def manual_ready(self) -> bool:
         """True when you confirm gameplay yourself (no ready log line set)."""
         return not self.cfg.ready_log_pattern
+
+    @property
+    def auto_save(self) -> bool:
+        """A save key is set: GameSwap presses it (and still verifies on disk)."""
+        return bool(self.cfg.save_key.strip())
+
+    @property
+    def save_needs_player(self) -> bool:
+        """You save by walking to the bed/save device: keep the game on OBS meanwhile."""
+        return not self.auto_save
+
+    @property
+    def asks_ready(self) -> bool:
+        """You tell GameSwap when you're in your save (no ready log line set)."""
+        return self.manual_ready
 
     @property
     def save_hint(self) -> str:
@@ -193,9 +214,9 @@ class Schedule1Driver(RealGameDriver):
         slot = self.slot()
         if isinstance(slot, str):
             return StepResult(False, slot)
-        how = "press Ready (button or hotkey) once you're in the game" if self.manual_ready else \
-            "the timer starts by itself once the game has loaded"
-        self.status = f"In Schedule I: Continue > load '{slot.name}' ({slot.folder}), then {how}"
+        how = "then press Start timer now (Ctrl+Shift+F10) once you're in it" if self.manual_ready else \
+            "the timer starts by itself once it has loaded"
+        self.status = f"Load your save '{slot.name}' ({slot.folder}): Continue > {slot.name}, {how}"
         return StepResult(True, f"waiting for you to load '{slot.name}'")
 
     def check_ready(self) -> ReadyCheck:
@@ -205,7 +226,7 @@ class Schedule1Driver(RealGameDriver):
         if w is None or w.minimized:
             return ReadyCheck(False, "Schedule I's window is minimized or missing")
         if self.manual_ready:
-            return ReadyCheck(False, "press Ready once you're in the game")
+            return ReadyCheck(False, "in your save? Press Start timer now (Ctrl+Shift+F10)")
         self.player_log.poll()
         if not self.player_log.ready_at:
             return ReadyCheck(False, "loading (waiting for the ready line in Player.log)")
@@ -231,6 +252,10 @@ class Schedule1Driver(RealGameDriver):
             return StepResult(False, slot)
         if not self.is_running():
             return StepResult(False, "Schedule I isn't running, so there is nothing to save")
+        if self.auto_save:
+            saved = self._save_with_key(slot, abort)
+            if saved is not None:
+                return saved
         since = self._wall() - self.cfg.save_max_age_seconds
         while not abort.is_set():
             done, why = s1saves.check_save(slot.path, since, SAVE_QUIET_SECONDS, now=self._wall())
@@ -245,6 +270,41 @@ class Schedule1Driver(RealGameDriver):
             abort.wait(1.0)
             self.refresh()
         return StepResult(False, "stopped waiting for the save. Schedule I was NOT closed")
+
+    def _save_with_key(self, slot: s1saves.Slot, abort) -> StepResult | None:
+        """Press the save key (up to twice) and wait for the save on disk.
+        None = no verified save: the caller asks you to save instead."""
+        key = self.cfg.save_key.strip().upper()
+        for attempt in (1, 2):
+            if abort.is_set() or not self.is_running():
+                return None
+            w = self.game_window()
+            if w is None:
+                log.warning("Save key: Schedule I's window wasn't found, so %s wasn't pressed.", key)
+                break
+            if self.actions.foreground() != w.hwnd and not self.actions.bring_to_front(w.hwnd):
+                log.warning("Save key: couldn't bring Schedule I to the front, so %s wasn't pressed.", key)
+                break
+            self.actions.release_modifiers()
+            pressed_at = self._wall()
+            if not self.actions.press_key(w.hwnd, key):
+                log.warning("Save key: Schedule I wasn't in front any more, so %s wasn't pressed.", key)
+                break
+            self.status = f"Pressed {key} to save Schedule I - checking the save on disk..."
+            log.info("Pressed %s in Schedule I (try %d); checking the save on disk.", key, attempt)
+            deadline = self._clock() + KEY_SAVE_WAIT
+            why = ""
+            while not abort.is_set() and self._clock() < deadline:
+                done, why = s1saves.check_save(slot.path, pressed_at - 1, SAVE_QUIET_SECONDS, now=self._wall())
+                if done:
+                    self.verified_save_at = self._wall()
+                    self.status = ""
+                    return StepResult(True, f"pressed {key}; save '{slot.name}' verified on disk: {why}")
+                abort.wait(0.5)
+                self.refresh()
+            log.warning("Pressing %s didn't produce a verified save (%s).", key, why)
+        log.warning("The save key didn't work, so you're asked to save in-game.")
+        return None
 
     def exit(self, abort):
         self.refresh()

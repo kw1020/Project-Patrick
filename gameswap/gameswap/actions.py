@@ -13,6 +13,7 @@ swap in a fake one. Rules every action follows:
 from __future__ import annotations
 
 import logging
+import re
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -22,6 +23,16 @@ from . import winapi
 log = logging.getLogger("gameswap.actions")
 
 VK_ESCAPE, SCAN_ESCAPE = 0x1B, 0x01
+
+
+def key_code(key: str) -> int | None:
+    """Windows key code for 'F1'..'F12', 'A'..'Z' or '0'..'9'; None for anything else."""
+    k = key.strip().upper()
+    if re.fullmatch(r"F([1-9]|1[0-2])", k):
+        return 0x70 + int(k[1:]) - 1
+    if re.fullmatch(r"[A-Z0-9]", k):
+        return ord(k)
+    return None
 KEYEVENTF_KEYUP = 0x0002
 # Left/right Shift, Ctrl, Alt, Windows keys.
 MODIFIERS = (0xA0, 0xA1, 0xA2, 0xA3, 0xA4, 0xA5, 0x5B, 0x5C)
@@ -76,6 +87,19 @@ class Actions:
             if win32api.GetAsyncKeyState(vk) & 0x8000:
                 win32api.keybd_event(vk, 0, KEYEVENTF_KEYUP, 0)
         time.sleep(0.05)
+
+    def press_key(self, hwnd: int, key: str) -> bool:
+        """Press one key (e.g. 'F2'), only if `hwnd` is the window in front right now."""
+        import win32api
+
+        vk = key_code(key)
+        if vk is None or self.foreground() != hwnd:
+            return False
+        scan = win32api.MapVirtualKey(vk, 0)
+        win32api.keybd_event(vk, scan, 0, 0)
+        time.sleep(0.05)
+        win32api.keybd_event(vk, scan, KEYEVENTF_KEYUP, 0)
+        return True
 
     def press_escape(self, hwnd: int) -> bool:
         """Press Esc once, only if `hwnd` is the window in front right now."""

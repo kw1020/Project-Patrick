@@ -315,3 +315,116 @@ def test_schedule1_turn_end_without_a_save_waits_then_asks_you(rig):
         time.sleep(0.01)
     assert m.state == State.SWITCHING and not rig.drivers["schedule1"].is_running()
     m.shutdown()
+
+
+# ---- save key (a save-key mod, e.g. F2) ------------------------------------------
+
+def _with_save_key(rig, monkeypatch, works=True):
+    """A pretend save-key mod: F2 saves, but only reaches Schedule I if it's in front."""
+    monkeypatch.setattr(s1, "KEY_SAVE_WAIT", 1.0)
+    rig.cfg.games["schedule1"].save_key = "F2"
+    pressed = []
+
+    def press_key(hwnd, key):
+        if rig.pc.actions.fg != hwnd:
+            return False
+        pressed.append(key)
+        if works and rig.game.proc and rig.game.proc.windows[0].hwnd == hwnd and key == "F2":
+            threading.Thread(target=rig.game.you_save, daemon=True).start()
+        return True
+
+    monkeypatch.setattr(rig.pc.actions, "press_key", press_key, raising=False)
+    return pressed
+
+
+def _machine(rig):
+    cfg = rig.cfg
+    cfg.play_seconds = 25
+    cfg.warning_seconds = [10, 5]
+    cfg.switch_delay_seconds = 0.1
+    cfg.ready_poll_seconds = 0.05
+    cfg.ready_stable_checks = 2
+    cfg.games["schedule1"].save_prompt_seconds = 20
+    m = Machine(cfg, rig.drivers)
+    m.sounds, m.scenes = [], []
+    m.on_sound = m.sounds.append
+
+    class Obs:
+        def set_scene(self, name):
+            m.scenes.append(name)
+
+        def preflight(self, names):
+            return []
+
+    m.obs = Obs()
+    return m
+
+
+def _tick_until(m, cond, timeout=20):
+    end = time.monotonic() + timeout
+    while time.monotonic() < end:
+        m.tick()
+        if cond():
+            return
+        time.sleep(0.01)
+    raise AssertionError(f"stuck in {m.state}: {m.error or m.message}")
+
+
+def test_save_key_saves_and_quits_schedule1_by_itself(rig, monkeypatch):
+    pressed = _with_save_key(rig, monkeypatch)
+    m = _machine(rig)
+    m.start()
+    _tick_until(m, lambda: m.state == State.PLAYING)  # Minecraft
+    m.switch_now()
+    _tick_until(m, lambda: m.state == State.VERIFYING_GAMEPLAY and m.driver.key == "schedule1")
+    s = m.snapshot()
+    assert s.waiting_for_you and "Ctrl+Shift+F10" in m.message, "you're told exactly what to press"
+    m.confirm_ready()
+    m._remaining = 15.0  # well inside the 20-second SAVE NOW window
+    for _ in range(5):
+        m.tick()
+    assert m.prompt == "", "no SAVE NOW: GameSwap saves with the key"
+    m.switch_now()
+    _tick_until(m, lambda: m.state == State.PLAYING and m.driver.key == "minecraft", timeout=30)
+    assert pressed == ["F2"]
+    assert rig.game.close_requests == 1 and not rig.drivers["schedule1"].is_running()
+    m.shutdown()
+
+
+def test_save_key_that_does_nothing_falls_back_to_save_now(rig, monkeypatch):
+    pressed = _with_save_key(rig, monkeypatch, works=False)
+    m = _machine(rig)
+    m.cfg.rotation = ["schedule1", "minecraft"]
+    m._enter(State.LAUNCHING)
+    _tick_until(m, lambda: m.state == State.VERIFYING_GAMEPLAY)
+    m.confirm_ready()
+    m.switch_now()
+    _tick_until(m, lambda: m.prompt.startswith("SAVE NOW"), timeout=10)
+    assert pressed == ["F2", "F2"], "pressed twice, then asks you"
+    assert m.scenes[-1] == "Schedule I" and "save" in m.sounds
+    assert rig.drivers["schedule1"].is_running() and rig.game.close_requests == 0, "never closed unsaved"
+    rig.game.you_save()
+    _tick_until(m, lambda: m.state == State.SWITCHING)
+    assert rig.game.close_requests == 1
+    m.shutdown()
+
+
+def test_save_key_is_never_pressed_when_schedule1_is_not_in_front(rig, monkeypatch):
+    pressed = _with_save_key(rig, monkeypatch)
+    d = rig.d
+    assert run(d.launch, threading.Event()).ok
+    rig.pc.actions.focus_allowed = False
+    rig.pc.actions.fg = 12345  # some other window, and Windows refuses to switch
+    abort = threading.Event()
+    threading.Timer(2.0, abort.set).start()
+    r = run(d.save, abort)
+    assert not r.ok and pressed == []
+    assert "SAVE NOW" in d.status
+
+
+def test_save_key_must_be_a_simple_key():
+    cfg = Config()
+    cfg.games["schedule1"].save_key = "ctrl+s"
+    assert any("save key" in p for p in cfg.validate())
+    cfg.games["schedule1"].save_key = "f2"
+    assert not any("save key" in p for p in cfg.validate())

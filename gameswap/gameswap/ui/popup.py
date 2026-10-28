@@ -204,8 +204,8 @@ class PopupPanel(QWidget):
                     self._auto_until = now + self.cfg.popup.alert_show_seconds
             if rem <= self.cfg.countdown_seconds:
                 want_full = True  # the big 10, 9, 8 ... countdown
-        if s.state == State.ERROR:
-            want_full = True  # something needs you
+        if s.state == State.ERROR or s.waiting_for_you:
+            want_full = True  # something needs you (or: load your save, then press Start timer now)
         if s.prompt and not self._last_prompt:
             self._auto_until = now + self.cfg.popup.alert_show_seconds  # SAVE NOW
         if s.state == State.PLAYING and self._last_state in SWITCH_STATES:
@@ -276,9 +276,11 @@ class PopupPanel(QWidget):
             self.clock_label.setText("⇄")
             self.detail.setText(s.prompt or s.message)
         elif s.state in (State.LAUNCHING, State.LOADING, State.VERIFYING_GAMEPLAY):
-            self.headline.setText(f"Loading {s.game_name}")
+            self.headline.setText(f"Load your {s.game_name} save" if s.waiting_for_you else f"Loading {s.game_name}")
             self.clock_label.setText("…")
             self.detail.setText(s.message)
+            if s.waiting_for_you:
+                level = "warning"
         elif s.state == State.ERROR:
             self.headline.setText("Needs your attention")
             self.clock_label.setText("!")
@@ -327,6 +329,8 @@ class PopupPanel(QWidget):
             game, clock = f"{s.game_name.upper()}  ·  LOADING{test}", "…"
             nxt = (f"Playing? {pretty(h.ready)} starts the timer" if s.can_confirm_ready
                    else _short(s.message))
+            if s.waiting_for_you:
+                nxt, level = f"In your save? {pretty(h.ready)}", "warning"
         elif s.state in (State.SAVING, State.EXITING, State.SWITCHING):
             game, clock = f"SWITCHING{test}", "⇄"
             nxt = "SAVE NOW!" if s.prompt else f"Up next: {s.next_name}"

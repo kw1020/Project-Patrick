@@ -357,6 +357,8 @@ class MainWindow(QMainWindow):
         if m.start_problems:
             self._show_start_problems(m.start_problems)
             m.start_problems = []
+        if self.isMinimized() or not self.isVisible():
+            return  # nobody can see this window: skip redrawing it while you play
 
         self.game_label.setText(s.game_name)
         state_text = STATE_TEXT[s.state] + (f"  ·  turn {s.turn}" if s.turn else "") + ("  (PAUSED)" if s.paused else "")

@@ -39,6 +39,15 @@ GameSwap doesn't click Minecraft's "Save and Quit to Title" button. Its position
 | Quit | GameSwap, **only after a verified save**: it closes the window, the same as clicking its X. | The process exits. If Schedule I asks "are you sure?", you confirm it; GameSwap never clicks it for you. |
 | Backup | GameSwap zips your save slot before every Start. | The zip appears in `C:\GameSwap\backups\`. |
 
+**Make Schedule I hands-free (optional, uses free mods).** Schedule I itself has no save key and always opens on its main menu. Two community mods fix that. They are made by other people, not by GameSwap or the game's developer, and a game update can break them until they're updated. GameSwap backs up your save before every Start either way.
+1. Install **MelonLoader** for Schedule I (see the mods' pages for the version they need).
+2. **Save Key Binds** ([Nexus](https://www.nexusmods.com/schedule1/mods/1211)) makes **F2** save the game. Then in GameSwap: **Settings → Games → Schedule I → Save key: `F2`**. At the end of the turn GameSwap brings Schedule I to the front, presses F2, **checks the save files on disk**, and closes the game. If no save shows up (twice), it falls back to SAVE NOW for you and never closes an unsaved game.
+3. **Fast Load** ([Nexus](https://www.nexusmods.com/schedule1/mods/725)) skips the main menu and loads straight into your save. Set which save in `Schedule I\UserData\LoadToSave.cfg` (created the first time the game starts with the mod).
+
+When Schedule I is in your save, press **Ctrl+Shift+F10** to start its timer. The corner timer pops up and beeps to remind you. GameSwap can't detect that moment by itself yet: every time you press it, the game's own log lines are copied into GameSwap's log. Send me that log and I can make this step automatic too.
+
+**Smooth while recording.** GameSwap runs at *below normal* priority, so your games and OBS always get the CPU first. It uses about 3% of one CPU core, and it doesn't redraw its main window while that window is minimized. Minimize GameSwap while you play. If you ever see frame drops, you can turn off the always-on corner timer (Settings → Overlay & Hotkeys); the alerts and countdown still pop up.
+
 If no save is verified when the turn ends, GameSwap **keeps waiting** (up to 5 minutes) with SAVE NOW showing. After that it stops and asks you, and it **never closes Schedule I without a verified save**.
 
 > **Important:** anything you do in Schedule I *after* your save isn't kept, because quitting doesn't save. Save near the end of the turn, then just wait out the last seconds.
