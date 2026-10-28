@@ -153,6 +153,8 @@ class Config:
     # The Start hotkey and the pop-up's Start do what you last clicked:
     # Start (with OBS) or Test Start (no OBS).
     hotkey_start_is_test: bool = False
+    # On start, ask GitHub for a newer GameSwap and offer to install it.
+    check_for_updates: bool = True
 
     sounds: bool = True
     obs: ObsConfig = field(default_factory=ObsConfig)

@@ -107,7 +107,7 @@ def _window_run() -> str:
         s.ready_after_seconds = 0.3
     logging.getLogger().setLevel(logging.INFO)
     win = main_window.MainWindow(cfg, config_path=tmp / "config.json", session_file=tmp / "session.json",
-                                 log_dir=tmp / "logs", ask_resume=False)
+                                 log_dir=tmp / "logs", ask_resume=False, check_updates=False)
     seen = []
 
     def pump_until(cond, timeout):

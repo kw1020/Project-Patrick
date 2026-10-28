@@ -73,6 +73,10 @@ GameSwap is installed in `%LOCALAPPDATA%\Programs\GameSwap`, and your settings, 
 
 Already set up GameSwap before? Copy your old `config.json` (from `C:\GameSwap` or `C:\GameSwap-App`) into the new folder: press **Win+R**, paste `%LOCALAPPDATA%\Programs\GameSwap`, press Enter, and paste the file in.
 
+### Updates install themselves
+
+When GameSwap opens, it checks GitHub for a newer version. If there is one, it asks **"Update now?"**; there's also an **Update to X** button next to Diagnostics. Say yes and GameSwap downloads the new installer, **checks it against the release's SHA-256 checksum** (a broken or tampered download is never run), installs it over the old version, and opens again. Your settings, logs and backups are kept. It never updates during a run. (Turn the check off with `"check_for_updates": false` in config.json.)
+
 ### The corner timer and pop-up panel
 
 **A small timer is always in the top-left corner of your screen** while GameSwap is open. You don't need to press anything. It's slightly see-through, and clicks pass straight through it to your game:

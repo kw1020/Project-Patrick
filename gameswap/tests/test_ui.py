@@ -162,3 +162,34 @@ def test_start_hotkey_repeats_the_last_start_button(app, tmp_path, monkeypatch):
     win._on_hotkey("start")
     assert calls[-2:] == [False, False]
     win.close()
+
+
+def test_update_button_downloads_installs_and_closes(app, tmp_path, monkeypatch):
+    from PySide6.QtWidgets import QMessageBox
+
+    from gameswap import updater
+    from gameswap.ui import main_window
+
+    monkeypatch.setattr(main_window.sound, "play", lambda kind: None)
+    cfg = make_cfg()
+    cfg.overlay.port = 0
+    cfg.overlay.write_text_file = False
+    win = main_window.MainWindow(cfg, config_path=tmp_path / "config.json", session_file=tmp_path / "session.json",
+                                 log_dir=tmp_path / "logs", ask_resume=False, check_updates=False)
+    win.show()
+    installed = []
+    monkeypatch.setattr(updater, "download", lambda u: tmp_path / u.name)
+    monkeypatch.setattr(updater, "start_install", installed.append)
+    monkeypatch.setattr(main_window.QApplication, "quit", lambda self=None: None)
+    u = updater.Update("9.9.9", "https://dl/x.exe", "GameSwap-Setup-9.9.9.exe", 1, "0" * 64)
+    win.bridge.update_found.emit(u)
+    pump(app, 0.2)
+    assert win.update_btn.isVisible() and win.update_btn.text() == "Update to 9.9.9"
+    for b in win.findChildren(QMessageBox):
+        b.close()
+    win.update_btn.click()
+    end = time.monotonic() + 5
+    while not installed and time.monotonic() < end:
+        pump(app, 0.05)
+    assert installed == [tmp_path / "GameSwap-Setup-9.9.9.exe"]
+    assert not win.isVisible(), "GameSwap closes so the installer can replace it"

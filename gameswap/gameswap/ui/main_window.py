@@ -12,12 +12,12 @@ import threading
 from PySide6.QtCore import QObject, Qt, QTimer, Signal
 from PySide6.QtGui import QGuiApplication, QIcon
 from PySide6.QtWidgets import (
-    QDialog, QFrame, QGridLayout, QGroupBox, QHBoxLayout, QLabel, QMainWindow, QMessageBox,
+    QApplication, QDialog, QFrame, QGridLayout, QGroupBox, QHBoxLayout, QLabel, QMainWindow, QMessageBox,
     QPlainTextEdit, QPushButton, QSizePolicy, QVBoxLayout, QWidget,
 )
 
 from .. import config as config_mod
-from .. import diagnostics, sound
+from .. import __version__, diagnostics, sound, updater
 from ..config import LOG_DIR, Config
 from ..drivers import make_drivers
 from ..hotkeys import HotkeyListener
@@ -81,6 +81,8 @@ class _Bridge(QObject):
     log_line = Signal(int, str)
     hotkey = Signal(str)
     diag_done = Signal(str)
+    update_found = Signal(object)  # updater.Update
+    update_ready = Signal(object)  # Path of the checked installer, or an error message
 
 
 class _QtLogHandler(logging.Handler):
@@ -98,7 +100,7 @@ class _QtLogHandler(logging.Handler):
 
 class MainWindow(QMainWindow):
     def __init__(self, cfg: Config, config_path=config_mod.CONFIG_PATH, session_file=STATE_FILE,
-                 log_dir=LOG_DIR, ask_resume: bool = True):
+                 log_dir=LOG_DIR, ask_resume: bool = True, check_updates: bool | None = None):
         super().__init__()
         self.cfg = cfg
         self.config_path = config_path
@@ -113,6 +115,10 @@ class MainWindow(QMainWindow):
         self.bridge.log_line.connect(self._append_log)
         self.bridge.hotkey.connect(self._on_hotkey)
         self.bridge.diag_done.connect(self._diagnostics_done)
+        self.bridge.update_found.connect(self._update_found)
+        self.bridge.update_ready.connect(self._update_ready)
+        self._update: updater.Update | None = None
+        self._updating = False
         self._log_handler = _QtLogHandler(self.bridge)
         logging.getLogger().addHandler(self._log_handler)
 
@@ -133,6 +139,11 @@ class MainWindow(QMainWindow):
         self.timer.start(100)
         if ask_resume:
             QTimer.singleShot(400, self._offer_resume)
+        if check_updates is None:  # only the installed GameSwap.exe updates itself
+            check_updates = bool(getattr(sys, "frozen", False)) and cfg.check_for_updates
+        if check_updates:
+            threading.Thread(target=lambda: self._emit_update(updater.check(__version__)),
+                             name="update-check", daemon=True).start()
 
     # ---- layout ------------------------------------------------------------
 
@@ -224,6 +235,11 @@ class MainWindow(QMainWindow):
         status.addWidget(self.overlay_label, 1)
         status.addWidget(copy_btn)
         status.addWidget(self.diag_btn)
+        self.update_btn = QPushButton("Update")
+        self.update_btn.setToolTip("Download and install the new GameSwap (your settings are kept)")
+        self.update_btn.clicked.connect(self._start_update)
+        self.update_btn.hide()
+        status.addWidget(self.update_btn)
         status.addWidget(self.settings_btn)
         col.addLayout(status)
 
@@ -539,6 +555,78 @@ class MainWindow(QMainWindow):
     def _append_log(self, level: int, text: str) -> None:
         color = LEVEL_COLORS.get(level, "#d8dee9")
         self.log_view.appendHtml(f'<span style="color:{color}">{html.escape(text)}</span>')
+
+    # ---- updates -----------------------------------------------------------------
+
+    def _emit_update(self, u) -> None:
+        if u is not None:
+            try:
+                self.bridge.update_found.emit(u)
+            except RuntimeError:  # window already closed
+                pass
+
+    def _update_found(self, u) -> None:
+        self._update = u
+        self.update_btn.setText(f"Update to {u.version}")
+        self.update_btn.show()
+        if self.machine.state not in (State.IDLE, State.STOPPED):
+            return  # never interrupt a run; the button stays there for later
+        box = QMessageBox(QMessageBox.Information, "GameSwap update",
+                          f"GameSwap {u.version} is ready (you have {__version__}).", parent=self)
+        box.setInformativeText("Update now? It takes about a minute: GameSwap closes, updates, and opens "
+                               "again by itself. Your settings, logs and backups are kept.")
+        now = box.addButton("Update now", QMessageBox.AcceptRole)
+        box.addButton("Later", QMessageBox.RejectRole)
+        box.setWindowModality(Qt.NonModal)
+        box.buttonClicked.connect(lambda b: self._start_update() if b is now else None)
+        box.show()
+
+    def _start_update(self) -> None:
+        u = self._update
+        if u is None or self._updating:
+            return
+        if self.machine.state not in (State.IDLE, State.STOPPED) or self.tests.busy:
+            QMessageBox.information(self, "GameSwap update", "Stop the run first, then press Update.")
+            return
+        self._updating = True
+        self.update_btn.setEnabled(False)
+        self.update_btn.setText("Downloading update...")
+        log.info("Downloading GameSwap %s...", u.version)
+
+        def work():
+            try:
+                result = updater.download(u)
+            except Exception as e:
+                result = str(e) or e.__class__.__name__
+            try:
+                self.bridge.update_ready.emit(result)
+            except RuntimeError:
+                pass
+
+        threading.Thread(target=work, name="update-download", daemon=True).start()
+
+    def _update_ready(self, result) -> None:
+        if isinstance(result, str):
+            log.error("The update couldn't be downloaded: %s. Nothing was changed.", result)
+            self._updating = False
+            self.update_btn.setEnabled(True)
+            self.update_btn.setText(f"Update to {self._update.version}")
+            return
+        if self.machine.state not in (State.IDLE, State.STOPPED):  # a run started meanwhile
+            self._updating = False
+            self.update_btn.setEnabled(True)
+            self.update_btn.setText(f"Update to {self._update.version}")
+            return
+        log.info("Installing GameSwap %s. GameSwap will close and open again.", self._update.version)
+        try:
+            updater.start_install(result)
+        except OSError as e:
+            log.error("Couldn't start the update installer: %s", e)
+            self._updating = False
+            self.update_btn.setEnabled(True)
+            return
+        self.close()
+        QApplication.instance().quit()
 
     def closeEvent(self, event) -> None:
         s = self.machine.snapshot()

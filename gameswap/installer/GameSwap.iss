@@ -44,3 +44,11 @@ Name: "{autodesktop}\GameSwap"; Filename: "{app}\GameSwap.exe"; Tasks: desktopic
 
 [Run]
 Filename: "{app}\GameSwap.exe"; Description: "Start GameSwap now"; Flags: nowait postinstall skipifsilent
+; After GameSwap updated itself (it runs this installer silently with /relaunch=1).
+Filename: "{app}\GameSwap.exe"; Flags: nowait; Check: RelaunchAfterUpdate
+
+[Code]
+function RelaunchAfterUpdate: Boolean;
+begin
+  Result := ExpandConstant('{param:relaunch|0}') = '1';
+end;

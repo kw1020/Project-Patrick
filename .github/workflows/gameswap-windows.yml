@@ -1,5 +1,6 @@
-# Runs GameSwap's tests on real Windows and builds GameSwap.exe.
-# The finished app can be downloaded from the run's "Artifacts" section.
+# Runs GameSwap's tests on real Windows and builds GameSwap.exe and its installer.
+# A push publishes the installer as a GitHub Release (tag gameswap-vX.Y.Z);
+# the installed GameSwap finds it there and updates itself.
 name: GameSwap (Windows)
 
 on:
@@ -12,6 +13,8 @@ on:
 jobs:
   test-and-build:
     runs-on: windows-latest
+    permissions:
+      contents: write  # to publish the GitHub Release that GameSwap updates itself from
     timeout-minutes: 30
     defaults:
       run:
@@ -80,3 +83,26 @@ jobs:
           name: GameSwap-Setup
           path: gameswap/dist/installer/*.exe
           retention-days: 30
+
+      - name: Publish the update (GitHub Release)
+        if: github.event_name == 'push'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $version = python -c "import gameswap; print(gameswap.__version__)"
+          $tag = "gameswap-v$version"
+          $setup = Get-ChildItem dist\installer\GameSwap-Setup-*.exe | Select-Object -First 1
+          $hash = (Get-FileHash $setup.FullName -Algorithm SHA256).Hash.ToLower()
+          $sha = "$($setup.FullName).sha256"
+          "$hash  $($setup.Name)" | Out-File -Encoding ascii -NoNewline $sha
+          $tags = gh release list --repo "${{ github.repository }}" --limit 200 --json tagName --jq ".[].tagName"
+          if ($tags -contains $tag) {
+            gh release upload $tag $setup.FullName $sha --clobber --repo "${{ github.repository }}"
+          } else {
+            gh release create $tag $setup.FullName $sha --repo "${{ github.repository }}" --target "${{ github.sha }}" `
+              --title "GameSwap $version" --latest=false `
+              --notes "GameSwap $version. Installed GameSwap updates itself to this version (Update button). First install: download GameSwap-Setup-$version.exe below."
+          }
+          if ($LASTEXITCODE -ne 0) { throw "publishing the release failed" }
+          Write-Host "Published $tag"
