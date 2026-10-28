@@ -52,6 +52,7 @@ class UiControl:
     handle: object = None  # the real uiautomation control (None in tests)
     parents: tuple = ()  # enclosing controls, nearest first
     selected: bool | None = None  # tabs: is this the page that's showing? (None = unknown)
+    description: str = ""  # extra text a screen reader would say (help text / description)
 
 
 def world_in_use(world_dir: Path) -> bool:
@@ -164,6 +165,17 @@ class Actions:
                         c.selected = bool(ctrl.GetSelectionItemPattern().IsSelected)
                     except Exception:
                         c.selected = None
+                if kind == "ButtonControl":
+                    extra = []
+                    try:
+                        extra.append(ctrl.HelpText or "")
+                    except Exception:
+                        pass
+                    try:
+                        extra.append(ctrl.GetLegacyIAccessiblePattern().Description or "")
+                    except Exception:
+                        pass
+                    c.description = " ".join(x for x in extra if x)
                 stack.append((depth, c))
                 if c.name and (kind in INVOKABLE_TYPES or kind in LABEL_TYPES):
                     found.append(c)
@@ -215,20 +227,41 @@ def find_java_tab(controls: list[UiControl]) -> UiControl | None:
     return tabs[0] if len(tabs) == 1 else None
 
 
-def choose_launcher_target(controls: list[UiControl], world_name: str) -> tuple[UiControl | None, str]:
+def _starts_with_world(text: str, w: str) -> bool:
+    n = _norm(text)
+    return n == w or (n.startswith(w) and not n[len(w)].isalnum())
+
+
+def _mentions_world(text: str, w: str) -> bool:
+    """The world's name as whole words somewhere in a description."""
+    n = _norm(text)
+    i = n.find(w)
+    while i >= 0:
+        if (i == 0 or not n[i - 1].isalnum()) and (i + len(w) == len(n) or not n[i + len(w)].isalnum()):
+            return True
+        i = n.find(w, i + 1)
+    return False
+
+
+def choose_launcher_target(controls: list[UiControl], world_name: str,
+                           world_is_most_recent: bool = False) -> tuple[UiControl | None, str]:
     """Pick what to press in the Minecraft Launcher.
 
     1. The Quick Play entry for your world: opens Minecraft straight into it.
+       Found by its name (or description), or - in launchers whose entries are
+       all just called "Quick Play" - the first one, which is the world played
+       most recently, when that's your world (world_is_most_recent).
     2. Otherwise the PLAY button: opens Minecraft at its title screen.
     Only presses something that matches exactly once; if anything is
-    ambiguous it returns None and you click yourself.
+    ambiguous it returns None and you click yourself. Which world Minecraft
+    really opened is checked afterwards, from its command line.
     """
     if world_name:
         w = _norm(world_name)
         targets: list[UiControl] = []
         for c in controls:
-            n = _norm(c.name)
-            if not (n == w or (n.startswith(w) and not n[len(w)].isalnum())):
+            if not (_starts_with_world(c.name, w)
+                    or (c.kind == "ButtonControl" and c.description and _mentions_world(c.description, w))):
                 continue
             # A text inside the entry: press the entry around it.
             t = c if c.kind in INVOKABLE_TYPES else next(
@@ -239,7 +272,11 @@ def choose_launcher_target(controls: list[UiControl], world_name: str) -> tuple[
             return targets[0], "quick play"
         if len(targets) > 1:
             return None, f"{len(targets)} launcher entries are called '{world_name}'"
-    play = [c for c in controls if c.kind in INVOKABLE_TYPES and _norm(c.name) == "play"]
+        quick = [c for c in controls if c.kind == "ButtonControl" and _norm(c.name) == "quick play"]
+        if quick and world_is_most_recent:
+            return quick[0], "quick play"  # newest first: your world
+    # The PLAY *button* (the Java page also has a "Play" tab).
+    play = [c for c in controls if c.kind == "ButtonControl" and _norm(c.name) == "play"]
     if len(play) == 1:
         return play[0], "play button"
     if len(play) > 1:

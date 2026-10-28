@@ -425,3 +425,44 @@ def test_launcher_on_home_page_switches_to_java_edition_first(pc):
     assert pc.actions.invoked == ["select MINECRAFT: JAVA EDITION", "Quick Play entry"]
     r = run(d.load_save, threading.Event())
     assert r.ok and "Quick Play" in r.detail
+
+
+def _real_launcher_java_page(descriptions=("", "", "")):
+    """What Krew's Xbox-app launcher showed (GameSwap's log, 26.3)."""
+    c = [UiControl("TabItemControl", "HOME", selected=False),
+         UiControl("TabItemControl", "MINECRAFT: JAVA EDITION", "Java Edition-menulink", selected=True),
+         UiControl("TabItemControl", "Play", selected=True), UiControl("TextControl", "Play"),
+         UiControl("TabItemControl", "Installations"), UiControl("TabItemControl", "Realms"),
+         UiControl("ButtonControl", "Try it now"), UiControl("ButtonControl", "Latest release 26.3"),
+         UiControl("ButtonControl", "PLAY"), UiControl("TextControl", "PLAY")]
+    quick = [UiControl("ButtonControl", "Quick Play", description=d) for d in descriptions]
+    return c + quick + [UiControl("ButtonControl", "Edit quick play list")], quick
+
+
+def test_real_launcher_quick_play_buttons_without_world_names():
+    controls, quick = _real_launcher_java_page()
+    target, why = choose_launcher_target(controls, "This 1", world_is_most_recent=True)
+    assert target is quick[0] and why == "quick play", "newest Quick Play entry = your world"
+    target, why = choose_launcher_target(controls, "This 1", world_is_most_recent=False)
+    assert target.name == "PLAY" and why == "play button", "not sure it's your world: PLAY, not Quick Play"
+    assert choose_launcher_target(controls, "")[1] == "play button", "the Play tab isn't a second PLAY button"
+
+
+def test_real_launcher_quick_play_found_by_description():
+    controls, quick = _real_launcher_java_page(("Other World", "This 1, Singleplayer", "This 10"))
+    target, why = choose_launcher_target(controls, "This 1", world_is_most_recent=False)
+    assert target is quick[1] and why == "quick play"
+
+
+def test_real_launcher_opens_your_world_through_the_first_quick_play(pc):
+    import os
+    controls, _ = _real_launcher_java_page()
+    pc.launcher_controls = controls
+    lvl = pc.saves / "Challenge World" / "level.dat"
+    os.utime(lvl, (time.time() + 60, time.time() + 60))  # you played this world last
+    cfg, d, _ = make(pc)
+    r = run(d.launch, threading.Event())
+    assert r.ok, r.detail
+    assert pc.actions.invoked == ["Quick Play"]
+    r = run(d.load_save, threading.Event())
+    assert r.ok and "Quick Play" in r.detail, "Minecraft confirms it opened your world"

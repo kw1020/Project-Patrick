@@ -415,6 +415,9 @@ class MinecraftDriver(RealGameDriver):
     def _press_in_launcher(self, w: WindowInfo, abort: threading.Event) -> str:
         world = self.world()
         shown = world[2] if not isinstance(world, str) else ""
+        # The launcher lists Quick Play newest first; the first entry is your world
+        # when it's also the world played most recently on this PC.
+        most_recent = not isinstance(world, str) and most_recent_world(self.game_dir) == world[1]
         self.status = "Looking for PLAY in the launcher..."
         deadline = time.monotonic() + LAUNCHER_UI_WAIT
         why = ""
@@ -444,7 +447,8 @@ class MinecraftDriver(RealGameDriver):
                     abort.wait(1.5)
                     deadline = time.monotonic() + LAUNCHER_UI_WAIT  # the Java page gets the full wait
                     continue
-            target, why = choose_launcher_target(controls, shown) if controls else (None, why or "no buttons yet")
+            target, why = (choose_launcher_target(controls, shown, most_recent) if controls
+                           else (None, why or "no buttons yet"))
             if target is not None:
                 if self.actions.invoke(target):
                     pressed = f"Quick Play '{shown}'" if why == "quick play" else "PLAY"

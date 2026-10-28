@@ -1,1 +1,1 @@
-__version__ = "0.10.0"  # Schedule I helper mod: loads your save, starts the timer
+__version__ = "0.10.1"  # launcher: newest Quick Play entry; Play tab is not a PLAY button
