@@ -94,7 +94,10 @@ namespace GameSwapHelper
             {
                 try
                 {
-                    HarmonyInstance.Patch(refresh, postfix: new HarmonyMethod(typeof(HelperMod), nameof(RefreshPostfix)));
+                    HarmonyInstance.Patch(refresh, postfix: new HarmonyMethod(typeof(HelperMod), nameof(RefreshPostfix))
+                    {
+                        priority = HarmonyLib.Priority.First,  // before other mods' patches, which may crash
+                    });
                 }
                 catch (Exception e)
                 {
@@ -143,14 +146,28 @@ namespace GameSwapHelper
             }
         }
 
+        object LoadManager() => menuLoadManager ?? GetStaticInstance(loadManagerType) ?? FindStaticOfType(loadManagerType);
+
         void TryStartLoad(float now)
         {
-            var lm = menuLoadManager ?? GetStaticInstance(loadManagerType);
-            if (lm == null)
-                return;
-            var save = FindSave(lm);
+            var lm = LoadManager();
+            var save = FindSave(lm, out var why);
+            if (now >= nextReport)
+            {
+                nextReport = now + 10f;
+                if (!dumped)
+                {
+                    dumped = true;
+                    LoggerInstance.Msg("LoadManager members: " + DescribeMembers(loadManagerType));
+                }
+                if (save == null)
+                    LoggerInstance.Msg($"Waiting at the menu: LoadManager {(lm == null ? "not found" : "found")}, {why}.");
+            }
             if (save == null)
                 return;
+            var startProbe = FindStartGame(save);
+            if (startProbe != null && !startProbe.IsStatic && lm == null)
+                return;  // StartGame needs the LoadManager itself; wait for it
             if (savesSeenAt < 0)
             {
                 savesSeenAt = now;  // let the main menu finish appearing first
@@ -159,11 +176,7 @@ namespace GameSwapHelper
             if (now - savesSeenAt < MenuSettleSeconds)
                 return;
 
-            var start = loadManagerType.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static)
-                .Where(m => m.Name == "StartGame")
-                .Where(m => m.GetParameters().Length > 0 && m.GetParameters()[0].ParameterType.IsInstanceOfType(save))
-                .OrderBy(m => m.GetParameters().Length)
-                .FirstOrDefault();
+            var start = FindStartGame(save);
             if (start == null)
             {
                 var all = string.Join("; ", loadManagerType.GetMethods().Where(m => m.Name.Contains("Start") || m.Name.Contains("Load")).Select(Describe));
@@ -177,11 +190,18 @@ namespace GameSwapHelper
             try { File.Delete(RequestFile); } catch { }
         }
 
+        MethodInfo FindStartGame(object save) =>
+            loadManagerType.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static)
+                .Where(m => m.Name == "StartGame")
+                .Where(m => m.GetParameters().Length > 0 && m.GetParameters()[0].ParameterType.IsInstanceOfType(save))
+                .OrderBy(m => m.GetParameters().Length)
+                .FirstOrDefault();
+
         void CheckLoaded(float now)
         {
-            var lm = menuLoadManager ?? GetStaticInstance(loadManagerType);
-            bool? loading = lm == null ? null : ReadBool(lm, "IsLoading");
-            bool? loaded = lm == null ? null : ReadBool(lm, "IsGameLoaded");
+            var lm = LoadManager();
+            bool? loading = ReadBool(lm, loadManagerType, "IsLoading");
+            bool? loaded = ReadBool(lm, loadManagerType, "IsGameLoaded");
             if (loading == true)
                 sawLoading = true;
             bool ready;
@@ -210,11 +230,15 @@ namespace GameSwapHelper
 
         // ---- helpers ----------------------------------------------------------------
 
-        object FindSave(object lm)
+        object FindSave(object lm, out string why)
         {
-            var saves = ReadMember(lm, "SaveGames") as IEnumerable;
+            // SaveGames may belong to the LoadManager or to the class as a whole (static).
+            var saves = ReadMember(lm, loadManagerType, "SaveGames") as IEnumerable;
             if (saves == null)
+            {
+                why = "its SaveGames list isn't there yet";
                 return null;
+            }
             int count = 0;
             foreach (var s in saves)
             {
@@ -233,17 +257,23 @@ namespace GameSwapHelper
                     if (string.Equals(t, wanted, StringComparison.OrdinalIgnoreCase)
                         || t.EndsWith("/" + wanted, StringComparison.OrdinalIgnoreCase)
                         || t.EndsWith("\\" + wanted, StringComparison.OrdinalIgnoreCase))
+                    {
+                        why = "";
                         return s;
+                    }
                 }
             }
+            why = $"save '{wanted}' isn't among the game's {count} saves (yet)";
             if (count > 0 && savesSeenAt < 0 && !loggedSaves)
             {
                 loggedSaves = true;
-                LoggerInstance.Warning($"Save '{wanted}' isn't among the game's {count} saves yet.");
+                LoggerInstance.Warning(why);
             }
             return null;
         }
         bool loggedSaves;
+        bool dumped;
+        float nextReport;
 
         void Fail(string why)
         {
@@ -288,21 +318,64 @@ namespace GameSwapHelper
             return null;
         }
 
-        static object ReadMember(object o, string name)
+        // A property or field of the object, or a static one of its class (or the class's bases).
+        static object ReadMember(object o, Type type, string name)
         {
-            var t = o.GetType();
-            try
+            const BindingFlags any = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance
+                                     | BindingFlags.Static | BindingFlags.FlattenHierarchy;
+            for (var t = o?.GetType() ?? type; t != null; t = t.BaseType)
             {
-                var p = t.GetProperty(name, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-                if (p != null)
-                    return p.GetValue(o);
-                var f = t.GetField(name, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-                return f?.GetValue(o);
+                try
+                {
+                    var p = t.GetProperty(name, any | BindingFlags.DeclaredOnly);
+                    if (p != null && p.GetIndexParameters().Length == 0)
+                    {
+                        var isStatic = p.GetMethod?.IsStatic == true;
+                        if (isStatic || o != null)
+                            return p.GetValue(isStatic ? null : o);
+                    }
+                    var f = t.GetField(name, any | BindingFlags.DeclaredOnly);
+                    if (f != null && (f.IsStatic || o != null))
+                        return f.GetValue(f.IsStatic ? null : o);
+                }
+                catch { return null; }
             }
-            catch { return null; }
+            return null;
         }
 
-        static bool? ReadBool(object o, string name) => ReadMember(o, name) is bool b ? b : (bool?)null;
+        static bool? ReadBool(object o, Type type, string name) => ReadMember(o, type, name) is bool b ? b : (bool?)null;
+
+        // Any static property/field (on the class or its bases) that holds a LoadManager.
+        static object FindStaticOfType(Type type)
+        {
+            const BindingFlags st = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.DeclaredOnly;
+            for (var t = type; t != null; t = t.BaseType)
+            {
+                foreach (var p in t.GetProperties(st))
+                {
+                    if (!type.IsAssignableFrom(p.PropertyType) || p.GetIndexParameters().Length > 0)
+                        continue;
+                    try { var v = p.GetValue(null); if (v != null) return v; } catch { }
+                }
+                foreach (var f in t.GetFields(st))
+                {
+                    if (!type.IsAssignableFrom(f.FieldType))
+                        continue;
+                    try { var v = f.GetValue(null); if (v != null) return v; } catch { }
+                }
+            }
+            return null;
+        }
+
+        static string DescribeMembers(Type type)
+        {
+            const BindingFlags any = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
+            var props = type.GetProperties(any).Where(p => p.Name.Contains("Save") || p.Name.Contains("Load") || p.Name == "Instance")
+                .Select(p => $"{(p.GetMethod?.IsStatic == true ? "static " : "")}{p.PropertyType.Name} {p.Name}");
+            var methods = type.GetMethods(any).Where(m => m.Name.Contains("StartGame") || m.Name.Contains("LoadGame"))
+                .Select(Describe);
+            return string.Join("; ", props.Concat(methods).Distinct());
+        }
 
         static object DefaultFor(ParameterInfo p)
         {
