@@ -22,7 +22,7 @@ What would kill it:
 | | **Daily** | **Signature** | **Reserve** |
 |---|---|---|---|
 | Who | Everyone. Impulse buy, students, first cars | Car people who care how their car feels | Exotic and luxury owners: Lambo, Rolls, G-Wagon, Porsche, McLaren |
-| Product | Scented felt card in a matte black sleeve, hangs from the mirror | Weighted zinc-alloy vent clip + solid refill discs | Solid brass or titanium clip, CNC-machined and hand-finished, numbered, engraved, in a leather case |
+| Product | Scented paper card in a foil sleeve, hangs from the mirror | Weighted zinc-alloy clip (PVD finish) + porous ceramic scent discs | Solid brass clip (titanium later), CNC-machined, numbered, engraved, black stone scent insert, leather case |
 | Price | $6 each, 3 for $15 | Starter Set $38, refills 3 for $24, Club $14/mo | Reserve Set $295, refills 3 for $65, Bespoke from $2,500 |
 | Est. cost | $0.40–0.90 | $9–12 (starter) | $50–90 (set) |
 | Profit per sale | ~$3–4 (single), ~$10 (3-pack) | ~$20 | ~$190 |
@@ -62,15 +62,20 @@ High-end car diffusers from fashion and perfume houses sell for about $60–100.
 
 Sells for $295. Dealership/studio wholesale at about $175 still leaves about $100 profit.
 
-## The scent collection (original names, all three lines)
+## The scent collection (original names)
 
-1. **Midnight Leather.** Black leather, oud, cracked pepper.
-2. **Coastal Highway.** Sea salt, bergamot, driftwood.
-3. **Private Club.** Tobacco leaf, cognac, vanilla.
-4. **Alpine Pass.** Cedar, fir, cold mint.
-5. **First Class.** White tea, fig, soft musk.
+Full research and reasoning in [MATERIALS-AND-SCENTS.md](MATERIALS-AND-SCENTS.md).
 
-Reserve gets stronger fine-fragrance versions of these, plus one Reserve-only scent per edition (for example **No. 1: Paddock**, made of warm leather, saffron and smoked wood).
+**Launch three (all lines):**
+1. **Midnight Leather.** Black leather, oud, cracked pepper. The hero.
+2. **Private Club.** Tobacco leaf, cognac, vanilla.
+3. **First Class.** White tea, fig, soft musk. For people who hate strong scents.
+
+**Later:** Coastal Highway (sea salt, bergamot, driftwood) in spring; Alpine Pass (cedar, fir, cold mint) as a winter seasonal.
+
+**Reserve-only:** **Paddock** (warm leather, saffron, smoked wood) and **Agar** (oud, amber, rose).
+
+Strength: Daily strong, Signature medium, Reserve soft.
 
 ## Keeping the lines apart
 
@@ -114,7 +119,7 @@ Reserve is made to order after the prototypes, so it needs no big upfront stock.
 ## 45-day launch
 
 **Week 1: Samples and brand**
-- Order samples: Daily felt cards, Signature zinc clips (MOQ ≤ 300, logo engraving), and quotes from 2–3 CNC shops for Reserve brass/titanium prototypes.
+- Order samples: Daily paper cards, Signature zinc clips (MOQ ≤ 300, logo engraving, PVD), ceramic/felt/stone discs for the 30-day test, and quotes from 2–3 CNC shops for Reserve brass prototypes.
 - Get the fragrance **SDS** and IFRA certificate from every supplier.
 - Run the USPTO trademark search for "Sutherland Motor Parfum" and lock the domain and handles.
 
