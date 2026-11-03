@@ -1,0 +1,895 @@
+<title>Sutherland Design Lab</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* Layout: a lit "bench" on the left (live object + scent pyramid), the workshop controls on the right, saved designs as a drawer below. Deliberately dark-only: the brand lives at night. */
+  :root {
+    color-scheme: dark;
+    --bg: #0f0e0c;
+    --panel: #171512;
+    --panel-2: #1e1b17;
+    --line: #2e2a24;
+    --text: #ece6da;
+    --muted: #9d9586;
+    --brass: #c9a961;
+    --brass-soft: #e6d3a3;
+    --warn: #e0a458;
+    --ok: #8fb59a;
+    --display: "Cormorant Garamond", Georgia, "Times New Roman", serif;
+    --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { background: var(--bg); color: var(--text); }
+  body {
+    margin: 0;
+    font: 15px/1.55 var(--body);
+    -webkit-font-smoothing: antialiased;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 0 48px;
+  }
+  button, input, select { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
+
+  .shell { max-width: 1220px; margin: 0 auto; }
+
+  header.top {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px;
+    padding-block: 22px 18px; border-bottom: 1px solid var(--line);
+  }
+  .brand { display: flex; flex-direction: column; gap: 2px; }
+  .eyebrow { font-size: 11px; letter-spacing: .26em; text-transform: uppercase; color: var(--brass); }
+  .brand h1 { margin: 0; font: 500 32px/1.05 var(--display); letter-spacing: .01em; text-wrap: balance; }
+
+  .seg { display: inline-flex; border: 1px solid var(--line); background: var(--panel); }
+  .seg button {
+    border: 0; background: transparent; padding: 9px 16px; cursor: pointer;
+    font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted);
+    display: flex; flex-direction: column; align-items: center; gap: 1px;
+  }
+  .seg button small { font-family: var(--mono); font-size: 11px; letter-spacing: 0; text-transform: none; }
+  .seg button[aria-pressed="true"] { background: var(--brass); color: var(--bg); }
+  .seg button:not([aria-pressed="true"]):hover { color: var(--text); }
+
+  main.lab { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 28px; padding-top: 24px; align-items: start; }
+
+  /* Bench */
+  .bench { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); display: grid; gap: 16px; }
+  .stage {
+    position: relative; background: radial-gradient(ellipse at 50% 38%, #2a241b 0%, #15130f 55%, #0c0b09 100%);
+    border: 1px solid var(--line); aspect-ratio: 1 / 1; max-width: 100%;
+  }
+  .stage svg { display: block; width: 100%; height: 100%; }
+  .stage .readout {
+    position: absolute; left: 14px; right: 14px; bottom: 12px; display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap;
+    font: 12px/1.3 var(--mono); color: var(--muted); font-variant-numeric: tabular-nums;
+  }
+  .readout b { color: var(--brass-soft); font-weight: 500; }
+
+  .scentcard { background: var(--panel); border: 1px solid var(--line); padding: 18px 18px 16px; display: grid; gap: 12px; }
+  .scentcard h2 { margin: 0; font: 500 30px/1.05 var(--display); text-wrap: balance; }
+  .scentcard .story { color: var(--muted); margin: -6px 0 0; font-style: italic; font-family: var(--display); font-size: 18px; }
+  .pyramid { display: grid; gap: 6px; }
+  .tier { display: grid; grid-template-columns: 64px 1fr; gap: 10px; align-items: center; }
+  .tier > span { font-size: 11px; letter-spacing: .18em; text-transform: uppercase; color: var(--muted); }
+  .tier .notes { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; min-height: 30px; align-items: center; border: 1px dashed transparent; padding: 3px; }
+  .tier:nth-child(1) .notes { margin-inline: 22%; }
+  .tier:nth-child(2) .notes { margin-inline: 11%; }
+  .tier.active .notes { border-color: var(--line); }
+  .tier .empty { font-size: 12px; color: var(--muted); }
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); background: var(--panel-2);
+    padding: 4px 10px 4px 8px; font-size: 13px; cursor: pointer; border-radius: 999px;
+  }
+  .chip i { width: 9px; height: 9px; border-radius: 50%; background: var(--c); flex-shrink: 0; }
+  .chip:hover { border-color: var(--brass); }
+  .chip.on { border-color: var(--brass); background: #2a2419; }
+  .chip.full { opacity: .45; cursor: not-allowed; }
+  .strengthbar { display: flex; gap: 4px; align-items: center; font-size: 12px; color: var(--muted); }
+  .strengthbar i { width: 22px; height: 6px; background: var(--line); }
+  .strengthbar i.on { background: var(--brass); }
+
+  .flags { display: grid; gap: 6px; }
+  .flag { font-size: 13px; padding: 8px 10px; border-left: 2px solid var(--warn); background: #211b12; color: #ead7b5; }
+  .flag.ok { border-left-color: var(--ok); background: #141b16; color: #cfe0d3; }
+
+  /* Workshop */
+  .workshop { background: var(--panel); border: 1px solid var(--line); min-width: 0; }
+  .tabs { display: flex; border-bottom: 1px solid var(--line); }
+  .tabs button {
+    flex: 1; background: transparent; border: 0; padding: 14px 8px; cursor: pointer; color: var(--muted);
+    font-size: 12px; letter-spacing: .18em; text-transform: uppercase; border-bottom: 2px solid transparent; margin-bottom: -1px;
+  }
+  .tabs button[aria-selected="true"] { color: var(--text); border-bottom-color: var(--brass); }
+  .pane { padding: 20px; display: grid; gap: 22px; }
+  .field { display: grid; gap: 9px; min-width: 0; }
+  .field > label, .field > .lbl { font-size: 11px; letter-spacing: .2em; text-transform: uppercase; color: var(--brass); }
+  .field .hint { font-size: 13px; color: var(--muted); margin: -4px 0 0; }
+  .opts { display: flex; flex-wrap: wrap; gap: 8px; }
+  .opt {
+    border: 1px solid var(--line); background: var(--panel-2); padding: 8px 12px; cursor: pointer; font-size: 13px;
+    display: inline-flex; align-items: center; gap: 8px;
+  }
+  .opt[aria-pressed="true"] { border-color: var(--brass); background: #2a2419; color: var(--brass-soft); }
+  .opt:hover { border-color: var(--brass); }
+  .sw { width: 14px; height: 14px; border-radius: 50%; background: var(--c); border: 1px solid rgba(255,255,255,.15); flex-shrink: 0; }
+  .opt svg { width: 18px; height: 18px; }
+  input[type="text"] {
+    background: var(--bg); border: 1px solid var(--line); padding: 10px 12px; width: 100%; min-width: 0;
+  }
+  input[type="text"]:focus { border-color: var(--brass); outline: none; }
+  input[type="range"] { width: 100%; accent-color: var(--brass); }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .rangehead { display: flex; justify-content: space-between; font: 13px var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+  .rangehead b { color: var(--text); font-weight: 500; }
+
+  .library { display: grid; gap: 12px; }
+  .fam { display: grid; gap: 6px; }
+  .fam > span { font-size: 12px; color: var(--muted); }
+  .fam .list { display: flex; flex-wrap: wrap; gap: 6px; }
+
+  .btn {
+    border: 1px solid var(--brass); background: var(--brass); color: var(--bg); padding: 10px 16px; cursor: pointer;
+    font-size: 12px; letter-spacing: .16em; text-transform: uppercase; font-weight: 600;
+  }
+  .btn.ghost { background: transparent; color: var(--brass); }
+  .btn:disabled { opacity: .5; cursor: progress; }
+  .btnrow { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .status { font-size: 13px; color: var(--muted); }
+
+  .economics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); }
+  .economics div { background: var(--panel-2); padding: 12px; display: grid; gap: 2px; }
+  .economics span { font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); }
+  .economics b { font: 500 22px var(--mono); font-variant-numeric: tabular-nums; }
+  .economics small { font-size: 12px; color: var(--muted); }
+
+  pre.spec {
+    margin: 0; background: var(--bg); border: 1px solid var(--line); padding: 16px; overflow-x: auto;
+    font: 12.5px/1.6 var(--mono); color: #d9d2c4; white-space: pre-wrap; word-break: break-word;
+  }
+
+  /* Saved drawer */
+  section.saved { margin-top: 34px; border-top: 1px solid var(--line); padding-top: 22px; display: grid; gap: 16px; }
+  section.saved header { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  section.saved h2 { margin: 0; font: 500 28px var(--display); }
+  .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 14px; }
+  .card { background: var(--panel); border: 1px solid var(--line); display: grid; grid-template-rows: auto 1fr auto; }
+  .card.current { border-color: var(--brass); }
+  .card .thumb { aspect-ratio: 1/1; background: radial-gradient(ellipse at 50% 38%, #2a241b 0%, #12100d 70%); max-width: 100%; }
+  .card .thumb svg { width: 100%; height: 100%; display: block; }
+  .card .meta { padding: 10px 12px 4px; display: grid; gap: 2px; min-width: 0; }
+  .card .meta b { font: 500 20px/1.1 var(--display); overflow-wrap: anywhere; }
+  .card .meta span { font-size: 12px; color: var(--muted); }
+  .card .acts { display: flex; gap: 6px; padding: 8px 12px 12px; }
+  .card .acts button { flex: 1; padding: 7px 6px; font-size: 11px; }
+  .emptystate { border: 1px dashed var(--line); padding: 22px; color: var(--muted); font-size: 14px; }
+
+  @media (max-width: 880px) {
+    main.lab { grid-template-columns: 1fr; }
+    .bench { position: static; }
+  }
+  @media (max-width: 480px) {
+    .seg button { padding: 8px 10px; }
+    .row2 { grid-template-columns: 1fr; }
+    .economics b { font-size: 18px; }
+    .brand h1 { font-size: 26px; }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .stage svg .obj { transition: transform .35s ease; }
+  }
+</style>
+
+<div class="shell">
+  <header class="top">
+    <div class="brand">
+      <span class="eyebrow">Sutherland Motor Parfum</span>
+      <h1>Design Lab</h1>
+    </div>
+    <div class="seg" role="group" aria-label="Product line" id="lineSeg"></div>
+  </header>
+
+  <main class="lab">
+    <div class="bench">
+      <div class="stage" id="stage" aria-live="polite"></div>
+      <div class="scentcard">
+        <div>
+          <div class="eyebrow" id="scentLineLbl">Scent</div>
+          <h2 id="scentName">Midnight Leather</h2>
+        </div>
+        <p class="story" id="scentStory"></p>
+        <div class="pyramid" id="pyramid"></div>
+        <div class="strengthbar" id="strengthBar"></div>
+        <div class="flags" id="flags"></div>
+      </div>
+    </div>
+
+    <div class="workshop">
+      <div class="tabs" role="tablist">
+        <button role="tab" id="tab-object" aria-selected="true" data-tab="object">Object</button>
+        <button role="tab" id="tab-scent" aria-selected="false" data-tab="scent">Scent</button>
+        <button role="tab" id="tab-spec" aria-selected="false" data-tab="spec">Spec sheet</button>
+      </div>
+      <div class="pane" id="pane-object" role="tabpanel"></div>
+      <div class="pane" id="pane-scent" role="tabpanel" hidden></div>
+      <div class="pane" id="pane-spec" role="tabpanel" hidden>
+        <div class="economics" id="econ"></div>
+        <pre class="spec" id="specText"></pre>
+        <div class="btnrow">
+          <button class="btn ghost" id="copyBtn" type="button">Copy spec</button>
+          <span class="status" id="copyStatus"></span>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <section class="saved">
+    <header>
+      <div>
+        <div class="eyebrow">Saved designs</div>
+        <h2>The collection so far</h2>
+      </div>
+      <div class="btnrow">
+        <button class="btn" id="saveBtn" type="button" hidden>Save design</button>
+        <button class="btn ghost" id="updateBtn" type="button" hidden>Update saved</button>
+        <span class="status" id="saveStatus"></span>
+      </div>
+    </header>
+    <div id="gallery" class="gallery"></div>
+  </section>
+</div>
+
+<script>
+(() => {
+  // ---------- Catalog ----------
+  const LINES = {
+    daily:     { label: "Daily",     price: 6,   priceNote: "3 for $15", cost: [0.40, 0.90], strength: 4 },
+    signature: { label: "Signature", price: 38,  priceNote: "Starter Set", cost: [9, 12], strength: 3 },
+    reserve:   { label: "Reserve",   price: 295, priceNote: "Reserve Set", cost: [50, 90], strength: 2 },
+  };
+  const FINISHES = {
+    signature: [
+      { id: "pvd-gold",      label: "PVD gold",       metal: "zinc", stops: ["#f3e2b0", "#c9a961", "#7a6131"] },
+      { id: "matte-black",   label: "Matte black",    metal: "zinc", stops: ["#55524c", "#26251f", "#121210"], dark: true },
+      { id: "gunmetal",      label: "Gunmetal PVD",   metal: "zinc", stops: ["#9a9c9f", "#55585c", "#2b2d30"], dark: true },
+      { id: "brushed-silver",label: "Brushed silver", metal: "zinc", stops: ["#eeeeeb", "#a9aaa7", "#5f605d"] },
+    ],
+    reserve: [
+      { id: "raw-brass",      label: "Raw brass",        metal: "brass", stops: ["#f0d9a0", "#b89a52", "#6d5524"] },
+      { id: "polished-brass", label: "Polished brass",   metal: "brass", stops: ["#fff1c4", "#d8b864", "#8a6b2a"] },
+      { id: "black-pvd",      label: "Black PVD brass",  metal: "brass", stops: ["#45413a", "#1d1c19", "#0b0b0a"], dark: true },
+      { id: "titanium",       label: "Natural titanium", metal: "titanium", stops: ["#d6d8da", "#8f9396", "#4e5255"] },
+      { id: "enamel",         label: "Color-matched enamel", metal: "brass", stops: ["#f0d9a0", "#b89a52", "#6d5524"] },
+    ],
+  };
+  const ENAMELS = [
+    { id: "racing-red",   label: "Racing Red",           c: "#b3261e" },
+    { id: "papaya",       label: "Papaya Orange",        c: "#e57a1f" },
+    { id: "brg",          label: "British Racing Green", c: "#1f4d36" },
+    { id: "track-grey",   label: "Track Grey",           c: "#6d7174" },
+    { id: "midnight",     label: "Midnight Blue",        c: "#1b2a4a" },
+  ];
+  const DENSITY = { zinc: 6.6, brass: 8.5, titanium: 4.5 };          // g/cm³
+  const METAL_LABEL = { zinc: "Zinc alloy (zamak), die-cast", brass: "Solid brass, CNC-machined", titanium: "Titanium, CNC-machined" };
+  const SHAPES = [
+    { id: "round", label: "Round", area: 1 },
+    { id: "octagon", label: "Octagon", area: 0.9 },
+    { id: "cushion", label: "Cushion", area: 1.15 },
+    { id: "shield", label: "Shield", area: 1.0 },
+  ];
+  const PATTERNS = [
+    { id: "plain", label: "Plain" },
+    { id: "guilloche", label: "Guilloché" },
+    { id: "knurl", label: "Knurled rim" },
+    { id: "carbon", label: "Carbon inlay" },
+    { id: "perforated", label: "Perforated" },
+  ];
+  const MOUNTS = [
+    { id: "vent", label: "Vent hook" },
+    { id: "stick", label: "Magnetic stick-on" },
+    { id: "both", label: "Both in the box" },
+  ];
+  const CARD_SHAPES = [
+    { id: "shield", label: "Shield" }, { id: "oval", label: "Oval" }, { id: "tag", label: "Tag" }, { id: "ticket", label: "Ticket" },
+  ];
+  const CARD_COLORS = [
+    { id: "matte-black", label: "Matte black", c: "#161513" },
+    { id: "ivory", label: "Ivory", c: "#e9e2d2", light: true },
+    { id: "oxblood", label: "Oxblood", c: "#4a1a1c" },
+    { id: "racing-green", label: "Racing green", c: "#173a2a" },
+  ];
+  const INKS = [
+    { id: "silver", label: "Silver ink", c: "#c9c9c4" },
+    { id: "white", label: "White ink", c: "#f4f1ea" },
+    { id: "black", label: "Black ink", c: "#141311" },
+  ];
+
+  const FAMILIES = {
+    citrus:  { label: "Citrus",        c: "#d9b44a" },
+    fresh:   { label: "Fresh & green", c: "#7fb3a8" },
+    spice:   { label: "Spice",         c: "#c46a3c" },
+    floral:  { label: "Floral & fruit",c: "#c58aa0" },
+    woods:   { label: "Woods",         c: "#8f6e47" },
+    leather: { label: "Leather & smoke", c: "#6b4636" },
+    sweet:   { label: "Amber & sweet", c: "#c09550" },
+    musk:    { label: "Musk",          c: "#b9b0a2" },
+  };
+  const NOTES = {
+    citrus: ["Bergamot", "Lemon", "Blood orange", "Grapefruit", "Yuzu"],
+    fresh: ["Sea salt", "Cold mint", "White tea", "Lavender", "Rosemary", "Fir"],
+    spice: ["Cracked pepper", "Pink pepper", "Saffron", "Cardamom", "Cinnamon"],
+    floral: ["Rose", "Iris", "Jasmine", "Neroli", "Fig"],
+    woods: ["Cedar", "Sandalwood", "Vetiver", "Driftwood", "Oud", "Smoked wood"],
+    leather: ["Black leather", "Suede", "Tobacco leaf", "Birch tar"],
+    sweet: ["Vanilla", "Amber", "Tonka", "Cognac", "Honey"],
+    musk: ["Soft musk", "Ambrox", "Clean cotton"],
+  };
+  const FAMILY_OF = {};
+  for (const [f, list] of Object.entries(NOTES)) for (const n of list) FAMILY_OF[n] = f;
+
+  const PRESETS = [
+    { id: "midnight-leather", name: "Midnight Leather", story: "The new-car luxury smell, after dark.", top: ["Cracked pepper", "Bergamot"], heart: ["Black leather", "Suede"], base: ["Oud", "Amber"] },
+    { id: "private-club", name: "Private Club", story: "Late nights, members only.", top: ["Cognac"], heart: ["Tobacco leaf", "Cinnamon"], base: ["Vanilla", "Tonka"] },
+    { id: "first-class", name: "First Class", story: "Quiet and expensive.", top: ["White tea"], heart: ["Fig", "Iris"], base: ["Soft musk"] },
+    { id: "coastal-highway", name: "Coastal Highway", story: "Windows down, salt in the air.", top: ["Bergamot", "Sea salt"], heart: ["Rosemary"], base: ["Driftwood"] },
+    { id: "alpine-pass", name: "Alpine Pass", story: "Cold air and switchbacks.", top: ["Cold mint"], heart: ["Fir"], base: ["Cedar"] },
+    { id: "paddock", name: "Paddock", story: "Warm leather in the pit lane.", top: ["Saffron"], heart: ["Black leather"], base: ["Smoked wood", "Amber"], reserve: true },
+    { id: "agar", name: "Agar", story: "For the back seat of a long car.", top: ["Pink pepper"], heart: ["Rose"], base: ["Oud", "Amber"], reserve: true },
+  ];
+  const STRENGTH_WORDS = ["", "Whisper", "Soft", "Present", "Strong", "Loud"];
+  const TIERS = [["top", "Top", "first impression"], ["heart", "Heart", "character"], ["base", "Base", "what lingers"]];
+
+  // ---------- State ----------
+  const DEFAULT = {
+    line: "signature",
+    shape: "round", size: 42, finish: "pvd-gold", pattern: "guilloche", engraving: "S", edition: "014",
+    enamel: "racing-red", mount: "both",
+    card: { shape: "shield", color: "matte-black", ink: "silver" },
+    scent: { preset: "midnight-leather", name: "Midnight Leather", story: "The new-car luxury smell, after dark.",
+             top: ["Cracked pepper", "Bergamot"], heart: ["Black leather", "Suede"], base: ["Oud", "Amber"], strength: 3, brief: "" },
+  };
+  const clone = (o) => JSON.parse(JSON.stringify(o));
+  let state = clone(DEFAULT);
+  let activeTier = "heart";
+  let activeTab = "object";
+  let loadedId = null;
+
+  try {
+    const raw = localStorage.getItem("sutherland-lab-draft");
+    if (raw) state = Object.assign(clone(DEFAULT), JSON.parse(raw));
+  } catch (_) {}
+  function saveDraft() { try { localStorage.setItem("sutherland-lab-draft", JSON.stringify(state)); } catch (_) {} }
+
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const finishOf = (s) => (FINISHES[s.line] || []).find((f) => f.id === s.finish) || (FINISHES[s.line] || [])[0];
+  const enamelOf = (s) => ENAMELS.find((e) => e.id === s.enamel) || ENAMELS[0];
+  const money = (n) => (n < 10 ? "$" + n.toFixed(2) : "$" + Math.round(n));
+
+  // ---------- Geometry ----------
+  function shapePath(shape, cx, cy, r) {
+    if (shape === "octagon") {
+      const pts = [];
+      for (let i = 0; i < 8; i++) { const a = (Math.PI / 180) * (i * 45 + 22.5); pts.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]); }
+      return "M" + pts.map((p) => p[0].toFixed(1) + " " + p[1].toFixed(1)).join(" L") + " Z";
+    }
+    if (shape === "cushion") {
+      const pts = [];
+      for (let i = 0; i < 72; i++) {
+        const t = (i / 72) * Math.PI * 2, c = Math.cos(t), s = Math.sin(t);
+        pts.push([cx + r * Math.sign(c) * Math.pow(Math.abs(c), 0.5), cy + r * Math.sign(s) * Math.pow(Math.abs(s), 0.5)]);
+      }
+      return "M" + pts.map((p) => p[0].toFixed(1) + " " + p[1].toFixed(1)).join(" L") + " Z";
+    }
+    if (shape === "shield") {
+      return `M${cx - r} ${cy - r * 0.85} L${cx + r} ${cy - r * 0.85} L${cx + r} ${cy + r * 0.1} Q${cx + r} ${cy + r * 0.78} ${cx} ${cy + r * 1.05} Q${cx - r} ${cy + r * 0.78} ${cx - r} ${cy + r * 0.1} Z`;
+    }
+    return `M${cx - r} ${cy} a${r} ${r} 0 1 0 ${2 * r} 0 a${r} ${r} 0 1 0 ${-2 * r} 0 Z`;
+  }
+
+  function weightGrams(s) {
+    if (s.line === "daily") return 3;
+    const f = finishOf(s);
+    const shape = SHAPES.find((x) => x.id === s.shape) || SHAPES[0];
+    const areaCm2 = Math.PI * Math.pow(s.size / 20, 2) * shape.area;
+    const vol = areaCm2 * 0.4 * 0.55; // 4 mm thick, ~55% solid after the disc pocket
+    return vol * DENSITY[f.metal];
+  }
+
+  function costRange(s) {
+    const L = LINES[s.line];
+    let lo = L.cost[0], hi = L.cost[1];
+    if (s.line === "reserve") {
+      const f = finishOf(s);
+      if (f.metal === "titanium") { lo += 25; hi += 60; }
+      if (f.id === "enamel") { lo += 4; hi += 8; }
+      if (s.pattern === "guilloche" || s.pattern === "knurl") { lo += 2; hi += 5; }
+      if (s.pattern === "carbon") { lo += 3; hi += 6; }
+    }
+    if (s.line === "signature" && s.pattern === "carbon") { lo += 1; hi += 2; }
+    if (s.line !== "daily" && s.mount === "both") { lo += 1; hi += 2; }
+    return [lo, hi];
+  }
+  function priceOf(s) {
+    if (s.line === "reserve" && finishOf(s).metal === "titanium") return 395;
+    return LINES[s.line].price;
+  }
+
+  // ---------- SVG renderer (stage + thumbnails) ----------
+  function renderSVG(s, uid, opts = {}) {
+    const W = 400, cx = 200, cy = 178;
+    if (s.line === "daily") return dailySVG(s, uid, opts);
+    const f = finishOf(s);
+    const r = s.size * 2.55;
+    const d = shapePath(s.shape, cx, cy, r);
+    const inner = shapePath(s.shape, cx, cy, r * 0.84);
+    const enamel = f.id === "enamel" ? enamelOf(s).c : null;
+    const darkFace = f.dark || !!enamel;
+    const engraveCol = darkFace ? "#e6d3a3" : "#2a2216";
+    const [s0, s1, s2] = f.stops;
+    let pattern = "";
+    const clip = `url(#${uid}-clip)`;
+    if (s.pattern === "guilloche") {
+      let g = "";
+      for (let i = 0; i < 36; i++) g += `<ellipse cx="${cx}" cy="${cy}" rx="${(r * 0.8).toFixed(1)}" ry="${(r * 0.26).toFixed(1)}" transform="rotate(${i * 5} ${cx} ${cy})" fill="none" stroke="${darkFace ? "#fff" : "#3b2b12"}" stroke-opacity="${darkFace ? 0.09 : 0.16}" stroke-width="0.8"/>`;
+      pattern = `<g clip-path="${clip}">${g}</g>`;
+    } else if (s.pattern === "knurl") {
+      let g = "";
+      const n = 120;
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * Math.PI * 2;
+        const x1 = cx + Math.cos(a) * r * 0.86, y1 = cy + Math.sin(a) * r * 0.86, x2 = cx + Math.cos(a) * r * 1.02, y2 = cy + Math.sin(a) * r * 1.02;
+        g += `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="${darkFace ? "#000" : "#3b2b12"}" stroke-opacity=".35" stroke-width="1.2"/>`;
+      }
+      pattern = `<g clip-path="${clip}">${g}</g>`;
+    } else if (s.pattern === "carbon") {
+      pattern = `<path d="${inner}" fill="url(#${uid}-cf)"/><path d="${inner}" fill="url(#${uid}-sheen)" opacity=".5"/>`;
+    } else if (s.pattern === "perforated") {
+      let g = "";
+      const step = r * 0.17;
+      for (let y = -r; y <= r; y += step) for (let x = -r; x <= r; x += step) {
+        const off = (Math.round((y + r) / step) % 2) * step / 2;
+        const px = cx + x + off, py = cy + y;
+        if (Math.hypot(px - cx, py - cy) < r * 0.7 && Math.hypot(px - cx, py - cy) > r * 0.36) g += `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="${(r * 0.038).toFixed(1)}" fill="#0a0907" fill-opacity=".85"/>`;
+      }
+      pattern = `<g clip-path="${clip}">${g}</g>`;
+    }
+    const mono = esc((s.engraving || "").slice(0, 3).toUpperCase());
+    const edition = s.line === "reserve" ? `RESERVE · ${esc(String(s.edition || "001").padStart(3, "0").slice(-3))} / 100` : "SUTHERLAND";
+    const monoSize = mono.length >= 3 ? r * 0.36 : mono.length === 2 ? r * 0.44 : r * 0.5;
+
+    // mounts
+    let mount = "";
+    const bottom = s.shape === "shield" ? cy + r * 1.02 : cy + r;
+    if (s.mount === "vent" || s.mount === "both") {
+      mount += `<g><rect x="${cx - 13}" y="${bottom - 8}" width="26" height="62" rx="3" fill="#2b2a26"/><rect x="${cx - 7}" y="${bottom - 2}" width="14" height="56" rx="2" fill="#1b1a17"/><path d="M${cx - 13} ${bottom + 54} q13 18 26 0" fill="none" stroke="#2b2a26" stroke-width="5" stroke-linecap="round"/></g>`;
+    }
+    if (s.mount === "stick" || s.mount === "both") {
+      const bx = s.mount === "both" ? 330 : cx, by = s.mount === "both" ? 330 : bottom + 34;
+      mount += `<g><ellipse cx="${bx}" cy="${by + 6}" rx="30" ry="7" fill="#000" opacity=".35"/><circle cx="${bx}" cy="${by}" r="24" fill="#24231f"/><circle cx="${bx}" cy="${by}" r="15" fill="url(#${uid}-g)" opacity=".85"/>${opts.thumb ? "" : `<text x="${bx}" y="${by + 40}" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9" fill="#9d9586">STICK-ON BASE</text>`}</g>`;
+    }
+
+    return `<svg viewBox="0 0 ${W} ${W}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="${esc(LINES[s.line].label)} clip, ${esc(f.label)}, ${esc(s.shape)} ${s.size} millimetre face">
+      <defs>
+        <linearGradient id="${uid}-g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${s0}"/><stop offset=".5" stop-color="${s1}"/><stop offset="1" stop-color="${s2}"/></linearGradient>
+        <radialGradient id="${uid}-face" cx=".35" cy=".3" r=".9"><stop offset="0" stop-color="${enamel ? lighten(enamel) : s0}"/><stop offset=".55" stop-color="${enamel || s1}"/><stop offset="1" stop-color="${enamel ? darken(enamel) : s2}"/></radialGradient>
+        <linearGradient id="${uid}-sheen" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".35"/><stop offset=".5" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".25"/></linearGradient>
+        <pattern id="${uid}-cf" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="10" height="10" fill="#151515"/><rect width="5" height="5" fill="#2a2a2a"/><rect x="5" y="5" width="5" height="5" fill="#222"/></pattern>
+        <clipPath id="${uid}-clip"><path d="${d}"/></clipPath>
+      </defs>
+      <g class="obj">
+        <ellipse cx="${cx}" cy="${bottom + 74}" rx="${r * 0.8}" ry="10" fill="#000" opacity=".35"/>
+        ${mount}
+        <path d="${d}" fill="url(#${uid}-g)"/>
+        <path d="${inner}" fill="url(#${uid}-face)"/>
+        ${pattern}
+        <path d="${inner}" fill="none" stroke="${darkFace ? "#e6d3a3" : "#3b2b12"}" stroke-opacity=".35"/>
+        <path d="${d}" fill="url(#${uid}-sheen)" opacity=".55"/>
+        ${mono ? `<text x="${cx}" y="${cy + monoSize * 0.34}" text-anchor="middle" font-family="Cormorant Garamond, Georgia, serif" font-size="${monoSize.toFixed(1)}" font-weight="500" letter-spacing="3" fill="${engraveCol}" fill-opacity=".9">${mono}</text>` : ""}
+        <text x="${cx}" y="${cy + r * 0.6}" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="${Math.max(7, r * 0.075).toFixed(1)}" letter-spacing="3" fill="${engraveCol}" fill-opacity=".75">${edition}</text>
+      </g>
+    </svg>`;
+  }
+
+  function dailySVG(s, uid, opts) {
+    const c = CARD_COLORS.find((x) => x.id === s.card.color) || CARD_COLORS[0];
+    let ink = INKS.find((x) => x.id === s.card.ink) || INKS[0];
+    if (c.light && ink.id !== "black") ink = INKS[2];
+    if (!c.light && ink.id === "black") ink = INKS[0];
+    const cx = 200;
+    let d;
+    switch (s.card.shape) {
+      case "oval": d = `M${cx} 120 a78 104 0 1 0 0.1 0 Z`; break;
+      case "tag": d = `M128 150 Q128 120 158 120 H242 Q272 120 272 150 V322 Q272 332 262 332 H138 Q128 332 128 322 Z`; break;
+      case "ticket": d = `M140 120 H260 L272 132 V320 L260 332 H140 L128 320 V132 Z`; break;
+      default: d = `M126 120 H274 V228 Q274 300 200 334 Q126 300 126 228 Z`;
+    }
+    const name = esc(s.scent.name || "Untitled");
+    const notesLine = [...s.scent.top, ...s.scent.heart, ...s.scent.base].slice(0, 2).join(" · ").toUpperCase();
+    const fs = name.length > 16 ? 15 : name.length > 11 ? 18 : 22;
+    return `<svg viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="SMP Daily hanging card, ${esc(c.label)}">
+      <defs><linearGradient id="${uid}-sh" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".10"/><stop offset="1" stop-color="#000" stop-opacity=".25"/></linearGradient></defs>
+      <g class="obj">
+        <path d="M200 26 L200 130" stroke="#c9c2b2" stroke-width="1.5"/>
+        <ellipse cx="200" cy="356" rx="80" ry="9" fill="#000" opacity=".35"/>
+        <path d="${d}" fill="${c.c}" stroke="${c.light ? "#c8bfae" : "#2e2a24"}"/>
+        <path d="${d}" fill="url(#${uid}-sh)"/>
+        <circle cx="200" cy="136" r="5" fill="#0f0e0c" stroke="${ink.c}" stroke-opacity=".5"/>
+        <text x="200" y="182" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10" letter-spacing="5" fill="${ink.c}" fill-opacity=".8">SMP DAILY</text>
+        <line x1="176" y1="196" x2="224" y2="196" stroke="${ink.c}" stroke-opacity=".4"/>
+        <text x="200" y="${232 + fs * 0.3}" text-anchor="middle" font-family="Cormorant Garamond, Georgia, serif" font-size="${fs}" fill="${ink.c}">${name}</text>
+        <text x="200" y="280" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="8" letter-spacing="1.5" fill="${ink.c}" fill-opacity=".6" ${notesLine.length > 22 ? 'textLength="120" lengthAdjust="spacingAndGlyphs"' : ""}>${esc(notesLine)}</text>
+      </g>
+    </svg>`;
+  }
+
+  function hexToRgb(h) { const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
+  function mix(h, t, k) { const a = hexToRgb(h), b = hexToRgb(t); return "#" + a.map((v, i) => Math.round(v + (b[i] - v) * k).toString(16).padStart(2, "0")).join(""); }
+  const lighten = (h) => mix(h, "#ffffff", 0.35), darken = (h) => mix(h, "#000000", 0.45);
+
+  // ---------- Flags ----------
+  function flagsFor(s) {
+    const out = [];
+    const all = [...s.scent.top, ...s.scent.heart, ...s.scent.base];
+    const citrus = all.filter((n) => FAMILY_OF[n] === "citrus");
+    if (citrus.length) out.push(["warn", `Citrus (${citrus.join(", ")}) can have a low flash point. Sweet orange oil is around 129°F, below dashboard heat. Ask for the finished oil at over 200°F.`]);
+    if (all.includes("Birch tar")) out.push(["warn", "Birch tar is restricted under IFRA. The perfumer handles the dose; get the IFRA certificate."]);
+    if (s.line === "reserve" && s.scent.strength > 3) out.push(["warn", "Loud reads as cheap at Reserve. Aim for soft (2) so the car smells expensive, not scented."]);
+    if (s.line === "daily" && s.scent.strength < 3) out.push(["warn", "Daily buyers expect to smell it right away. Try 4."]);
+    if (s.line !== "daily") {
+      const w = weightGrams(s);
+      if (w > 30 && s.mount === "vent") out.push(["warn", `About ${Math.round(w)} g hanging on a vent louver risks sag. Add the stick-on base or go smaller.`]);
+    }
+    if (!all.length) out.push(["warn", "No notes yet. Pick some in the Scent tab."]);
+    if (!out.length) out.push(["ok", "No issues found. Ready for a supplier quote."]);
+    return out;
+  }
+
+  // ---------- Spec text ----------
+  function specText(s) {
+    const L = LINES[s.line];
+    const [lo, hi] = costRange(s);
+    const lines = [];
+    lines.push(`SUTHERLAND MOTOR PARFUM · ${L.label.toUpperCase()} LINE`);
+    lines.push(`Design: ${s.scent.name || "Untitled"}${s.line === "reserve" ? ` · Edition ${String(s.edition || "001").padStart(3, "0")}/100` : ""}`);
+    lines.push("");
+    lines.push("OBJECT");
+    if (s.line === "daily") {
+      const c = CARD_COLORS.find((x) => x.id === s.card.color), ink = INKS.find((x) => x.id === s.card.ink);
+      lines.push(`  Format     Hanging scented card, paper pulp board, sealed foil sleeve`);
+      lines.push(`  Shape      ${CARD_SHAPES.find((x) => x.id === s.card.shape).label}, approx. 70 × 95 mm`);
+      lines.push(`  Color      ${c.label}, ${c.light ? "black" : ink.id === "black" ? "silver" : ink.label.toLowerCase()} print, "SMP Daily" mark, no gold`);
+      lines.push(`  Hanger     Elastic cord, black`);
+    } else {
+      const f = finishOf(s);
+      lines.push(`  Body       ${METAL_LABEL[f.metal]}`);
+      lines.push(`  Face       ${SHAPES.find((x) => x.id === s.shape).label}, ${s.size} mm, approx. 4 mm thick`);
+      lines.push(`  Finish     ${f.label}${f.id === "enamel" ? ` (${enamelOf(s).label})` : ""}${f.id.includes("pvd") || f.id === "pvd-gold" ? ", PVD coating" : ""}`);
+      lines.push(`  Pattern    ${PATTERNS.find((x) => x.id === s.pattern).label}`);
+      lines.push(`  Engraving  "${(s.engraving || "").toUpperCase() || "none"}"${s.line === "reserve" ? `, back: RESERVE ${String(s.edition || "001").padStart(3, "0")}/100` : ""}`);
+      lines.push(`  Refill     ${s.line === "reserve" ? "Black porous stone insert, fine-fragrance load" : "Porous ceramic disc, matte black, pressed logo"}`);
+      lines.push(`  Mount      ${s.mount === "both" ? "Magnetic face + vent hook base + adhesive stick-on base" : s.mount === "vent" ? "Magnetic face + vent hook base" : "Magnetic face + adhesive stick-on base"}`);
+      lines.push(`  Weight     ~${Math.round(weightGrams(s))} g (estimate)`);
+      lines.push(`  Package    ${s.line === "reserve" ? "Leather case, rigid magnetic box, signed card, numbered certificate" : "Rigid black box, gold-foil logo, molded insert"}`);
+    }
+    lines.push("");
+    lines.push("SCENT");
+    lines.push(`  Name       ${s.scent.name || "Untitled"}`);
+    if (s.scent.story) lines.push(`  Story      ${s.scent.story}`);
+    lines.push(`  Top        ${s.scent.top.join(", ") || "-"}`);
+    lines.push(`  Heart      ${s.scent.heart.join(", ") || "-"}`);
+    lines.push(`  Base       ${s.scent.base.join(", ") || "-"}`);
+    lines.push(`  Strength   ${s.scent.strength}/5 (${STRENGTH_WORDS[s.scent.strength]})`);
+    if (s.scent.brief) { lines.push(""); lines.push("PERFUMER BRIEF"); lines.push("  " + s.scent.brief); }
+    lines.push("");
+    lines.push("SUPPLIER MUST PROVIDE");
+    lines.push("  - IFRA certificate covering Category 12 (solid car diffuser)");
+    lines.push("  - SDS (safety data sheet)");
+    lines.push("  - Flash point of finished oil above 200°F");
+    lines.push("  - Phthalate-free statement");
+    lines.push("  - Fragrance allergen list (California Right to Know Act)");
+    lines.push("  - Prop 65 statement");
+    lines.push("");
+    lines.push("TARGETS (estimates)");
+    lines.push(`  Retail     $${priceOf(s)} (${L.priceNote})`);
+    lines.push(`  Landed     ${money(lo)}–${money(hi)} per unit`);
+    return lines.join("\n");
+  }
+
+  // ---------- Rendering ----------
+  function optButtons(items, current, key, extra = () => "") {
+    return items.map((it) => `<button type="button" class="opt" data-set="${key}" data-val="${it.id}" aria-pressed="${it.id === current}">${extra(it)}${esc(it.label)}</button>`).join("");
+  }
+
+  function renderLineSeg() {
+    $("lineSeg").innerHTML = Object.entries(LINES).map(([id, L]) =>
+      `<button type="button" data-line="${id}" aria-pressed="${state.line === id}">${L.label}<small>$${L.price}</small></button>`).join("");
+  }
+
+  function renderObjectPane() {
+    const s = state;
+    let h = "";
+    if (s.line === "daily") {
+      h += `<div class="field"><span class="lbl">Card shape</span><div class="opts">${optButtons(CARD_SHAPES, s.card.shape, "card.shape")}</div></div>`;
+      h += `<div class="field"><span class="lbl">Card color</span><div class="opts">${optButtons(CARD_COLORS, s.card.color, "card.color", (c) => `<span class="sw" style="--c:${c.c}"></span>`)}</div></div>`;
+      h += `<div class="field"><span class="lbl">Print</span><p class="hint">Daily never gets gold, so it can't cheapen the Signature and Reserve lines.</p><div class="opts">${optButtons(INKS, s.card.ink, "card.ink", (c) => `<span class="sw" style="--c:${c.c}"></span>`)}</div></div>`;
+    } else {
+      h += `<div class="field"><span class="lbl">Face shape</span><div class="opts">${optButtons(SHAPES, s.shape, "shape", (x) => `<svg viewBox="0 0 40 40" aria-hidden="true"><path d="${shapePath(x.id, 20, 19, 14)}" fill="currentColor" opacity=".7"/></svg>`)}</div></div>`;
+      h += `<div class="field"><div class="rangehead"><label for="size">Face size</label><span><b id="sizeVal">${s.size} mm</b> · ~<b id="wVal">${Math.round(weightGrams(s))}</b> g</span></div><input type="range" id="size" min="34" max="52" step="1" value="${s.size}"></div>`;
+      h += `<div class="field"><span class="lbl">${s.line === "reserve" ? "Metal & finish" : "Finish (zinc alloy)"}</span><div class="opts">${optButtons(FINISHES[s.line], finishOf(s).id, "finish", (f) => `<span class="sw" style="--c:${f.id === "enamel" ? enamelOf(s).c : f.stops[1]}"></span>`)}</div></div>`;
+      if (finishOf(s).id === "enamel") h += `<div class="field"><span class="lbl">Enamel color</span><p class="hint">Generic names only. Never a carmaker's trademarked color name.</p><div class="opts">${optButtons(ENAMELS, s.enamel, "enamel", (e) => `<span class="sw" style="--c:${e.c}"></span>`)}</div></div>`;
+      h += `<div class="field"><span class="lbl">Face pattern</span><div class="opts">${optButtons(PATTERNS, s.pattern, "pattern")}</div></div>`;
+      h += `<div class="row2"><div class="field"><label for="engraving">Engraving (up to 3 letters)</label><input type="text" id="engraving" maxlength="3" value="${esc(s.engraving)}" autocomplete="off"></div>`;
+      if (s.line === "reserve") h += `<div class="field"><label for="edition">Edition number</label><input type="text" id="edition" maxlength="3" inputmode="numeric" value="${esc(s.edition)}" autocomplete="off"></div>`;
+      h += `</div>`;
+      h += `<div class="field"><span class="lbl">Mount</span><p class="hint">Teslas, round Mercedes vents and many exotics won't hold a normal clip. "Both" covers every car.</p><div class="opts">${optButtons(MOUNTS, s.mount, "mount")}</div></div>`;
+    }
+    $("pane-object").innerHTML = h;
+  }
+
+  function renderScentPane() {
+    const s = state;
+    let h = "";
+    h += `<div class="field"><span class="lbl">Start from</span><div class="opts">${PRESETS.map((p) =>
+      `<button type="button" class="opt" data-preset="${p.id}" aria-pressed="${s.scent.preset === p.id}">${esc(p.name)}${p.reserve ? ' <small style="color:var(--muted)">Reserve</small>' : ""}</button>`).join("")}
+      <button type="button" class="opt" data-preset="blank" aria-pressed="${s.scent.preset === "custom-blank"}">Blank</button></div></div>`;
+    h += `<div class="row2"><div class="field"><label for="sname">Scent name</label><input type="text" id="sname" maxlength="28" value="${esc(s.scent.name)}" autocomplete="off"></div>
+          <div class="field"><label for="sstory">One-line story</label><input type="text" id="sstory" maxlength="70" value="${esc(s.scent.story)}" autocomplete="off"></div></div>`;
+    h += `<div class="btnrow" id="nameRow" hidden><button type="button" class="btn ghost" id="nameBtn">Name it for me</button><span class="status" id="nameStatus"></span></div>`;
+    h += `<div class="field"><div class="rangehead"><label for="strength">Strength</label><span><b id="strVal">${s.scent.strength} · ${STRENGTH_WORDS[s.scent.strength]}</b></span></div><input type="range" id="strength" min="1" max="5" step="1" value="${s.scent.strength}"></div>`;
+    h += `<div class="field"><span class="lbl">Add notes to</span><div class="opts">${TIERS.map(([id, label, hint]) =>
+      `<button type="button" class="opt" data-tier="${id}" aria-pressed="${activeTier === id}">${label} <small style="color:var(--muted)">${hint}</small></button>`).join("")}</div>
+      <p class="hint">Up to 3 notes per layer. Tap a note in the pyramid to remove it.</p></div>`;
+    const inTier = new Set(s.scent[activeTier]);
+    const full = s.scent[activeTier].length >= 3;
+    h += `<div class="library">${Object.entries(NOTES).map(([fam, list]) =>
+      `<div class="fam"><span>${FAMILIES[fam].label}</span><div class="list">${list.map((n) =>
+        `<button type="button" class="chip${inTier.has(n) ? " on" : ""}${!inTier.has(n) && full ? " full" : ""}" data-note="${esc(n)}" style="--c:${FAMILIES[fam].c}"><i></i>${esc(n)}</button>`).join("")}</div></div>`).join("")}</div>`;
+    $("pane-scent").innerHTML = h;
+    if (sampleApi) $("nameRow").hidden = false;
+  }
+
+  function renderBench() {
+    const s = state;
+    $("stage").innerHTML = renderSVG(s, "stage") + `<div class="readout"><span>${s.line === "daily" ? "SMP Daily card" : `<b>${s.size} mm</b> · ${esc(finishOf(s).label)}`}</span><span>${s.line === "daily" ? "≈3 g" : `~<b>${Math.round(weightGrams(s))} g</b> est.`} · <b>$${priceOf(s)}</b></span></div>`;
+    $("scentLineLbl").textContent = `${LINES[s.line].label} · scent`;
+    $("scentName").textContent = s.scent.name || "Untitled";
+    $("scentStory").textContent = s.scent.story || "";
+    $("scentStory").hidden = !s.scent.story;
+    $("pyramid").innerHTML = TIERS.map(([id, label]) =>
+      `<div class="tier${activeTier === id ? " active" : ""}"><span>${label}</span><div class="notes">${
+        s.scent[id].length ? s.scent[id].map((n) => `<button type="button" class="chip" data-remove="${id}" data-note="${esc(n)}" title="Remove ${esc(n)}" style="--c:${(FAMILIES[FAMILY_OF[n]] || FAMILIES.musk).c}"><i></i>${esc(n)}</button>`).join("") : `<span class="empty">Empty</span>`
+      }</div></div>`).join("");
+    $("strengthBar").innerHTML = `Strength ${[1, 2, 3, 4, 5].map((i) => `<i class="${i <= s.scent.strength ? "on" : ""}"></i>`).join("")} ${STRENGTH_WORDS[s.scent.strength]}`;
+    $("flags").innerHTML = flagsFor(s).map(([k, t]) => `<div class="flag ${k === "ok" ? "ok" : ""}">${esc(t)}</div>`).join("");
+  }
+
+  function renderSpec() {
+    const s = state;
+    const [lo, hi] = costRange(s);
+    const price = priceOf(s);
+    $("econ").innerHTML = `
+      <div><span>Retail</span><b>$${price}</b><small>${esc(LINES[s.line].priceNote)}${price === 395 ? " · titanium (suggested)" : ""}</small></div>
+      <div><span>Landed cost</span><b>${money(lo)}–${money(hi)}</b><small>rough estimate</small></div>
+      <div><span>Gross / unit</span><b>${money(price - hi)}+</b><small>before shipping & fees</small></div>`;
+    $("specText").textContent = specText(s);
+  }
+
+  function renderAll() {
+    renderLineSeg(); renderBench();
+    if (activeTab === "object") renderObjectPane();
+    if (activeTab === "scent") renderScentPane();
+    if (activeTab === "spec") renderSpec();
+    renderSaveButtons();
+    markCurrentCard();
+    saveDraft();
+  }
+  // Light re-render that keeps focus in text inputs and sliders.
+  function renderLive() { renderBench(); if (activeTab === "spec") renderSpec(); saveDraft(); }
+
+  // ---------- Events ----------
+  document.addEventListener("click", (e) => {
+    const t = e.target.closest("button");
+    if (!t) return;
+    if (t.dataset.line) {
+      const line = t.dataset.line;
+      if (line === state.line) return;
+      state.line = line;
+      if (line !== "daily" && !FINISHES[line].some((f) => f.id === state.finish)) state.finish = FINISHES[line][0].id;
+      state.scent.strength = LINES[line].strength;
+      return renderAll();
+    }
+    if (t.dataset.tab) {
+      activeTab = t.dataset.tab;
+      for (const b of document.querySelectorAll(".tabs button")) b.setAttribute("aria-selected", String(b.dataset.tab === activeTab));
+      for (const p of ["object", "scent", "spec"]) $("pane-" + p).hidden = p !== activeTab;
+      return renderAll();
+    }
+    if (t.dataset.set) {
+      const [a, b] = t.dataset.set.split(".");
+      if (b) state[a][b] = t.dataset.val; else state[a] = t.dataset.val;
+      return renderAll();
+    }
+    if (t.dataset.preset) {
+      if (t.dataset.preset === "blank") {
+        Object.assign(state.scent, { preset: "custom-blank", name: "Untitled", story: "", top: [], heart: [], base: [], brief: "" });
+      } else {
+        const p = PRESETS.find((x) => x.id === t.dataset.preset);
+        Object.assign(state.scent, { preset: p.id, name: p.name, story: p.story, top: [...p.top], heart: [...p.heart], base: [...p.base], brief: "" });
+      }
+      return renderAll();
+    }
+    if (t.dataset.tier) { activeTier = t.dataset.tier; return renderAll(); }
+    if (t.dataset.remove) {
+      state.scent[t.dataset.remove] = state.scent[t.dataset.remove].filter((n) => n !== t.dataset.note);
+      state.scent.preset = "custom";
+      return renderAll();
+    }
+    if (t.dataset.note) {
+      const n = t.dataset.note, list = state.scent[activeTier];
+      if (list.includes(n)) state.scent[activeTier] = list.filter((x) => x !== n);
+      else if (list.length < 3) {
+        for (const [id] of TIERS) state.scent[id] = state.scent[id].filter((x) => x !== n);
+        state.scent[activeTier].push(n);
+      } else return;
+      state.scent.preset = "custom";
+      return renderAll();
+    }
+  });
+
+  document.addEventListener("input", (e) => {
+    const t = e.target;
+    if (t.id === "size") { state.size = +t.value; $("sizeVal").textContent = state.size + " mm"; $("wVal").textContent = Math.round(weightGrams(state)); return renderLive(); }
+    if (t.id === "engraving") { state.engraving = t.value.replace(/[^A-Za-z&]/g, "").slice(0, 3); return renderLive(); }
+    if (t.id === "edition") { state.edition = t.value.replace(/\D/g, "").slice(0, 3); return renderLive(); }
+    if (t.id === "sname") { state.scent.name = t.value; state.scent.preset = "custom"; return renderLive(); }
+    if (t.id === "sstory") { state.scent.story = t.value; return renderLive(); }
+    if (t.id === "strength") { state.scent.strength = +t.value; $("strVal").textContent = `${state.scent.strength} · ${STRENGTH_WORDS[state.scent.strength]}`; return renderLive(); }
+  });
+
+  $("copyBtn").addEventListener("click", async () => {
+    const text = $("specText").textContent;
+    try { await navigator.clipboard.writeText(text); $("copyStatus").textContent = "Copied."; }
+    catch (_) {
+      const r = document.createRange(); r.selectNodeContents($("specText"));
+      const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
+      $("copyStatus").textContent = "Selected. Press Ctrl+C or ⌘C to copy.";
+    }
+  });
+
+  // ---------- Claude naming (sample capability) ----------
+  let sampleApi = null;
+  document.addEventListener("click", async (e) => {
+    if (!e.target.closest("#nameBtn") || !sampleApi) return;
+    const btn = $("nameBtn"), st = $("nameStatus");
+    btn.disabled = true; st.textContent = "Naming…";
+    const s = state;
+    const prompt = `You name scents for Sutherland Motor Parfum, a luxury car fragrance brand with three lines: Daily (cheap hanging card), Signature (metal vent clip), Reserve (solid brass, for exotic-car owners).
+Line: ${LINES[s.line].label}. Strength ${s.scent.strength}/5.
+Notes. Top: ${s.scent.top.join(", ") || "none"}. Heart: ${s.scent.heart.join(", ") || "none"}. Base: ${s.scent.base.join(", ") || "none"}.
+Return JSON only: {"name": "2-3 words, evocative of driving, roads, cars or luxury travel; never a designer, perfume house or carmaker name", "story": "one line under 12 words, plain and confident", "brief": "two sentences a perfumer could work from, covering the mood and how it should open and dry down"}.`;
+    try {
+      const out = await sampleApi.json(prompt, { modelTier: "quick" });
+      if (out && out.name) {
+        state.scent.name = String(out.name).slice(0, 28);
+        state.scent.story = String(out.story || "").slice(0, 70);
+        state.scent.brief = String(out.brief || "").slice(0, 400);
+        state.scent.preset = "custom";
+        renderAll();
+        $("nameStatus").textContent = "Named. The perfumer brief is on the spec sheet.";
+      } else { st.textContent = "No name came back. Try again."; }
+    } catch (err) {
+      if (err && err.code === "not_granted") { $("nameRow").hidden = true; sampleApi = null; }
+      else st.textContent = err && err.code === "rate_limited" ? "Too many requests. Wait a minute and try again." : "Naming didn't work this time. Try again.";
+    } finally { const b = $("nameBtn"); if (b) b.disabled = false; }
+  });
+
+  // ---------- Saved designs (db capability) ----------
+  let db = null, uid = null, canWrite = true, saved = [];
+  function renderSaveButtons() {
+    $("saveBtn").hidden = !db || !canWrite;
+    $("updateBtn").hidden = !db || !canWrite || !loadedId;
+  }
+  function markCurrentCard() {
+    for (const c of document.querySelectorAll(".card")) c.classList.toggle("current", c.dataset.id === loadedId);
+  }
+  function renderGallery(note) {
+    const g = $("gallery");
+    if (!db) {
+      g.innerHTML = `<div class="emptystate">${note || "Saving needs this page open on claude.ai while signed in. Your current design is kept in this browser either way."}</div>`;
+      return;
+    }
+    if (!saved.length) {
+      g.innerHTML = `<div class="emptystate">${note || "Nothing saved yet. Design a clip or card and its scent, then press Save design. Saved designs show up here and Patrick can turn them into supplier quotes."}</div>`;
+      return;
+    }
+    g.innerHTML = saved.map((d) => {
+      const s = d.design || {};
+      let thumb = "";
+      try { thumb = renderSVG(Object.assign(clone(DEFAULT), s, { scent: Object.assign(clone(DEFAULT.scent), s.scent || {}), card: Object.assign(clone(DEFAULT.card), s.card || {}) }), "t" + d.id.replace(/[^a-zA-Z0-9]/g, ""), { thumb: true }); } catch (_) {}
+      const when = d.savedAt ? new Date(d.savedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "";
+      return `<div class="card${d.id === loadedId ? " current" : ""}" data-id="${esc(d.id)}">
+        <div class="thumb">${thumb}</div>
+        <div class="meta"><b>${esc((s.scent && s.scent.name) || "Untitled")}</b><span>${esc((LINES[s.line] || {}).label || "")}${d.tag ? " · " + esc(d.tag) : ""}${when ? " · " + esc(when) : ""}</span></div>
+        <div class="acts"><button type="button" class="btn ghost" data-load="${esc(d.id)}">Open</button>${canWrite ? `<button type="button" class="btn ghost" data-del="${esc(d.id)}">Delete</button>` : ""}</div>
+      </div>`;
+    }).join("");
+  }
+
+  document.addEventListener("click", async (e) => {
+    const L = e.target.closest("[data-load]");
+    if (L) {
+      const d = saved.find((x) => x.id === L.dataset.load);
+      if (!d) return;
+      const s = d.design || {};
+      state = Object.assign(clone(DEFAULT), s, { scent: Object.assign(clone(DEFAULT.scent), s.scent || {}), card: Object.assign(clone(DEFAULT.card), s.card || {}) });
+      loadedId = d.id;
+      $("saveStatus").textContent = `Opened "${state.scent.name}".`;
+      renderAll();
+      window.scrollTo({ top: 0, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+      return;
+    }
+    const D = e.target.closest("[data-del]");
+    if (D && db) {
+      if (D.dataset.armed !== "1") {
+        D.dataset.armed = "1"; D.textContent = "Confirm";
+        setTimeout(() => { if (D.isConnected) { D.dataset.armed = ""; D.textContent = "Delete"; } }, 3500);
+        return;
+      }
+      D.disabled = true;
+      try {
+        await db.collection("designs").doc(D.dataset.del).delete();
+        if (loadedId === D.dataset.del) loadedId = null;
+        $("saveStatus").textContent = "Deleted.";
+        renderSaveButtons();
+      } catch (err) { $("saveStatus").textContent = "Couldn't delete it. Try again."; D.disabled = false; }
+    }
+  });
+
+  async function writeDesign(ref, verb) {
+    const btns = [$("saveBtn"), $("updateBtn")];
+    btns.forEach((b) => (b.disabled = true));
+    $("saveStatus").textContent = verb === "update" ? "Updating…" : "Saving…";
+    try {
+      await ref.set({ design: clone(state), title: `${state.scent.name || "Untitled"} · ${LINES[state.line].label}`, line: state.line, savedAt: new Date().toISOString(), by: uid || null });
+      loadedId = ref.id;
+      $("saveStatus").textContent = verb === "update" ? "Updated." : "Saved.";
+      renderSaveButtons();
+    } catch (err) {
+      if (err && err.code === "invalid_argument") { canWrite = false; renderSaveButtons(); $("saveStatus").textContent = "You can view designs here but not save them."; }
+      else if (err && err.code === "quota_exceeded") $("saveStatus").textContent = "Storage is full. Delete a few old designs first.";
+      else $("saveStatus").textContent = "Couldn't save. Check your connection and try again.";
+    } finally { btns.forEach((b) => (b.disabled = false)); }
+  }
+  $("saveBtn").addEventListener("click", () => db && writeDesign(db.collection("designs").doc(), "save"));
+  $("updateBtn").addEventListener("click", () => db && loadedId && writeDesign(db.collection("designs").doc(loadedId), "update"));
+
+  // ---------- Boot ----------
+  renderAll();
+  renderGallery();
+
+  const use = (n) => (window.claude && typeof window.claude.use === "function" ? window.claude.use(n) : Promise.resolve(null));
+  use("sample").then((s) => { sampleApi = s; if (s && activeTab === "scent") { const r = $("nameRow"); if (r) r.hidden = false; } }).catch(() => {});
+  Promise.all([use("db"), use("user")]).then(async ([d, u]) => {
+    db = d;
+    if (u) {
+      try { uid = await u.id(); } catch (_) {}
+      try { const w = await u.can("data.write"); if (w === false) canWrite = false; } catch (_) {}
+    }
+    if (!db) { renderGallery(); renderSaveButtons(); return; }
+    renderSaveButtons();
+    renderGallery("Loading saved designs…");
+    let settled = false;
+    const timer = setTimeout(() => { if (!settled) renderGallery("Saved designs can't be reached yet. They'll appear when the connection comes back."); }, 10000);
+    db.collection("designs").orderBy("savedAt", "desc").limit(60).onSnapshot((snap) => {
+      if (!snap.metadata.fromCache) { settled = true; clearTimeout(timer); }
+      saved = snap.docs.map((x) => Object.assign({ id: x.id }, x.data()));
+      if (loadedId && !saved.some((x) => x.id === loadedId)) { loadedId = null; renderSaveButtons(); }
+      renderGallery();
+    }, () => { settled = true; clearTimeout(timer); renderGallery("Saved designs aren't available right now."); });
+  }).catch(() => { renderGallery(); });
+})();
+</script>
