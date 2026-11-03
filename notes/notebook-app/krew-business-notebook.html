@@ -1,0 +1,570 @@
+<title>Krew's Business Notebook</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Patrick+Hand&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: one reading column; a sticky tab bar switches Study Path / My Notes / How to Learn.
+   Notes render on legal-pad cards (yellow, blue rules, red margin) like Krew's original pad. */
+:root {
+  --bg: #f3f4f7;
+  --surface: #ffffff;
+  --ink: #1d2740;
+  --ink-soft: #55607a;
+  --line: #dfe3ec;
+  --accent: #2d55c8;
+  --accent-soft: #e6ecfb;
+  --pad: #fbf1b3;
+  --pad-rule: #a9c8e6;
+  --pad-margin: #e0675e;
+  --pad-ink: #2a2f4a;
+  --done: #1f8a5b;
+  --done-soft: #e2f4ea;
+  --font-body: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-hand: "Patrick Hand", "Comic Sans MS", "Segoe Print", cursive;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12151d; --surface: #1a1f2b; --ink: #e7eaf2; --ink-soft: #a2abc0; --line: #2c3343;
+    --accent: #8aa7ff; --accent-soft: #232d48; --pad: #3a3622; --pad-rule: #4b5a70; --pad-margin: #b6564f;
+    --pad-ink: #f3ecc8; --done: #5fd39b; --done-soft: #183427; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12151d; --surface: #1a1f2b; --ink: #e7eaf2; --ink-soft: #a2abc0; --line: #2c3343;
+  --accent: #8aa7ff; --accent-soft: #232d48; --pad: #3a3622; --pad-rule: #4b5a70; --pad-margin: #b6564f;
+  --pad-ink: #f3ecc8; --done: #5fd39b; --done-soft: #183427; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 16px; line-height: 1.55; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--surface); }
+a { color: var(--accent); }
+.wrap { max-width: 760px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+header.top { background: var(--surface); border-bottom: 1px solid var(--line); }
+header.top .wrap { padding-block: 22px 18px; display: grid; gap: 14px; }
+.kicker { font-family: var(--font-mono); font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-soft); }
+h1 { font-family: var(--font-hand); font-weight: 400; font-size: clamp(34px, 7vw, 46px); line-height: 1.05; margin: 0; text-wrap: balance; }
+.sub { margin: 0; color: var(--ink-soft); max-width: 60ch; }
+.progress { display: grid; gap: 8px; }
+.progress-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; font-size: 14px; }
+.progress-row strong { font-variant-numeric: tabular-nums; }
+.bar { height: 10px; border-radius: 99px; background: var(--line); overflow: hidden; }
+.bar > span { display: block; height: 100%; width: 0; background: var(--done); border-radius: 99px; transition: width .4s ease; }
+.save-note { font-size: 12px; color: var(--ink-soft); }
+nav.tabs { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--surface); border-bottom: 1px solid var(--line); }
+nav.tabs .wrap { display: flex; gap: 4px; overflow-x: auto; }
+nav.tabs a { flex: none; padding: 12px 14px; text-decoration: none; color: var(--ink-soft); font-weight: 600; font-size: 15px; border-bottom: 3px solid transparent; }
+nav.tabs a[aria-current="page"] { color: var(--ink); border-bottom-color: var(--accent); }
+nav.tabs a:focus-visible, button:focus-visible, summary:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+main .wrap { padding-block: 24px 64px; display: grid; gap: 18px; }
+h2 { font-size: 22px; margin: 0; text-wrap: balance; }
+.lede { margin: 0; color: var(--ink-soft); max-width: 62ch; }
+
+/* Study path */
+.next { background: var(--accent-soft); border-radius: 14px; padding: 16px 18px; display: grid; gap: 6px; }
+.next .kicker { color: var(--accent); }
+.next p { margin: 0; }
+.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.step { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; }
+.step.is-done { border-color: var(--done); }
+.step summary { list-style: none; cursor: pointer; display: grid; grid-template-columns: auto 1fr auto; gap: 14px; align-items: center; padding: 16px 18px; }
+.step summary::-webkit-details-marker { display: none; }
+.num { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; font-family: var(--font-mono); font-size: 14px; background: var(--bg); color: var(--ink-soft); border: 1px solid var(--line); }
+.step.is-done .num { background: var(--done); color: var(--surface); border-color: var(--done); }
+.step-title { display: grid; gap: 2px; min-width: 0; }
+.step-title b { font-size: 17px; }
+.step-title span { font-size: 14px; color: var(--ink-soft); }
+.chev { color: var(--ink-soft); transition: transform .2s; }
+.step[open] .chev { transform: rotate(90deg); }
+.step-body { padding: 0 18px 18px; display: grid; gap: 16px; }
+.block { display: grid; gap: 6px; min-width: 0; }
+.block h3 { margin: 0; font-family: var(--font-mono); font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-soft); font-weight: 500; }
+.block p { margin: 0; }
+.block ul, .block ol { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 99px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); text-decoration: none; font-size: 14px; }
+.chip:hover { border-color: var(--accent); }
+.chip .ts { font-family: var(--font-mono); font-size: 12px; color: var(--accent); }
+.practice { background: var(--pad); color: var(--pad-ink); border-radius: 10px; padding: 12px 14px; border-left: 4px solid var(--pad-margin); }
+.practice h3 { color: var(--pad-ink); opacity: .75; }
+.res { display: grid; gap: 8px; }
+.res a { display: grid; gap: 1px; text-decoration: none; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; }
+.res a:hover { border-color: var(--accent); }
+.res a b { color: var(--accent); font-weight: 600; }
+.res a span { color: var(--ink-soft); font-size: 14px; }
+.done-btn { justify-self: start; font: inherit; font-weight: 600; padding: 10px 16px; border-radius: 10px; border: 1px solid var(--done); background: var(--surface); color: var(--done); cursor: pointer; }
+.step.is-done .done-btn { background: var(--done-soft); }
+
+/* Notes */
+.search { display: flex; gap: 10px; align-items: center; }
+.search input { flex: 1; min-width: 0; font: inherit; padding: 11px 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
+.toc { display: flex; flex-wrap: wrap; gap: 6px; }
+.toc a { font-size: 13px; padding: 4px 9px; border-radius: 99px; background: var(--surface); border: 1px solid var(--line); text-decoration: none; color: var(--ink); }
+.pad {
+  background-color: var(--pad); color: var(--pad-ink); border-radius: 4px;
+  background-image: linear-gradient(to right, transparent 46px, var(--pad-margin) 46px, var(--pad-margin) 48px, transparent 48px),
+                    repeating-linear-gradient(to bottom, transparent 0, transparent 31px, var(--pad-rule) 31px, var(--pad-rule) 32px);
+  padding: 14px 16px 16px 62px; box-shadow: 0 1px 0 var(--line), 0 6px 18px -12px rgba(20, 25, 45, .45);
+  scroll-margin-top: calc(env(safe-area-inset-top, 0px) + 64px);
+}
+.pad header { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.pad h3 { font-family: var(--font-hand); font-weight: 400; font-size: 26px; line-height: 32px; margin: 0; }
+.pad .flag { font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--pad-margin); }
+.pad .watch { font-size: 13px; color: var(--pad-ink); opacity: .8; }
+.pad ul { list-style: none; margin: 0; padding: 0; font-family: var(--font-hand); font-size: 20px; line-height: 32px; }
+.pad li.sub { font-weight: 400; text-decoration: underline; text-decoration-color: var(--pad-margin); text-underline-offset: 4px; }
+.pad li.star { color: var(--pad-margin); }
+.pad li:not(.sub)::before { content: "• "; opacity: .55; }
+.map { overflow-x: auto; }
+.map svg { display: block; min-width: 480px; width: 100%; height: auto; }
+.empty { color: var(--ink-soft); }
+
+/* Learn */
+.loop { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; counter-reset: loop; }
+.loop li { counter-increment: loop; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px 14px 58px; position: relative; }
+.loop li::before { content: counter(loop); position: absolute; left: 16px; top: 14px; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--accent); color: var(--surface); font-family: var(--font-mono); font-size: 13px; }
+.loop b { display: block; }
+.loop p { margin: 2px 0 0; color: var(--ink-soft); }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; display: grid; gap: 10px; }
+.panel ul { margin: 0; padding-left: 20px; display: grid; gap: 6px; }
+.copy-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.copy-row code { font-family: var(--font-mono); font-size: 13px; background: var(--bg); border: 1px solid var(--line); padding: 8px 10px; border-radius: 8px; flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.copy-row button { font: inherit; font-size: 14px; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+@media (max-width: 480px) {
+  .pad { padding-left: 40px; background-image: linear-gradient(to right, transparent 26px, var(--pad-margin) 26px, var(--pad-margin) 28px, transparent 28px), repeating-linear-gradient(to bottom, transparent 0, transparent 31px, var(--pad-rule) 31px, var(--pad-rule) 32px); }
+  .step summary { gap: 10px; padding: 14px; }
+  .step-body { padding: 0 14px 14px; }
+}
+</style>
+
+<header class="top">
+  <div class="wrap">
+    <div class="kicker">Project Patrick · Study desk</div>
+    <h1>Krew's Business Notebook</h1>
+    <p class="sub">Your notes from Simon Squibb's "30 Years of Business Knowledge", plus a study path: what to learn first, how to learn it, and where to go deeper.</p>
+    <div class="progress">
+      <div class="progress-row"><span>Study path progress</span><strong id="progress-text">0 of 9 steps done</strong></div>
+      <div class="bar"><span id="progress-bar"></span></div>
+      <div class="save-note" id="save-note">Loading your progress…</div>
+    </div>
+  </div>
+</header>
+
+<nav class="tabs" aria-label="Sections">
+  <div class="wrap">
+    <a href="#path" data-view="path">Study path</a>
+    <a href="#notes" data-view="notes">My notes</a>
+    <a href="#learn" data-view="learn">How to learn</a>
+  </div>
+</nav>
+
+<main>
+  <section class="wrap" id="view-path">
+    <div class="next" id="next-up"></div>
+    <h2>What to study, in order</h2>
+    <p class="lede">One step a week. Each step tells you which notes to reread, which part of the video to rewatch, how to study it, and one real thing to do for Patrick. Tick it off when the practice is done, not when you've just read it.</p>
+    <ol class="steps" id="steps"></ol>
+  </section>
+
+  <section class="wrap" id="view-notes" hidden>
+    <h2>My notes</h2>
+    <p class="lede">Copied from your yellow pad (IMG_8645.MOV), cleaned up, same words. Each section links to that part of the video.</p>
+    <div class="search"><input id="note-search" type="search" placeholder="Search your notes, e.g. purpose, investor, brand" aria-label="Search notes"></div>
+    <div class="toc" id="toc"></div>
+    <div id="notes" style="display:grid;gap:16px"></div>
+  </section>
+
+  <section class="wrap" id="view-learn" hidden>
+    <h2>How to learn anything (and make it stick)</h2>
+    <p class="lede">Watching a video once feels like learning, but most of it is gone in a week. This loop is what turns your notes into skills. Run it for every step on the study path.</p>
+    <ol class="loop">
+      <li><b>Watch one chapter, nothing more</b><p>Use the chapter links on each step. One topic per sitting keeps it clear.</p></li>
+      <li><b>Explain it in your own words</b><p>Close the video and write or say it like you're teaching a 12-year-old. The parts you can't explain are the parts you don't know yet. This is called the Feynman technique.</p></li>
+      <li><b>Do one real thing within 24 hours</b><p>Every step has a "Do this for Patrick" task. Doing it is where the lesson actually lands.</p></li>
+      <li><b>Get quizzed</b><p>Ask Claude or Patrick to quiz you on the step. Being tested beats re-reading.</p></li>
+      <li><b>Review on a schedule</b><p>Look at the notes again after 1 day, 1 week and 1 month. Spacing reviews out is the strongest memory trick there is.</p></li>
+    </ol>
+
+    <div class="panel">
+      <h2>How to get better, week to week</h2>
+      <ul>
+        <li><b>One step a week.</b> Nine steps is about two months. Going slower and doing the practice beats racing through.</li>
+        <li><b>Keep a wins and losses log.</b> Your notes say "lose, lose, lose, win". Write each one down with one sentence on what you learned.</li>
+        <li><b>Count real things.</b> Conversations with customers, posts made, people using the app, dollars in. Your goal is your first paying customer.</li>
+        <li><b>Teach Patrick.</b> Tell Patrick what you learned each week. Explaining it is step 2 of the loop, and Patrick remembers it for you.</li>
+      </ul>
+    </div>
+
+    <div class="panel">
+      <h2>Ask Claude to quiz you</h2>
+      <p class="lede">Copy this into a chat with Claude or Patrick after you finish a step.</p>
+      <div class="copy-row"><code id="quiz-prompt">Quiz me on step 1 of my business notebook (notes/simon-squibb-30-years-business.md). Ask 5 questions one at a time, wait for my answer, then tell me what I got right and what I missed.</code><button type="button" id="copy-quiz">Copy</button></div>
+    </div>
+
+    <div class="panel">
+      <h2>Free tools for learning</h2>
+      <div class="res">
+        <a href="https://www.coursera.org/learn/learning-how-to-learn" target="_blank" rel="noopener"><b>Learning How to Learn (Coursera)</b><span>Free course on how memory and focus work. The most popular online course for a reason.</span></a>
+        <a href="https://apps.ankiweb.net/" target="_blank" rel="noopener"><b>Anki</b><span>Free flashcard app that schedules your reviews for you (step 5 of the loop).</span></a>
+        <a href="https://excalidraw.com/" target="_blank" rel="noopener"><b>Excalidraw</b><span>Free sketching site for mind maps, like the one in your notes.</span></a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+const VIDEO = "https://www.youtube.com/watch?v=9VlvbpXwLJs";
+function fmt(t) { const h = Math.floor(t / 3600), m = Math.floor(t % 3600 / 60), s = t % 60; return (h ? h + ":" + String(m).padStart(2, "0") : m) + ":" + String(s).padStart(2, "0"); }
+
+// Krew's notes. Lines starting "#" are subheadings, "*" is a starred note.
+const NOTES = [
+  { id: "no-money", title: "How to start a business with no money", t: 177, items: [
+    "Start with a feeling.", "Don't start with a business.", "Do what you like. Apply a business mindset to what you love.",
+    "Get good at what you love to do. Get obsessed. The next step is the idea.", "Combine / team up with people if needed.", "Link it to your passion.",
+    "#Execution", "Don't make it hard for yourself. Simple execution plan.", "Find where the revenue will come from. Experiment with revenue/incomes.",
+    "Make sure your purpose is strong. Install it into your business.", "Purpose > revenue." ] },
+  { id: "win", title: "How to win", t: 685, items: [
+    "If you're passionate, you're ahead.", "#Gratification", "Don't rush to charge customers.", "Build a relationship with customers. Get customers on your side.",
+    "#Culture", "Think: bring value.", "#Luck", "Be persistent. Outlast the competition.", "Know your destination. Shoot big.",
+    "Luck is hackable. Learn to hack luck.", "LEARN to take RISK. Lean into fear.", "Take a chance, DON'T RUSH.",
+    "Build value. Build a brand, not a business.", "It needs value for people." ] },
+  { id: "lose", title: "How to lose", t: 1054, items: [
+    "Learn to bounce back from failure. Learn and accept failure.", "Don't let things own you.", "Let short-term ego go.",
+    "Let them underestimate you. Let them think you're a loser.", "Take your TIME.", "Lose, lose, lose, lose, win, lose, win, win…" ] },
+  { id: "mind-map", title: "How to do a mind map (business plan)", t: 1244, map: true, items: [
+    "No plan, just do.", "Start with hobbies, then put it into a business mindset.", "Put in resources. Connect multiple things.",
+    "Build it up, just keep building.", "Think future.", "Just WRITE." ] },
+  { id: "purpose", title: "How to find purpose", t: 1695, items: [
+    "It's a personal thing. Not easy. People tend not to think about it.", "Think about your purpose: what problem matters to you?",
+    "Break down what you do in a day, then find your purpose.", "Break free. Truly know yourself.", "Ask: what is that purpose?",
+    "You can team up. Seek people with the same purpose." ] },
+  { id: "cofounder", title: "How to find a co-founder", t: 2074, items: [
+    "Accountability.", "Find what you love to do and what you hate to do.", "Same moral code. Find someone who loves what you hate doing.",
+    "Be honest and clear on what you do.", "What are you looking for in a person? Make it clear.", "Define your moral code. Post it. Look for it." ] },
+  { id: "sell", title: "How to sell", t: 2427, items: [
+    "Sell the sizzle, not the steak.", "Get them on your side so they sell to others.", "Sell the outcome.",
+    "#Understand the customer", "Do they need you?", "Get to know them.", "Do you like them?",
+    "#Deal", "Think long term.", "Learn their business.", "Be yourself, be honest.", "Sell what they need." ] },
+  { id: "market", title: "How to market", t: 2935, flag: "You marked this important", items: [
+    "#Experimenting", "Connecting.", "Understanding who your customer is.",
+    "#Staircase", "Buy the staircase.", "Do something crazy with the staircase.",
+    "See marketing as a living, evolving thing.", "What's gonna make you stand out? Find it, then evolve it to expand.",
+    "#Systems", "Build a system for how you market.", "Do it well, even if it's one channel.", "Pick what works for you.",
+    "It's meant to be fun. Enjoy it." ] },
+  { id: "pr", title: "How to PR your business", t: 3668, items: [
+    "#Targeting", "Start local.", "Find who you're targeting.", "Journalists are busy: give them what they need.",
+    "Research the journalist. Find them.", "Make a relationship. Become part of their life.",
+    "#Engage", "Think about the image of your project.", "Learn to be the brand." ] },
+  { id: "investor", title: "How to get an investor", t: 4048, items: [
+    "The more traction, the more likely you'll get an investor.", "Do research.",
+    "#Family and friends", "They know you.", "Tell the truth, make it clear.", "Early stage, getting help is almost more valuable than money.",
+    "Consider future investors.",
+    "#Angel investors", "Be very clear what you'll give them.", "Don't ask for money, ASK FOR HELP.", "Look for the right people and their money.",
+    "#FOMO", "Make them think they're missing out.", "Make them feel needed.",
+    "#VCs", "Do they have money? Don't waste time.", "See who they've invested in before.", "Try to get connected to a company they've invested in.",
+    "Work with your brand partners. They might pay for your expansion.", "Ask yourself: do you even need an investor?" ] },
+  { id: "sponsors", title: "How to get sponsors", t: 5003, items: [
+    "#Value return", "They get value back.", "#Emotion sell", "Understand the brand.", "What is the brand's value?",
+    "Research the people who run the brands: media buyers, agencies." ] },
+  { id: "brand", title: "How to build a brand", t: 5565, items: [
+    "Start with your personal brand: your values, what you care about.", "Take your personal brand seriously.",
+    "Write down the different brand values.",
+    "#Reference", "Using someone good, or supporting someone who uses your brand, makes your brand look good.",
+    "Have the ability to cut it out of the business.", "Learn to say NO." ] },
+  { id: "hire", title: "How to hire, grow and build", t: 6166, items: [
+    "#Purpose", "If your business has a purpose, hire people with the same purpose.", "You'll manage a purpose, not people. Install a purpose.",
+    "Hire people if they care about the purpose.", "Check and do research on the people. Check references.", "Give the team equity.",
+    "#Values and destination", "Know your destination.", "Take risks, try things out.", "Can't sit still.", "#Systems" ] },
+  { id: "fire", title: "How to fire someone", t: 6751, items: [
+    "Understand when to do it.", "Work out the situation." ] },
+  { id: "global", title: "How to go global", t: 7107, items: [
+    "#Research", "Can other markets use your product?", "Find out where your product can be sold.",
+    "#Franchising", "Applies to a service business.", "A bigger business is easier to manage." ] },
+  { id: "mentor", title: "How to get a mentor", t: 7322, items: [
+    "What do you really need?", "Someone who can answer your questions, or answers questions you don't know to ask.",
+    "Research what matters to that person.", "Define what you mean when asking.", "Ask a question first.",
+    "#Mentor → Advisor", "Connect the people they mentor, referrals.", "Give value." ] },
+  { id: "equity", title: "How equity works", t: 7717, items: [
+    "Control isn't by equity, it's by the shareholder agreement.", "Don't sell much at the start, or don't sell any.",
+    "#50/50", "Don't belittle the other person.", "Use a 3rd party / board of advisors.", "Be very clear. Work it out, figure out why.",
+    "Shows who's involved.", "Remember brand image.", "Equity is the business.", "Shares are maybe future equity.",
+    "*Future note: do more research on equity and go deeper into the details." ] },
+  { id: "sell-business", title: "How to sell your business", t: 8393, items: [
+    "The best way to sell is not wanting to sell it at all.", "Build a business you love; it will sell by accident.",
+    "#Partnership", "Partner up with a company that could buy it.", "Don't accept the first offer.", "Sell emotion.",
+    "#Agents", "Research.", "#Merger", "Ally with a competitor so they could buy it or merge.", "Allowing the management to buy it." ] }
+];
+const NOTE = Object.fromEntries(NOTES.map(n => [n.id, n]));
+
+const STEPS = [
+  { id: "s1", title: "Find your purpose and start with nothing", tag: "The foundation everything else sits on",
+    notes: ["purpose", "no-money"],
+    why: "Your notes say \"purpose > revenue\" and \"don't start with a business.\" Every later page (selling, brand, hiring) assumes you already know what you care about.",
+    how: ["Rewatch both chapters.", "Answer in writing: what problem matters to me? What do I already do every day without being paid?", "Circle the answer that shows up in both lists."],
+    practice: "Write one sentence: \"Patrick exists to ___ for ___.\" Then list everything you can use today for $0: Claude, Patrick, the flip scanner, your hobbies, people you know.",
+    res: [{ name: "How to Get Startup Ideas, by Paul Graham", url: "https://paulgraham.com/startupideas.html", note: "Free essay: the best ideas come from problems you have yourself." }],
+    check: ["Why does Squibb say to start with a feeling instead of a business?", "What does \"install purpose into your business\" mean for Patrick?"] },
+  { id: "s2", title: "Turn it into a mind map", tag: "Your business plan on one page",
+    notes: ["mind-map"],
+    why: "You already drew one: Hobbies → Business → AI. Now it needs one branch picked as the thing you do first.",
+    how: ["Redraw your map from the notes without looking at the video.", "Add a dollar sign next to every branch that could make money.", "Pick one branch to start. Cross nothing out, just choose."],
+    practice: "Redraw the map on Excalidraw or paper and circle the first branch to build. Our suggestion: \"App → release to public\", since the flip scanner already exists.",
+    res: [{ name: "Excalidraw", url: "https://excalidraw.com/", note: "Free sketch board for mind maps." }],
+    check: ["What does \"no plan, just do\" mean if you still draw a map?", "Which branch of your map earns money first, and why that one?"] },
+  { id: "s3", title: "Learn to sell", tag: "Your first paying customer depends on this",
+    notes: ["sell"],
+    why: "Your goal is a first paying customer. Selling comes before marketing: you have to know what people actually want before you shout about it.",
+    how: ["Rewatch the chapter.", "Rewrite your pitch so it sells the outcome, not the tool.", "Read The Mom Test's main idea: ask about people's real past, not their opinion of your idea."],
+    practice: "Talk to 5 people who flip or resell stuff. Ask about the last thing they flipped and what went wrong. Don't pitch the app until the end.",
+    res: [{ name: "The Mom Test, by Rob Fitzpatrick", url: "https://www.momtestbook.com/", note: "Short book on talking to customers without them lying to you." },
+          { name: "Y Combinator Startup Library", url: "https://www.ycombinator.com/library", note: "Free videos and essays, including how to talk to users." }],
+    check: ["What's the \"sizzle\" of the flip scanner, and what's the \"steak\"?", "Why does Squibb say to learn the customer's business before the deal?"] },
+  { id: "s4", title: "Market it, one channel at a time", tag: "You marked this one important",
+    notes: ["market"],
+    why: "Marketing is how strangers hear about Patrick. Your notes say: pick one channel, build a system for it, and do it well.",
+    how: ["Rewatch the chapter, especially the staircase story.", "Write down the one thing that makes Patrick stand out.", "Pick ONE channel (TikTok, Instagram or YouTube Shorts) and a posting schedule you can keep."],
+    practice: "Post 3 short videos this week of the scanner finding a real deal. Write down views and comments for each one.",
+    res: [{ name: "Do Things That Don't Scale, by Paul Graham", url: "https://paulgraham.com/ds.html", note: "Why early growth comes from doing things by hand." },
+          { name: "HubSpot Academy", url: "https://academy.hubspot.com/", note: "Free marketing courses with certificates." }],
+    check: ["What is your \"crazy staircase\" for Patrick?", "What does a marketing \"system\" look like for one channel?"] },
+  { id: "s5", title: "Win and lose on purpose", tag: "The mindset that keeps you going",
+    notes: ["win", "lose"],
+    why: "Steps 3 and 4 will bring rejections. Read these now so a bad week doesn't stop you.",
+    how: ["Rewatch both chapters.", "Pick the 3 lines from your notes that hit hardest and put them somewhere you'll see daily.", "After every loss, write one sentence on what it taught you."],
+    practice: "Start a wins and losses log (a note on your phone is enough). Add at least 3 entries this week.",
+    res: [],
+    check: ["What does \"luck is hackable\" mean in practice?", "Why does Squibb say \"take a chance, don't rush\" in the same breath?"] },
+  { id: "s6", title: "Build the brand and get noticed", tag: "Brand, then PR",
+    notes: ["brand", "pr"],
+    why: "Your notes say \"build a brand, not a business\" and \"start with your personal brand.\" PR works once people can tell what you stand for.",
+    how: ["Rewatch both chapters.", "Write 3 brand values for Patrick and 3 for yourself.", "List people who'd care: local news, creators who cover AI or side hustles."],
+    practice: "Write the 3 brand values, then send one short message to a local creator or journalist offering them a ready-made story about a teen building an AI business.",
+    res: [{ name: "StoryBrand", url: "https://storybrand.com/", note: "A simple framework for explaining what your brand does for people." }],
+    check: ["Why start with a personal brand before a company brand?", "What does a busy journalist need from you?"] },
+  { id: "s7", title: "Find your people", tag: "Co-founder, mentor, team",
+    notes: ["cofounder", "mentor", "hire", "fire"],
+    why: "Your mind map has a Team branch: partners, accountant. These chapters cover how to choose them well.",
+    how: ["Rewatch the four chapters.", "Write your moral code in 5 lines.", "List what you love doing and what you hate doing in Patrick's business."],
+    practice: "Post your moral code somewhere public (\"post it, look for it\"). Then send one possible mentor one specific question, before asking for anything else.",
+    res: [{ name: "SCORE", url: "https://www.score.org/", note: "Free business mentoring from volunteers (US)." }],
+    check: ["What should a co-founder love that you hate?", "Why ask a mentor a question first instead of asking them to mentor you?"] },
+  { id: "s8", title: "Money: investors, sponsors, equity", tag: "Only after you have traction",
+    notes: ["investor", "sponsors", "equity"],
+    why: "Your notes say traction comes first, and to ask whether you even need an investor. You also starred equity for deeper research.",
+    how: ["Rewatch the three chapters.", "Read the equity basics below, then explain them back in your own words.", "Write down what help (not money) Patrick needs most."],
+    practice: "Answer in writing: does Patrick need an investor right now? If yes, for what exactly? Then explain why 50/50 splits go wrong.",
+    res: [{ name: "How to Raise Money, by Paul Graham", url: "https://paulgraham.com/fr.html", note: "Long, clear essay on how fundraising actually works." },
+          { name: "Equity explained (Investopedia)", url: "https://www.investopedia.com/terms/e/equity.asp", note: "Plain-English definition, for your starred future note." },
+          { name: "Y Combinator SAFE documents", url: "https://www.ycombinator.com/documents", note: "The standard paperwork most startup investors use." }],
+    check: ["What controls a company, equity or the shareholder agreement?", "What's the difference between an angel investor and a VC?"] },
+  { id: "s9", title: "Grow big, and one day sell", tag: "Later, but good to know now",
+    notes: ["global", "sell-business"],
+    why: "\"Build a business you love; it will sell by accident.\" Knowing the endgame shapes the choices you make now.",
+    how: ["Rewatch the two chapters.", "List places outside your town where people flip and resell stuff.", "Think about who would want to own Patrick one day."],
+    practice: "Name 3 companies that could partner with Patrick now and might buy it later (resale apps, marketplaces, AI companies).",
+    res: [{ name: "Mergers and acquisitions explained (Investopedia)", url: "https://www.investopedia.com/terms/m/mergersandacquisitions.asp", note: "What it means when one company buys or merges with another." }],
+    check: ["Why is not wanting to sell the best way to sell?", "How could a partnership turn into a sale?"] }
+];
+
+// ---------- helpers ----------
+function el(tag, attrs, ...kids) {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (v == null) continue;
+    if (k === "class") n.className = v; else if (k === "text") n.textContent = v; else n.setAttribute(k, v);
+  }
+  for (const k of kids.flat()) if (k != null) n.append(k.nodeType ? k : document.createTextNode(k));
+  return n;
+}
+function link(href, ...kids) { return el("a", { href, target: "_blank", rel: "noopener" }, ...kids); }
+
+// ---------- progress ----------
+let done = {};
+let saveMode = "loading";
+let progressDoc = null;
+function loadLocal() { try { return JSON.parse(localStorage.getItem("krew-notebook-done") || "{}") || {}; } catch (e) { return {}; } }
+function saveLocal() { try { localStorage.setItem("krew-notebook-done", JSON.stringify(done)); } catch (e) {} }
+function setNote(text) { document.getElementById("save-note").textContent = text; }
+function renderProgress() {
+  const n = STEPS.filter(s => done[s.id]).length;
+  document.getElementById("progress-text").textContent = n + " of " + STEPS.length + " steps done";
+  document.getElementById("progress-bar").style.width = (n / STEPS.length * 100) + "%";
+  const nextStep = STEPS.find(s => !done[s.id]);
+  const box = document.getElementById("next-up");
+  box.replaceChildren();
+  if (nextStep) {
+    const i = STEPS.indexOf(nextStep) + 1;
+    box.append(el("div", { class: "kicker", text: "Up next" }),
+      el("p", {}, el("b", { text: "Step " + i + ": " + nextStep.title }), ". " + nextStep.practice));
+  } else {
+    box.append(el("div", { class: "kicker", text: "All done" }),
+      el("p", { text: "You've finished the whole path. Go back through your wins and losses log, then pick a new video to learn from." }));
+  }
+  for (const s of STEPS) {
+    const li = document.getElementById("step-" + s.id);
+    if (!li) continue;
+    li.classList.toggle("is-done", !!done[s.id]);
+    li.querySelector(".done-btn").textContent = done[s.id] ? "✓ Done (tap to undo)" : "Mark step done";
+    li.querySelector(".num").textContent = done[s.id] ? "✓" : String(STEPS.indexOf(s) + 1);
+  }
+}
+let writing = Promise.resolve();
+function toggleDone(id) {
+  done = { ...done, [id]: !done[id] };
+  if (!done[id]) delete done[id];
+  renderProgress();
+  saveLocal();
+  if (progressDoc) {
+    const snapshot = { done: { ...done }, updatedAt: new Date().toISOString() };
+    writing = writing.then(() => progressDoc.set(snapshot)).catch(() => setNote("Couldn't save to your account just now. Progress is kept on this device."));
+  }
+}
+async function startProgress() {
+  done = loadLocal();
+  renderProgress();
+  let db = null;
+  try { db = window.claude && window.claude.use ? await window.claude.use("db") : null; } catch (e) { db = null; }
+  if (!db) { setNote("Progress saves on this device only."); return; }
+  progressDoc = db.doc("progress/krew");
+  setNote("Loading your progress…");
+  const timer = setTimeout(() => setNote("Can't reach your saved progress yet. Showing what's on this device."), 10000);
+  progressDoc.onSnapshot(snap => {
+    if (!snap.metadata || !snap.metadata.fromCache) clearTimeout(timer);
+    const data = snap.exists ? snap.data() : null;
+    if (data && data.done && typeof data.done === "object") { done = { ...data.done }; saveLocal(); }
+    renderProgress();
+    setNote("Progress saves to your account, so it follows you across devices.");
+  }, () => { clearTimeout(timer); setNote("Progress saves on this device only."); });
+}
+
+// ---------- study path ----------
+function renderSteps() {
+  const ol = document.getElementById("steps");
+  STEPS.forEach((s, i) => {
+    const noteChips = el("div", { class: "chips" }, s.notes.map(id =>
+      el("a", { class: "chip", href: "#notes", "data-note": id }, NOTE[id].title)));
+    const watchChips = el("div", { class: "chips" }, s.notes.map(id =>
+      el("a", { class: "chip", href: VIDEO + "&t=" + NOTE[id].t + "s", target: "_blank", rel: "noopener" },
+        el("span", { class: "ts", text: fmt(NOTE[id].t) }), NOTE[id].title.replace(/^How to /, "").replace(/^How /, ""))));
+    const body = el("div", { class: "step-body" },
+      el("div", { class: "block" }, el("h3", { text: "Why now" }), el("p", { text: s.why })),
+      el("div", { class: "block" }, el("h3", { text: "Reread your notes" }), noteChips),
+      el("div", { class: "block" }, el("h3", { text: "Rewatch these parts" }), watchChips),
+      el("div", { class: "block" }, el("h3", { text: "How to study it" }), el("ol", {}, s.how.map(h => el("li", { text: h })))),
+      el("div", { class: "block practice" }, el("h3", { text: "Do this for Patrick" }), el("p", { text: s.practice })),
+      s.res.length ? el("div", { class: "block" }, el("h3", { text: "Go deeper (free)" }),
+        el("div", { class: "res" }, s.res.map(r => link(r.url, el("b", { text: r.name }), el("span", { text: r.note }))))) : null,
+      el("div", { class: "block" }, el("h3", { text: "Check yourself" }), el("ul", {}, s.check.map(q => el("li", { text: q })))),
+      el("button", { type: "button", class: "done-btn", id: "done-" + s.id }, "Mark step done"));
+    body.querySelector(".done-btn").addEventListener("click", () => toggleDone(s.id));
+    const det = el("details", { class: "step", id: "step-" + s.id },
+      el("summary", {},
+        el("span", { class: "num", text: String(i + 1) }),
+        el("span", { class: "step-title" }, el("b", { text: s.title }), el("span", { text: s.tag })),
+        el("span", { class: "chev", "aria-hidden": "true", text: "›" })),
+      body);
+    if (i === 0) det.open = true;
+    ol.append(el("li", {}, det));
+  });
+  ol.addEventListener("click", e => {
+    const a = e.target.closest("a[data-note]");
+    if (!a) return;
+    e.preventDefault();
+    goNote(a.getAttribute("data-note"));
+  });
+}
+
+// ---------- notes ----------
+function mindMap() {
+  const ns = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(ns, "svg");
+  svg.setAttribute("viewBox", "0 0 560 300");
+  svg.setAttribute("role", "img");
+  svg.setAttribute("aria-label", "Krew's mind map: Hobbies inside Business with AI, branching to Build new AI, App, Claude and Team");
+  const ink = "var(--pad-ink)";
+  const add = (tag, a, text) => { const n = document.createElementNS(ns, tag); for (const k in a) n.setAttribute(k, a[k]); if (text) n.textContent = text; svg.append(n); return n; };
+  const lines = [[280,150,120,70],[280,150,110,200],[280,150,440,70],[280,150,440,210],[120,70,60,30],[110,200,70,262],[110,200,190,262],[440,70,410,22],[440,70,520,110],[440,210,520,170],[440,210,440,268]];
+  lines.forEach(([x1,y1,x2,y2]) => add("line", { x1, y1, x2, y2, stroke: ink, "stroke-width": 1.5, opacity: .6 }));
+  add("path", { d: "M110 215 Q 280 290 440 225", fill: "none", stroke: ink, "stroke-dasharray": "6 6", opacity: .6 });
+  add("text", { x: 280, y: 278, "text-anchor": "middle", "font-family": "Patrick Hand, cursive", "font-size": 15, fill: ink }, "connect");
+  add("ellipse", { cx: 280, cy: 140, rx: 120, ry: 72, fill: "var(--pad)", stroke: ink, "stroke-width": 2 });
+  add("text", { x: 280, y: 100, "text-anchor": "middle", "font-family": "Patrick Hand, cursive", "font-size": 20, fill: ink }, "Business");
+  add("ellipse", { cx: 280, cy: 148, rx: 66, ry: 34, fill: "var(--pad)", stroke: ink, "stroke-width": 2 });
+  add("text", { x: 280, y: 155, "text-anchor": "middle", "font-family": "Patrick Hand, cursive", "font-size": 24, fill: ink }, "Hobbies");
+  add("text", { x: 280, y: 200, "text-anchor": "middle", "font-family": "Patrick Hand, cursive", "font-size": 20, fill: ink }, "AI");
+  const bubble = (x, y, label, big) => {
+    const w = Math.max(64, label.length * (big ? 10 : 8.5) + 22), h = big ? 34 : 28;
+    add("rect", { x: x - w / 2, y: y - h / 2, width: w, height: h, rx: h / 2, fill: "var(--pad)", stroke: ink, "stroke-width": big ? 2 : 1.5 });
+    add("text", { x, y: y + 5, "text-anchor": "middle", "font-family": "Patrick Hand, cursive", "font-size": big ? 18 : 15, fill: ink }, label);
+  };
+  bubble(120, 70, "Build new AI", true); bubble(60, 30, "Models"); bubble(110, 200, "App", true);
+  bubble(70, 262, "Build for me"); bubble(190, 262, "Release to public");
+  bubble(440, 70, "Claude", true); bubble(410, 22, "Build"); bubble(520, 110, "More time");
+  bubble(440, 210, "Team", true); bubble(520, 170, "Partners"); bubble(440, 268, "Accountant");
+  return el("div", { class: "map" }, svg);
+}
+function renderNotes(filter) {
+  const box = document.getElementById("notes");
+  box.replaceChildren();
+  const q = (filter || "").trim().toLowerCase();
+  let shown = 0;
+  for (const n of NOTES) {
+    const hay = (n.title + " " + n.items.join(" ")).toLowerCase();
+    if (q && !hay.includes(q)) continue;
+    shown++;
+    const ul = el("ul", {}, n.items.map(it => {
+      if (it.startsWith("#")) return el("li", { class: "sub", text: it.slice(1) });
+      if (it.startsWith("*")) return el("li", { class: "star", text: "★ " + it.slice(1) });
+      return el("li", { text: it });
+    }));
+    box.append(el("article", { class: "pad", id: "note-" + n.id },
+      el("header", {}, el("h3", { text: n.title }),
+        link(VIDEO + "&t=" + n.t + "s", el("span", { class: "watch", text: "▶ Watch at " + fmt(n.t) }))),
+      n.flag ? el("div", { class: "flag", text: n.flag }) : null,
+      n.map ? mindMap() : null,
+      ul));
+  }
+  if (!shown) box.append(el("p", { class: "empty", text: "Nothing in your notes matches \"" + filter + "\". Try a shorter word." }));
+}
+function renderToc() {
+  const toc = document.getElementById("toc");
+  NOTES.forEach(n => {
+    const a = el("a", { href: "#notes", text: n.title.replace(/^How to /, "").replace(/^How /, "") });
+    a.addEventListener("click", e => { e.preventDefault(); goNote(n.id); });
+    toc.append(a);
+  });
+}
+function goNote(id) {
+  const search = document.getElementById("note-search");
+  if (search.value) { search.value = ""; renderNotes(""); }
+  if (location.hash !== "#notes") location.hash = "notes"; else show("notes");
+  requestAnimationFrame(() => { const t = document.getElementById("note-" + id); if (t) t.scrollIntoView({ block: "start" }); });
+}
+
+// ---------- views ----------
+const VIEWS = ["path", "notes", "learn"];
+function show(v) {
+  if (!VIEWS.includes(v)) v = "path";
+  for (const name of VIEWS) document.getElementById("view-" + name).hidden = name !== v;
+  document.querySelectorAll("nav.tabs a").forEach(a => {
+    if (a.dataset.view === v) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
+  });
+}
+window.addEventListener("hashchange", () => show(location.hash.slice(1)));
+
+document.getElementById("note-search").addEventListener("input", e => renderNotes(e.target.value));
+document.getElementById("copy-quiz").addEventListener("click", async e => {
+  const btn = e.currentTarget, code = document.getElementById("quiz-prompt");
+  try { await navigator.clipboard.writeText(code.textContent); btn.textContent = "Copied"; }
+  catch (err) { const r = document.createRange(); r.selectNodeContents(code); const s = getSelection(); s.removeAllRanges(); s.addRange(r); btn.textContent = "Selected, press copy"; }
+  setTimeout(() => { btn.textContent = "Copy"; }, 2000);
+});
+
+renderSteps();
+renderToc();
+renderNotes("");
+show(location.hash.slice(1));
+startProgress();
+</script>
