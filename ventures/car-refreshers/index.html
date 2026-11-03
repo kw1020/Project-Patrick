@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sutherland Motor Parfum</title>
+<meta name="description" content="Luxury car fragrance. A solid metal vent clip with refillable scents.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d0d0c;
+    --panel: #151513;
+    --line: #2a2925;
+    --text: #ece8df;
+    --muted: #a39d90;
+    --gold: #c9a961;
+    --gold-soft: #e3cf9f;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font: 16px/1.6 Inter, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: inherit; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 16px; }
+  .serif { font-family: "Cormorant Garamond", Georgia, serif; font-weight: 500; }
+  .eyebrow { font-size: 12px; letter-spacing: .28em; text-transform: uppercase; color: var(--gold); }
+
+  header { border-bottom: 1px solid var(--line); }
+  header .wrap { display: flex; justify-content: space-between; align-items: center; height: 64px; }
+  .logo { font-family: "Cormorant Garamond", serif; font-size: 20px; letter-spacing: .14em; text-transform: uppercase; }
+  .logo span { color: var(--gold); }
+  .btn {
+    display: inline-block; padding: 12px 22px; border: 1px solid var(--gold);
+    color: var(--bg); background: var(--gold); text-decoration: none;
+    font-size: 13px; letter-spacing: .14em; text-transform: uppercase; font-weight: 600;
+    cursor: pointer; transition: background .2s, color .2s;
+  }
+  .btn:hover { background: transparent; color: var(--gold); }
+  .btn.ghost { background: transparent; color: var(--gold); }
+  .btn.ghost:hover { background: var(--gold); color: var(--bg); }
+
+  .hero { padding: 96px 0 80px; text-align: center; }
+  .hero h1 { font-size: clamp(44px, 8vw, 88px); line-height: 1.02; margin: 18px 0 22px; }
+  .hero h1 em { color: var(--gold-soft); }
+  .hero p { max-width: 560px; margin: 0 auto 34px; color: var(--muted); font-size: 18px; }
+
+  .clip { display: block; margin: 56px auto 0; width: min(340px, 80vw); }
+
+  section { padding: 88px 0; border-top: 1px solid var(--line); }
+  section h2 { font-size: clamp(34px, 5vw, 52px); line-height: 1.1; margin: 12px 0 18px; }
+  .lead { color: var(--muted); max-width: 620px; }
+
+  .how { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); margin-top: 44px; }
+  .how div { background: var(--bg); padding: 30px 26px; }
+  .how b { display: block; font-family: "Cormorant Garamond", serif; font-size: 40px; color: var(--gold); font-weight: 500; line-height: 1; margin-bottom: 14px; }
+  .how h3 { font-size: 16px; font-weight: 600; margin-bottom: 6px; }
+  .how p { color: var(--muted); font-size: 15px; }
+
+  .scents { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 16px; margin-top: 44px; }
+  .scent { background: var(--panel); border: 1px solid var(--line); padding: 26px 22px 24px; position: relative; overflow: hidden; }
+  .scent::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 3px; background: var(--tone); }
+  .scent .num { font-size: 12px; color: var(--muted); letter-spacing: .2em; }
+  .scent h3 { font-family: "Cormorant Garamond", serif; font-size: 28px; font-weight: 500; line-height: 1.1; margin: 10px 0 10px; }
+  .scent p { color: var(--muted); font-size: 14px; }
+  .scent .notes { margin-top: 16px; font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--gold-soft); }
+
+  .pricing { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 44px; }
+  .tier { border: 1px solid var(--line); padding: 32px 26px; display: flex; flex-direction: column; }
+  .tier.featured { border-color: var(--gold); background: var(--panel); }
+  .tier h3 { font-family: "Cormorant Garamond", serif; font-size: 30px; font-weight: 500; }
+  .tier .price { font-size: 34px; margin: 10px 0 4px; font-weight: 500; }
+  .tier .price small { font-size: 15px; color: var(--muted); }
+  .tier ul { list-style: none; color: var(--muted); font-size: 15px; margin: 18px 0 28px; flex: 1; }
+  .tier li { padding: 7px 0; border-bottom: 1px solid var(--line); }
+  .tier li:last-child { border-bottom: 0; }
+  .tag { align-self: flex-start; font-size: 11px; letter-spacing: .2em; text-transform: uppercase; color: var(--bg); background: var(--gold); padding: 4px 10px; margin-bottom: 14px; }
+
+  .list { text-align: center; }
+  .list .lead { margin: 0 auto; }
+  form { display: flex; gap: 10px; max-width: 480px; margin: 34px auto 0; }
+  input[type=email] {
+    flex: 1; min-width: 0; padding: 14px 16px; background: var(--panel); border: 1px solid var(--line);
+    color: var(--text); font: inherit;
+  }
+  input[type=email]:focus { outline: none; border-color: var(--gold); }
+  #msg { margin-top: 16px; min-height: 24px; color: var(--gold-soft); font-size: 15px; }
+
+  footer { border-top: 1px solid var(--line); padding: 36px 0 48px; color: var(--muted); font-size: 13px; }
+  footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+
+  @media (max-width: 760px) {
+    .how, .pricing { grid-template-columns: 1fr; }
+    .hero { padding: 64px 0 56px; }
+    section { padding: 64px 0; }
+    form { flex-direction: column; }
+    header .btn { padding: 10px 14px; font-size: 11px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <div class="logo">Sutherland <span>·</span> MP</div>
+    <a class="btn ghost" href="#list">Join the list</a>
+  </div>
+</header>
+
+<main>
+  <div class="hero">
+    <div class="wrap">
+      <div class="eyebrow">Motor Parfum · Est. 2026</div>
+      <h1 class="serif">Your car should smell<br>like it <em>costs more.</em></h1>
+      <p>A solid metal vent clip and original fragrances made for the drive. Refill it every month and keep the clip for good.</p>
+      <a class="btn" href="#list">Reserve a Starter Set</a>
+
+      <svg class="clip" viewBox="0 0 340 200" role="img" aria-label="Brushed gold vent clip with a black scent refill">
+        <defs>
+          <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#f1dfae"/><stop offset=".45" stop-color="#c9a961"/><stop offset="1" stop-color="#7d6534"/>
+          </linearGradient>
+          <linearGradient id="k" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#2b2a27"/><stop offset="1" stop-color="#0b0b0a"/>
+          </linearGradient>
+        </defs>
+        <rect x="150" y="128" width="40" height="64" rx="4" fill="#3a3832"/>
+        <rect x="158" y="128" width="24" height="56" rx="3" fill="#24231f"/>
+        <circle cx="170" cy="78" r="70" fill="url(#g)"/>
+        <circle cx="170" cy="78" r="56" fill="url(#k)"/>
+        <circle cx="170" cy="78" r="56" fill="none" stroke="#c9a961" stroke-opacity=".35"/>
+        <text x="170" y="74" text-anchor="middle" font-family="Cormorant Garamond, Georgia, serif" font-size="28" fill="#e3cf9f" letter-spacing="3">S</text>
+        <text x="170" y="98" text-anchor="middle" font-family="Inter, sans-serif" font-size="7" fill="#a39d90" letter-spacing="3">MOTOR PARFUM</text>
+      </svg>
+    </div>
+  </div>
+
+  <section>
+    <div class="wrap">
+      <div class="eyebrow">How it works</div>
+      <h2 class="serif">Buy the clip once. Keep refilling.</h2>
+      <p class="lead">No liquid to leak onto your dash. The refill is a solid scent disc that slides in behind the face, so nothing drips.</p>
+      <div class="how">
+        <div><b>I</b><h3>Clip it in</h3><p>Weighted zinc-alloy body with a grip that holds tight on any vent.</p></div>
+        <div><b>II</b><h3>Choose a scent</h3><p>Five original fragrances. Each refill lasts around 30–45 days.</p></div>
+        <div><b>III</b><h3>Refill monthly</h3><p>Join the Refill Club and a fresh disc arrives before the last one fades.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <div class="eyebrow">The collection</div>
+      <h2 class="serif">Five scents. One for every drive.</h2>
+      <div class="scents">
+        <div class="scent" style="--tone:#5a3a2a"><div class="num">No. 01</div><h3>Midnight Leather</h3><p>The new-car luxury smell, after dark.</p><div class="notes">Leather · Oud · Black pepper</div></div>
+        <div class="scent" style="--tone:#3f6f7a"><div class="num">No. 02</div><h3>Coastal Highway</h3><p>Windows down, salt in the air.</p><div class="notes">Sea salt · Bergamot · Driftwood</div></div>
+        <div class="scent" style="--tone:#8a5a2b"><div class="num">No. 03</div><h3>Private Club</h3><p>Late nights, members only.</p><div class="notes">Tobacco leaf · Cognac · Vanilla</div></div>
+        <div class="scent" style="--tone:#3e5a43"><div class="num">No. 04</div><h3>Alpine Pass</h3><p>Cold air and switchbacks.</p><div class="notes">Cedar · Fir · Cold mint</div></div>
+        <div class="scent" style="--tone:#b9ad96"><div class="num">No. 05</div><h3>First Class</h3><p>Quiet and expensive.</p><div class="notes">White tea · Fig · Soft musk</div></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <div class="eyebrow">Pricing</div>
+      <h2 class="serif">Start here.</h2>
+      <div class="pricing">
+        <div class="tier">
+          <h3>Refill Trio</h3>
+          <div class="price">$24</div>
+          <ul><li>3 scent discs</li><li>Mix and match scents</li><li>Fits every Sutherland clip</li></ul>
+          <a class="btn ghost" href="#list">Notify me</a>
+        </div>
+        <div class="tier featured">
+          <span class="tag">Launch price $32</span>
+          <h3>Starter Set</h3>
+          <div class="price">$38</div>
+          <ul><li>Weighted metal vent clip</li><li>Matte black or brushed gold</li><li>2 scent discs</li><li>Rigid gift box</li></ul>
+          <a class="btn" href="#list">Reserve yours</a>
+        </div>
+        <div class="tier">
+          <h3>Refill Club</h3>
+          <div class="price">$14<small> / month</small></div>
+          <ul><li>1 disc every month</li><li>Swap scents anytime</li><li>Skip or cancel in one click</li></ul>
+          <a class="btn ghost" href="#list">Notify me</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="list" id="list">
+    <div class="wrap">
+      <div class="eyebrow">First release</div>
+      <h2 class="serif">The first run is small.</h2>
+      <p class="lead">Join the list to get the $32 launch price and first pick of finishes before they sell out.</p>
+      <!-- Set data-endpoint to a form service URL (e.g. Formspree) to start collecting emails. -->
+      <form id="waitlist" data-endpoint="">
+        <input type="email" name="email" placeholder="Your email" required aria-label="Email address">
+        <button class="btn" type="submit">Join the list</button>
+      </form>
+      <div id="msg" role="status"></div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div>© 2026 Sutherland Motor Parfum</div>
+    <div>Keep away from children and pets. Do not let refills touch dashboard surfaces.</div>
+  </div>
+</footer>
+
+<script>
+  const form = document.getElementById("waitlist");
+  const msg = document.getElementById("msg");
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const endpoint = form.dataset.endpoint;
+    if (!endpoint) {
+      msg.textContent = "The waitlist isn't connected yet. Check back soon.";
+      return;
+    }
+    msg.textContent = "Saving…";
+    try {
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { Accept: "application/json" },
+        body: new FormData(form),
+      });
+      if (!res.ok) throw new Error();
+      form.reset();
+      msg.textContent = "You're on the list. Watch your inbox for the launch price.";
+    } catch {
+      msg.textContent = "Something went wrong. Please try again.";
+    }
+  });
+</script>
+</body>
+</html>
