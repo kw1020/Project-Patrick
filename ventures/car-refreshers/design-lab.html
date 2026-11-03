@@ -56,6 +56,30 @@
   }
   nav.modes button[aria-selected="true"] { color: var(--text); border-bottom-color: var(--brass); }
 
+  .tiers { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; padding-top: 18px; }
+  .tiercard {
+    text-align: left; cursor: pointer; display: grid; gap: 10px; align-content: start; padding: 16px; border-radius: 14px;
+    border: 1px solid var(--line); background: linear-gradient(180deg, #1c1915, #141210); color: var(--text); min-width: 0;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .tiercard:hover { border-color: #5a4b2c; }
+  .tiercard[aria-pressed="true"] { border-color: var(--brass); box-shadow: 0 0 0 1px var(--brass) inset, 0 14px 30px -18px rgba(201,169,97,.6); }
+  .tiercard .th { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .tiercard .th b { font: 500 24px/1 var(--display); }
+  .tiercard .th span { font: 13px var(--mono); color: var(--brass-soft); }
+  .tiercard .tg { font-size: 10.5px; letter-spacing: .2em; text-transform: uppercase; color: var(--brass); }
+  .tiercard dl { margin: 0; display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 6px 10px; font-size: 12.5px; }
+  .tiercard dt { color: var(--muted); font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; padding-top: 2px; }
+  .tiercard dd { margin: 0; color: #d8d1c3; }
+  .gems { display: inline-flex; gap: 3px; vertical-align: middle; margin-left: 6px; }
+  .gems i { width: 7px; height: 7px; transform: rotate(45deg); background: var(--line); }
+  .gems i.on { background: var(--brass); }
+  .gradeline { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--muted); }
+  .gradeline b { color: var(--brass-soft); font-weight: 500; }
+  @media (max-width: 760px) {
+    .tiers { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(250px, 82%); overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 4px; }
+    .tiercard { scroll-snap-align: start; }
+  }
   main.lab { display: grid; grid-template-columns: minmax(0, 1.08fr) minmax(0, 1fr); gap: 28px; padding-top: 24px; align-items: start; }
   .bench { display: grid; gap: 16px; position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); }
   .right { display: grid; gap: 18px; min-width: 0; align-content: start; }
@@ -245,6 +269,8 @@
     <button role="tab" data-mode="spec" aria-selected="false" id="m-spec">Spec sheet</button>
   </nav>
 
+  <div class="tiers" id="tiers" role="group" aria-label="Choose an air freshener"></div>
+
   <main class="lab">
     <div class="bench">
       <div class="stage" id="stage">
@@ -273,6 +299,7 @@
             <button type="button" class="btn ghost small" id="emptyBtn">Empty beaker</button>
           </div>
         </div>
+        <div class="gradeline" id="gradeLine"></div>
         <div class="formula" id="formula"></div>
         <div class="balance" id="balance"></div>
         <div class="flags" id="labFlags"></div>
@@ -307,6 +334,14 @@
     signature: { label: "Signature", price: 38,  priceNote: "Starter Set", cost: [9, 12],      strength: 3 },
     reserve:   { label: "Reserve",   price: 295, priceNote: "Reserve Set", cost: [50, 90],     strength: 2 },
   };
+  // What separates the three air fresheners. Longevity figures are targets to confirm in the 30-day carrier test.
+  const TIER_SPEC = {
+    daily:     { tag: "Affordable", material: "Thick printed paper board, matte inks, foil sleeve", grade: "Standard", oil: "Stock fragrance oils, phthalate-free", lasts: "2–4 weeks", throw: "Strong", meter: 1 },
+    signature: { tag: "Mid-tier", material: "Weighted zinc alloy, PVD finish, soft-touch silicone vent pad, porous ceramic disc", grade: "Premium", oil: "Higher-grade oils, custom-tuned, full top/heart/base structure", lasts: "4–6 weeks per disc", throw: "Medium and smooth", meter: 2 },
+    reserve:   { tag: "Luxury", material: "Solid brass or titanium, hand-finished, black stone insert, leather case", grade: "Fine fragrance", oil: "Made with an independent perfumer, natural materials where IFRA allows", lasts: "6–8 weeks per insert", throw: "Soft and close", meter: 3 },
+  };
+  // Costly materials: natural versions go into Reserve; Daily uses synthetic stand-ins.
+  const LUXE = new Set(["Oud", "Saffron", "Iris", "Rose", "Jasmine", "Sandalwood", "Neroli"]);
   // l/m/d = swatch light/mid/dark. base = 3D base color. rough = 3D roughness.
   const FINISHES = {
     signature: [
@@ -543,6 +578,9 @@
     const citrus = all.filter((n) => famOf(n) === "citrus");
     if (citrus.length) out.push(["warn", `Citrus (${citrus.join(", ")}) can have a low flash point. Sweet orange oil is around 129°F, below dashboard heat. Ask for the finished oil at over 200°F.`]);
     if (f["Birch tar"]) out.push(["warn", "Birch tar is restricted under IFRA. The perfumer handles the dose; get the IFRA certificate."]);
+    const luxe = all.filter((n) => LUXE.has(n));
+    if (luxe.length && s.line === "daily") out.push(["warn", `${luxe.join(", ")} ${luxe.length > 1 ? "are" : "is"} costly as naturals. At the Daily price ${luxe.length > 1 ? "these will be synthetic versions" : "this will be a synthetic version"}, which is normal for this tier.`]);
+    if (luxe.length && s.line === "reserve") out.push(["ok", `Reserve uses natural ${luxe.join(", ").toLowerCase()} where IFRA allows. This is where the price goes.`]);
     if (s.line === "reserve" && s.scent.strength > 3) out.push(["warn", "Loud reads as cheap at Reserve. Aim for soft (2) so the car smells expensive, not scented."]);
     if (s.line === "daily" && s.scent.strength < 3) out.push(["warn", "Daily buyers expect to smell it right away. Try 4."]);
     if (s.line !== "daily" && weightGrams(s) > 30 && s.mount === "vent") out.push(["warn", `About ${Math.round(weightGrams(s))} g hanging on a vent louver risks sag. Add the stick-on base or go smaller.`]);
@@ -1011,6 +1049,8 @@
   function renderFormula() {
     const f = state.scent.formula, t = total(f), tr = tiersOf(f), p = tierPct(f);
     $("labName").textContent = state.scent.name || "Untitled";
+    const ts = TIER_SPEC[state.line];
+    $("gradeLine").innerHTML = `<span>${esc(state.line === "daily" ? "SMP Daily" : LINES[state.line].label)} oil: <b>${esc(ts.grade)}</b></span><span>Lasts: <b>${esc(ts.lasts)}</b></span><span>Throw: <b>${esc(ts.throw)}</b></span>`;
     let h = "";
     if (!t) h = `<p class="emptynote">Empty. Pour a recommended blend, or tap vials on the shelf to add drops one at a time.</p>`;
     for (const [id, label, hint] of TIERS) {
@@ -1113,11 +1153,15 @@
       ln.push(`  Pattern    ${PATTERNS.find((x) => x.id === s.pattern).label}`);
       ln.push(`  Engraving  "${(s.engraving || "").toUpperCase() || "none"}"${s.line === "reserve" ? `, back: RESERVE ${String(s.edition || "001").padStart(3, "0")}/100` : ""}`);
       ln.push(`  Refill     ${s.line === "reserve" ? "Black porous stone insert, fine-fragrance load" : "Porous ceramic disc, matte black, pressed logo"}`);
+      if (s.line === "signature") ln.push(`  Vent pad   Soft-touch silicone on the hook, protects vent louvers, stops rattle`);
       ln.push(`  Mount      ${s.mount === "both" ? "Magnetic face + vent hook base + adhesive stick-on base" : s.mount === "vent" ? "Magnetic face + vent hook base" : "Magnetic face + adhesive stick-on base"}`);
       ln.push(`  Weight     ~${Math.round(weightGrams(s))} g (estimate)`);
       ln.push(`  Package    ${s.line === "reserve" ? "Leather case, rigid magnetic box, signed card, numbered certificate" : "Rigid black box, gold-foil logo, molded insert"}`);
     }
+    const ts = TIER_SPEC[s.line];
     ln.push("", "SCENT", `  Name       ${s.scent.name || "Untitled"}`);
+    ln.push(`  Oil grade  ${ts.grade}: ${ts.oil}`);
+    ln.push(`  Lasts      ${ts.lasts} (target; confirm in the 30-day test)`);
     if (s.scent.story) ln.push(`  Story      ${s.scent.story}`);
     for (const [id, label] of TIERS) ln.push(`  ${label.padEnd(10)} ${tr[id].map(([n, v]) => `${n} ${Math.round((v / t) * 100)}%`).join(", ") || "-"}`);
     const p = tierPct(f);
@@ -1142,6 +1186,14 @@
     $("specText").textContent = specText(s);
   }
 
+  function renderTiers() {
+    $("tiers").innerHTML = Object.entries(TIER_SPEC).map(([id, t]) => `<button type="button" class="tiercard" data-line="${id}" aria-pressed="${state.line === id}">
+      <div class="tg">${t.tag}</div>
+      <div class="th"><b>${id === "daily" ? "SMP Daily" : LINES[id].label}</b><span>$${LINES[id].price}</span></div>
+      <dl><dt>Made of</dt><dd>${esc(t.material)}</dd>
+      <dt>Scent</dt><dd>${esc(t.grade)}<span class="gems" aria-hidden="true">${[1, 2, 3].map((i) => `<i class="${i <= t.meter ? "on" : ""}"></i>`).join("")}</span> · ${esc(t.oil)}</dd>
+      <dt>Lasts</dt><dd>${esc(t.lasts)} · ${esc(t.throw.toLowerCase())}</dd></dl></button>`).join("");
+  }
   function renderLineSeg() {
     $("lineSeg").innerHTML = Object.entries(LINES).map(([id, L]) => `<button type="button" data-line="${id}" aria-pressed="${state.line === id}">${L.label}<small>$${L.price}</small></button>`).join("");
   }
@@ -1149,7 +1201,7 @@
   function renderAll() {
     document.body.className = "mode-" + mode;
     for (const b of document.querySelectorAll("nav.modes button")) b.setAttribute("aria-selected", String(b.dataset.mode === mode));
-    renderLineSeg(); renderStage(); renderSummary(); renderFormula(); renderPanel(); renderSaveButtons(); markCurrentCard(); saveDraft();
+    renderLineSeg(); renderTiers(); renderStage(); renderSummary(); renderFormula(); renderPanel(); renderSaveButtons(); markCurrentCard(); saveDraft();
   }
   function renderLive() { renderStage(); renderSummary(); renderFormula(); saveDraft(); }
   function renderAfterDrop() {
