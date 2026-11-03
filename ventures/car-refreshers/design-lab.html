@@ -2,7 +2,7 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Pinyon+Script&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <style>
   /* Layout: a lit stage on the left (3D object, or the mixing beaker in the lab), the workshop on the right, saved designs below. Dark-only on purpose: the brand lives at night. */
@@ -131,6 +131,17 @@
   .patt.knurl { background: repeating-conic-gradient(#b59650 0 4deg, #6e5527 4deg 8deg); }
   .patt.carbon { background: repeating-linear-gradient(45deg, #2b2b2b 0 4px, #161616 4px 8px); }
   .patt.perforated { background: radial-gradient(circle, #15120d 0 2.2px, transparent 2.6px) 0 0 / 8px 8px, radial-gradient(circle at 35% 30%, #e9d29a, #a88a48 60%, #6b5428); }
+  .patt.sunburst { background: repeating-conic-gradient(#e9d29a 0 3deg, #9c8040 3deg 6deg); }
+  .bz { width: 38px; height: 38px; border-radius: 50%; background: radial-gradient(circle, #15130f 0 50%, transparent 51%), var(--ring); box-shadow: 0 6px 12px -4px rgba(0,0,0,.7); }
+  .bz.polished { --ring: radial-gradient(circle at 35% 30%, #fff2c8, #d9b863 50%, #7e6024); }
+  .bz.fluted { --ring: repeating-conic-gradient(#f3dda6 0 6deg, #7e6024 6deg 12deg); }
+  .bz.knurled { --ring: repeating-conic-gradient(#d9b863 0 2deg, #5e4720 2deg 4deg); }
+  .dl { width: 38px; height: 38px; border-radius: 50%; box-shadow: inset 0 0 0 2px #b8964c, 0 6px 12px -4px rgba(0,0,0,.7); }
+  .dl.sunburst { background: repeating-conic-gradient(color-mix(in srgb, var(--c) 75%, white) 0 3deg, var(--c) 3deg 6deg); }
+  .dl.clous { background: repeating-linear-gradient(45deg, rgba(255,255,255,.2) 0 3px, transparent 3px 6px), repeating-linear-gradient(-45deg, rgba(0,0,0,.28) 0 3px, transparent 3px 6px), var(--c); }
+  .dl.walnut { background: radial-gradient(ellipse at 30% 40%, #8a5a30 0 12%, #4a2a16 30%, #7a4c26 45%, #3a2212 70%); }
+  .dl.carbon { background: conic-gradient(from 20deg, #1a1a1a, #3c3c3c, #121212, #2e2e2e, #1a1a1a); }
+  .dl.enamel { background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--c) 70%, white), var(--c) 55%, color-mix(in srgb, var(--c) 70%, black)); }
   .pills { display: flex; flex-wrap: wrap; gap: 8px; }
   .pillbtn { border: 1px solid var(--line); background: var(--panel-2); padding: 8px 14px; border-radius: 999px; cursor: pointer; font-size: 13px; display: inline-flex; gap: 8px; align-items: center; }
   .pillbtn[aria-pressed="true"] { border-color: var(--brass); color: var(--brass-soft); background: #2a2419; }
@@ -338,43 +349,39 @@
   const TIER_SPEC = {
     daily:     { tag: "Affordable", material: "Thick printed paper board, matte inks, foil sleeve", grade: "Standard", oil: "Stock fragrance oils, phthalate-free", lasts: "2–4 weeks", throw: "Strong", meter: 1 },
     signature: { tag: "Mid-tier", material: "Weighted zinc alloy, PVD finish, soft-touch silicone vent pad, porous ceramic disc", grade: "Premium", oil: "Higher-grade oils, custom-tuned, full top/heart/base structure", lasts: "4–6 weeks per disc", throw: "Medium and smooth", meter: 2 },
-    reserve:   { tag: "Luxury", material: "Solid brass or titanium, hand-finished, sealed membrane fragrance cartridge, leather case", grade: "Fine fragrance", oil: "Made with an independent perfumer, natural materials where IFRA allows", lasts: "60–90 days per cartridge (target)", throw: "Soft and close", meter: 3 },
+    reserve:   { tag: "Luxury", material: "Watch-inspired solid brass or titanium case, domed sapphire crystal, hand-finished dial, sealed membrane cartridge, leather case", grade: "Fine fragrance", oil: "Made with an independent perfumer, natural materials where IFRA allows", lasts: "60–90 days per cartridge (target)", throw: "Soft and close", meter: 3 },
   };
   // Costly materials: natural versions go into Reserve; Daily uses synthetic stand-ins.
   const LUXE = new Set(["Oud", "Saffron", "Iris", "Rose", "Jasmine", "Sandalwood", "Neroli"]);
   // l/m/d = swatch light/mid/dark. base = 3D base color. rough = 3D roughness.
-  const FINISHES = {
-    signature: [
-      { id: "pvd-gold",       label: "PVD gold",       metal: "zinc", l: "#f6e6b8", m: "#c9a961", d: "#6d5528", base: "#d9b56a", rough: 0.26, metalness: 1 },
-      { id: "matte-black",    label: "Matte black",    metal: "zinc", l: "#5b5852", m: "#25241f", d: "#0f0f0d", base: "#2a2926", rough: 0.6, metalness: 0.55, dark: true },
-      { id: "gunmetal",       label: "Gunmetal",       metal: "zinc", l: "#a6a8ab", m: "#56595d", d: "#24262a", base: "#5d6166", rough: 0.32, metalness: 1, dark: true },
-      { id: "brushed-silver", label: "Brushed silver", metal: "zinc", l: "#f4f4f1", m: "#a9aaa7", d: "#56575a", base: "#c9cac7", rough: 0.38, metalness: 1 },
-    ],
-    reserve: [
-      { id: "raw-brass",      label: "Raw brass",      metal: "brass",    l: "#f0d9a0", m: "#b89a52", d: "#5e4720", base: "#bf9b50", rough: 0.42, metalness: 1 },
-      { id: "polished-brass", label: "Polished brass", metal: "brass",    l: "#fff2c8", m: "#d9b863", d: "#7e6024", base: "#e2bf66", rough: 0.12, metalness: 1 },
-      { id: "black-pvd",      label: "Black PVD",      metal: "brass",    l: "#4d4942", m: "#1e1d1a", d: "#090908", base: "#1f1e1b", rough: 0.28, metalness: 0.9, dark: true },
-      { id: "titanium",       label: "Titanium",       metal: "titanium", l: "#e2e4e6", m: "#8f9396", d: "#3f4245", base: "#a2a6aa", rough: 0.3, metalness: 1 },
-      { id: "enamel",         label: "Enamel face",    metal: "brass",    l: "#f0d9a0", m: "#b89a52", d: "#5e4720", base: "#bf9b50", rough: 0.42, metalness: 1 },
-    ],
-  };
-  const ENAMELS = [
-    { id: "racing-red", label: "Racing Red", c: "#a8231b" },
-    { id: "papaya", label: "Papaya Orange", c: "#e2741a" },
-    { id: "brg", label: "British Racing Green", c: "#1d4a33" },
-    { id: "track-grey", label: "Track Grey", c: "#666a6d" },
-    { id: "midnight", label: "Midnight Blue", c: "#182645" },
+  // ---- Signature: deliberately few choices, die-cast zinc ----
+  const SIG_FINISHES = [
+    { id: "pvd-gold", label: "PVD gold", l: "#f6e6b8", m: "#c9a961", d: "#6d5528", base: "#d9b56a", rough: 0.3, metalness: 1 },
+    { id: "matte-black", label: "Matte black", l: "#5b5852", m: "#25241f", d: "#0f0f0d", base: "#2a2926", rough: 0.62, metalness: 0.5, dark: true },
   ];
+  const SIG_FACES = [{ id: "plain", label: "Plain" }, { id: "sunburst", label: "Sunburst" }];
+  // ---- Reserve: watch-inspired, finer choices ----
+  const RES_CASES = [
+    { id: "polished-brass", label: "Polished brass", metal: "brass", l: "#fff2c8", m: "#d9b863", d: "#7e6024", base: "#e2bf66", rough: 0.1, metalness: 1 },
+    { id: "brushed-brass", label: "Brushed brass", metal: "brass", l: "#f0d9a0", m: "#b89a52", d: "#5e4720", base: "#bf9b50", rough: 0.36, metalness: 1 },
+    { id: "rose-gold", label: "Rose gold PVD", metal: "brass", l: "#f8d9cb", m: "#c98f78", d: "#6e4234", base: "#d39a83", rough: 0.16, metalness: 1 },
+    { id: "black-pvd", label: "Black PVD", metal: "brass", l: "#4d4942", m: "#1e1d1a", d: "#090908", base: "#1f1e1b", rough: 0.26, metalness: 0.9, dark: true },
+    { id: "titanium", label: "Titanium", metal: "titanium", l: "#e2e4e6", m: "#8f9396", d: "#3f4245", base: "#a2a6aa", rough: 0.26, metalness: 1 },
+  ];
+  const RES_SHAPES = [{ id: "round", label: "Round", area: 1 }, { id: "cushion", label: "Cushion", area: 1.15 }];
+  const RES_SIZES = [40, 44, 48];
+  const BEZELS = [{ id: "polished", label: "Polished" }, { id: "fluted", label: "Fluted" }, { id: "knurled", label: "Knurled" }];
+  const DIALS = [
+    { id: "sunburst", label: "Sunburst" }, { id: "clous", label: "Clous de Paris" }, { id: "walnut", label: "Burl walnut" },
+    { id: "carbon", label: "Forged carbon" }, { id: "enamel", label: "Grand feu enamel" },
+  ];
+  const DIAL_METAL = [{ id: "champagne", label: "Champagne", c: "#cdb27a" }, { id: "slate", label: "Slate", c: "#5b6066" }, { id: "midnight", label: "Midnight blue", c: "#1d2c4f" }, { id: "black", label: "Black", c: "#1a1a1a" }];
+  const DIAL_ENAMEL = [{ id: "ivory", label: "Ivory", c: "#efe8d8" }, { id: "midnight", label: "Midnight blue", c: "#16244a" }, { id: "brg", label: "British racing green", c: "#1b4430" }, { id: "oxblood", label: "Oxblood", c: "#5a1a1e" }];
+  const ACCENTS = [{ id: "match", label: "Matching case" }, { id: "gold", label: "Yellow gold", c: "#e0bd6a" }, { id: "rhodium", label: "Rhodium", c: "#dfe1e3" }];
+  const FONTS = [{ id: "roman", label: "Roman" }, { id: "script", label: "Script" }];
+  const LEATHERS = [{ id: "black", label: "Black", c: "#141312" }, { id: "tan", label: "Tan", c: "#9a6a3c" }, { id: "oxblood", label: "Oxblood", c: "#4a1719" }, { id: "green", label: "Racing green", c: "#1c3a2a" }];
   const DENSITY = { zinc: 6.6, brass: 8.5, titanium: 4.5 };
-  const METAL_LABEL = { zinc: "Zinc alloy (zamak), die-cast", brass: "Solid brass, CNC-machined", titanium: "Titanium, CNC-machined" };
-  const SHAPES = [
-    { id: "round", label: "Round", area: 1 }, { id: "octagon", label: "Octagon", area: 0.9 },
-    { id: "cushion", label: "Cushion", area: 1.15 }, { id: "shield", label: "Shield", area: 1.0 },
-  ];
-  const PATTERNS = [
-    { id: "plain", label: "Plain" }, { id: "guilloche", label: "Guilloché" }, { id: "knurl", label: "Knurled" },
-    { id: "carbon", label: "Carbon" }, { id: "perforated", label: "Perforated" },
-  ];
+  const METAL_LABEL = { brass: "Solid brass C360, CNC-machined, hand-finished", titanium: "Grade 5 titanium (Ti-6Al-4V), CNC-machined, hand-finished" };
   const MOUNTS = [{ id: "vent", label: "Vent hook" }, { id: "stick", label: "Magnetic stick-on" }, { id: "both", label: "Both in the box" }];
   const CARD_SHAPES = [{ id: "shield", label: "Shield" }, { id: "oval", label: "Oval" }, { id: "tag", label: "Tag" }, { id: "ticket", label: "Ticket" }];
   const CARD_COLORS = [
@@ -470,15 +477,46 @@
 
   // ================= State =================
   const DEFAULT = {
-    line: "signature", shape: "round", size: 42, finish: "pvd-gold", pattern: "guilloche", engraving: "S", edition: "014",
-    enamel: "racing-red", mount: "both",
+    line: "signature",
+    sig: { finish: "pvd-gold", face: "sunburst", initial: "S", mount: "both" },
+    res: { shape: "round", size: 44, case: "polished-brass", bezel: "fluted", dial: "sunburst", dialColor: "champagne", enamel: "midnight", accent: "match", font: "roman", monogram: "KS", edition: "014", leather: "black", mount: "both" },
     card: { shape: "shield", color: "matte-black", ink: "silver" },
     scent: { preset: "midnight-leather", name: "Midnight Leather", story: "The new-car luxury smell, after dark.", formula: clone(RECIPES[0].f), strength: 3, brief: "" },
   };
+  const pick = (list, id, fallback) => (list.some((x) => x.id === id) ? id : fallback);
   function normalize(d) {
     d = d || {};
-    const s = Object.assign(clone(DEFAULT), d);
-    s.card = Object.assign(clone(DEFAULT.card), d.card || {});
+    const s = clone(DEFAULT);
+    if (LINES[d.line]) s.line = d.line;
+    Object.assign(s.card, d.card || {});
+    const sig = Object.assign({}, s.sig, d.sig || {}), res = Object.assign({}, s.res, d.res || {});
+    // Designs saved before the Signature/Reserve split used flat fields.
+    if (!d.sig && d.finish) {
+      sig.finish = d.finish === "matte-black" || d.finish === "gunmetal" ? "matte-black" : "pvd-gold";
+      sig.face = d.pattern === "plain" ? "plain" : "sunburst";
+      if (d.engraving) sig.initial = String(d.engraving)[0];
+      if (d.mount) sig.mount = d.mount;
+    }
+    if (!d.res && d.finish) {
+      const map = { "raw-brass": "brushed-brass", "polished-brass": "polished-brass", "black-pvd": "black-pvd", "titanium": "titanium", "enamel": "polished-brass" };
+      if (map[d.finish]) res.case = map[d.finish];
+      if (d.finish === "enamel") res.dial = "enamel";
+      if (d.pattern === "knurl") res.bezel = "knurled"; else if (d.pattern === "plain") res.bezel = "polished";
+      if (d.pattern === "carbon") res.dial = "carbon";
+      if (d.engraving) res.monogram = d.engraving;
+      if (d.edition) res.edition = d.edition;
+      if (d.mount) res.mount = d.mount;
+      if (d.size) res.size = RES_SIZES.reduce((a, b) => (Math.abs(b - d.size) < Math.abs(a - d.size) ? b : a));
+    }
+    sig.finish = pick(SIG_FINISHES, sig.finish, "pvd-gold"); sig.face = pick(SIG_FACES, sig.face, "sunburst"); sig.mount = pick(MOUNTS, sig.mount, "both");
+    sig.initial = String(sig.initial || "").replace(/[^A-Za-z]/g, "").slice(0, 1).toUpperCase();
+    res.shape = pick(RES_SHAPES, res.shape, "round"); res.size = RES_SIZES.includes(+res.size) ? +res.size : 44;
+    res.case = pick(RES_CASES, res.case, "polished-brass"); res.bezel = pick(BEZELS, res.bezel, "fluted"); res.dial = pick(DIALS, res.dial, "sunburst");
+    res.dialColor = pick(DIAL_METAL, res.dialColor, "champagne"); res.enamel = pick(DIAL_ENAMEL, res.enamel, "midnight");
+    res.accent = pick(ACCENTS, res.accent, "match"); res.font = pick(FONTS, res.font, "roman"); res.leather = pick(LEATHERS, res.leather, "black"); res.mount = pick(MOUNTS, res.mount, "both");
+    res.monogram = String(res.monogram || "").replace(/[^A-Za-z&]/g, "").slice(0, 3);
+    res.edition = String(res.edition || "").replace(/[^0-9]/g, "").slice(0, 3);
+    s.sig = sig; s.res = res;
     const ds = d.scent || {};
     s.scent = Object.assign(clone(DEFAULT.scent), ds);
     let f = ds.formula;
@@ -492,8 +530,6 @@
     s.scent.formula = cleanF;
     delete s.scent.top; delete s.scent.heart; delete s.scent.base;
     s.scent.strength = Math.max(1, Math.min(5, Math.round(+s.scent.strength || 3)));
-    if (!LINES[s.line]) s.line = "signature";
-    s.size = Math.max(34, Math.min(52, Math.round(+s.size || 42)));
     return s;
   }
   let state = normalize(DEFAULT);
@@ -501,8 +537,6 @@
   let mode = "object", loadedId = null, history = [], pouring = false;
   function saveDraft() { try { localStorage.setItem("sutherland-lab-draft", JSON.stringify(state)); } catch (_) {} }
 
-  const finishOf = (s) => (FINISHES[s.line] || []).find((f) => f.id === s.finish) || (FINISHES[s.line] || FINISHES.signature)[0];
-  const enamelOf = (s) => ENAMELS.find((e) => e.id === s.enamel) || ENAMELS[0];
   const money = (n) => (n < 10 ? "$" + n.toFixed(2) : "$" + Math.round(n));
 
   // ---- Formula math ----
@@ -553,25 +587,34 @@
   }
 
   // ---- Object math ----
+  const sigFinish = (s) => SIG_FINISHES.find((f) => f.id === s.sig.finish) || SIG_FINISHES[0];
+  const resCase = (s) => RES_CASES.find((f) => f.id === s.res.case) || RES_CASES[0];
+  const resDial = (s) => DIALS.find((x) => x.id === s.res.dial) || DIALS[0];
+  const dialColorOf = (s) => (s.res.dial === "enamel" ? DIAL_ENAMEL.find((x) => x.id === s.res.enamel) || DIAL_ENAMEL[0] : DIAL_METAL.find((x) => x.id === s.res.dialColor) || DIAL_METAL[0]);
+  const accentHex = (s) => { const a = ACCENTS.find((x) => x.id === s.res.accent); return a && a.c ? a.c : resCase(s).base; };
+  const mountOf = (s) => (s.line === "reserve" ? s.res.mount : s.sig.mount);
+  const mountText = (m) => (m === "both" ? "Magnetic face + vent hook base + adhesive stick-on base" : m === "vent" ? "Magnetic face + vent hook base" : "Magnetic face + adhesive stick-on base");
   function weightGrams(s) {
     if (s.line === "daily") return 3;
-    const f = finishOf(s), shape = SHAPES.find((x) => x.id === s.shape) || SHAPES[0];
-    return Math.PI * Math.pow(s.size / 20, 2) * shape.area * 0.4 * 0.55 * DENSITY[f.metal];
+    if (s.line === "signature") return Math.PI * Math.pow(42 / 20, 2) * 0.4 * 0.55 * DENSITY.zinc;
+    const sh = RES_SHAPES.find((x) => x.id === s.res.shape) || RES_SHAPES[0];
+    return Math.PI * Math.pow(s.res.size / 20, 2) * sh.area * 0.8 * 0.4 * DENSITY[resCase(s).metal];
   }
   function costRange(s) {
-    const L = LINES[s.line]; let lo = L.cost[0], hi = L.cost[1];
-    if (s.line === "reserve") {
-      const f = finishOf(s);
-      if (f.metal === "titanium") { lo += 25; hi += 60; }
-      if (f.id === "enamel") { lo += 4; hi += 8; }
-      if (s.pattern === "guilloche" || s.pattern === "knurl") { lo += 2; hi += 5; }
-      if (s.pattern === "carbon") { lo += 3; hi += 6; }
-    }
-    if (s.line === "signature" && s.pattern === "carbon") { lo += 1; hi += 2; }
-    if (s.line !== "daily" && s.mount === "both") { lo += 1; hi += 2; }
+    if (s.line === "daily") return [0.40, 0.90];
+    if (s.line === "signature") return s.sig.mount === "both" ? [10, 14] : [9, 12];
+    const r = s.res; let lo = 65, hi = 120;
+    if (resCase(s).metal === "titanium") { lo += 25; hi += 60; }
+    if (r.case === "rose-gold") { lo += 2; hi += 5; }
+    if (r.bezel !== "polished") { lo += 2; hi += 5; }
+    if (r.dial === "enamel") { lo += 15; hi += 40; } else if (r.dial === "carbon") { lo += 4; hi += 10; } else if (r.dial === "walnut") { lo += 3; hi += 8; } else if (r.dial === "clous") { lo += 2; hi += 6; }
+    if (r.mount === "both") { lo += 1; hi += 2; }
     return [lo, hi];
   }
-  const priceOf = (s) => (s.line === "reserve" && finishOf(s).metal === "titanium" ? 395 : LINES[s.line].price);
+  function priceOf(s) {
+    if (s.line !== "reserve") return LINES[s.line].price;
+    return 295 + (resCase(s).metal === "titanium" ? 100 : 0) + (s.res.dial === "enamel" ? 50 : 0);
+  }
 
   function flagsFor(s) {
     const out = [], f = s.scent.formula, all = Object.keys(f);
@@ -583,7 +626,7 @@
     if (luxe.length && s.line === "reserve") out.push(["ok", `Reserve uses natural ${luxe.join(", ").toLowerCase()} where IFRA allows. This is where the price goes.`]);
     if (s.line === "reserve" && s.scent.strength > 3) out.push(["warn", "Loud reads as cheap at Reserve. Aim for soft (2) so the car smells expensive, not scented."]);
     if (s.line === "daily" && s.scent.strength < 3) out.push(["warn", "Daily buyers expect to smell it right away. Try 4."]);
-    if (s.line !== "daily" && weightGrams(s) > 30 && s.mount === "vent") out.push(["warn", `About ${Math.round(weightGrams(s))} g hanging on a vent louver risks sag. Add the stick-on base or go smaller.`]);
+    if (s.line !== "daily" && weightGrams(s) > 30 && mountOf(s) === "vent") out.push(["warn", `About ${Math.round(weightGrams(s))} g hanging on a vent louver risks sag. Add the stick-on base or go smaller.`]);
     if (!all.length) out.push(["warn", "The beaker is empty. Add ingredients in the Scent lab."]);
     if (!out.length) out.push(["ok", "No issues found. Ready for a supplier quote."]);
     return out;
@@ -633,15 +676,29 @@
       const name = esc(s.scent.name || "Untitled"), fs = name.length > 16 ? 16 : name.length > 11 ? 19 : 23;
       return `<svg viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg"><path d="M200 40 L200 126" stroke="#c9c2b2" stroke-width="1.5"/><ellipse cx="200" cy="362" rx="80" ry="9" fill="#000" opacity=".35"/><path d="${d}" fill="${c.c}" stroke="${c.light ? "#c8bfae" : "#2e2a24"}"/><circle cx="200" cy="141" r="5" fill="#0f0e0c"/><text x="200" y="180" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10" letter-spacing="5" fill="${ink.c}" fill-opacity=".8">SMP DAILY</text><text x="200" y="${232 + fs * 0.3}" text-anchor="middle" font-family="Cormorant Garamond, Georgia, serif" font-size="${fs}" fill="${ink.c}">${name}</text></svg>`;
     }
-    const f = finishOf(s), r = s.size * 2.55, cx = 200, cy = 185;
+    const cx = 200, cy = 190;
     const toD = (pts) => "M" + pts.map((p) => `${(cx + p[0]).toFixed(1)} ${(cy - p[1]).toFixed(1)}`).join(" L") + " Z";
-    const enamel = f.id === "enamel" ? enamelOf(s).c : null, dark = f.dark || !!enamel || s.pattern === "carbon";
-    const faceFill = s.pattern === "carbon" ? "#1d1d1d" : enamel || f.m;
-    const mono = esc((s.engraving || "").slice(0, 3).toUpperCase());
-    return `<svg viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="${uid}g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${f.l}"/><stop offset=".5" stop-color="${f.m}"/><stop offset="1" stop-color="${f.d}"/></linearGradient><radialGradient id="${uid}f" cx=".35" cy=".3" r=".9"><stop offset="0" stop-color="${mixHex(faceFill, "#ffffff", .3)}"/><stop offset="1" stop-color="${mixHex(faceFill, "#000000", .45)}"/></radialGradient></defs>
+    if (s.line === "signature") {
+      const f = sigFinish(s), r = 42 * 2.55, ini = esc(s.sig.initial || "");
+      return `<svg viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="${uid}g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${f.l}"/><stop offset=".5" stop-color="${f.m}"/><stop offset="1" stop-color="${f.d}"/></linearGradient></defs>
+        <ellipse cx="${cx}" cy="${cy + r + 40}" rx="${r * 0.8}" ry="10" fill="#000" opacity=".35"/>
+        <path d="${toD(shapePoints("round", r))}" fill="url(#${uid}g)"/><path d="${toD(shapePoints("round", r * 0.84))}" fill="${f.m}" stroke="${f.d}" stroke-opacity=".5"/>
+        ${ini ? `<text x="${cx}" y="${cy + r * 0.2}" text-anchor="middle" font-family="Cormorant Garamond, Georgia, serif" font-size="${(r * 0.56).toFixed(1)}" fill="${f.dark ? "#d9c08a" : "#3a2a12"}">${ini}</text>` : ""}</svg>`;
+    }
+    const c = resCase(s), r = s.res.size * 2.3, acc = accentHex(s);
+    const dialFill = s.res.dial === "walnut" ? "#6b4423" : s.res.dial === "carbon" ? "#1f1f1f" : dialColorOf(s).c;
+    const script = s.res.font === "script", mono = esc(script ? s.res.monogram : s.res.monogram.toUpperCase());
+    let marks = "";
+    for (let i = 0; i < 12; i++) { const a = (i / 12) * Math.PI * 2, r1 = r * 0.62, r2 = r * (i % 3 === 0 ? 0.71 : 0.68); marks += `<line x1="${(cx + Math.sin(a) * r1).toFixed(1)}" y1="${(cy - Math.cos(a) * r1).toFixed(1)}" x2="${(cx + Math.sin(a) * r2).toFixed(1)}" y2="${(cy - Math.cos(a) * r2).toFixed(1)}" stroke="${acc}" stroke-width="3"/>`; }
+    return `<svg viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="${uid}g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${c.l}"/><stop offset=".5" stop-color="${c.m}"/><stop offset="1" stop-color="${c.d}"/></linearGradient><radialGradient id="${uid}d" cx=".4" cy=".35" r=".8"><stop offset="0" stop-color="${mixHex(dialFill, "#ffffff", .18)}"/><stop offset="1" stop-color="${mixHex(dialFill, "#000000", .35)}"/></radialGradient></defs>
       <ellipse cx="${cx}" cy="${cy + r + 40}" rx="${r * 0.8}" ry="10" fill="#000" opacity=".35"/>
-      <path d="${toD(shapePoints(s.shape, r))}" fill="url(#${uid}g)"/><path d="${toD(shapePoints(s.shape, r * 0.84))}" fill="url(#${uid}f)"/>
-      ${mono ? `<text x="${cx}" y="${cy + r * 0.17}" text-anchor="middle" font-family="Cormorant Garamond, Georgia, serif" font-size="${(r * (mono.length > 2 ? 0.36 : 0.48)).toFixed(1)}" fill="${dark ? "#e6d3a3" : "#2a2216"}">${mono}</text>` : ""}</svg>`;
+      <rect x="${cx + r - 4}" y="${cy - 10}" width="18" height="20" rx="3" fill="url(#${uid}g)"/>
+      <path d="${toD(shapePoints(s.res.shape, r))}" fill="url(#${uid}g)"/>
+      <path d="${toD(shapePoints(s.res.shape, r * 0.965))}" fill="none" stroke="${c.d}" stroke-opacity=".6" stroke-width="2"/>
+      <path d="${toD(shapePoints(s.res.shape, r * 0.8))}" fill="url(#${uid}d)" stroke="#000" stroke-opacity=".5" stroke-width="2"/>
+      ${marks}
+      ${mono ? `<text x="${cx}" y="${cy + r * 0.13}" text-anchor="middle" font-family="${script ? "Pinyon Script, cursive" : "Cormorant Garamond, Georgia, serif"}" font-size="${(r * (script ? 0.42 : 0.34)).toFixed(1)}" fill="${acc}">${mono}</text>` : ""}
+      <ellipse cx="${cx - r * 0.2}" cy="${cy - r * 0.35}" rx="${r * 0.45}" ry="${r * 0.18}" fill="#fff" opacity=".08"/></svg>`;
   }
 
   // ================= 3D stage (three.js) =================
@@ -701,106 +758,195 @@
       return t;
     }
 
-    function buildClip(s) {
-      const f = finishOf(s), R = s.size / 2, inner = R * 0.84;
-      const group = new THREE.Group();
-      const outerPts = shapePoints(s.shape, R), innerPts = shapePoints(s.shape, inner);
-      const metal = (extra) => track(new THREE.MeshPhysicalMaterial(Object.assign({ color: new THREE.Color(f.base).convertSRGBToLinear(), metalness: f.metalness, roughness: f.rough, envMapIntensity: 1.25 }, extra || {})));
+    const metalMat = (hex, rough, metalness, extra) => track(new THREE.MeshPhysicalMaterial(Object.assign({ color: new THREE.Color(hex).convertSRGBToLinear(), metalness, roughness: rough, envMapIntensity: 1.25 }, extra || {})));
+    const darkMat = () => track(new THREE.MeshStandardMaterial({ color: 0x1c1b19, metalness: 0.4, roughness: 0.55 }));
 
-      const ring = toShape(outerPts); ring.holes.push(toPath(innerPts));
-      const ringGeo = track(new THREE.ExtrudeGeometry(ring, { depth: 3, bevelEnabled: true, bevelThickness: 0.9, bevelSize: 0.8, bevelSegments: 6, curveSegments: 16 }));
-      let rimCap = metal();
-      if (s.pattern === "knurl") {
-        const bb = bbox(outerPts);
-        const bump = canvasTex((g, S, P, k) => {
-          g.fillStyle = "#808080"; g.fillRect(0, 0, S, S);
-          g.strokeStyle = "#000"; g.lineWidth = S * 0.006;
-          const c0 = P(0, 0);
-          for (let i = 0; i < 140; i++) { const a = (i / 140) * Math.PI * 2; g.beginPath(); g.moveTo(c0[0] + Math.cos(a) * inner * k, c0[1] + Math.sin(a) * inner * k); g.lineTo(c0[0] + Math.cos(a) * R * k * 1.1, c0[1] + Math.sin(a) * R * k * 1.1); g.stroke(); }
-        }, bb, 1024);
-        rimCap = metal({ bumpMap: bump, bumpScale: 0.6 });
+    function addMounts(group, R, mount, zBack, topMat) {
+      const dark = darkMat();
+      if (mount === "vent" || mount === "both") {
+        const stem = new THREE.Mesh(track(new THREE.BoxGeometry(5, 4, 9)), dark); stem.position.set(0, 0, zBack - 4.5); group.add(stem);
+        for (const sx of [-1.8, 1.8]) { const prong = new THREE.Mesh(track(new THREE.BoxGeometry(1.2, 1.2, 16)), dark); prong.position.set(sx, 0, zBack - 16); group.add(prong); }
+        const hook = new THREE.Mesh(track(new THREE.TorusGeometry(2.2, 0.6, 10, 20, Math.PI)), dark); hook.rotation.y = Math.PI / 2; hook.position.set(0, -2.2, zBack - 24); group.add(hook);
       }
-      group.add(new THREE.Mesh(ringGeo, [rimCap, metal()]));
-
-      const bbF = bbox(innerPts);
-      const enamel = f.id === "enamel" ? enamelOf(s).c : null;
-      const carbon = s.pattern === "carbon";
-      const darkFace = f.dark || !!enamel || carbon;
-      const faceTex = canvasTex((g, S, P, k) => {
-        const c0 = P(0, 0), cx = c0[0], cy = c0[1], rr = inner * k;
-        if (carbon) {
-          g.fillStyle = "#151515"; g.fillRect(0, 0, S, S);
-          g.save(); g.translate(cx, cy); g.rotate(Math.PI / 4);
-          const q = S / 40;
-          for (let y = -S; y < S; y += q) for (let x = -S; x < S; x += q) {
-            const odd = (Math.round(x / q) + Math.round(y / q)) % 2 === 0;
-            const gr = g.createLinearGradient(x, y, x + q, y + q);
-            gr.addColorStop(0, odd ? "#3a3a3a" : "#1c1c1c"); gr.addColorStop(1, odd ? "#1e1e1e" : "#2c2c2c");
-            g.fillStyle = gr; g.fillRect(x, y, q, q);
-          }
-          g.restore();
-        } else if (enamel) {
-          const gr = g.createRadialGradient(cx - rr * 0.3, cy - rr * 0.3, 0, cx, cy, rr * 1.3);
-          gr.addColorStop(0, mixHex(enamel, "#ffffff", 0.18)); gr.addColorStop(1, mixHex(enamel, "#000000", 0.25));
-          g.fillStyle = gr; g.fillRect(0, 0, S, S);
-        } else {
-          g.fillStyle = f.base; g.fillRect(0, 0, S, S);
-          g.globalAlpha = 0.06;
-          for (let i = 0; i < 900; i++) { g.strokeStyle = Math.random() > 0.5 ? "#fff" : "#000"; g.lineWidth = 1; const y = Math.random() * S; g.beginPath(); g.moveTo(0, y); g.lineTo(S, y + (Math.random() - 0.5) * 4); g.stroke(); }
-          g.globalAlpha = 1;
-        }
-        if (s.pattern === "guilloche") {
-          g.save(); g.globalAlpha = darkFace ? 0.22 : 0.32; g.strokeStyle = darkFace ? "#fff" : "#3b2b12"; g.lineWidth = S * 0.0018;
-          for (let i = 0; i < 48; i++) { g.beginPath(); g.ellipse(cx, cy, rr * 0.82, rr * 0.27, (i * Math.PI) / 48, 0, Math.PI * 2); g.stroke(); }
-          g.restore();
-        }
-        if (s.pattern === "perforated") {
-          const step = rr * 0.15;
-          g.fillStyle = "#070605";
-          for (let y = -rr; y <= rr; y += step) for (let x = -rr; x <= rr; x += step) {
-            const off = (Math.round((y + rr) / step) % 2) * step / 2, px = x + off, d = Math.hypot(px, y);
-            if (d < rr * 0.74 && d > rr * 0.4) { g.beginPath(); g.arc(cx + px, cy + y, rr * 0.035, 0, Math.PI * 2); g.fill(); }
-          }
-        }
-        const mono = (s.engraving || "").slice(0, 3).toUpperCase();
-        const ink = darkFace ? "#e3cd93" : "#3a2a12";
-        g.textAlign = "center"; g.textBaseline = "middle";
-        if (mono) {
-          const fs = rr * (mono.length >= 3 ? 0.42 : mono.length === 2 ? 0.55 : 0.68);
-          g.font = `500 ${fs}px "Cormorant Garamond", Georgia, serif`;
-          g.fillStyle = darkFace ? "rgba(0,0,0,.35)" : "rgba(255,255,255,.35)"; g.fillText(mono, cx + S * 0.002, cy + S * 0.004);
-          g.fillStyle = ink; g.fillText(mono, cx, cy);
-        }
-        const ed = s.line === "reserve" ? `RESERVE · ${String(s.edition || "001").padStart(3, "0").slice(-3)} / 100` : "SUTHERLAND";
-        g.font = `500 ${rr * 0.085}px "IBM Plex Mono", monospace`; g.fillStyle = ink; g.globalAlpha = 0.8;
-        if ("letterSpacing" in g) g.letterSpacing = `${rr * 0.03}px`;
-        g.fillText(ed, cx, cy + rr * 0.62); g.globalAlpha = 1;
-      }, bbF, 1024);
-      const faceMat = track(new THREE.MeshPhysicalMaterial(enamel || carbon
-        ? { map: faceTex, metalness: carbon ? 0.25 : 0.0, roughness: carbon ? 0.35 : 0.22, clearcoat: 1, clearcoatRoughness: 0.06, envMapIntensity: 0.7, bumpMap: faceTex, bumpScale: 0.15 }
-        : { map: faceTex, color: 0xffffff, metalness: f.metalness, roughness: Math.min(0.6, f.rough + 0.04), envMapIntensity: 1.25, bumpMap: faceTex, bumpScale: 0.35 }));
-      const faceGeo = track(new THREE.ExtrudeGeometry(toShape(innerPts), { depth: 3.0, bevelEnabled: false, curveSegments: 16 }));
-      const face = new THREE.Mesh(faceGeo, [faceMat, metal()]);
-      face.position.z = -0.5;
-      group.add(face);
-
-      const dark = track(new THREE.MeshStandardMaterial({ color: 0x1c1b19, metalness: 0.4, roughness: 0.55 }));
-      const magnet = new THREE.Mesh(track(new THREE.CylinderGeometry(R * 0.32, R * 0.32, 2, 48)), dark); magnet.rotation.x = Math.PI / 2; magnet.position.z = -2.2; group.add(magnet);
-      if (s.mount === "vent" || s.mount === "both") {
-        const stem = new THREE.Mesh(track(new THREE.BoxGeometry(5, 4, 9)), dark); stem.position.set(0, 0, -6.5); group.add(stem);
-        for (const sx of [-1.8, 1.8]) { const prong = new THREE.Mesh(track(new THREE.BoxGeometry(1.2, 1.2, 16)), dark); prong.position.set(sx, 0, -18); group.add(prong); }
-        const hook = new THREE.Mesh(track(new THREE.TorusGeometry(2.2, 0.6, 10, 20, Math.PI)), dark); hook.rotation.y = Math.PI / 2; hook.position.set(0, -2.2, -26); group.add(hook);
-      }
-      if (s.mount === "stick" || s.mount === "both") {
+      if (mount === "stick" || mount === "both") {
         const base = new THREE.Group();
         const pad = new THREE.Mesh(track(new THREE.CylinderGeometry(R * 0.42, R * 0.46, 3.2, 64)), dark);
-        const ringTop = new THREE.Mesh(track(new THREE.CylinderGeometry(R * 0.3, R * 0.3, 0.8, 64)), metal());
-        ringTop.position.y = 2; base.add(pad, ringTop);
-        base.rotation.x = Math.PI / 2 - 0.35;
-        base.scale.setScalar(0.85);
-        base.position.set(R * 1.62, -R * 1.02, -8);
+        const top = new THREE.Mesh(track(new THREE.CylinderGeometry(R * 0.3, R * 0.3, 0.8, 64)), topMat);
+        top.position.y = 2; base.add(pad, top);
+        base.rotation.x = Math.PI / 2 - 0.35; base.scale.setScalar(0.85);
+        base.position.set(R * 1.62, -R * 1.02, zBack - 2);
         group.add(base);
       }
+    }
+
+    // Signature: a simple, well-made die-cast coin.
+    function buildSignature(s) {
+      const f = sigFinish(s), R = 21, inner = R * 0.84, group = new THREE.Group();
+      const outerPts = shapePoints("round", R), innerPts = shapePoints("round", inner);
+      const m = () => metalMat(f.base, f.rough, f.metalness);
+      const ring = toShape(outerPts); ring.holes.push(toPath(innerPts));
+      group.add(new THREE.Mesh(track(new THREE.ExtrudeGeometry(ring, { depth: 3, bevelEnabled: true, bevelThickness: 0.9, bevelSize: 0.8, bevelSegments: 8, curveSegments: 48 })), [m(), m()]));
+      const tex = canvasTex((g, S, P, k) => {
+        const c0 = P(0, 0), cx = c0[0], cy = c0[1], rr = inner * k;
+        g.fillStyle = f.base; g.fillRect(0, 0, S, S);
+        g.globalAlpha = 0.06;
+        for (let i = 0; i < 900; i++) { g.strokeStyle = Math.random() > 0.5 ? "#fff" : "#000"; g.lineWidth = 1; const y = Math.random() * S; g.beginPath(); g.moveTo(0, y); g.lineTo(S, y + (Math.random() - 0.5) * 4); g.stroke(); }
+        g.globalAlpha = 1;
+        if (s.sig.face === "sunburst") {
+          for (let i = 0; i < 180; i++) { const a = (i / 180) * Math.PI * 2; g.strokeStyle = i % 2 ? (f.dark ? "rgba(255,255,255,.07)" : "rgba(255,255,255,.2)") : "rgba(0,0,0,.14)"; g.lineWidth = S * 0.006; g.beginPath(); g.moveTo(cx + Math.cos(a) * rr * 0.34, cy + Math.sin(a) * rr * 0.34); g.lineTo(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr); g.stroke(); }
+        }
+        const ink = f.dark ? "#d9c08a" : "#3a2a12";
+        g.textAlign = "center"; g.textBaseline = "middle";
+        if (s.sig.initial) {
+          g.font = `500 ${rr * 0.62}px "Cormorant Garamond", Georgia, serif`;
+          g.fillStyle = f.dark ? "rgba(0,0,0,.4)" : "rgba(255,255,255,.35)"; g.fillText(s.sig.initial, cx + S * 0.002, cy + S * 0.004);
+          g.fillStyle = ink; g.fillText(s.sig.initial, cx, cy);
+        }
+        g.font = `500 ${rr * 0.085}px "IBM Plex Mono", monospace`; g.fillStyle = ink; g.globalAlpha = 0.8;
+        if ("letterSpacing" in g) g.letterSpacing = `${rr * 0.03}px`;
+        g.fillText("SUTHERLAND", cx, cy + rr * 0.62); g.globalAlpha = 1;
+        if ("letterSpacing" in g) g.letterSpacing = "0px";
+      }, bbox(innerPts), 1024);
+      const faceMat = track(new THREE.MeshPhysicalMaterial({ map: tex, color: 0xffffff, metalness: f.metalness, roughness: Math.min(0.65, f.rough + 0.05), envMapIntensity: 1.2, bumpMap: tex, bumpScale: 0.35 }));
+      const face = new THREE.Mesh(track(new THREE.ExtrudeGeometry(toShape(innerPts), { depth: 3, bevelEnabled: false, curveSegments: 48 })), [faceMat, m()]);
+      face.position.z = -0.5; group.add(face);
+      const magnet = new THREE.Mesh(track(new THREE.CylinderGeometry(R * 0.32, R * 0.32, 2, 48)), darkMat()); magnet.rotation.x = Math.PI / 2; magnet.position.z = -2.2; group.add(magnet);
+      addMounts(group, R, s.sig.mount, -2, m());
+      return group;
+    }
+
+    function drawDial(g, S, P, k, s, dr) {
+      const r = s.res, c0 = P(0, 0), cx = c0[0], cy = c0[1], rr = dr * k, col = dialColorOf(s).c;
+      if (r.dial === "walnut") {
+        const n = 512, img = g.createImageData(n, n);
+        for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+          const w = Math.sin(x * 0.019 + Math.sin(y * 0.023) * 3.1) * 1.4 + Math.sin(y * 0.031 + Math.sin(x * 0.017) * 2.6) + 0.5 * Math.sin((x - y) * 0.06 + Math.sin(y * 0.05) * 1.8);
+          const t = Math.pow(0.5 + 0.5 * Math.sin(w * 6.0 + x * 0.004), 1.6), i = (y * n + x) * 4;
+          img.data[i] = 42 + t * 96; img.data[i + 1] = 22 + t * 52; img.data[i + 2] = 10 + t * 22; img.data[i + 3] = 255;
+        }
+        const tmp = document.createElement("canvas"); tmp.width = tmp.height = n; tmp.getContext("2d").putImageData(img, 0, 0);
+        g.drawImage(tmp, 0, 0, S, S);
+        for (let i = 0; i < 140; i++) { const x = Math.random() * S, y = Math.random() * S, rr2 = 2 + Math.random() * 5; const eg = g.createRadialGradient(x, y, 0, x, y, rr2 * 2.2); eg.addColorStop(0, "rgba(18,8,2,.85)"); eg.addColorStop(0.45, "rgba(40,20,8,.5)"); eg.addColorStop(1, "rgba(40,20,8,0)"); g.fillStyle = eg; g.beginPath(); g.arc(x, y, rr2 * 2.2, 0, Math.PI * 2); g.fill(); }
+        const sheen = g.createLinearGradient(0, 0, S, S); sheen.addColorStop(0, "rgba(255,200,140,.10)"); sheen.addColorStop(1, "rgba(0,0,0,.25)"); g.fillStyle = sheen; g.fillRect(0, 0, S, S);
+      } else if (r.dial === "carbon") {
+        g.fillStyle = "#0e0e0e"; g.fillRect(0, 0, S, S);
+        for (let i = 0; i < 1400; i++) {
+          const x = Math.random() * S, y = Math.random() * S, sz = 6 + Math.random() * 26, a = Math.random() * Math.PI, v = (20 + Math.random() * 55) | 0;
+          g.fillStyle = `rgb(${v},${v},${v})`; g.save(); g.translate(x, y); g.rotate(a);
+          g.beginPath(); g.moveTo(-sz, 0); g.lineTo(0, -sz * 0.3); g.lineTo(sz * 0.8, sz * 0.1); g.lineTo(-sz * 0.2, sz * 0.4); g.closePath(); g.fill(); g.restore();
+        }
+      } else if (r.dial === "enamel") {
+        const gr = g.createRadialGradient(cx - rr * 0.25, cy - rr * 0.3, 0, cx, cy, rr * 1.2);
+        gr.addColorStop(0, mixHex(col, "#ffffff", 0.12)); gr.addColorStop(1, mixHex(col, "#000000", 0.18));
+        g.fillStyle = gr; g.fillRect(0, 0, S, S);
+      } else {
+        g.fillStyle = col; g.fillRect(0, 0, S, S);
+        if (r.dial === "sunburst") {
+          for (let i = 0; i < 720; i++) { const a = (i / 720) * Math.PI * 2; g.strokeStyle = i % 2 ? "rgba(255,255,255,.10)" : "rgba(0,0,0,.12)"; g.lineWidth = S * 0.003; g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx + Math.cos(a) * S, cy + Math.sin(a) * S); g.stroke(); }
+          const v = g.createRadialGradient(cx, cy, 0, cx, cy, rr); v.addColorStop(0, "rgba(255,255,255,.12)"); v.addColorStop(1, "rgba(0,0,0,.25)"); g.fillStyle = v; g.fillRect(0, 0, S, S);
+        } else {
+          const q = S / 36;
+          const tri = (p, fill) => { g.fillStyle = fill; g.beginPath(); g.moveTo(p[0], p[1]); g.lineTo(p[2], p[3]); g.lineTo(p[4], p[5]); g.closePath(); g.fill(); };
+          g.save(); g.translate(cx, cy); g.rotate(Math.PI / 4);
+          for (let y = -S; y < S; y += q) for (let x = -S; x < S; x += q) {
+            const mx = x + q / 2, my = y + q / 2;
+            tri([x, y, x + q, y, mx, my], "rgba(255,255,255,.16)");
+            tri([x + q, y, x + q, y + q, mx, my], "rgba(0,0,0,.10)");
+            tri([x + q, y + q, x, y + q, mx, my], "rgba(0,0,0,.24)");
+            tri([x, y + q, x, y, mx, my], "rgba(255,255,255,.06)");
+          }
+          g.restore();
+        }
+      }
+      // halo shadow at the edge and a fine chapter ring
+      g.strokeStyle = "rgba(0,0,0,.6)"; g.lineWidth = rr * 0.035; g.beginPath(); g.arc(cx, cy, rr * 0.985, 0, Math.PI * 2); g.stroke();
+      const lightDial = (r.dial === "enamel" && r.enamel === "ivory") || ((r.dial === "sunburst" || r.dial === "clous") && r.dialColor === "champagne");
+      g.strokeStyle = lightDial ? "rgba(40,30,20,.35)" : "rgba(255,255,255,.18)"; g.lineWidth = rr * 0.006; g.beginPath(); g.arc(cx, cy, rr * 0.9, 0, Math.PI * 2); g.stroke();
+      const acc = accentHex(s), script = r.font === "script", mono = script ? r.monogram : r.monogram.toUpperCase();
+      g.textAlign = "center"; g.textBaseline = "middle";
+      if (mono) {
+        const fs = rr * (script ? (mono.length > 2 ? 0.5 : 0.62) : mono.length > 2 ? 0.38 : mono.length === 2 ? 0.48 : 0.6);
+        g.font = `${script ? 400 : 600} ${fs}px ${script ? '"Pinyon Script", cursive' : '"Cormorant Garamond", Georgia, serif'}`;
+        g.fillStyle = "rgba(0,0,0,.45)"; g.fillText(mono, cx + rr * 0.012, cy + rr * 0.02);
+        const lg = g.createLinearGradient(0, cy - fs / 2, 0, cy + fs / 2);
+        lg.addColorStop(0, mixHex(acc, "#ffffff", 0.45)); lg.addColorStop(0.55, acc); lg.addColorStop(1, mixHex(acc, "#000000", 0.35));
+        g.fillStyle = lg; g.fillText(mono, cx, cy);
+      }
+      g.fillStyle = lightDial ? "rgba(40,30,18,.8)" : mixHex(acc, "#ffffff", 0.2); g.globalAlpha = 0.85;
+      if ("letterSpacing" in g) g.letterSpacing = `${rr * 0.025}px`;
+      g.font = `500 ${rr * 0.07}px "IBM Plex Mono", monospace`; g.fillText("SUTHERLAND", cx, cy - rr * 0.46);
+      g.font = `500 ${rr * 0.055}px "IBM Plex Mono", monospace`; g.fillText(`RESERVE · ${String(r.edition || "001").padStart(3, "0")} / 100`, cx, cy + rr * 0.48);
+      if ("letterSpacing" in g) g.letterSpacing = "0px";
+      g.globalAlpha = 1;
+    }
+
+    // Reserve: watch-inspired case, separate bezel, dial, domed crystal, crown.
+    function buildReserve(s) {
+      const r = s.res, c = resCase(s), R = r.size / 2, group = new THREE.Group();
+      const caseMat = metalMat(c.base, c.rough, c.metalness);
+      const outer = shapePoints(r.shape, R), bezO = shapePoints(r.shape, R * 0.965), dialPts = shapePoints(r.shape, R * 0.8);
+      const body = new THREE.Mesh(track(new THREE.ExtrudeGeometry(toShape(outer), { depth: 5, bevelEnabled: true, bevelThickness: 1.4, bevelSize: 1.1, bevelSegments: 10, curveSegments: 48 })), [caseMat, caseMat]);
+      body.position.z = -6.2; group.add(body);
+      let bezCap;
+      if (r.bezel !== "polished") {
+        const bump = canvasTex((g, S, P, k) => {
+          const c0 = P(0, 0); g.fillStyle = "#808080"; g.fillRect(0, 0, S, S);
+          if (r.bezel === "fluted" && g.createConicGradient) {
+            const cg = g.createConicGradient(0, c0[0], c0[1]), n = 60;
+            for (let i = 0; i < n; i++) { cg.addColorStop(i / n, "#202020"); cg.addColorStop((i + 0.5) / n, "#f0f0f0"); }
+            cg.addColorStop(1, "#202020"); g.fillStyle = cg; g.fillRect(0, 0, S, S);
+          } else {
+            g.strokeStyle = "#000"; g.lineWidth = S * (r.bezel === "fluted" ? 0.012 : 0.004);
+            const n = r.bezel === "fluted" ? 60 : 220;
+            for (let i = 0; i < n; i++) { const a = (i / n) * Math.PI * 2; g.beginPath(); g.moveTo(c0[0] + Math.cos(a) * R * 0.78 * k, c0[1] + Math.sin(a) * R * 0.78 * k); g.lineTo(c0[0] + Math.cos(a) * R * 1.1 * k, c0[1] + Math.sin(a) * R * 1.1 * k); g.stroke(); }
+          }
+        }, bbox(bezO), 1024);
+        bezCap = metalMat(c.base, Math.max(0.12, c.rough - 0.05), c.metalness, { bumpMap: bump, bumpScale: r.bezel === "fluted" ? 1.2 : 0.7 });
+      } else bezCap = metalMat(c.base, Math.max(0.05, c.rough - 0.12), c.metalness);
+      const ring = toShape(bezO); ring.holes.push(toPath(dialPts));
+      const bez = new THREE.Mesh(track(new THREE.ExtrudeGeometry(ring, { depth: 1.4, bevelEnabled: true, bevelThickness: 0.55, bevelSize: 0.45, bevelSegments: 8, curveSegments: 48 })), [bezCap, caseMat]);
+      bez.position.z = 0.25; group.add(bez);
+
+      const dialTex = canvasTex((g, S, P, k) => drawDial(g, S, P, k, s, R * 0.8), bbox(dialPts), 1024);
+      const dm = r.dial === "walnut" ? { metalness: 0, roughness: 0.5, clearcoat: 0.8, clearcoatRoughness: 0.12, envMapIntensity: 0.55 }
+        : r.dial === "carbon" ? { metalness: 0.3, roughness: 0.4, clearcoat: 1, clearcoatRoughness: 0.05 }
+        : r.dial === "enamel" ? { metalness: 0, roughness: 0.4, clearcoat: 0.7, clearcoatRoughness: 0.04, envMapIntensity: 0.3 }
+        : { metalness: 0.75, roughness: 0.32 };
+      const dialMat = track(new THREE.MeshPhysicalMaterial(Object.assign({ map: dialTex, bumpMap: dialTex, bumpScale: r.dial === "clous" ? 0.5 : 0.15, envMapIntensity: 1.1 }, dm)));
+      const dialMesh = new THREE.Mesh(track(new THREE.ExtrudeGeometry(toShape(dialPts), { depth: 0.6, bevelEnabled: false, curveSegments: 48 })), [dialMat, caseMat]);
+      dialMesh.position.z = 0.1; group.add(dialMesh);
+
+      const accMat = metalMat(accentHex(s), 0.12, 1);
+      const rm = R * 0.8 * 0.8;
+      for (let i = 0; i < 12; i++) {
+        const a = (i / 12) * Math.PI * 2, len = i % 3 === 0 ? R * 0.11 : R * 0.07, w = i === 0 ? 1.2 : 0.7;
+        const mk = new THREE.Mesh(track(new THREE.BoxGeometry(w, len, 0.45)), accMat);
+        mk.position.set(Math.sin(a) * rm, Math.cos(a) * rm, 0.95); mk.rotation.z = -a; group.add(mk);
+      }
+
+      const glass = track(new THREE.MeshPhysicalMaterial({ color: 0xffffff, metalness: 0, roughness: 0, transparent: true, opacity: 0.06, clearcoat: 1, clearcoatRoughness: 0, envMapIntensity: 1.6, depthWrite: false }));
+      if (r.shape === "round") {
+        const a = R * 0.8, h = R * 0.09, Rs = (a * a + h * h) / (2 * h), th = Math.asin(a / Rs);
+        const dome = new THREE.Mesh(track(new THREE.SphereGeometry(Rs, 96, 24, 0, Math.PI * 2, 0, th)), glass);
+        dome.rotation.x = Math.PI / 2; dome.position.z = 2.0 - (Rs - h); group.add(dome);
+      } else {
+        const flat = new THREE.Mesh(track(new THREE.ExtrudeGeometry(toShape(dialPts), { depth: 0.8, bevelEnabled: true, bevelThickness: 0.3, bevelSize: 0.3, bevelSegments: 4, curveSegments: 48 })), glass);
+        flat.position.z = 1.4; group.add(flat);
+      }
+
+      const kn = document.createElement("canvas"); kn.width = 256; kn.height = 32;
+      const kg = kn.getContext("2d"); for (let x = 0; x < 256; x += 8) { kg.fillStyle = "#fff"; kg.fillRect(x, 0, 4, 32); kg.fillStyle = "#222"; kg.fillRect(x + 4, 0, 4, 32); }
+      const knurlTex = track(new THREE.CanvasTexture(kn));
+      const crownSide = metalMat(c.base, Math.max(0.1, c.rough - 0.05), c.metalness, { bumpMap: knurlTex, bumpScale: 0.8 });
+      const crown = new THREE.Mesh(track(new THREE.CylinderGeometry(R * 0.1, R * 0.1, 3.4, 48)), [crownSide, caseMat, caseMat]);
+      crown.rotation.z = Math.PI / 2; crown.position.set(R + 1.5, 0, -3.2); group.add(crown);
+      const crownStem = new THREE.Mesh(track(new THREE.CylinderGeometry(R * 0.05, R * 0.05, 2.4, 24)), caseMat);
+      crownStem.rotation.z = Math.PI / 2; crownStem.position.set(R - 0.1, 0, -3.2); group.add(crownStem);
+
+      const ano = track(new THREE.MeshPhysicalMaterial({ color: 0x121212, metalness: 0.8, roughness: 0.42 }));
+      const cart = new THREE.Mesh(track(new THREE.CylinderGeometry(R * 0.6, R * 0.6, 3, 64)), ano);
+      cart.rotation.x = Math.PI / 2; cart.position.z = -9.1; group.add(cart);
+      addMounts(group, R, r.mount, -10.6, accMat);
       return group;
     }
 
@@ -842,7 +988,8 @@
     function build(s) {
       disposeAll();
       isCard = s.line === "daily";
-      root = isCard ? buildCard(s) : buildClip(s);
+      if (s.line === "reserve" && s.res.font === "script" && document.fonts && !document.fonts.check('40px "Pinyon Script"')) document.fonts.load('400 40px "Pinyon Script"').then(() => { built3DKey = ""; renderStage(); }).catch(() => {});
+      root = isCard ? buildCard(s) : s.line === "reserve" ? buildReserve(s) : buildSignature(s);
       scene.add(root);
       const bx = new THREE.Box3().setFromObject(root), size = new THREE.Vector3(), ctr = new THREE.Vector3();
       bx.getSize(size); bx.getCenter(ctr);
@@ -1005,7 +1152,12 @@
 
   // ================= Rendering: stage + summaries =================
   let build3DTimer = null, built3DKey = "";
-  function objectKey(s) { return JSON.stringify([s.line, s.shape, s.size, s.finish, s.pattern, s.engraving, s.edition, s.enamel, s.mount, s.card, s.line === "daily" ? [s.scent.name, s.scent.formula] : 0]); }
+  function objectKey(s) { return JSON.stringify([s.line, s.line === "signature" ? s.sig : s.line === "reserve" ? s.res : s.card, s.line === "daily" ? [s.scent.name, s.scent.formula] : 0]); }
+  function readoutObject(s) {
+    if (s.line === "daily") return `<span>SMP Daily card · 70 × 95 mm</span><span>≈3 g · <b>$6</b></span>`;
+    if (s.line === "signature") return `<span><b>42 mm</b> · ${esc(sigFinish(s).label)} zinc</span><span>~<b>${Math.round(weightGrams(s))} g</b> est. · <b>$${priceOf(s)}</b></span>`;
+    return `<span><b>${s.res.size} mm</b> · ${esc(resCase(s).label)} · ${esc(resDial(s).label)}</span><span>~<b>${Math.round(weightGrams(s))} g</b> est. · <b>$${priceOf(s)}</b></span>`;
+  }
   function renderStage() {
     const inLab = mode === "scent";
     $("beaker").hidden = !inLab;
@@ -1026,7 +1178,7 @@
     const s = state, t = total(s.scent.formula);
     $("readout").innerHTML = inLab
       ? `<span><b>${t}</b> / ${CAP} drops</span><span>${esc(s.scent.name || "Untitled")}</span>`
-      : `<span>${s.line === "daily" ? "SMP Daily card · 70 × 95 mm" : `<b>${s.size} mm</b> · ${esc(finishOf(s).label)}${finishOf(s).id === "enamel" ? " · " + esc(enamelOf(s).label) : ""}`}</span><span>${s.line === "daily" ? "≈3 g" : `~<b>${Math.round(weightGrams(s))} g</b> est.`} · <b>$${priceOf(s)}</b></span>`;
+      : readoutObject(s);
   }
 
   function notePills(f) {
@@ -1079,26 +1231,38 @@
   }
   const shapeIcon = (id) => `<svg class="shapeicon" viewBox="-22 -22 44 44" aria-hidden="true"><defs><linearGradient id="si${id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f1dca4"/><stop offset="1" stop-color="#7a6131"/></linearGradient></defs><path d="M${shapePoints(id, 17).map((p) => `${p[0].toFixed(1)} ${(-p[1]).toFixed(1)}`).join(" L")} Z" fill="url(#si${id})"/></svg>`;
 
+  const ball = (l, m, d) => `<span class="ball" style="--l:${l};--m:${m};--d:${d}"></span>`;
   function renderObjectPanel() {
     const s = state; let h = "";
     if (s.line === "daily") {
       h += `<div class="group"><span class="lbl">Card shape</span><div class="tiles">${tiles(CARD_SHAPES, s.card.shape, "card.shape", (x) => `<svg class="shapeicon" viewBox="-40 -54 80 108" aria-hidden="true"><path d="M${cardPoints(x.id).map((p) => `${p[0].toFixed(1)} ${(-p[1]).toFixed(1)}`).join(" L")} Z" fill="#2a2722" stroke="#8a7a5a"/></svg>`)}</div></div>`;
-      h += `<div class="group"><span class="lbl">Card color</span><div class="tiles">${tiles(CARD_COLORS, s.card.color, "card.color", (c) => `<span class="ball" style="--l:${mixHex(c.c, "#ffffff", .25)};--m:${c.c};--d:${mixHex(c.c, "#000000", .5)}"></span>`)}</div></div>`;
+      h += `<div class="group"><span class="lbl">Card color</span><div class="tiles">${tiles(CARD_COLORS, s.card.color, "card.color", (c) => ball(mixHex(c.c, "#ffffff", .25), c.c, mixHex(c.c, "#000000", .5)))}</div></div>`;
       h += `<div class="group"><span class="lbl">Print</span><p class="hint2">Daily never gets gold, so it can't cheapen the Signature and Reserve lines.</p><div class="pills">${pills(INKS, s.card.ink, "card.ink", true)}</div></div>`;
+    } else if (s.line === "signature") {
+      const g = s.sig;
+      h += `<div class="group"><span class="lbl">Signature · 42 mm die-cast zinc</span><p class="hint2">Kept simple on purpose: two finishes, two faces, one initial. The fine choices live in Reserve.</p>
+        <span class="hint2">Finish</span><div class="tiles">${tiles(SIG_FINISHES, g.finish, "sig.finish", (f) => ball(f.l, f.m, f.d))}</div>
+        <span class="hint2">Face</span><div class="tiles">${tiles(SIG_FACES, g.face, "sig.face", (x) => `<span class="patt ${x.id}"></span>`)}</div></div>`;
+      h += `<div class="group"><label for="sigInitial">Initial · one letter</label><input type="text" id="sigInitial" maxlength="1" value="${esc(g.initial)}" autocomplete="off" style="max-width:120px"></div>`;
+      h += `<div class="group"><span class="lbl">Mount</span><p class="hint2">Teslas, round Mercedes vents and many exotics won't hold a normal clip. "Both" covers every car.</p><div class="pills">${pills(MOUNTS, g.mount, "sig.mount")}</div></div>`;
     } else {
-      h += `<div class="group"><span class="lbl">${s.line === "reserve" ? "Metal & finish" : "Finish · zinc alloy"}</span><div class="tiles">${tiles(FINISHES[s.line], finishOf(s).id, "finish", (f) => {
-        const e = f.id === "enamel" ? enamelOf(s).c : null;
-        return `<span class="ball" style="--l:${e ? mixHex(e, "#ffffff", .35) : f.l};--m:${e || f.m};--d:${e ? mixHex(e, "#000000", .5) : f.d}"></span>`;
-      })}</div>`;
-      if (finishOf(s).id === "enamel") h += `<p class="hint2">Enamel color. Generic names only, never a carmaker's trademarked color name.</p><div class="pills">${pills(ENAMELS, s.enamel, "enamel", true)}</div>`;
+      const r = s.res, cs = resCase(s);
+      h += `<div class="group"><span class="lbl">Case</span><div class="tiles">${tiles(RES_CASES, r.case, "res.case", (c) => ball(c.l, c.m, c.d))}</div>
+        <div class="tiles">${tiles(RES_SHAPES, r.shape, "res.shape", (x) => shapeIcon(x.id))}</div>
+        <div class="pills">${pills(RES_SIZES.map((n) => ({ id: String(n), label: n + " mm" })), String(r.size), "res.size")}</div></div>`;
+      h += `<div class="group"><span class="lbl">Bezel</span><div class="tiles">${tiles(BEZELS, r.bezel, "res.bezel", (x) => `<span class="bz ${x.id}"></span>`)}</div></div>`;
+      const dc = (x) => (x.id === "enamel" ? (DIAL_ENAMEL.find((e) => e.id === r.enamel) || DIAL_ENAMEL[0]).c : (DIAL_METAL.find((e) => e.id === r.dialColor) || DIAL_METAL[0]).c);
+      h += `<div class="group"><span class="lbl">Dial</span><div class="tiles">${tiles(DIALS, r.dial, "res.dial", (x) => `<span class="dl ${x.id}" style="--c:${dc(x)}"></span>`)}</div>`;
+      if (r.dial === "sunburst" || r.dial === "clous") h += `<div class="pills">${pills(DIAL_METAL, r.dialColor, "res.dialColor", true)}</div>`;
+      if (r.dial === "enamel") h += `<p class="hint2">Grand feu: powdered glass fired in a kiln, layer by layer. It never fades. Made by a specialist enameller.</p><div class="pills">${pills(DIAL_ENAMEL, r.enamel, "res.enamel", true)}</div>`;
+      if (r.dial === "walnut") h += `<p class="hint2">Burl walnut veneer under clear lacquer, the same idea as a luxury car's dashboard trim.</p>`;
       h += `</div>`;
-      h += `<div class="group"><span class="lbl">Face shape</span><div class="tiles">${tiles(SHAPES, s.shape, "shape", (x) => shapeIcon(x.id))}</div>
-        <div class="rangehead"><label for="size">Size</label><span><b id="sizeVal">${s.size} mm</b> · ~<b id="wVal">${Math.round(weightGrams(s))}</b> g</span></div><input type="range" id="size" min="34" max="52" step="1" value="${s.size}"></div>`;
-      h += `<div class="group"><span class="lbl">Face pattern</span><div class="tiles">${tiles(PATTERNS, s.pattern, "pattern", (x) => `<span class="patt ${x.id}"></span>`)}</div></div>`;
-      h += `<div class="group"><div class="row2"><div><label for="engraving">Engraving · up to 3 letters</label><input type="text" id="engraving" maxlength="3" value="${esc(s.engraving)}" autocomplete="off"></div>`;
-      if (s.line === "reserve") h += `<div><label for="edition">Edition number</label><input type="text" id="edition" maxlength="3" inputmode="numeric" value="${esc(s.edition)}" autocomplete="off"></div>`;
-      h += `</div></div>`;
-      h += `<div class="group"><span class="lbl">Mount</span><p class="hint2">Teslas, round Mercedes vents and many exotics won't hold a normal clip. "Both" covers every car.</p><div class="pills">${pills(MOUNTS, s.mount, "mount")}</div></div>`;
+      h += `<div class="group"><span class="lbl">Monogram</span><div class="row2"><div><label for="resMono">Letters · up to 3</label><input type="text" id="resMono" maxlength="3" value="${esc(r.monogram)}" autocomplete="off"></div>
+        <div><label for="resEdition">Edition number</label><input type="text" id="resEdition" maxlength="3" inputmode="numeric" value="${esc(r.edition)}" autocomplete="off"></div></div>
+        <div class="pills">${pills(FONTS, r.font, "res.font")}</div>
+        <div class="pills">${pills(ACCENTS.map((a) => Object.assign({}, a, { c: a.c || cs.m })), r.accent, "res.accent", true)}</div></div>`;
+      h += `<div class="group"><span class="lbl">Leather case</span><div class="pills">${pills(LEATHERS, r.leather, "res.leather", true)}</div></div>`;
+      h += `<div class="group"><span class="lbl">Mount</span><p class="hint2">Reserve weighs about ${Math.round(weightGrams(s))} g. The magnetic stick-on base carries that weight best; "Both" covers every car.</p><div class="pills">${pills(MOUNTS, r.mount, "res.mount")}</div></div>`;
     }
     $("workshop").innerHTML = h;
   }
@@ -1138,26 +1302,42 @@
     const L = LINES[s.line], cr = costRange(s), f = s.scent.formula, t = total(f) || 1, tr = tiersOf(f);
     const ln = [];
     ln.push(`SUTHERLAND MOTOR PARFUM · ${L.label.toUpperCase()} LINE`);
-    ln.push(`Design: ${s.scent.name || "Untitled"}${s.line === "reserve" ? ` · Edition ${String(s.edition || "001").padStart(3, "0")}/100` : ""}`, "", "OBJECT");
+    ln.push(`Design: ${s.scent.name || "Untitled"}${s.line === "reserve" ? ` · Edition ${String(s.res.edition || "001").padStart(3, "0")}/100` : ""}`, "", "OBJECT");
     if (s.line === "daily") {
       const c = CARD_COLORS.find((x) => x.id === s.card.color), ink = INKS.find((x) => x.id === s.card.ink);
       ln.push(`  Format     Hanging scented card, paper pulp board, sealed foil sleeve`);
       ln.push(`  Shape      ${CARD_SHAPES.find((x) => x.id === s.card.shape).label}, approx. 70 × 95 mm`);
       ln.push(`  Color      ${c.label}, ${c.light ? "black" : ink.id === "black" ? "silver" : ink.label.toLowerCase()} print, "SMP Daily" mark, no gold`);
       ln.push(`  Hanger     Elastic cord, black`);
-    } else {
-      const fi = finishOf(s);
-      ln.push(`  Body       ${METAL_LABEL[fi.metal]}`);
-      ln.push(`  Face       ${SHAPES.find((x) => x.id === s.shape).label}, ${s.size} mm, approx. 4 mm thick, recessed face`);
-      ln.push(`  Finish     ${fi.label}${fi.id === "enamel" ? ` (${enamelOf(s).label})` : ""}${/pvd|gold|gunmetal/.test(fi.id) ? ", PVD coating" : ""}`);
-      ln.push(`  Pattern    ${PATTERNS.find((x) => x.id === s.pattern).label}`);
-      ln.push(`  Engraving  "${(s.engraving || "").toUpperCase() || "none"}"${s.line === "reserve" ? `, back: RESERVE ${String(s.edition || "001").padStart(3, "0")}/100` : ""}`);
-      ln.push(`  Refill     ${s.line === "reserve" ? "Sealed fine-fragrance cartridge, microporous membrane front, about 6–8 ml (stone insert as backup)" : "Porous ceramic disc, matte black, ribbed back, pressed logo"}`);
-      if (s.line === "signature") ln.push(`  Vent pad   Soft-touch silicone on the hook, protects vent louvers, stops rattle`);
-      ln.push(`  Mount      ${s.mount === "both" ? "Magnetic face + vent hook base + adhesive stick-on base" : s.mount === "vent" ? "Magnetic face + vent hook base" : "Magnetic face + adhesive stick-on base"}`);
+    } else if (s.line === "signature") {
+      const f = sigFinish(s);
+      ln.push(`  Body       Zinc alloy (Zamak 3), die-cast, 42 mm round, approx. 4 mm thick`);
+      ln.push(`  Finish     ${f.label}${f.id === "pvd-gold" ? ", PVD coating over base plate" : ", PVD or e-coat"}`);
+      ln.push(`  Face       ${s.sig.face === "sunburst" ? "Stamped sunburst" : "Plain, brushed"}`);
+      ln.push(`  Initial    "${s.sig.initial || "none"}", laser-etched, plus SUTHERLAND`);
+      ln.push(`  Refill     Porous ceramic disc, matte black, ribbed back, pressed logo`);
       ln.push(`  Magnets    Neodymium N42SH (high-temperature grade)`);
+      ln.push(`  Vent pad   Soft-touch silicone on the hook, protects vent louvers, stops rattle`);
+      ln.push(`  Mount      ${mountText(s.sig.mount)}`);
       ln.push(`  Weight     ~${Math.round(weightGrams(s))} g (estimate)`);
-      ln.push(`  Package    ${s.line === "reserve" ? "Leather case, rigid magnetic box, signed card, numbered certificate" : "Rigid black box, gold-foil logo, molded insert"}`);
+      ln.push(`  Package    Rigid black box, gold-foil logo, molded insert`);
+    } else {
+      const r = s.res, c = resCase(s), d = resDial(s);
+      const dialDesc = d.id === "walnut" ? "Burl walnut veneer under clear lacquer" : d.id === "carbon" ? "Forged carbon, clear-coated" : d.id === "enamel" ? `Grand feu (kiln-fired) enamel, ${dialColorOf(s).label.toLowerCase()}` : `${d.label}, ${dialColorOf(s).label.toLowerCase()}, on brass`;
+      ln.push(`  Case       ${METAL_LABEL[c.metal]}, ${r.shape} ${r.size} mm, approx. 9 mm thick`);
+      ln.push(`  Finish     ${c.label}`);
+      ln.push(`  Bezel      ${BEZELS.find((x) => x.id === r.bezel).label}, separate ring`);
+      ln.push(`  Dial       ${dialDesc}`);
+      ln.push(`  Crystal    ${r.shape === "round" ? "Domed" : "Flat"} sapphire crystal`);
+      ln.push(`  Crown      Knurled crown at 3 o'clock; push to release the cartridge`);
+      ln.push(`  Applied    Monogram "${r.monogram || "none"}" in ${r.font} lettering, 12 raised markers, ${ACCENTS.find((a) => a.id === r.accent).label.toLowerCase()} finish`);
+      ln.push(`  Engraving  Caseback: RESERVE ${String(r.edition || "001").padStart(3, "0")}/100`);
+      ln.push(`  Scent exit Halo gap around the bezel`);
+      ln.push(`  Refill     Sealed fine-fragrance cartridge, microporous membrane front, about 6–8 ml (stone insert as backup)`);
+      ln.push(`  Magnets    Neodymium N42SH (high-temperature grade), gold-plated`);
+      ln.push(`  Mount      ${mountText(r.mount)}`);
+      ln.push(`  Weight     ~${Math.round(weightGrams(s))} g (estimate)`);
+      ln.push(`  Package    ${LEATHERS.find((x) => x.id === r.leather).label} full-grain leather case, rigid magnetic box, signed numbered certificate`);
     }
     const ts = TIER_SPEC[s.line];
     ln.push("", "SCENT", `  Name       ${s.scent.name || "Untitled"}`);
@@ -1179,7 +1359,7 @@
   function renderSpecPanel() {
     const s = state, cr = costRange(s), price = priceOf(s);
     $("workshop").innerHTML = `<div class="group"><div class="economics">
-        <div><span>Retail</span><b>$${price}</b><small>${esc(LINES[s.line].priceNote)}${price === 395 ? " · titanium (suggested)" : ""}</small></div>
+        <div><span>Retail</span><b>$${price}</b><small>${esc(LINES[s.line].priceNote)}${s.line === "reserve" && price !== 295 ? " · with upgrades (suggested)" : ""}</small></div>
         <div><span>Landed cost</span><b>${money(cr[0])}–${money(cr[1])}</b><small>rough estimate</small></div>
         <div><span>Gross / unit</span><b>${money(price - cr[1])}+</b><small>before shipping & fees</small></div></div>
       <pre class="spec" id="specText"></pre>
@@ -1253,12 +1433,11 @@
     if (t.dataset.line) {
       if (t.dataset.line === state.line) return;
       state.line = t.dataset.line;
-      if (state.line !== "daily" && !FINISHES[state.line].some((f) => f.id === state.finish)) state.finish = FINISHES[state.line][0].id;
       state.scent.strength = LINES[state.line].strength;
       return renderAll();
     }
     if (t.dataset.mode) { mode = t.dataset.mode; if (mode === "scent") Beaker.settle(); return renderAll(); }
-    if (t.dataset.set) { const parts = t.dataset.set.split("."); if (parts[1]) state[parts[0]][parts[1]] = t.dataset.val; else state[parts[0]] = t.dataset.val; return renderAll(); }
+    if (t.dataset.set) { const parts = t.dataset.set.split("."), v = t.dataset.set === "res.size" ? +t.dataset.val : t.dataset.val; if (parts[1]) state[parts[0]][parts[1]] = v; else state[parts[0]] = v; return renderAll(); }
     if (t.dataset.vial) return addDrop(t.dataset.vial);
     if (t.dataset.inc) return addDrop(t.dataset.inc);
     if (t.dataset.dec) {
@@ -1279,9 +1458,9 @@
 
   document.addEventListener("input", (e) => {
     const t = e.target;
-    if (t.id === "size") { state.size = +t.value; $("sizeVal").textContent = state.size + " mm"; $("wVal").textContent = Math.round(weightGrams(state)); return renderLive(); }
-    if (t.id === "engraving") { state.engraving = t.value.replace(/[^A-Za-z&]/g, "").slice(0, 3); return renderLive(); }
-    if (t.id === "edition") { state.edition = t.value.replace(/\D/g, "").slice(0, 3); return renderLive(); }
+    if (t.id === "sigInitial") { state.sig.initial = t.value.replace(/[^A-Za-z]/g, "").slice(0, 1).toUpperCase(); return renderLive(); }
+    if (t.id === "resMono") { state.res.monogram = t.value.replace(/[^A-Za-z&]/g, "").slice(0, 3); return renderLive(); }
+    if (t.id === "resEdition") { state.res.edition = t.value.replace(/[^0-9]/g, "").slice(0, 3); return renderLive(); }
     if (t.id === "sname") { state.scent.name = t.value; return renderLive(); }
     if (t.id === "sstory") { state.scent.story = t.value; return renderLive(); }
     if (t.id === "strength") { state.scent.strength = +t.value; $("strVal").textContent = `${state.scent.strength} · ${STRENGTH_WORDS[state.scent.strength]}`; return renderLive(); }
