@@ -349,7 +349,7 @@
   const TIER_SPEC = {
     daily:     { tag: "Affordable", material: "Thick printed paper board, matte inks, foil sleeve", grade: "Standard", oil: "Stock fragrance oils, phthalate-free", lasts: "2–4 weeks", throw: "Strong", meter: 1 },
     signature: { tag: "Mid-tier", material: "Weighted zinc alloy, PVD finish, soft-touch silicone vent pad, porous ceramic disc", grade: "Premium", oil: "Higher-grade oils, custom-tuned, full top/heart/base structure", lasts: "4–6 weeks per disc", throw: "Medium and smooth", meter: 2 },
-    reserve:   { tag: "Luxury", material: "Watch-inspired solid brass or titanium case, domed sapphire crystal, hand-finished dial, sealed membrane cartridge, leather case", grade: "Fine fragrance", oil: "Made with an independent perfumer, natural materials where IFRA allows", lasts: "60–90 days per cartridge (target)", throw: "Soft and close", meter: 3 },
+    reserve:   { tag: "Luxury", material: "Solid brass or titanium, separate bezel, sapphire lens, hand-finished dial, sealed membrane cartridge, leather case", grade: "Fine fragrance", oil: "Made with an independent perfumer, natural materials where IFRA allows", lasts: "60–90 days per cartridge (target)", throw: "Soft and close", meter: 3 },
   };
   // Costly materials: natural versions go into Reserve; Daily uses synthetic stand-ins.
   const LUXE = new Set(["Oud", "Saffron", "Iris", "Rose", "Jasmine", "Sandalwood", "Neroli"]);
@@ -598,7 +598,7 @@
     if (s.line === "daily") return 3;
     if (s.line === "signature") return Math.PI * Math.pow(42 / 20, 2) * 0.4 * 0.55 * DENSITY.zinc;
     const sh = RES_SHAPES.find((x) => x.id === s.res.shape) || RES_SHAPES[0];
-    return Math.PI * Math.pow(s.res.size / 20, 2) * sh.area * 0.8 * 0.4 * DENSITY[resCase(s).metal];
+    return Math.PI * Math.pow(s.res.size / 20, 2) * sh.area * 0.7 * 0.4 * DENSITY[resCase(s).metal];
   }
   function costRange(s) {
     if (s.line === "daily") return [0.40, 0.90];
@@ -688,15 +688,11 @@
     const c = resCase(s), r = s.res.size * 2.3, acc = accentHex(s);
     const dialFill = s.res.dial === "walnut" ? "#6b4423" : s.res.dial === "carbon" ? "#1f1f1f" : dialColorOf(s).c;
     const script = s.res.font === "script", mono = esc(script ? s.res.monogram : s.res.monogram.toUpperCase());
-    let marks = "";
-    for (let i = 0; i < 12; i++) { const a = (i / 12) * Math.PI * 2, r1 = r * 0.62, r2 = r * (i % 3 === 0 ? 0.71 : 0.68); marks += `<line x1="${(cx + Math.sin(a) * r1).toFixed(1)}" y1="${(cy - Math.cos(a) * r1).toFixed(1)}" x2="${(cx + Math.sin(a) * r2).toFixed(1)}" y2="${(cy - Math.cos(a) * r2).toFixed(1)}" stroke="${acc}" stroke-width="3"/>`; }
     return `<svg viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="${uid}g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${c.l}"/><stop offset=".5" stop-color="${c.m}"/><stop offset="1" stop-color="${c.d}"/></linearGradient><radialGradient id="${uid}d" cx=".4" cy=".35" r=".8"><stop offset="0" stop-color="${mixHex(dialFill, "#ffffff", .18)}"/><stop offset="1" stop-color="${mixHex(dialFill, "#000000", .35)}"/></radialGradient></defs>
       <ellipse cx="${cx}" cy="${cy + r + 40}" rx="${r * 0.8}" ry="10" fill="#000" opacity=".35"/>
-      <rect x="${cx + r - 4}" y="${cy - 10}" width="18" height="20" rx="3" fill="url(#${uid}g)"/>
       <path d="${toD(shapePoints(s.res.shape, r))}" fill="url(#${uid}g)"/>
       <path d="${toD(shapePoints(s.res.shape, r * 0.965))}" fill="none" stroke="${c.d}" stroke-opacity=".6" stroke-width="2"/>
       <path d="${toD(shapePoints(s.res.shape, r * 0.8))}" fill="url(#${uid}d)" stroke="#000" stroke-opacity=".5" stroke-width="2"/>
-      ${marks}
       ${mono ? `<text x="${cx}" y="${cy + r * 0.13}" text-anchor="middle" font-family="${script ? "Pinyon Script, cursive" : "Cormorant Garamond, Georgia, serif"}" font-size="${(r * (script ? 0.42 : 0.34)).toFixed(1)}" fill="${acc}">${mono}</text>` : ""}
       <ellipse cx="${cx - r * 0.2}" cy="${cy - r * 0.35}" rx="${r * 0.45}" ry="${r * 0.18}" fill="#fff" opacity=".08"/></svg>`;
   }
@@ -880,13 +876,13 @@
       g.globalAlpha = 1;
     }
 
-    // Reserve: watch-inspired case, separate bezel, dial, domed crystal, crown.
+    // Reserve: solid case, separate bezel, fine dial, low sapphire lens.
     function buildReserve(s) {
       const r = s.res, c = resCase(s), R = r.size / 2, group = new THREE.Group();
       const caseMat = metalMat(c.base, c.rough, c.metalness);
       const outer = shapePoints(r.shape, R), bezO = shapePoints(r.shape, R * 0.965), dialPts = shapePoints(r.shape, R * 0.8);
-      const body = new THREE.Mesh(track(new THREE.ExtrudeGeometry(toShape(outer), { depth: 5, bevelEnabled: true, bevelThickness: 1.4, bevelSize: 1.1, bevelSegments: 10, curveSegments: 48 })), [caseMat, caseMat]);
-      body.position.z = -6.2; group.add(body);
+      const body = new THREE.Mesh(track(new THREE.ExtrudeGeometry(toShape(outer), { depth: 3.6, bevelEnabled: true, bevelThickness: 1.4, bevelSize: 1.1, bevelSegments: 10, curveSegments: 48 })), [caseMat, caseMat]);
+      body.position.z = -4.8; group.add(body);
       let bezCap;
       if (r.bezel !== "polished") {
         const bump = canvasTex((g, S, P, k) => {
@@ -917,16 +913,9 @@
       dialMesh.position.z = 0.1; group.add(dialMesh);
 
       const accMat = metalMat(accentHex(s), 0.12, 1);
-      const rm = R * 0.8 * 0.8;
-      for (let i = 0; i < 12; i++) {
-        const a = (i / 12) * Math.PI * 2, len = i % 3 === 0 ? R * 0.11 : R * 0.07, w = i === 0 ? 1.2 : 0.7;
-        const mk = new THREE.Mesh(track(new THREE.BoxGeometry(w, len, 0.45)), accMat);
-        mk.position.set(Math.sin(a) * rm, Math.cos(a) * rm, 0.95); mk.rotation.z = -a; group.add(mk);
-      }
-
       const glass = track(new THREE.MeshPhysicalMaterial({ color: 0xffffff, metalness: 0, roughness: 0, transparent: true, opacity: 0.06, clearcoat: 1, clearcoatRoughness: 0, envMapIntensity: 1.6, depthWrite: false }));
       if (r.shape === "round") {
-        const a = R * 0.8, h = R * 0.09, Rs = (a * a + h * h) / (2 * h), th = Math.asin(a / Rs);
+        const a = R * 0.8, h = R * 0.035, Rs = (a * a + h * h) / (2 * h), th = Math.asin(a / Rs);
         const dome = new THREE.Mesh(track(new THREE.SphereGeometry(Rs, 96, 24, 0, Math.PI * 2, 0, th)), glass);
         dome.rotation.x = Math.PI / 2; dome.position.z = 2.0 - (Rs - h); group.add(dome);
       } else {
@@ -934,19 +923,10 @@
         flat.position.z = 1.4; group.add(flat);
       }
 
-      const kn = document.createElement("canvas"); kn.width = 256; kn.height = 32;
-      const kg = kn.getContext("2d"); for (let x = 0; x < 256; x += 8) { kg.fillStyle = "#fff"; kg.fillRect(x, 0, 4, 32); kg.fillStyle = "#222"; kg.fillRect(x + 4, 0, 4, 32); }
-      const knurlTex = track(new THREE.CanvasTexture(kn));
-      const crownSide = metalMat(c.base, Math.max(0.1, c.rough - 0.05), c.metalness, { bumpMap: knurlTex, bumpScale: 0.8 });
-      const crown = new THREE.Mesh(track(new THREE.CylinderGeometry(R * 0.1, R * 0.1, 3.4, 48)), [crownSide, caseMat, caseMat]);
-      crown.rotation.z = Math.PI / 2; crown.position.set(R + 1.5, 0, -3.2); group.add(crown);
-      const crownStem = new THREE.Mesh(track(new THREE.CylinderGeometry(R * 0.05, R * 0.05, 2.4, 24)), caseMat);
-      crownStem.rotation.z = Math.PI / 2; crownStem.position.set(R - 0.1, 0, -3.2); group.add(crownStem);
-
       const ano = track(new THREE.MeshPhysicalMaterial({ color: 0x121212, metalness: 0.8, roughness: 0.42 }));
       const cart = new THREE.Mesh(track(new THREE.CylinderGeometry(R * 0.6, R * 0.6, 3, 64)), ano);
-      cart.rotation.x = Math.PI / 2; cart.position.z = -9.1; group.add(cart);
-      addMounts(group, R, r.mount, -10.6, accMat);
+      cart.rotation.x = Math.PI / 2; cart.position.z = -7.7; group.add(cart);
+      addMounts(group, R, r.mount, -9.2, accMat);
       return group;
     }
 
@@ -1324,13 +1304,13 @@
     } else {
       const r = s.res, c = resCase(s), d = resDial(s);
       const dialDesc = d.id === "walnut" ? "Burl walnut veneer under clear lacquer" : d.id === "carbon" ? "Forged carbon, clear-coated" : d.id === "enamel" ? `Grand feu (kiln-fired) enamel, ${dialColorOf(s).label.toLowerCase()}` : `${d.label}, ${dialColorOf(s).label.toLowerCase()}, on brass`;
-      ln.push(`  Case       ${METAL_LABEL[c.metal]}, ${r.shape} ${r.size} mm, approx. 9 mm thick`);
+      ln.push(`  Case       ${METAL_LABEL[c.metal]}, ${r.shape} ${r.size} mm, approx. 7 mm thick`);
       ln.push(`  Finish     ${c.label}`);
       ln.push(`  Bezel      ${BEZELS.find((x) => x.id === r.bezel).label}, separate ring`);
       ln.push(`  Dial       ${dialDesc}`);
-      ln.push(`  Crystal    ${r.shape === "round" ? "Domed" : "Flat"} sapphire crystal`);
-      ln.push(`  Crown      Knurled crown at 3 o'clock; push to release the cartridge`);
-      ln.push(`  Applied    Monogram "${r.monogram || "none"}" in ${r.font} lettering, 12 raised markers, ${ACCENTS.find((a) => a.id === r.accent).label.toLowerCase()} finish`);
+      ln.push(`  Lens       ${r.shape === "round" ? "Low-domed" : "Flat"} sapphire crystal`);
+      ln.push(`  Applied    Raised monogram "${r.monogram || "none"}" in ${r.font} lettering, ${ACCENTS.find((a) => a.id === r.accent).label.toLowerCase()} finish`);
+      ln.push(`  Cartridge  Face lifts off magnetically to swap the cartridge`);
       ln.push(`  Engraving  Caseback: RESERVE ${String(r.edition || "001").padStart(3, "0")}/100`);
       ln.push(`  Scent exit Halo gap around the bezel`);
       ln.push(`  Refill     Sealed fine-fragrance cartridge, microporous membrane front, about 6–8 ml (stone insert as backup)`);

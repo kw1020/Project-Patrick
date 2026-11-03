@@ -69,20 +69,20 @@ Stack from front to back: **face → disc cradle with rear lattice → magnet �
 
 Target life: 4–6 weeks per disc (longer with booster). Estimated landed cost: $9–12.
 
-### Tier 3: Reserve ($295). Best: a watch-inspired object, solid metal, fine fragrance, leak-proof long-life cartridge.
+### Tier 3: Reserve ($295). Best: solid metal with a few fine-watch cues, fine fragrance, leak-proof long-life cartridge.
 
-Reserve is built like a luxury watch so it looks nothing like Signature. Stack from front to back: **domed crystal → bezel ring → dial with applied monogram and markers → case with crown → cartridge cradle with rear lattice → membrane cartridge → magnet → base**.
+Reserve borrows a few cues from fine watches (separate bezel, sapphire lens, dial finishes) without becoming one, so it looks clearly richer than Signature. Stack from front to back: **sapphire lens → bezel ring → dial with applied monogram → case → cartridge cradle with rear lattice → membrane cartridge → magnet → base**.
 
 | # | Part | Material | Options (Design Lab) |
 |---|---|---|---|
-| R1 | Case | Solid brass C360, CNC-machined, hand-finished, about 9 mm thick. Titanium Edition: Grade 5 titanium (Ti-6Al-4V). | Round or cushion; 40, 44 or 48 mm |
+| R1 | Case | Solid brass C360, CNC-machined, hand-finished, about 7 mm thick. Titanium Edition: Grade 5 titanium (Ti-6Al-4V). | Round or cushion; 40, 44 or 48 mm |
 | R2 | Case finish | Polished brass, brushed brass (ages over time), rose gold PVD, black PVD, or bare titanium | 5 finishes |
 | R3 | Bezel | Separate brass ring, pressed or screwed onto R1 | Polished, fluted or knurled |
 | R4 | Halo gap | About 0.5–0.8 mm ring gap around the bezel | Exit path for scented air |
-| R4a | Crystal | Sapphire crystal: domed on round cases, flat on cushion | |
+| R4a | Lens | Sapphire crystal: low dome on round cases, flat on cushion | |
 | R4b | Dial | Brass dial blank, about 0.6 mm | Sunburst guilloché or clous de Paris (champagne, slate, midnight blue, black); burl walnut veneer under lacquer; forged carbon; grand feu (kiln-fired) enamel (ivory, midnight blue, British racing green, oxblood) |
-| R4c | Applied monogram + 12 markers | Brass, plated, set onto the dial | Monogram up to 3 letters, roman or script; matching case, yellow gold or rhodium plating |
-| R4d | Crown | Knurled brass or titanium at 3 o'clock | Push to release the cartridge (not a turning intensity control) |
+| R4c | Applied monogram | Brass, plated, set onto the dial | Monogram up to 3 letters, roman or script; matching case, yellow gold or rhodium plating |
+| R4d | Cartridge access | Face assembly lifts off its magnetic seat | No crown or buttons on the outside |
 | R5 | Caseback engraving | Fiber laser or rotary engraving | "RESERVE 014/100" |
 | R6 | Cartridge cradle + rear lattice | Brass, or anodized aluminum (black) | No plastic in Reserve. The lattice guides vent air across the membrane. |
 | R7 | **Fragrance cartridge** | Sealed reservoir (anodized aluminum cup or glass ampoule), about 6–8 ml; front sealed with a **microporous membrane** (PE or PTFE family); peel-off foil seal until use | Leak-proof, near-steady release. Swaps in by magnet. **Target 60–90 days**, to be measured. |
@@ -112,7 +112,7 @@ Estimated landed cost: about $65–120 for the base Reserve (crystal, applied pa
 - Swapping scents means throwing away the whole unit.
 
 **The design:**
-1. A watch-style metal case with bezel, crystal and dial (R1–R4d) that attaches by high-temperature magnets (R9) to one of several interchangeable bases: a vent hook with soft pads (R10/R11) or an adhesive base (R12).
+1. A metal case with separate bezel, sapphire lens and dial (R1–R4d) that attaches by high-temperature magnets (R9) to one of several interchangeable bases: a vent hook with soft pads (R10/R11) or an adhesive base (R12).
 2. Behind the face, a cradle with an open rear lattice (R6) holds a removable sealed membrane cartridge (R7).
 3. Vent air enters through the lattice, passes across the membrane, and exits through a thin annular gap (R4) between face and rim. Scent leaves around the edge of the face rather than through visible holes.
 4. Cartridges swap without tools; the face and bases are kept for life.
@@ -129,7 +129,7 @@ Estimated landed cost: about $65–120 for the base Reserve (crystal, applied pa
 | Vent clip fresheners, many shapes | Crowded with design patents (e.g. D979037, D871564). |
 | Rotating cap or body that sets intensity | Patented: US 11,433,155 (wick cap changes vent opening), US 7,140,553 (rotating cap), US 7,097,555 (front knob). **Check these before using R3.** |
 | Interchangeable magnetic face + multi-base system + rear-lattice-to-halo airflow path + swappable membrane cartridge, combined | Not found in this search. **Possible** utility claim, depending on a professional search. |
-| The Reserve's specific look (watch-style case, bezel, crystal, crown, halo) | **Design patent candidate** (about $520 + $520 USPTO fees at small-entity rates). |
+| The Reserve's specific look (case, separate bezel, low lens, dial, halo) | **Design patent candidate** (about $520 + $520 USPTO fees at small-entity rates). |
 
 **Next steps:**
 1. Build the prototype and test the halo airflow (does scent output beat a plain disc?).
