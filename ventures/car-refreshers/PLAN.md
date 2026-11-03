@@ -22,10 +22,10 @@ What would kill it:
 | | **Daily** | **Signature** | **Reserve** |
 |---|---|---|---|
 | Who | Everyone. Impulse buy, students, first cars | Car people who care how their car feels | Exotic and luxury owners: Lambo, Rolls, G-Wagon, Porsche, McLaren |
-| Product | Scented paper card in a foil sleeve, hangs from the mirror | Weighted zinc-alloy clip (PVD finish) + porous ceramic scent discs | Solid brass clip (titanium later), CNC-machined, numbered, engraved, black stone scent insert, leather case |
-| Material grade | **Good.** Thick printed paper board, matte inks, foil sleeve | **Better.** Weighted zinc alloy, PVD finish, soft-touch silicone vent pad (no scratches, no rattle), porous ceramic disc | **Best.** Solid brass or titanium, hand-finished, engraved, black stone insert, leather case |
+| Product | Scented paper card in a foil sleeve, hangs from the mirror | Weighted zinc-alloy clip (PVD finish) + porous ceramic scent discs | Solid brass clip (titanium later), CNC-machined, numbered, engraved, sealed membrane fragrance cartridge, leather case |
+| Material grade | **Good.** Thick printed paper board, matte inks, foil sleeve | **Better.** Weighted zinc alloy, PVD finish, soft-touch silicone vent pad (no scratches, no rattle), porous ceramic disc | **Best.** Solid brass or titanium, hand-finished, engraved, sealed membrane fragrance cartridge, leather case |
 | Scent grade | **Standard.** Stock fragrance oils, phthalate-free | **Premium.** Higher-grade oils, custom-tuned, full top/heart/base structure | **Fine fragrance.** Made with an independent perfumer, using natural materials (oud, saffron, iris, rose) where IFRA allows |
-| Lasts (target, confirm in the 30-day test) | 2–4 weeks | 4–6 weeks per disc | 6–8 weeks per insert |
+| Lasts (target, confirm in the 30-day test) | 2–4 weeks | 4–6 weeks per disc | 60–90 days per cartridge |
 | Scent strength | Strong | Medium and smooth | Soft and close |
 | Price | $6 each, 3 for $15 | Starter Set $38, refills 3 for $24, Club $14/mo | Reserve Set $295, refills 3 for $65, Bespoke from $2,500 |
 | Est. cost | $0.40–0.90 | $9–12 (starter) | $50–90 (set) |

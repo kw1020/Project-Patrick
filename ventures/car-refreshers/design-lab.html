@@ -338,7 +338,7 @@
   const TIER_SPEC = {
     daily:     { tag: "Affordable", material: "Thick printed paper board, matte inks, foil sleeve", grade: "Standard", oil: "Stock fragrance oils, phthalate-free", lasts: "2–4 weeks", throw: "Strong", meter: 1 },
     signature: { tag: "Mid-tier", material: "Weighted zinc alloy, PVD finish, soft-touch silicone vent pad, porous ceramic disc", grade: "Premium", oil: "Higher-grade oils, custom-tuned, full top/heart/base structure", lasts: "4–6 weeks per disc", throw: "Medium and smooth", meter: 2 },
-    reserve:   { tag: "Luxury", material: "Solid brass or titanium, hand-finished, black stone insert, leather case", grade: "Fine fragrance", oil: "Made with an independent perfumer, natural materials where IFRA allows", lasts: "6–8 weeks per insert", throw: "Soft and close", meter: 3 },
+    reserve:   { tag: "Luxury", material: "Solid brass or titanium, hand-finished, sealed membrane fragrance cartridge, leather case", grade: "Fine fragrance", oil: "Made with an independent perfumer, natural materials where IFRA allows", lasts: "60–90 days per cartridge (target)", throw: "Soft and close", meter: 3 },
   };
   // Costly materials: natural versions go into Reserve; Daily uses synthetic stand-ins.
   const LUXE = new Set(["Oud", "Saffron", "Iris", "Rose", "Jasmine", "Sandalwood", "Neroli"]);
@@ -1152,16 +1152,17 @@
       ln.push(`  Finish     ${fi.label}${fi.id === "enamel" ? ` (${enamelOf(s).label})` : ""}${/pvd|gold|gunmetal/.test(fi.id) ? ", PVD coating" : ""}`);
       ln.push(`  Pattern    ${PATTERNS.find((x) => x.id === s.pattern).label}`);
       ln.push(`  Engraving  "${(s.engraving || "").toUpperCase() || "none"}"${s.line === "reserve" ? `, back: RESERVE ${String(s.edition || "001").padStart(3, "0")}/100` : ""}`);
-      ln.push(`  Refill     ${s.line === "reserve" ? "Black porous stone insert, fine-fragrance load" : "Porous ceramic disc, matte black, pressed logo"}`);
+      ln.push(`  Refill     ${s.line === "reserve" ? "Sealed fine-fragrance cartridge, microporous membrane front, about 6–8 ml (stone insert as backup)" : "Porous ceramic disc, matte black, ribbed back, pressed logo"}`);
       if (s.line === "signature") ln.push(`  Vent pad   Soft-touch silicone on the hook, protects vent louvers, stops rattle`);
       ln.push(`  Mount      ${s.mount === "both" ? "Magnetic face + vent hook base + adhesive stick-on base" : s.mount === "vent" ? "Magnetic face + vent hook base" : "Magnetic face + adhesive stick-on base"}`);
+      ln.push(`  Magnets    Neodymium N42SH (high-temperature grade)`);
       ln.push(`  Weight     ~${Math.round(weightGrams(s))} g (estimate)`);
       ln.push(`  Package    ${s.line === "reserve" ? "Leather case, rigid magnetic box, signed card, numbered certificate" : "Rigid black box, gold-foil logo, molded insert"}`);
     }
     const ts = TIER_SPEC[s.line];
     ln.push("", "SCENT", `  Name       ${s.scent.name || "Untitled"}`);
     ln.push(`  Oil grade  ${ts.grade}: ${ts.oil}`);
-    ln.push(`  Lasts      ${ts.lasts} (target; confirm in the 30-day test)`);
+    ln.push(`  Lasts      ${ts.lasts.replace(" (target)", "")} (target; confirm in testing)`);
     if (s.scent.story) ln.push(`  Story      ${s.scent.story}`);
     for (const [id, label] of TIERS) ln.push(`  ${label.padEnd(10)} ${tr[id].map(([n, v]) => `${n} ${Math.round((v / t) * 100)}%`).join(", ") || "-"}`);
     const p = tierPct(f);
