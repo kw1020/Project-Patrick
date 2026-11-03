@@ -10,6 +10,11 @@ Owner: Krew Sutherland. Krew hates repeating themself — read this first.
 - **Cloud Claude Code sessions** (like this repo's sessions) do NOT have `watch_video`;
   they use the `watch` skill below instead.
 
+## Krew's learning notes
+- `notes/` holds Krew's notes from videos and courses, transcribed and cleaned.
+  Read them before teaching or advising on business topics.
+  - `notes/simon-squibb-30-years-business.md`: Simon Squibb's "30 Years of Business Knowledge".
+
 ## Watching videos in cloud sessions: the `watch` skill
 - `.claude/skills/watch/` is the MIT-licensed watch skill from
   github.com/bradautomates/claude-video (copied at commit 03ceb42). When Krew sends a
