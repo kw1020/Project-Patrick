@@ -1,121 +1,159 @@
-# Luxury Car Refreshers: Launch Plan
+# Sutherland Motor Parfum: Launch Plan
 
-Working brand name: **Sutherland Motor Parfum** (alternatives at the bottom). Every number here is an estimate to check against real supplier quotes.
+One brand, three lines: cheap, mid and ultra-luxury. Every cost here is an estimate to check against real supplier quotes.
 
 ## Verdict
 
-Worth doing, if the brand is the product. A car freshener costs a few dollars to make, so the money is in the margin between cheap and luxury. The physical object, the scents, the packaging and the content are what people pay for. The risk is that it's a crowded market (Drift, Carfume, and hundreds of TikTok Shop knockoffs), so a generic "nice-smelling clip" will lose on price.
+Worth doing, if the brand is the product. A car freshener costs a few dollars to make, so the money is in the margin between cheap and luxury. The risk is that the market is crowded (Drift, Carfume, and hundreds of TikTok Shop knockoffs), so a generic "nice-smelling clip" will lose on price.
 
 Why it works:
-- **Margins.** A starter set lands at about $9–12 all-in and sells for $38.
-- **Repeat buyers.** Scent fades in 30–45 days, so every customer becomes a refill customer. Drift built a business on about $11/month refills.
-- **Easy to show on video.** Cars, interiors and unboxings do well on TikTok and Instagram, and car culture is a huge audience.
-- **Small to start.** Low-MOQ suppliers exist, so the first batch can be 100–300 units instead of 5,000.
+- **Margins.** Product costs are cents to a few dollars; prices run $6 to $295+.
+- **Repeat buyers.** Scent fades in 30–45 days, so every customer becomes a refill customer.
+- **Easy to show on video.** Cars, interiors and unboxings do well on TikTok and Instagram.
+- **Small to start.** Low-MOQ suppliers exist, and the luxury line can be made to order.
 
 What would kill it:
-- Looking cheap. If the clip is light plastic, nobody pays $38.
-- "Designer dupes." Naming scents after Tom Ford or Creed invites trademark letters. Use original names only.
-- Liquid leaks. Oil on a dashboard ruins plastic and brings refunds and bad reviews. That's why the plan uses solid refills, not liquid.
+- The cheap line making the luxury line look cheap (see "Keeping the lines apart").
+- "Designer dupes" or car-brand names. Tom Ford, Creed, Ferrari, Lamborghini and similar names stay out of all names, ads and listings.
+- Liquid leaks. Oil on a dashboard ruins it, and on a $300k interior it means a very angry customer. Every line uses solid refills.
 
-## The product
+## The three lines
 
-**Hero object: a heavy metal vent clip with swappable scent refills.** It works like a razor and its blades: buy the clip once, then keep buying refills.
-
-| Item | What it is | Price | Est. landed cost |
+| | **Daily** | **Signature** | **Reserve** |
 |---|---|---|---|
-| Starter Set | Zinc-alloy vent clip (matte black or brushed gold) + 2 refills, rigid gift box | $38 | $9–12 |
-| Refill 3-pack | 3 scented refill pads/stones, one scent or mixed | $24 | $2–4 |
-| Refill Club | 1 refill a month, ships monthly, cancel anytime | $14/mo | $1.50–3 + shipping |
-| Gift Box | Clip + all 5 scents, magnetic box | $68 | $14–18 |
+| Who | Everyone. Impulse buy, students, first cars | Car people who care how their car feels | Exotic and luxury owners: Lambo, Rolls, G-Wagon, Porsche, McLaren |
+| Product | Scented felt card in a matte black sleeve, hangs from the mirror | Weighted zinc-alloy vent clip + solid refill discs | Solid brass or titanium clip, CNC-machined and hand-finished, numbered, engraved, in a leather case |
+| Price | $6 each, 3 for $15 | Starter Set $38, refills 3 for $24, Club $14/mo | Reserve Set $295, refills 3 for $65, Bespoke from $2,500 |
+| Est. cost | $0.40–0.90 | $9–12 (starter) | $50–90 (set) |
+| Profit per sale | ~$3–4 (single), ~$10 (3-pack) | ~$20 | ~$190 |
+| Where | TikTok Shop, car washes, detail-shop counters | Website, TikTok Shop, gifts | Private: dealerships, PPF/detail studios, car clubs, referrals, Instagram DMs |
 
-Profit on one Starter Set: $38 − about $11 product − $5 shipping − $1.50 payment fees ≈ **$20**. A Club member who stays 6 months is worth about $50+ more.
+How the lines feed each other: **Daily** gets the scents into lots of cars cheaply. People who like it move up to **Signature**. **Reserve** is what makes the brand look expensive. It sells fewer units, but each one earns about $190 and gives the brand its status.
 
-## The scent collection (original names, no designer references)
+### Daily (the cheap line)
+- Same five scents as the other lines, so people who like them move up.
+- Wholesale to car washes, gas stations and detailers at about $3 each, sold from a countertop display box.
+- Every sleeve has a QR code: "Upgrade to the metal clip, 15% off."
 
-1. **Midnight Leather.** Black leather, oud, cracked pepper. The new-car luxury smell.
-2. **Coastal Highway.** Sea salt, bergamot, driftwood. Windows-down summer.
-3. **Private Club.** Tobacco leaf, cognac, vanilla. Late-night, members only.
-4. **Alpine Pass.** Cedar, fir, cold mint. Clean and sharp.
-5. **First Class.** White tea, fig, soft musk. Quiet and expensive.
+### Signature (the middle line)
+- The $38 heavy metal clip, matte black or brushed gold, with refill discs.
+- The Refill Club ($14/mo) is where the recurring money comes from.
 
-Launch with 3 (Midnight Leather, Coastal Highway, First Class) to keep the first order small. Add the other two once one sells out.
+### Reserve (for the ballers)
+High-end car diffusers from fashion and perfume houses sell for about $60–100. Reserve sits above them on purpose, so it has to be better in ways people can see and feel:
+- **Real materials.** Solid brass (ages and darkens over time) or titanium. Heavy, cold to the touch, machined edges, no plastic.
+- **Fine-fragrance refills.** Higher oil concentration, made with an independent perfumer.
+- **Numbered editions.** "First Edition, No. 014 of 100" engraved on the back.
+- **Personal.** Monogram or initials engraved. Optional color-matched face: Racing Red, Papaya Orange, British Racing Green, Track Grey, Rolls-style Midnight Blue. Use generic color names only, never a carmaker's trademarked color name.
+- **Presentation.** Leather case, card signed by hand, ships in a wooden or rigid magnetic box.
+- **Made to order.** Customers pay first, then it's machined and ships in about 3 weeks. Rich buyers expect a wait for handmade, and it means no unsold stock.
+- **Never discounted.** No sales and no coupons. Price stays fixed.
 
-## Who buys it
+**Bespoke ($2,500+).** A one-off signature scent for one person's car or collection, made with a perfumer, plus 3 Reserve clips and a year of refills. Few people will buy it, but it gets talked about. "My Rolls has its own scent" makes the brand's reputation.
 
-1. **Car people, 18–35.** They spend on their car before themselves, and they watch car TikTok and car-meet content.
-2. **Gift buyers.** Boyfriend/dad/new-car gifts, plus Christmas and Father's Day.
-3. **Businesses (fastest early cash).** Detail shops, dealerships, Uber/limo services. A detailer leaves one in every finished car. Sell them wholesale at about $12/clip, or co-branded with their logo once volume allows.
+### Reserve unit economics (estimates)
+| Item | Cost |
+|---|---|
+| CNC brass/titanium clip, small run of 25–100 | $18–45 |
+| Leather case | $12–25 |
+| 3 fine-fragrance refills | $9–20 |
+| Box, card, engraving | $8–15 |
+| **Total** | **≈ $50–90** |
 
-## Where it sells
+Sells for $295. Dealership/studio wholesale at about $175 still leaves about $100 profit.
 
-1. **Shopify site** (the landing page in this folder turns into it). Main store and home of the Refill Club.
-2. **TikTok Shop.** Short videos with a buy button, plus affiliate creators who post for a commission.
-3. **Local B2B.** Walk into 10 detail shops with samples.
-4. Amazon later, once reviews and the brand exist. Too much price competition to start there.
+## The scent collection (original names, all three lines)
+
+1. **Midnight Leather.** Black leather, oud, cracked pepper.
+2. **Coastal Highway.** Sea salt, bergamot, driftwood.
+3. **Private Club.** Tobacco leaf, cognac, vanilla.
+4. **Alpine Pass.** Cedar, fir, cold mint.
+5. **First Class.** White tea, fig, soft musk.
+
+Reserve gets stronger fine-fragrance versions of these, plus one Reserve-only scent per edition (for example **No. 1: Paddock**, made of warm leather, saffron and smoked wood).
+
+## Keeping the lines apart
+
+Luxury loses value fast if rich people see the same logo in a gas-station bin. Rules:
+- **Daily** is labeled "SMP Daily" in small print, with no gold and no crest.
+- **Signature** gets the full Sutherland name.
+- **Reserve** gets its own crest, never appears on TikTok Shop or Amazon, and is never discounted.
+- Different photography: Daily is fun and loud, Reserve is quiet, dark and slow.
+
+## How to reach rich car owners
+
+Ads don't work on this audience; referrals and the right places do.
+1. **PPF / ceramic coating / detail studios.** Their clients own $150k+ cars. Offer the studio a wholesale Reserve to hand over with every finished car ("the car comes back smelling like this").
+2. **Exotic and luxury dealerships.** A gift when the buyer gets the keys. Buying 10–20 at a time = $1,750–3,500 per order.
+3. **Exotic rental companies** (Miami, LA, Vegas, Dallas). A Reserve clip in every car, branded card in the glovebox.
+4. **Car condos, private garages, car clubs, rallies, Cars & Coffee.** Show up with the product in hand.
+5. **Owners with followings.** Give free numbered Reserves to 10 supercar owners with Instagram/TikTok audiences. One clip on camera in a Lambo sells the brand.
+
+## Where each line sells
+
+- **Daily:** TikTok Shop, car washes, gas stations, detail-shop counters.
+- **Signature:** Shopify site + TikTok Shop + local detailers.
+- **Reserve:** The website (with an "Enquire" form, not a "Buy now" button), DMs, dealerships and studios.
+- Amazon later, Daily and Signature only.
 
 ## Startup budget (rough)
 
 | Item | Low | High |
 |---|---|---|
-| Samples from 3–4 suppliers | $100 | $250 |
-| First run: 150 clips + 600 refills | $900 | $1,800 |
-| Custom boxes + labels | $250 | $600 |
+| Samples: Daily cards + Signature clips from 3–4 suppliers | $150 | $300 |
+| First run: 1,000 Daily cards + 150 Signature clips + 600 refills | $1,300 | $2,400 |
+| Reserve prototypes (5–10 CNC brass/titanium clips) + leather cases | $300 | $900 |
+| Packaging for all three lines | $350 | $800 |
 | Shopify + domain (first 2 months) | $60 | $80 |
-| Content (props, a few creator seedings) | $100 | $400 |
-| Business license / LLC (varies by state) | $50 | $300 |
-| **Total** | **≈ $1,500** | **≈ $3,400** |
+| Content and seeding (props, creator gifts) | $150 | $500 |
+| LLC / license (varies by state) | $50 | $300 |
+| **Total** | **≈ $2,400** | **≈ $5,300** |
 
-You can start with less: get samples, film content, and take pre-orders before buying the full run.
+Reserve is made to order after the prototypes, so it needs no big upfront stock.
 
-## 30-day launch
+## 45-day launch
 
 **Week 1: Samples and brand**
-- Request samples from 3–4 vent-clip suppliers (Alibaba / Global Sources). Filter for: metal (zinc alloy) body, solid refill (felt pad, ceramic stone or gel), MOQ ≤ 300, custom logo engraving.
-- Ask each for the fragrance **SDS (safety data sheet)** and IFRA certificate. No paperwork, no deal.
-- Lock the name: run a USPTO trademark search, then check that the domain and @handles are free.
+- Order samples: Daily felt cards, Signature zinc clips (MOQ ≤ 300, logo engraving), and quotes from 2–3 CNC shops for Reserve brass/titanium prototypes.
+- Get the fragrance **SDS** and IFRA certificate from every supplier.
+- Run the USPTO trademark search for "Sutherland Motor Parfum" and lock the domain and handles.
 
-**Week 2: Pick and film**
-- Test the samples in a real car for 2 weeks: scent strength on day 1, 7 and 14, heat, rattle, whether the clip grips the vent.
-- Pick the winner. Start filming: unboxing, clip-in ASMR, "rating my car's smell", before/after reactions.
-- Put the landing page live with a waitlist.
+**Week 2–3: Test and film**
+- Test samples in a real car: scent strength day 1/7/14, heat, rattle, grip.
+- Film Daily/Signature content (TikTok) and shoot Reserve photography (dark, slow, a nice car).
+- Landing page live with a waitlist.
 
-**Week 3: Pre-orders**
-- Post 1–2 videos a day. Pre-orders at a launch price ($32 Starter).
-- Take samples to 10 local detail shops.
-- Goal: 50 pre-orders or 2 shop accounts → place the production order.
+**Week 3–4: Pre-orders and first accounts**
+- Daily + Signature pre-orders on the site at launch prices.
+- Take Daily display boxes to 10 car washes and detail shops.
+- Take the Reserve prototype to 5 PPF/detail studios and 2 luxury dealerships.
 
-**Week 4: Production and launch**
-- Order the first run (about 3 weeks to produce and ship by air).
-- Shopify store live, TikTok Shop application in, Refill Club turned on.
+**Week 5–6: Launch**
+- Production order for Daily + Signature.
+- Reserve "First Edition, 100 numbered" opens for orders.
+- Seed 10 Reserves to supercar owners with audiences.
 
 ## Legal and safety checklist
 
-- [ ] Fragrance SDS + IFRA compliance from the supplier
+- [ ] Fragrance SDS + IFRA compliance from every supplier
 - [ ] Warning label: keep away from children/pets, don't ingest, avoid contact with dashboard surfaces
-- [ ] California Prop 65 check if the fragrance contains listed chemicals
+- [ ] California Prop 65 check if a fragrance contains listed chemicals
 - [ ] USPTO trademark search before buying packaging
-- [ ] Product liability insurance once you sell to businesses (about $300–600/yr)
+- [ ] Product liability insurance before selling to businesses (about $300–600/yr)
 - [ ] LLC + EIN + sales tax registration for your state
-- [ ] No designer brand names in scent names, ads or listings
+- [ ] No designer or carmaker names (or their trademarked color names) in names, ads or listings
 
 ## How Patrick runs it (agent team)
 
 | Agent | Job |
 |---|---|
-| Sourcing | Finds suppliers, writes outreach, compares quotes, tracks samples |
-| Brand / Content | Writes TikTok hooks and scripts, captions, product copy |
-| Store | Builds the Shopify listings, TikTok Shop listings, pricing tests |
-| Sales (B2B) | Finds local detailers/dealerships, writes pitch emails and follow-ups |
-| Ops | Inventory, reorder points, Refill Club shipments, customer emails |
-
-## Name options
-
-- **Sutherland Motor Parfum.** Uses your last name, which already sounds old-money British. Strongest pick if the trademark is clear.
-- **Noir Drive.** Short, dark, easy handle.
-- **Atelier Auto.** Fashion-house feel.
-- **Velour.** Soft and expensive.
-- **Halcyon Motor Co.** Calm, classic.
+| Sourcing | Suppliers for all three lines, CNC quotes, compares costs, tracks samples |
+| Brand / Content | TikTok scripts for Daily/Signature, quiet luxury copy for Reserve |
+| Store | Shopify + TikTok Shop listings, pricing tests |
+| Sales (B2B) | Car washes for Daily; studios, dealerships and rentals for Reserve |
+| Concierge | Reserve orders, engraving details, Bespoke clients, follow-ups |
+| Ops | Inventory, reorders, Refill Club shipments, customer emails |
 
 ---
 
-Sources for the market numbers: [GM Insights car air freshener market](https://gminsights.com/industry-analysis/car-air-freshener-market/amp), [Straits Research](https://straitsresearch.com/report/car-air-fresheners-market), [Drift refill pricing at Grove](https://www.grove.co/products/wood-car-air-freshener-refill), [Sense2 custom freshener MOQs](https://sense2.com/product/11052), [Closo fragrance MOQ guide](https://closo.co/blogs/inventory-liquidation/fragrance-manufacturer).
+Sources: [GM Insights car air freshener market](https://gminsights.com/industry-analysis/car-air-freshener-market/amp), [Straits Research](https://straitsresearch.com/report/car-air-fresheners-market), [Drift refill pricing at Grove](https://www.grove.co/products/wood-car-air-freshener-refill), [Sense2 custom freshener MOQs](https://sense2.com/product/11052), [Closo fragrance MOQ guide](https://closo.co/blogs/inventory-liquidation/fragrance-manufacturer), [Diptyque car diffuser (Refinery29)](https://www.refinery29.com/2017/08/168949/diptyque-car-diffuser-fragrance?geo=us), [Baobab gold car diffuser](https://www.gwynns.com/collections/home-and-gift-home-fragrance/products/white-pearls-car-diffuser).

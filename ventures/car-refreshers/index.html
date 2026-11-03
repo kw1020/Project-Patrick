@@ -35,6 +35,8 @@
   header .wrap { display: flex; justify-content: space-between; align-items: center; height: 64px; }
   .logo { font-family: "Cormorant Garamond", serif; font-size: 20px; letter-spacing: .14em; text-transform: uppercase; }
   .logo span { color: var(--gold); }
+  .nav { display: flex; align-items: center; gap: 22px; }
+  .nav > a:not(.btn) { text-decoration: none; font-size: 12px; letter-spacing: .2em; text-transform: uppercase; color: var(--gold-soft); }
   .btn {
     display: inline-block; padding: 12px 22px; border: 1px solid var(--gold);
     color: var(--bg); background: var(--gold); text-decoration: none;
@@ -81,6 +83,17 @@
   .tier li:last-child { border-bottom: 0; }
   .tag { align-self: flex-start; font-size: 11px; letter-spacing: .2em; text-transform: uppercase; color: var(--bg); background: var(--gold); padding: 4px 10px; margin-bottom: 14px; }
 
+  .reserve { background: radial-gradient(ellipse at 80% 40%, #1f1a10 0%, var(--bg) 60%); }
+  .reserve-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 56px; align-items: center; }
+  .reserve-art { width: 100%; max-width: 360px; justify-self: center; filter: drop-shadow(0 30px 60px rgba(201,169,97,.18)); }
+  .spec { list-style: none; margin: 30px 0; border-top: 1px solid var(--line); }
+  .spec li { display: flex; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--line); font-size: 15px; }
+  .spec span { width: 96px; flex-shrink: 0; color: var(--gold); font-size: 11px; letter-spacing: .2em; text-transform: uppercase; padding-top: 3px; }
+  .reserve-cta { display: flex; align-items: center; gap: 22px; flex-wrap: wrap; }
+  .reserve-cta .price { font-size: 46px; color: var(--gold-soft); line-height: 1; }
+  .bespoke { margin-top: 26px; color: var(--muted); font-size: 14px; max-width: 520px; }
+  .bespoke b { color: var(--text); font-weight: 600; }
+
   .list { text-align: center; }
   .list .lead { margin: 0 auto; }
   form { display: flex; gap: 10px; max-width: 480px; margin: 34px auto 0; }
@@ -95,7 +108,8 @@
   footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 
   @media (max-width: 760px) {
-    .how, .pricing { grid-template-columns: 1fr; }
+    .how, .pricing, .reserve-grid { grid-template-columns: 1fr; }
+    .reserve-art { max-width: 240px; grid-row: 1; }
     .hero { padding: 64px 0 56px; }
     section { padding: 64px 0; }
     form { flex-direction: column; }
@@ -108,7 +122,10 @@
 <header>
   <div class="wrap">
     <div class="logo">Sutherland <span>·</span> MP</div>
-    <a class="btn ghost" href="#list">Join the list</a>
+    <nav class="nav">
+      <a href="#reserve">Reserve</a>
+      <a class="btn ghost" href="#list">Join the list</a>
+    </nav>
   </div>
 </header>
 
@@ -173,9 +190,9 @@
       <h2 class="serif">Start here.</h2>
       <div class="pricing">
         <div class="tier">
-          <h3>Refill Trio</h3>
-          <div class="price">$24</div>
-          <ul><li>3 scent discs</li><li>Mix and match scents</li><li>Fits every Sutherland clip</li></ul>
+          <h3>SMP Daily</h3>
+          <div class="price">$6<small> · 3 for $15</small></div>
+          <ul><li>Hanging scented card</li><li>All five scents</li><li>Try a scent before you buy the clip</li></ul>
           <a class="btn ghost" href="#list">Notify me</a>
         </div>
         <div class="tier featured">
@@ -188,9 +205,46 @@
         <div class="tier">
           <h3>Refill Club</h3>
           <div class="price">$14<small> / month</small></div>
-          <ul><li>1 disc every month</li><li>Swap scents anytime</li><li>Skip or cancel in one click</li></ul>
+          <ul><li>1 disc every month</li><li>Swap scents anytime</li><li>Extra discs 3 for $24</li><li>Skip or cancel in one click</li></ul>
           <a class="btn ghost" href="#list">Notify me</a>
         </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="reserve" id="reserve">
+    <div class="wrap">
+      <div class="reserve-grid">
+        <div>
+          <div class="eyebrow">Sutherland Reserve · First Edition</div>
+          <h2 class="serif">For cars that turn heads.</h2>
+          <p class="lead">Machined from solid brass or titanium, finished by hand and numbered one of one hundred. Engraved with your initials and filled with fine-fragrance refills made with an independent perfumer.</p>
+          <ul class="spec">
+            <li><span>Body</span>Solid brass or titanium, CNC-machined</li>
+            <li><span>Edition</span>Numbered, 100 pieces</li>
+            <li><span>Finish</span>Raw brass, black titanium, or a color-matched face</li>
+            <li><span>Engraving</span>Your monogram, included</li>
+            <li><span>Case</span>Leather, with three fine-fragrance refills</li>
+            <li><span>Made</span>To order. Ships in about three weeks</li>
+          </ul>
+          <div class="reserve-cta">
+            <div class="price serif">$295</div>
+            <a class="btn" href="#list">Request a Reserve</a>
+          </div>
+          <p class="bespoke"><b>Bespoke, from $2,500.</b> A signature scent made for one person's car or collection, with three Reserve clips and a year of refills. By appointment.</p>
+        </div>
+        <svg class="reserve-art" viewBox="0 0 300 300" role="img" aria-label="Numbered solid brass Reserve clip">
+          <defs>
+            <radialGradient id="br" cx=".35" cy=".3" r=".8">
+              <stop offset="0" stop-color="#f6e4b5"/><stop offset=".5" stop-color="#b8924a"/><stop offset="1" stop-color="#5e4520"/>
+            </radialGradient>
+          </defs>
+          <circle cx="150" cy="150" r="118" fill="url(#br)"/>
+          <circle cx="150" cy="150" r="96" fill="none" stroke="#3b2b12" stroke-opacity=".45"/>
+          <circle cx="150" cy="150" r="88" fill="none" stroke="#fff5d6" stroke-opacity=".25"/>
+          <text x="150" y="152" text-anchor="middle" font-family="Cormorant Garamond, Georgia, serif" font-size="58" fill="#3b2b12" letter-spacing="4">KS</text>
+          <text x="150" y="190" text-anchor="middle" font-family="Inter, sans-serif" font-size="9" fill="#3b2b12" letter-spacing="4">RESERVE · 014 / 100</text>
+        </svg>
       </div>
     </div>
   </section>
