@@ -1,0 +1,28 @@
+import type { Metadata } from "next";
+import "./globals.css";
+import { prisma } from "@/lib/db";
+import { Nav } from "@/components/Nav";
+
+export const dynamic = "force-dynamic";
+export const metadata: Metadata = { title: "Clip Factory", description: "GTA 6 clip pipeline" };
+
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const pending = await prisma.clip.count({ where: { status: "pending" } }).catch(() => 0);
+  return (
+    <html lang="en">
+      <body className="min-h-screen antialiased">
+        <header className="sticky top-0 z-20 border-b border-line bg-ink/90 backdrop-blur">
+          <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
+            <div className="flex items-center gap-2 font-black tracking-tight">
+              <span className="grid h-8 w-8 place-items-center rounded-lg bg-gradient-to-br from-hot to-sun text-sm text-black">CF</span>
+              <span className="text-lg">Clip Factory</span>
+              <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] font-bold uppercase text-zinc-400">GTA 6</span>
+            </div>
+            <Nav pending={pending} />
+          </div>
+        </header>
+        <main className="mx-auto max-w-7xl px-4 py-6">{children}</main>
+      </body>
+    </html>
+  );
+}

@@ -1,0 +1,94 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Every GTA 6 streamer the Scout has seen. Only approved ones get clipped.
+model Streamer {
+  id            String    @id @default(cuid())
+  twitchId      String    @unique
+  login         String    @unique
+  name          String
+  approved      Boolean   @default(false)
+  approvalNote  String?
+  facecam       String?   // "x,y,w,h" fractions of the frame, for the facecam-on-top layout
+  profileImage  String?
+  isLive        Boolean   @default(false)
+  viewers       Int       @default(0)
+  peakViewers   Int       @default(0)
+  streamTitle   String?
+  streamId      String?
+  liveSince     DateTime?
+  lastSeenAt    DateTime?
+  chatRate      Float     @default(0) // messages/sec, last minute (approved + live only)
+  chatAvg       Float     @default(0) // messages/sec, 5-min rolling average
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  moments       Moment[]
+}
+
+// A moment worth clipping. Phase 1 source = twitch_clip; Phase 2 adds chat spikes.
+model Moment {
+  id           String   @id @default(cuid())
+  streamerId   String
+  streamer     Streamer @relation(fields: [streamerId], references: [id], onDelete: Cascade)
+  timestamp    DateTime
+  spikeScore   Float    @default(0)
+  source       String // chat | twitch_clip
+  twitchClipId String?  @unique
+  sourceUrl    String?
+  sourceTitle  String?
+  sourceViews  Int      @default(0)
+  vodId        String?
+  vodOffset    Int? // seconds into the VOD
+  createdAt    DateTime @default(now())
+  clips        Clip[]
+}
+
+model Clip {
+  id         String   @id @default(cuid())
+  momentId   String
+  moment     Moment   @relation(fields: [momentId], references: [id], onDelete: Cascade)
+  rawPath    String?
+  finalPath  String?
+  transcript String?
+  duration   Float?
+  score      Float? // Judge score (Phase 2)
+  title      String?
+  caption    String?
+  // processing -> pending (waiting for review) -> approved | rejected -> posted ; failed on error
+  status     String   @default("processing")
+  stage      String?  // grab | cut (while processing)
+  error      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  posts      Post[]
+}
+
+model Post {
+  id       String   @id @default(cuid())
+  clipId   String
+  clip     Clip     @relation(fields: [clipId], references: [id], onDelete: Cascade)
+  platform String // youtube | tiktok | instagram
+  url      String?
+  postedAt DateTime @default(now())
+  views    Int?
+}
+
+// Single-row settings (id = "main").
+model Settings {
+  id               String  @id @default("main")
+  spikeMultiplier  Float   @default(3) // Phase 2: msgs/sec >= N x 5-min average
+  minScore         Float   @default(6) // Phase 2: Judge auto-reject below this
+  clipMinSec       Int     @default(15)
+  clipMaxSec       Int     @default(45)
+  minClipViews     Int     @default(25) // Twitch clips need at least this many views
+  clipLookbackHrs  Int     @default(24)
+  layout           String  @default("blur") // blur | facecam
+  captions         Boolean @default(true)
+  scoutPaused      Boolean @default(false)
+}

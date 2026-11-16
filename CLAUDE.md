@@ -10,6 +10,10 @@ Owner: Krew Sutherland. Krew hates repeating themself — read this first.
 - **Cloud Claude Code sessions** (like this repo's sessions) do NOT have `watch_video`;
   they use the `watch` skill below instead.
 
+## Clip Factory (GTA 6 clip pipeline)
+- `clip-factory/` — Twitch → vertical captioned clips → review dashboard. Its own `clip-factory/CLAUDE.md`
+  holds Krew's full brief + build status; read it before touching that folder. Phase 1 built 2026-11-16.
+
 ## Krew's learning notes
 - `notes/` holds Krew's notes from videos and courses, transcribed and cleaned.
   Read them before teaching or advising on business topics.
