@@ -4,7 +4,7 @@ Phases 1–3 are built. This plan hardens the build for launch-day load. Each st
 Run every test with Redis up (`redis-server --daemonize yes`). A step is done only when its test AND the
 full `npm test` pass and `npx tsc --noEmit` is clean.
 
-- [ ] **1. Spike detector v2 (false-spike guards)** — implement the design in `CLAUDE.md` → "Chat spike
+- [x] **1. Spike detector v2 (false-spike guards)** — implement the design in `CLAUDE.md` → "Chat spike
   detector": IRC tags/commands caps, USERNOTICE raid/sub parsing + mutes, bot + `!command` filter, per-user cap,
   distinct chatters, median baseline, throttled JOINs (≤15 per 10s).
   Files: `src/lib/chat.ts`, `src/workers/spike.ts`. Test: `test/spike.test.ts` — steady chat → no spike; 3x
