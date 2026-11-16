@@ -14,7 +14,7 @@ full `npm test` pass and `npx tsc --noEmit` is clean.
 - [ ] **2. Judge prompt from file** — `src/lib/judge.ts` reads the SYSTEM block of `prompts/judge.md` (between
   `## SYSTEM` and `## END SYSTEM`) once at load; Dockerfile already copies the repo. Test: unit test that the
   loaded prompt equals the file block and the existing judge tests still pass.
-- [ ] **3. Twitch robustness** — `helix()` retries 429 after `Ratelimit-Reset` (max 2 retries, max wait 60s)
+- [x] **3. Twitch robustness** — `helix()` retries 429 after `Ratelimit-Reset` (max 2 retries, max wait 60s)
   and 5xx once; Scout also fetches `/streams?user_id=` for all approved streamers (100 ids per call) so they are
   tracked even outside the top 500. Files: `src/lib/twitch.ts`, `src/workers/scout.ts`. Test: `test/twitch.test.ts`
   with a stubbed `fetch`: 429 then 200 succeeds and waits; approved streamer missing from game pages is still

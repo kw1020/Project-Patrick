@@ -14,7 +14,12 @@ export async function runScout(chat: ChatHeat) {
   const approvedIds = (await prisma.streamer.findMany({ where: { approved: true }, select: { twitchId: true } })).map((s) => s.twitchId);
   if (approvedIds.length) {
     const seen = new Set(streams.map((s) => s.user_id));
-    for (const st of await getStreamsByUserIds(approvedIds)) {
+    // Fail-soft: if this extra lookup fails, keep the game-wide list rather than losing the whole scan.
+    const extra = await getStreamsByUserIds(approvedIds).catch((e) => {
+      console.warn("[scout] approved-streamer lookup failed:", (e as Error).message);
+      return [];
+    });
+    for (const st of extra) {
       if (st.game_id === gameId && !seen.has(st.user_id)) { streams.push(st); seen.add(st.user_id); }
     }
   }
