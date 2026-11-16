@@ -74,9 +74,12 @@ claude-animated-shorts skill instead (see "Main tool" below).** Brism notes kept
 - Niche: **true history stories** (Krew said yes, 2026-11-16).
 - Approve scripts in `scripts/SCRIPTS-batch-01.md` (Emu War, 1904 marathon, Pisa, Vasa, Molasses Flood).
 - Channel name.
-- Voice: Krew's own voice or Patrick's Kokoro voice.
+- Voice: using Kokoro af_heart for now (Krew said "do it" without choosing). Swap in Krew's voice any time.
 
 ## Log
+- 2026-11-16: Krew approved batch 01 ("do it"). Built Short 01 Emu War (`shorts/01-emu-war/`): Kokoro af_heart
+  voice (runs in the cloud too), new emu/soldier art, new 3D farm world, original march + SFX. Preview rendered here at
+  540x960 (~1.2 s/frame with `video.mjs`); 2K final goes to local Patrick.
 - 2026-11-16: niche = true history. Wrote batch 01 (5 scripts, 62-66 s). Test-rendered the skill's
   template in the cloud: works after pinning @react-three/postprocessing 3.0.4; too slow without a GPU.
 - 2026-11-16: Brism ruled out on price; switched to claude-animated-shorts.
