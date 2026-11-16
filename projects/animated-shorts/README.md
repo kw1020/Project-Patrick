@@ -71,12 +71,16 @@ claude-animated-shorts skill instead (see "Main tool" below).** Brism notes kept
    which is Krew's bigger plan for Project Patrick.
 
 ## Open decisions (Krew)
-- Niche: **true history stories** (Krew said yes, 2026-11-16).
+- **Niche changed (2026-11-16): "What if" science.** History is parked after Short 01 (Emu War); batch 01 scripts
+  02-05 are on hold. Batch 02 = `scripts/SCRIPTS-batch-02-what-if.md` (waiting for OK).
+- ~~Niche: true history stories~~ replaced by "What if" science (see above).
 - Approve scripts in `scripts/SCRIPTS-batch-01.md` (Emu War, 1904 marathon, Pisa, Vasa, Molasses Flood).
 - Channel name.
 - Voice: using Kokoro af_heart for now (Krew said "do it" without choosing). Swap in Krew's voice any time.
 
 ## Log
+- 2026-11-16: Krew liked the Emu War ("could be a little better, but great") and switched the niche to "What if"
+  science. Wrote batch 02 (sleep, Moon, hole through Earth, Sun goes out, shrink to ant size).
 - 2026-11-16: Krew approved batch 01 ("do it"). Built Short 01 Emu War (`shorts/01-emu-war/`): Kokoro af_heart
   voice (runs in the cloud too), new emu/soldier art, new 3D farm world, original march + SFX. Preview rendered here at
   540x960 (~1.2 s/frame with `video.mjs`); 2K final goes to local Patrick.

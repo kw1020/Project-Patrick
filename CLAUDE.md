@@ -17,7 +17,8 @@ Owner: Krew Sutherland. Krew hates repeating themself — read this first.
 
 ## Active projects (read the project file before working on one)
 - `projects/animated-shorts/`: animated YouTube Shorts (started 2026-11-16). Brism ruled out (too
-  expensive); we use the free claude-animated-shorts skill.
+  expensive); we use the free claude-animated-shorts skill. Niche since 2026-11-16: "What if" science
+  (history parked after Short 01, the Emu War).
   Plan, YouTube rules, backups and open decisions are in its README; add to its Log when things change.
 
 ## Watching videos in cloud sessions: the `watch` skill
