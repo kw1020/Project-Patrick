@@ -32,7 +32,7 @@ full `npm test` pass and `npx tsc --noEmit` is clean.
   `src/lib/db.ts`); chat-heat flush done in one transaction; `CUT_CONCURRENCY` env (default 1).
   Test: `test/db-load.test.ts` — 2 processes (or 2 Prisma clients) doing 300 interleaved writes each finish
   with no "database is locked".
-- [ ] **6. `npm run doctor`** — one command Krew runs on his machine before launch: env keys present; ffmpeg,
+- [x] **6. `npm run doctor`** — one command Krew runs on his machine before launch: env keys present; ffmpeg,
   yt-dlp (prints version, warns if > 14 days old), faster-whisper import; Redis; DB; Twitch token + GTA 6 game id
   + live stream count; downloads the top GTA 6 Twitch clip and renders it vertical into `storage/doctor/`;
   one Judge call (if key); refresh each connected YouTube/TikTok account's token. Prints ✅/⚠️/❌ with a fix
