@@ -1,6 +1,9 @@
 # Project: Animated YouTube Shorts with Brism
 
-Started 2026-11-16. Krew's call: post animated content on YouTube Shorts, made with **Brism**.
+Started 2026-11-16. Krew's call: post animated content on YouTube Shorts.
+
+**Decision 2026-11-16: Brism is too expensive (Krew checked the Whop page). Use the free
+claude-animated-shorts skill instead (see "Main tool" below).** Brism notes kept for reference.
 
 ## What Brism is (researched 2026-11-16)
 - Made by Dominik Sabo (@sabodominik_ on Instagram). Tagline: "Faceless YouTube videos with Claude."
@@ -17,7 +20,18 @@ Started 2026-11-16. Krew's call: post animated content on YouTube Shorts, made w
 - Unknown until we have access: whether it's a Claude Code plugin/skill or an MCP connector, whether
   it renders locally (likely, so it'd run on **local Patrick**, not cloud sessions), and its price.
 
-## Backup if Brism is late, pricey or weak
+## Main tool: claude-animated-shorts (free)
+- github.com/mromidev/claude-animated-shorts, MIT. Checked 2026-11-16: repo is real, 36 MB,
+  SKILL.md + full source of a proven 67 s short ("The Bridge That Fell for a Song").
+- Look: flat 2D cartoon characters in a painted 3D world, ink outlines, gliding cameras, music + SFX.
+  55-70 s vertical. Best fit: true history / science stories.
+- Needs: Node + Remotion (`@remotion/three`), Python 3, ffmpeg. Install to `~/.claude/skills/cartoon-3d-short/`.
+- Voice: any `voice.wav` + word timings. Free options: Krew's own voice (best for YouTube's
+  "authentic content" rule) or local Patrick's Kokoro voice, then free Whisper for timings.
+- Runs on local Patrick (Kokoro + big disk). Set `REMOTION_TMP` to a big drive (~1.3 GB per bundle).
+- Cost per video: $0 beyond the Claude subscription Krew already has.
+
+## Other free backups
 - **claude-animated-shorts** (github.com/mromidev, MIT, free): Claude skill that makes 55-70s vertical
   3D cartoon story shorts with three.js + Remotion. No AI video model, so no per-video cost.
 - **claude-faceless-shorts-creator** (learnwithhasan, MIT, free): Claude Code + Remotion + ElevenLabs.
@@ -50,4 +64,5 @@ Started 2026-11-16. Krew's call: post animated content on YouTube Shorts, made w
 - Budget ceiling for Brism + voice tools.
 
 ## Log
+- 2026-11-16: Brism ruled out on price; switched to claude-animated-shorts.
 - 2026-11-16: project started; Brism researched; no Brism access yet (nothing in Patrick's Gmail).

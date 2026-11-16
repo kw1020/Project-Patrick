@@ -16,7 +16,8 @@ Owner: Krew Sutherland. Krew hates repeating themself — read this first.
   - `notes/simon-squibb-30-years-business.md`: Simon Squibb's "30 Years of Business Knowledge".
 
 ## Active projects (read the project file before working on one)
-- `projects/animated-shorts/`: animated YouTube Shorts made with Brism (started 2026-11-16).
+- `projects/animated-shorts/`: animated YouTube Shorts (started 2026-11-16). Brism ruled out (too
+  expensive); we use the free claude-animated-shorts skill.
   Plan, YouTube rules, backups and open decisions are in its README; add to its Log when things change.
 
 ## Watching videos in cloud sessions: the `watch` skill
