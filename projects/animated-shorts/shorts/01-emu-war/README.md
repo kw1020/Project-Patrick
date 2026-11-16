@@ -38,6 +38,9 @@ ffmpeg -i out/emu/video.mp4 -i ../shorts/01-emu-war/audio/mix.m4a -map 0:v:0 -ma
 Expect ~10 min on a GPU. Without a GPU, `GL=swangle node video.mjs out.mp4 0 1989 0.5 0.5 2` makes a 540x960
 preview in ~45 min (that's how the preview was made).
 
+## Preview
+- `emu-war-preview.mp4`: 540x960 preview with the final sound mix (cloud render, 2026-11-16).
+
 ## Upload
 - Title: **The Australian Army Lost a War to Emus**
 - Description: In 1932, Australia sent soldiers with machine guns to fight 20,000 emus. The emus won.
