@@ -72,7 +72,9 @@ claude-animated-shorts skill instead (see "Main tool" below).** Brism notes kept
 
 ## Open decisions (Krew)
 - **Niche changed (2026-11-16): "What if" science.** History is parked after Short 01 (Emu War); batch 01 scripts
-  02-05 are on hold. Batch 02 = `scripts/SCRIPTS-batch-02-what-if.md` (waiting for OK).
+  02-05 are on hold. Batch 02 = `scripts/SCRIPTS-batch-02-what-if.md`, batch 03 = `scripts/SCRIPTS-batch-03-what-if-you.md`
+  (Krew's style: put YOU in it: last person alive, powers, reactions, the world ending). More ideas:
+  `scripts/WHAT-IF-backlog.md`. Both batches waiting for OK.
 - ~~Niche: true history stories~~ replaced by "What if" science (see above).
 - Approve scripts in `scripts/SCRIPTS-batch-01.md` (Emu War, 1904 marathon, Pisa, Vasa, Molasses Flood).
 - Channel name.
