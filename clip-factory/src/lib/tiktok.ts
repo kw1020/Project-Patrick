@@ -112,6 +112,11 @@ async function accessToken(acct: Account) {
   }
 }
 
+/** For `npm run doctor`: force a token refresh so a dead connection shows up now, not at upload time. */
+export function checkAccount(acct: Account) {
+  return accessToken({ ...acct, accessToken: null });
+}
+
 /** TikTok's chunk rules: under 64 MB goes up whole; bigger files in 10 MB chunks, the last one taking the remainder. */
 export function chunkPlan(size: number) {
   const MB = 1024 * 1024;

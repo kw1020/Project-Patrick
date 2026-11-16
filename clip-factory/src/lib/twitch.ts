@@ -1,5 +1,7 @@
 // Minimal Twitch Helix client (app access token, client-credentials flow).
-const HELIX = "https://api.twitch.tv/helix";
+// Overridable so tests (and `npm run doctor` against the stand-ins) can point at a mock server.
+const HELIX = () => process.env.TWITCH_API_URL || "https://api.twitch.tv/helix";
+const AUTH_URL = () => process.env.TWITCH_AUTH_URL || "https://id.twitch.tv/oauth2/token";
 
 let token: { value: string; expiresAt: number } | null = null;
 let gameIdCache: string | null = null;
@@ -12,7 +14,7 @@ async function getToken(): Promise<string> {
   if (token && Date.now() < token.expiresAt - 60_000) return token.value;
   const id = process.env.TWITCH_CLIENT_ID, secret = process.env.TWITCH_CLIENT_SECRET;
   if (!id || !secret) throw new Error("TWITCH_CLIENT_ID / TWITCH_CLIENT_SECRET missing in .env");
-  const res = await fetch("https://id.twitch.tv/oauth2/token", {
+  const res = await fetch(AUTH_URL(), {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({ client_id: id, client_secret: secret, grant_type: "client_credentials" }),
@@ -26,7 +28,7 @@ async function getToken(): Promise<string> {
 type Params = Record<string, string | number | string[] | undefined>;
 
 export async function helix<T = any>(endpoint: string, params: Params = {}): Promise<{ data: T[]; pagination?: { cursor?: string } }> {
-  const url = new URL(HELIX + endpoint);
+  const url = new URL(HELIX() + endpoint);
   for (const [k, v] of Object.entries(params)) {
     if (v === undefined) continue;
     for (const item of Array.isArray(v) ? v : [v]) url.searchParams.append(k, String(item));

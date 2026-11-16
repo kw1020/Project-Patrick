@@ -1,4 +1,4 @@
-// Stand-in Anthropic + Google/YouTube servers for tests (no real keys or network).
+// Stand-in Anthropic + Google/YouTube + TikTok + Twitch servers for tests (no real keys or network).
 import http from "node:http";
 
 export type Mock = { tiktokStatus: Record<string, unknown>; refreshCount: number; url: string; requests: { method: string; path: string; headers: http.IncomingHttpHeaders; body: Buffer }[]; close: () => Promise<void>; verdict: Record<string, unknown> };
@@ -36,6 +36,25 @@ export async function startMocks(port = 0): Promise<Mock> {
       if (path.startsWith("/v2/post/publish/status/fetch/")) return tt(mock.tiktokStatus);
       if (path.startsWith("/v2/video/query/")) return tt({ videos: [{ id: "7300000000000000001", view_count: 12000, like_count: 900, comment_count: 40 }] });
 
+      // ---- Twitch (client-credentials token + Helix) ----
+      if (path.startsWith("/oauth2/token") && req.method === "POST") return json(200, { access_token: "twitch-mock-token", expires_in: 5000000, token_type: "bearer" });
+      if (path.startsWith("/helix/")) {
+        const u = new URL(path, "http://x"), ep = u.pathname.slice("/helix".length);
+        const gta = { id: "1234567", name: "Grand Theft Auto VI", box_art_url: "", igdb_id: "" };
+        const now = new Date().toISOString();
+        if (ep === "/games") return json(200, { data: u.searchParams.getAll("name").some((n) => /grand theft auto (vi|6)/i.test(n)) ? [gta] : [] });
+        if (ep === "/search/categories") return json(200, { data: [gta], pagination: {} });
+        if (ep === "/streams") return json(200, { data: [
+          { id: "s1", user_id: "u1", user_login: "kai", user_name: "Kai", game_id: gta.id, type: "live", title: "GTA 6 day one", viewer_count: 12000, started_at: now, thumbnail_url: "" },
+          { id: "s2", user_id: "u2", user_login: "mira", user_name: "Mira", game_id: gta.id, type: "live", title: "Vice City heists", viewer_count: 800, started_at: now, thumbnail_url: "" },
+        ], pagination: {} });
+        if (ep === "/clips") return json(200, { data: [
+          { id: "ClipOne", url: "https://clips.twitch.tv/ClipOne", broadcaster_id: "u1", broadcaster_name: "Kai", creator_name: "fan1", video_id: "", game_id: gta.id, title: "bridge jump", view_count: 5400, created_at: now, thumbnail_url: "", duration: 28.5, vod_offset: null },
+          { id: "ClipTwo", url: "https://clips.twitch.tv/ClipTwo", broadcaster_id: "u2", broadcaster_name: "Mira", creator_name: "fan2", video_id: "", game_id: gta.id, title: "cops lol", view_count: 300, created_at: now, thumbnail_url: "", duration: 40, vod_offset: null },
+        ], pagination: {} });
+        if (ep === "/users") return json(200, { data: [...u.searchParams.getAll("login"), ...u.searchParams.getAll("id")].map((x, i) => ({ id: `u${i + 1}`, login: x.toLowerCase(), display_name: x, profile_image_url: "" })) });
+        return json(404, { error: "Not Found", status: 404, message: "mock: no helix " + ep });
+      }
       if (path.startsWith("/token")) return json(200, { access_token: "ya29.mock", refresh_token: "1//mock-refresh", expires_in: 3600 });
       if (path.startsWith("/youtube/v3/channels")) return json(200, { items: [{ id: "UCmock", snippet: { title: "Krew Clips (mock)" } }] });
       if (path.startsWith("/youtube/v3/videos")) return json(200, { items: [{ id: "vid123", statistics: { viewCount: "4321" } }] });
@@ -57,6 +76,7 @@ export function mockEnv(url: string) {
     TIKTOK_CLIENT_KEY: "mock-key", TIKTOK_CLIENT_SECRET: "mock-secret", TIKTOK_AUTH_URL: `${url}/tt-auth`, TIKTOK_API_URL: url,
     YOUTUBE_CLIENT_ID: "mock-client", YOUTUBE_CLIENT_SECRET: "mock-secret",
     GOOGLE_OAUTH_URL: `${url}/auth`, GOOGLE_TOKEN_URL: `${url}/token`, YOUTUBE_API_URL: `${url}/youtube/v3`, YOUTUBE_UPLOAD_URL: `${url}/upload/youtube/v3/videos`,
+    TWITCH_CLIENT_ID: "mock-twitch-id", TWITCH_CLIENT_SECRET: "mock-twitch-secret", TWITCH_API_URL: `${url}/helix`, TWITCH_AUTH_URL: `${url}/oauth2/token`,
   };
 }
 
