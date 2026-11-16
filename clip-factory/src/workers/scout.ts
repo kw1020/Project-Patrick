@@ -60,8 +60,10 @@ export async function runScout(chat: ChatHeat) {
 /** Write chat heat for approved live streamers (every 10s). */
 export async function flushChatHeat(chat: ChatHeat) {
   const live = await prisma.streamer.findMany({ where: { approved: true, isLive: true }, select: { id: true, login: true } });
-  for (const s of live) {
+  if (!live.length) return;
+  // One transaction instead of N writes: fewer lock grabs while the web app is writing too.
+  await prisma.$transaction(live.map((s) => {
     const st = chat.stats(s.login);
-    await prisma.streamer.update({ where: { id: s.id }, data: { chatRate: st.rate, chatAvg: st.avg } });
-  }
+    return prisma.streamer.update({ where: { id: s.id }, data: { chatRate: st.rate, chatAvg: st.avg } });
+  }));
 }

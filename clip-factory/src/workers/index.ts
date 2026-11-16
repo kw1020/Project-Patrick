@@ -1,6 +1,6 @@
 import { Worker, type Job } from "bullmq";
 import { ChatHeat } from "../lib/chat";
-import { prisma } from "../lib/db";
+import { prisma, ensureSqliteTuned } from "../lib/db";
 import { run } from "../lib/media";
 import { ensureStorage } from "../lib/paths";
 import { queue, redis, setStatus, QUEUES } from "../lib/queues";
@@ -53,6 +53,7 @@ function worker(name: keyof typeof QUEUES, concurrency: number, fn: (job: Job) =
 }
 
 async function main() {
+  await ensureSqliteTuned(); // WAL + busy timeout: web and worker write the same SQLite file
   ensureStorage();
   await checkTools();
   await migrateLegacySettings().catch((e) => console.error("[migrate]", e.message));
@@ -63,7 +64,7 @@ async function main() {
     worker("grab", 2, (job) => runGrab(job.data.clipId)),
     worker("transcribe", 1, (job) => runTranscribe(job.data.clipId)),
     worker("judge", 3, (job) => runJudge(job.data.clipId)),
-    worker("cut", 1, (job) => runCut(job.data.clipId)), // ffmpeg is CPU-heavy: one at a time
+    worker("cut", Number(process.env.CUT_CONCURRENCY || 1), (job) => runCut(job.data.clipId)), // ffmpeg is CPU-heavy: one at a time
     worker("post", 1, (job) => (job.name === "views" ? runStatsSync() : runPost(job.data.clipId, job.data.accountId))),
   ];
 
