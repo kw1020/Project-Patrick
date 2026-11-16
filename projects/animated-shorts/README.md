@@ -81,6 +81,8 @@ claude-animated-shorts skill instead (see "Main tool" below).** Brism notes kept
 - Voice: using Kokoro af_heart for now (Krew said "do it" without choosing). Swap in Krew's voice any time.
 
 ## Log
+- 2026-11-16: Krew: "Build me 3 test shorts." Built 06 Last person alive, 07 Speed of sound, 03 Hole through the
+  Earth (`shorts/TEST-SHORTS.md`): voices, worlds (city set reused for 06 + 07), scores + SFX, upload meta.
 - 2026-11-16: Krew liked the Emu War ("could be a little better, but great") and switched the niche to "What if"
   science. Wrote batch 02 (sleep, Moon, hole through Earth, Sun goes out, shrink to ant size).
 - 2026-11-16: Krew approved batch 01 ("do it"). Built Short 01 Emu War (`shorts/01-emu-war/`): Kokoro af_heart

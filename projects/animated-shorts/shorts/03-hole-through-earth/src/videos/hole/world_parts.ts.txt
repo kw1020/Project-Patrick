@@ -1,0 +1,116 @@
+// ==== PART: imports ====
+// "What if you jumped into a hole through the Earth?": the template's sky + light rig (plus space and core looks and
+// a star dome), then our sets: a backyard with the hole, an Arctic drill rig, a cutaway Earth in space (glowing
+// layers on the cut faces, the tunnel along its axis), the exit hole in the open ocean, a bowl with a marble, and the
+// inside of the core.
+import * as THREE from "three";
+import { Batch, boxGeo, V, lam, house, Kit } from "./build";
+import { ctex, rep, cloudHD } from "./paint";
+import { Pen } from "./toon";
+import { LIGHTS, LOOK, LightPreset } from "./lights";
+import { TONE, CHAR, twoTone, untone } from "./shade";
+import { NOINK } from "./ink";
+import { Pool, Actor, Fx, stage, SU } from "./cast";
+import { quadUp, disc, T4, cyl, beamBetween, discTex, haloTex } from "./kit";
+import { FPS, SHOTS, camAt, V3, hh, smooth, clamp01, ShotDef, YARD, RIG, EARTH, ER, OCEAN, BOWL, CORE, marbleA } from "./story";
+
+export const loadKit = () => Promise.resolve({} as Kit);
+const SUN_SHOT: Record<number, { az?: number; el?: number }> = {};
+
+// ==== PART: helpers ====
+const globeTex = () => ctex("globe", 2048, 1024, (g, r) => {
+  g.fillStyle = "#2f7fc4"; g.fillRect(0, 0, 2048, 1024);
+  for (let i = 0; i < 26; i++) {
+    const cx = r() * 2048, cy = 200 + r() * 620, n = 6 + Math.floor(r() * 8);
+    for (let k = 0; k < n; k++) { g.fillStyle = r() < 0.3 ? "#c9a66b" : "#5aa04a"; g.beginPath(); g.ellipse(cx + (r() - 0.5) * 180, cy + (r() - 0.5) * 120, 30 + r() * 90, 20 + r() * 60, r() * 3, 0, 6.3); g.fill(); }
+  }
+  g.fillStyle = "#f4f8ff"; g.fillRect(0, 0, 2048, 70); g.fillRect(0, 954, 2048, 70);
+  for (let i = 0; i < 40; i++) { g.fillStyle = "rgba(255,255,255,0.55)"; g.beginPath(); g.ellipse(r() * 2048, r() * 1024, 60 + r() * 120, 12 + r() * 20, 0, 0, 6.3); g.fill(); }
+});
+const layersTex = () => ctex("layers", 1024, 1024, (g) => {
+  const c = 512, R = 512;
+  const ring = (f: number, col: string) => { g.fillStyle = col; g.beginPath(); g.arc(c, c, R * f, 0, 6.3); g.fill(); };
+  ring(1.0, "#7a4e30"); ring(0.955, "#e07a3a"); ring(0.8, "#d8602a"); ring(0.55, "#f5a623"); ring(0.19, "#fff1a0");
+  g.strokeStyle = "rgba(60,30,10,0.6)"; g.lineWidth = 6; for (const f of [0.955, 0.55, 0.19]) { g.beginPath(); g.arc(c, c, R * f, 0, 6.3); g.stroke(); }
+});
+const lavaTex = () => ctex("lava", 1024, 512, (g, r) => {
+  g.fillStyle = "#ff8a2a"; g.fillRect(0, 0, 1024, 512);
+  for (let i = 0; i < 500; i++) { g.fillStyle = r() < 0.5 ? "rgba(255,220,120,0.5)" : "rgba(200,60,20,0.5)"; g.beginPath(); g.ellipse(r() * 1024, r() * 512, 10 + 50 * r(), 6 + 20 * r(), r() * 3, 0, 6.3); g.fill(); }
+});
+const starTex = () => ctex("stars", 4096, 2048, (g, r) => {
+  g.fillStyle = "#000000"; g.fillRect(0, 0, 4096, 2048);
+  for (let i = 0; i < 9000; i++) { const s = r() < 0.03 ? 3 : r() < 0.2 ? 2 : 1; g.fillStyle = `rgba(255,${235 + 20 * r()},${215 + 40 * r()},${0.5 + 0.5 * r()})`; g.fillRect(r() * 4096, r() * 2048, s, s); }
+});
+
+// ==== PART: build ====
+    const b = new Batch(), M: Record<string, THREE.Material> = {};
+    M.lawn = lam("lawnH", () => ({ color: "#7fae55" }));
+    M.dirt = lam("dirtH", () => ({ color: "#8a5a3a" }));
+    M.dark = lam("darkH", () => ({ color: "#1a1418" }));
+    M.wood = lam("woodH", () => ({ color: "#9a6a3a" }));
+    M.iron = twoTone(new THREE.MeshPhongMaterial({ color: "#c0453a", specular: "#888888", shininess: 30 }), 0.15);
+    M.steel = twoTone(new THREE.MeshPhongMaterial({ color: "#9aa0a8", specular: "#bbbbbb", shininess: 40 }), 0.15);
+    M.snow = lam("snowH", () => ({ color: "#eef3fa" }));
+    M.hut = lam("hutH", () => ({ color: "#5a7fa8" }));
+    M.ocean = lam("oceanH", () => ({ color: "#2f8fb5" }));
+    M.stone = lam("stoneH", () => ({ color: "#a39a8c" }));
+    M.bowl = lam("bowlH", () => ({ color: "#f2efe6", side: THREE.DoubleSide }));
+    M.table = lam("tableH", () => ({ color: "#b07a4a" }));
+    M.red = lam("redH", () => ({ color: "#e8453c" }));
+    // ---- backyard: lawn with an opening, the pit, a dirt pile, a shovel, the house ----
+    const HR = 0.8;
+    for (const [x0, x1, z0, z1] of [[-1000, YARD[0] - HR, -1000, 1000], [YARD[0] + HR, 1000, -1000, 1000], [YARD[0] - HR, YARD[0] + HR, -1000, YARD[2] - HR], [YARD[0] - HR, YARD[0] + HR, YARD[2] + HR, 1000]] as const)
+      b.add(quadUp(x0, x1, z0, z1, (x1 - x0) / 4, (z1 - z0) / 4, 0), M.lawn);
+    const pit = cyl(HR, HR, 6, 24, ); pit.translate(0, -3, 0);
+    b.add(pit, lam("pitH", () => ({ color: "#2a1d18", side: THREE.BackSide })), T4(YARD[0], 0, YARD[2]));
+    b.add(disc(HR + 0.25, 0.01).translate(YARD[0], 0, YARD[2]), M.dirt);
+    b.add(new THREE.SphereGeometry(1, 14, 8, 0, 6.3, 0, Math.PI / 2), M.dirt, T4(YARD[0] + 2.0, 0, YARD[2] + 0.8, 0, [1.3, 0.8, 1.1]));
+    b.add(cyl(0.025, 0.025, 1.3, 8), M.wood, new THREE.Matrix4().compose(V(YARD[0] + 1.5, 0.85, YARD[2] + 0.4), new THREE.Quaternion().setFromAxisAngle(V(0, 0, 1), 0.35), V(1, 1, 1)));
+    b.add(boxGeo(V(-0.12, -0.18, -0.02), V(0.12, 0.12, 0.02)), M.steel, T4(YARD[0] + 1.73, 0.18, YARD[2] + 0.4));
+    house(b, YARD[0] + 0.5, YARD[2] + 7, Math.PI, 9, 7, 3.3, 2, 0);
+    for (let x = -12; x <= 12; x += 1.6) b.add(boxGeo(V(YARD[0] + x - 0.05, 0, YARD[2] - 12), V(YARD[0] + x + 0.05, 1.1, YARD[2] - 11.9)), M.wood);
+    // ---- the Arctic drill rig ----
+    b.add(quadUp(RIG[0] - 300, RIG[0] + 300, RIG[2] - 300, RIG[2] + 300, 1, 1, 0.02), M.snow);
+    for (const [sx, sz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) b.add(beamBetween(V(RIG[0] + sx * 3, 0, RIG[2] + sz * 3), V(RIG[0] + sx * 0.6, 24, RIG[2] + sz * 0.6), 0.2), M.iron);
+    for (let h = 3; h < 24; h += 3) { const k = 3 - (2.4 * h) / 24; for (const [ax, az, bx, bz] of [[-k, -k, k, -k], [k, -k, k, k], [k, k, -k, k], [-k, k, -k, -k]]) b.add(beamBetween(V(RIG[0] + ax, h, RIG[2] + az), V(RIG[0] + bx, h, RIG[2] + bz), 0.1), M.iron); }
+    b.add(boxGeo(V(RIG[0] - 1.2, 24, RIG[2] - 1.2), V(RIG[0] + 1.2, 25.2, RIG[2] + 1.2)), M.iron);
+    b.add(cyl(0.12, 0.12, 22, 10), M.steel, T4(RIG[0], 12, RIG[2]));
+    b.add(boxGeo(V(RIG[0] + 5, 0, RIG[2] - 3), V(RIG[0] + 13, 3.5, RIG[2] + 3)), M.hut);
+    for (let k = 0; k < 12; k++) b.add(cyl(0.12, 0.12, 6, 10).rotateZ(Math.PI / 2), M.steel, T4(RIG[0] - 6, 0.15 + 0.24 * (k % 4), RIG[2] - 3 + 0.25 * Math.floor(k / 4) * 2));
+    // ---- the bowl and the table ----
+    b.add(boxGeo(V(BOWL[0] - 1.2, 0, BOWL[2] - 0.8), V(BOWL[0] + 1.2, 0.02, BOWL[2] + 0.8)), M.table);
+    const bowl = new THREE.LatheGeometry(Array.from({ length: 16 }, (_, i) => { const a = (i / 15) * Math.PI * 0.45; return new THREE.Vector2(0.6 * Math.sin(a) + 0.001, 0.6 - 0.6 * Math.cos(a)); }), 40);
+    b.add(bowl, M.bowl, T4(BOWL[0], 0.02, BOWL[2]));
+    // ---- the exit: a stone rim in the middle of the sea ----
+    b.add(quadUp(OCEAN[0] - 1500, OCEAN[0] + 1500, OCEAN[2] - 1500, OCEAN[2] + 1500, 1, 1, 0.05), M.ocean);
+    b.add(new THREE.TorusGeometry(1.0, 0.18, 10, 32).rotateX(Math.PI / 2), M.stone, T4(OCEAN[0], 0.12, OCEAN[2]));
+    b.add(disc(1.0, 0.07).translate(OCEAN[0], 0, OCEAN[2]), M.dark);
+    b.build(this.root);
+
+    // ---- the cutaway Earth (a quarter wedge opened toward -z), tunnel and the tiny red borehole ----
+    const E = this.earth;
+    const gm = lam("globeM", () => ({ map: globeTex() }));
+    const globe = new THREE.Mesh(new THREE.SphereGeometry(ER, 96, 64, (7 * Math.PI) / 4, (3 * Math.PI) / 2), gm); E.add(globe);
+    const lm = new THREE.MeshBasicMaterial({ map: layersTex(), side: THREE.DoubleSide, color: new THREE.Color(1.15, 1.1, 1.05) });
+    for (const th of [(3 * Math.PI) / 4, Math.PI / 4]) { const face = new THREE.Mesh(new THREE.CircleGeometry(ER, 96, -Math.PI / 2, Math.PI), lm); face.rotation.y = th; E.add(face); }
+    const tun = new THREE.Mesh(cyl(0.7, 0.7, 2 * ER + 0.4, 12), new THREE.MeshBasicMaterial({ color: "#140c10" })); tun.position.z = -0.3; E.add(tun);
+    const tick = new THREE.Mesh(cyl(0.3, 0.3, 1.2, 10), M.red); tick.position.set(0, ER - 0.4, -0.9); E.add(tick);
+    E.position.set(...EARTH); this.root.add(E);
+    // ---- inside the core ----
+    const core = new THREE.Mesh(new THREE.SphereGeometry(30, 48, 24), new THREE.MeshBasicMaterial({ map: lavaTex(), side: THREE.BackSide, color: new THREE.Color(1.25, 1.05, 0.9), fog: false }));
+    core.position.set(...CORE); core.layers.set(NOINK); this.root.add(core);
+    // ---- the marble ----
+    this.marble = new THREE.Mesh(new THREE.SphereGeometry(0.05, 16, 12), twoTone(new THREE.MeshPhongMaterial({ color: "#3c7be8", specular: "#ffffff", shininess: 80 }), 0.2));
+    this.marble.castShadow = true; this.root.add(this.marble);
+    // ---- star dome for the space shots ----
+    this.stars = new THREE.Mesh(new THREE.SphereGeometry(1050, 48, 24), new THREE.MeshBasicMaterial({ map: starTex(), side: THREE.BackSide, transparent: true,
+      blending: THREE.AdditiveBlending, depthWrite: false, fog: false, color: new THREE.Color(1.6, 1.6, 1.6) }));
+    this.stars.renderOrder = -0.9; this.stars.frustumCulled = false; this.stars.layers.set(NOINK); this.root.add(this.stars);
+
+// ==== PART: pose ====
+    const space = s.light === "space";
+    this.stars.visible = space; this.stars.position.copy(cam.position);
+    for (const c of this.clouds) c.visible = !space && s.light !== "core";
+    this.earth.rotation.y = 0;
+    const a = marbleA(t);
+    this.marble.position.set(BOWL[0] + 0.55 * Math.sin(a), 0.02 + 0.6 - 0.55 * Math.cos(a) + 0.05, BOWL[2]);

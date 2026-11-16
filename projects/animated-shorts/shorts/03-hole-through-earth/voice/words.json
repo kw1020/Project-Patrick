@@ -1,0 +1,1472 @@
+[
+{
+"w": "What",
+"start": 0.25,
+"end": 0.38,
+"line": 0
+},
+{
+"w": "if",
+"start": 0.38,
+"end": 0.54,
+"line": 0
+},
+{
+"w": "you",
+"start": 0.54,
+"end": 0.74,
+"line": 0
+},
+{
+"w": "dug",
+"start": 0.74,
+"end": 0.92,
+"line": 0
+},
+{
+"w": "a",
+"start": 0.92,
+"end": 1.13,
+"line": 0
+},
+{
+"w": "hole",
+"start": 1.13,
+"end": 1.26,
+"line": 0
+},
+{
+"w": "straight",
+"start": 1.26,
+"end": 1.46,
+"line": 0
+},
+{
+"w": "through",
+"start": 1.46,
+"end": 1.53,
+"line": 0
+},
+{
+"w": "the",
+"start": 1.53,
+"end": 1.69,
+"line": 0
+},
+{
+"w": "Earth",
+"start": 1.69,
+"end": 1.81,
+"line": 0
+},
+{
+"w": "and",
+"start": 1.81,
+"end": 2.02,
+"line": 0
+},
+{
+"w": "jumped",
+"start": 2.02,
+"end": 2.42,
+"line": 0
+},
+{
+"w": "in",
+"start": 2.42,
+"end": 2.69,
+"line": 0
+},
+{
+"w": "You'd",
+"start": 2.69,
+"end": 2.72,
+"line": 0
+},
+{
+"w": "pop",
+"start": 2.72,
+"end": 2.99,
+"line": 0
+},
+{
+"w": "out",
+"start": 2.99,
+"end": 3.0,
+"line": 0
+},
+{
+"w": "the",
+"start": 3.0,
+"end": 3.17,
+"line": 0
+},
+{
+"w": "other",
+"start": 3.17,
+"end": 3.51,
+"line": 0
+},
+{
+"w": "side",
+"start": 3.51,
+"end": 3.66,
+"line": 0
+},
+{
+"w": "in",
+"start": 3.66,
+"end": 3.84,
+"line": 0
+},
+{
+"w": "about",
+"start": 3.84,
+"end": 4.22,
+"line": 0
+},
+{
+"w": "forty",
+"start": 4.22,
+"end": 4.5,
+"line": 0
+},
+{
+"w": "minutes",
+"start": 4.5,
+"end": 5.14,
+"line": 0
+},
+{
+"w": "First",
+"start": 5.58,
+"end": 5.89,
+"line": 1
+},
+{
+"w": "the",
+"start": 5.89,
+"end": 5.98,
+"line": 1
+},
+{
+"w": "digging",
+"start": 5.98,
+"end": 6.64,
+"line": 1
+},
+{
+"w": "The",
+"start": 6.64,
+"end": 6.83,
+"line": 1
+},
+{
+"w": "deepest",
+"start": 6.83,
+"end": 7.15,
+"line": 1
+},
+{
+"w": "hole",
+"start": 7.15,
+"end": 7.4,
+"line": 1
+},
+{
+"w": "humans",
+"start": 7.4,
+"end": 7.63,
+"line": 1
+},
+{
+"w": "have",
+"start": 7.63,
+"end": 7.96,
+"line": 1
+},
+{
+"w": "ever",
+"start": 7.96,
+"end": 8.18,
+"line": 1
+},
+{
+"w": "drilled",
+"start": 8.18,
+"end": 8.72,
+"line": 1
+},
+{
+"w": "took",
+"start": 8.72,
+"end": 8.87,
+"line": 1
+},
+{
+"w": "about",
+"start": 8.87,
+"end": 9.12,
+"line": 1
+},
+{
+"w": "twenty",
+"start": 9.12,
+"end": 9.58,
+"line": 1
+},
+{
+"w": "years",
+"start": 9.58,
+"end": 9.79,
+"line": 1
+},
+{
+"w": "and",
+"start": 9.79,
+"end": 9.96,
+"line": 1
+},
+{
+"w": "went",
+"start": 9.96,
+"end": 10.24,
+"line": 1
+},
+{
+"w": "twelve",
+"start": 10.24,
+"end": 10.33,
+"line": 1
+},
+{
+"w": "kilometres",
+"start": 10.33,
+"end": 11.08,
+"line": 1
+},
+{
+"w": "down",
+"start": 11.08,
+"end": 11.41,
+"line": 1
+},
+{
+"w": "That's",
+"start": 11.63,
+"end": 11.75,
+"line": 2
+},
+{
+"w": "about",
+"start": 11.75,
+"end": 12.07,
+"line": 2
+},
+{
+"w": "a",
+"start": 12.07,
+"end": 12.14,
+"line": 2
+},
+{
+"w": "tenth",
+"start": 12.14,
+"end": 12.36,
+"line": 2
+},
+{
+"w": "of",
+"start": 12.36,
+"end": 12.49,
+"line": 2
+},
+{
+"w": "one",
+"start": 12.49,
+"end": 12.76,
+"line": 2
+},
+{
+"w": "percent",
+"start": 12.76,
+"end": 12.96,
+"line": 2
+},
+{
+"w": "of",
+"start": 12.96,
+"end": 13.17,
+"line": 2
+},
+{
+"w": "the",
+"start": 13.17,
+"end": 13.38,
+"line": 2
+},
+{
+"w": "way",
+"start": 13.38,
+"end": 13.55,
+"line": 2
+},
+{
+"w": "Keep",
+"start": 13.77,
+"end": 13.96,
+"line": 3
+},
+{
+"w": "going",
+"start": 13.96,
+"end": 14.29,
+"line": 3
+},
+{
+"w": "and",
+"start": 14.29,
+"end": 14.39,
+"line": 3
+},
+{
+"w": "the",
+"start": 14.39,
+"end": 14.6,
+"line": 3
+},
+{
+"w": "rock",
+"start": 14.6,
+"end": 14.81,
+"line": 3
+},
+{
+"w": "gets",
+"start": 14.81,
+"end": 14.92,
+"line": 3
+},
+{
+"w": "hotter",
+"start": 14.92,
+"end": 15.16,
+"line": 3
+},
+{
+"w": "and",
+"start": 15.16,
+"end": 15.41,
+"line": 3
+},
+{
+"w": "hotter",
+"start": 15.41,
+"end": 15.88,
+"line": 3
+},
+{
+"w": "At",
+"start": 16.1,
+"end": 16.18,
+"line": 4
+},
+{
+"w": "the",
+"start": 16.18,
+"end": 16.5,
+"line": 4
+},
+{
+"w": "centre",
+"start": 16.5,
+"end": 16.81,
+"line": 4
+},
+{
+"w": "it's",
+"start": 16.81,
+"end": 16.83,
+"line": 4
+},
+{
+"w": "about",
+"start": 16.83,
+"end": 17.29,
+"line": 4
+},
+{
+"w": "as",
+"start": 17.29,
+"end": 17.36,
+"line": 4
+},
+{
+"w": "hot",
+"start": 17.36,
+"end": 17.62,
+"line": 4
+},
+{
+"w": "as",
+"start": 17.62,
+"end": 17.78,
+"line": 4
+},
+{
+"w": "the",
+"start": 17.78,
+"end": 18.07,
+"line": 4
+},
+{
+"w": "surface",
+"start": 18.07,
+"end": 18.35,
+"line": 4
+},
+{
+"w": "of",
+"start": 18.35,
+"end": 18.53,
+"line": 4
+},
+{
+"w": "the",
+"start": 18.53,
+"end": 18.79,
+"line": 4
+},
+{
+"w": "Sun",
+"start": 18.79,
+"end": 19.03,
+"line": 4
+},
+{
+"w": "and",
+"start": 19.03,
+"end": 19.08,
+"line": 4
+},
+{
+"w": "the",
+"start": 19.08,
+"end": 19.33,
+"line": 4
+},
+{
+"w": "pressure",
+"start": 19.33,
+"end": 19.71,
+"line": 4
+},
+{
+"w": "would",
+"start": 19.71,
+"end": 19.86,
+"line": 4
+},
+{
+"w": "crush",
+"start": 19.86,
+"end": 20.11,
+"line": 4
+},
+{
+"w": "a",
+"start": 20.11,
+"end": 20.29,
+"line": 4
+},
+{
+"w": "submarine",
+"start": 20.29,
+"end": 20.86,
+"line": 4
+},
+{
+"w": "like",
+"start": 20.86,
+"end": 20.99,
+"line": 4
+},
+{
+"w": "a",
+"start": 20.99,
+"end": 21.2,
+"line": 4
+},
+{
+"w": "soda",
+"start": 21.2,
+"end": 21.47,
+"line": 4
+},
+{
+"w": "can",
+"start": 21.47,
+"end": 21.8,
+"line": 4
+},
+{
+"w": "But",
+"start": 22.02,
+"end": 22.09,
+"line": 5
+},
+{
+"w": "say",
+"start": 22.09,
+"end": 22.4,
+"line": 5
+},
+{
+"w": "you've",
+"start": 22.4,
+"end": 22.52,
+"line": 5
+},
+{
+"w": "got",
+"start": 22.52,
+"end": 22.72,
+"line": 5
+},
+{
+"w": "a",
+"start": 22.72,
+"end": 22.83,
+"line": 5
+},
+{
+"w": "magic",
+"start": 22.83,
+"end": 23.39,
+"line": 5
+},
+{
+"w": "fireproof",
+"start": 23.39,
+"end": 23.95,
+"line": 5
+},
+{
+"w": "airless",
+"start": 23.95,
+"end": 24.31,
+"line": 5
+},
+{
+"w": "tunnel",
+"start": 24.31,
+"end": 24.65,
+"line": 5
+},
+{
+"w": "You",
+"start": 24.65,
+"end": 24.83,
+"line": 5
+},
+{
+"w": "jump",
+"start": 24.83,
+"end": 25.17,
+"line": 5
+},
+{
+"w": "For",
+"start": 25.39,
+"end": 25.49,
+"line": 6
+},
+{
+"w": "twenty",
+"start": 25.49,
+"end": 25.94,
+"line": 6
+},
+{
+"w": "minutes",
+"start": 25.94,
+"end": 26.58,
+"line": 6
+},
+{
+"w": "you",
+"start": 26.58,
+"end": 26.72,
+"line": 6
+},
+{
+"w": "just",
+"start": 26.72,
+"end": 26.85,
+"line": 6
+},
+{
+"w": "keep",
+"start": 26.85,
+"end": 27.14,
+"line": 6
+},
+{
+"w": "speeding",
+"start": 27.14,
+"end": 27.49,
+"line": 6
+},
+{
+"w": "up",
+"start": 27.49,
+"end": 27.61,
+"line": 6
+},
+{
+"w": "By",
+"start": 27.61,
+"end": 27.77,
+"line": 6
+},
+{
+"w": "the",
+"start": 27.77,
+"end": 28.05,
+"line": 6
+},
+{
+"w": "centre",
+"start": 28.05,
+"end": 28.4,
+"line": 6
+},
+{
+"w": "you're",
+"start": 28.4,
+"end": 28.44,
+"line": 6
+},
+{
+"w": "doing",
+"start": 28.44,
+"end": 28.61,
+"line": 6
+},
+{
+"w": "over",
+"start": 28.61,
+"end": 29.03,
+"line": 6
+},
+{
+"w": "twenty-eight",
+"start": 29.03,
+"end": 29.29,
+"line": 6
+},
+{
+"w": "thousand",
+"start": 29.29,
+"end": 29.63,
+"line": 6
+},
+{
+"w": "kilometres",
+"start": 29.63,
+"end": 30.45,
+"line": 6
+},
+{
+"w": "an",
+"start": 30.45,
+"end": 30.6,
+"line": 6
+},
+{
+"w": "hour",
+"start": 30.6,
+"end": 30.87,
+"line": 6
+},
+{
+"w": "Then",
+"start": 31.09,
+"end": 31.28,
+"line": 7
+},
+{
+"w": "you",
+"start": 31.28,
+"end": 31.37,
+"line": 7
+},
+{
+"w": "start",
+"start": 31.37,
+"end": 31.53,
+"line": 7
+},
+{
+"w": "slowing",
+"start": 31.53,
+"end": 31.91,
+"line": 7
+},
+{
+"w": "down",
+"start": 31.91,
+"end": 32.33,
+"line": 7
+},
+{
+"w": "all",
+"start": 32.33,
+"end": 32.45,
+"line": 7
+},
+{
+"w": "the",
+"start": 32.45,
+"end": 32.67,
+"line": 7
+},
+{
+"w": "way",
+"start": 32.67,
+"end": 32.68,
+"line": 7
+},
+{
+"w": "up",
+"start": 32.68,
+"end": 33.11,
+"line": 7
+},
+{
+"w": "until",
+"start": 33.11,
+"end": 33.32,
+"line": 7
+},
+{
+"w": "you",
+"start": 33.32,
+"end": 33.65,
+"line": 7
+},
+{
+"w": "stop",
+"start": 33.65,
+"end": 33.94,
+"line": 7
+},
+{
+"w": "right",
+"start": 33.94,
+"end": 33.99,
+"line": 7
+},
+{
+"w": "at",
+"start": 33.99,
+"end": 34.25,
+"line": 7
+},
+{
+"w": "the",
+"start": 34.25,
+"end": 34.3,
+"line": 7
+},
+{
+"w": "lip",
+"start": 34.3,
+"end": 34.63,
+"line": 7
+},
+{
+"w": "of",
+"start": 34.63,
+"end": 34.65,
+"line": 7
+},
+{
+"w": "the",
+"start": 34.65,
+"end": 34.85,
+"line": 7
+},
+{
+"w": "hole",
+"start": 34.85,
+"end": 35.1,
+"line": 7
+},
+{
+"w": "on",
+"start": 35.1,
+"end": 35.34,
+"line": 7
+},
+{
+"w": "the",
+"start": 35.34,
+"end": 35.35,
+"line": 7
+},
+{
+"w": "other",
+"start": 35.35,
+"end": 35.87,
+"line": 7
+},
+{
+"w": "side",
+"start": 35.87,
+"end": 36.08,
+"line": 7
+},
+{
+"w": "Luckily",
+"start": 36.3,
+"end": 36.82,
+"line": 8
+},
+{
+"w": "you",
+"start": 36.82,
+"end": 36.88,
+"line": 8
+},
+{
+"w": "made",
+"start": 36.88,
+"end": 37.17,
+"line": 8
+},
+{
+"w": "it",
+"start": 37.17,
+"end": 37.17,
+"line": 8
+},
+{
+"w": "through",
+"start": 37.17,
+"end": 37.48,
+"line": 8
+},
+{
+"w": "the",
+"start": 37.48,
+"end": 37.49,
+"line": 8
+},
+{
+"w": "whole",
+"start": 37.49,
+"end": 37.67,
+"line": 8
+},
+{
+"w": "planet",
+"start": 37.67,
+"end": 38.08,
+"line": 8
+},
+{
+"w": "Unluckily",
+"start": 38.3,
+"end": 38.91,
+"line": 9
+},
+{
+"w": "from",
+"start": 38.91,
+"end": 39.23,
+"line": 9
+},
+{
+"w": "most",
+"start": 39.23,
+"end": 39.31,
+"line": 9
+},
+{
+"w": "of",
+"start": 39.31,
+"end": 39.39,
+"line": 9
+},
+{
+"w": "America",
+"start": 39.39,
+"end": 40.22,
+"line": 9
+},
+{
+"w": "the",
+"start": 40.22,
+"end": 40.22,
+"line": 9
+},
+{
+"w": "other",
+"start": 40.22,
+"end": 40.66,
+"line": 9
+},
+{
+"w": "end",
+"start": 40.66,
+"end": 40.83,
+"line": 9
+},
+{
+"w": "is",
+"start": 40.83,
+"end": 40.87,
+"line": 9
+},
+{
+"w": "in",
+"start": 40.87,
+"end": 40.99,
+"line": 9
+},
+{
+"w": "the",
+"start": 40.99,
+"end": 41.26,
+"line": 9
+},
+{
+"w": "middle",
+"start": 41.26,
+"end": 41.43,
+"line": 9
+},
+{
+"w": "of",
+"start": 41.43,
+"end": 41.55,
+"line": 9
+},
+{
+"w": "the",
+"start": 41.55,
+"end": 41.67,
+"line": 9
+},
+{
+"w": "Indian",
+"start": 41.67,
+"end": 41.99,
+"line": 9
+},
+{
+"w": "Ocean",
+"start": 41.99,
+"end": 42.39,
+"line": 9
+},
+{
+"w": "You",
+"start": 42.61,
+"end": 42.78,
+"line": 10
+},
+{
+"w": "see",
+"start": 42.78,
+"end": 43.09,
+"line": 10
+},
+{
+"w": "gravity",
+"start": 43.09,
+"end": 43.69,
+"line": 10
+},
+{
+"w": "always",
+"start": 43.69,
+"end": 44.0,
+"line": 10
+},
+{
+"w": "pulls",
+"start": 44.0,
+"end": 44.28,
+"line": 10
+},
+{
+"w": "you",
+"start": 44.28,
+"end": 44.37,
+"line": 10
+},
+{
+"w": "toward",
+"start": 44.37,
+"end": 44.81,
+"line": 10
+},
+{
+"w": "the",
+"start": 44.81,
+"end": 45.07,
+"line": 10
+},
+{
+"w": "centre",
+"start": 45.07,
+"end": 45.38,
+"line": 10
+},
+{
+"w": "It",
+"start": 45.38,
+"end": 45.47,
+"line": 10
+},
+{
+"w": "speeds",
+"start": 45.47,
+"end": 45.7,
+"line": 10
+},
+{
+"w": "you",
+"start": 45.7,
+"end": 45.9,
+"line": 10
+},
+{
+"w": "up",
+"start": 45.9,
+"end": 46.18,
+"line": 10
+},
+{
+"w": "on",
+"start": 46.18,
+"end": 46.4,
+"line": 10
+},
+{
+"w": "the",
+"start": 46.4,
+"end": 46.43,
+"line": 10
+},
+{
+"w": "way",
+"start": 46.43,
+"end": 46.63,
+"line": 10
+},
+{
+"w": "down",
+"start": 46.63,
+"end": 46.99,
+"line": 10
+},
+{
+"w": "and",
+"start": 46.99,
+"end": 47.01,
+"line": 10
+},
+{
+"w": "slows",
+"start": 47.01,
+"end": 47.21,
+"line": 10
+},
+{
+"w": "you",
+"start": 47.21,
+"end": 47.54,
+"line": 10
+},
+{
+"w": "down",
+"start": 47.54,
+"end": 47.67,
+"line": 10
+},
+{
+"w": "on",
+"start": 47.67,
+"end": 47.85,
+"line": 10
+},
+{
+"w": "the",
+"start": 47.85,
+"end": 48.05,
+"line": 10
+},
+{
+"w": "way",
+"start": 48.05,
+"end": 48.34,
+"line": 10
+},
+{
+"w": "up",
+"start": 48.34,
+"end": 48.5,
+"line": 10
+},
+{
+"w": "by",
+"start": 48.5,
+"end": 48.76,
+"line": 10
+},
+{
+"w": "exactly",
+"start": 48.76,
+"end": 49.32,
+"line": 10
+},
+{
+"w": "the",
+"start": 49.32,
+"end": 49.52,
+"line": 10
+},
+{
+"w": "same",
+"start": 49.52,
+"end": 49.67,
+"line": 10
+},
+{
+"w": "amount",
+"start": 49.67,
+"end": 50.24,
+"line": 10
+},
+{
+"w": "It's",
+"start": 50.46,
+"end": 50.68,
+"line": 11
+},
+{
+"w": "like",
+"start": 50.68,
+"end": 50.92,
+"line": 11
+},
+{
+"w": "a",
+"start": 50.92,
+"end": 51.09,
+"line": 11
+},
+{
+"w": "marble",
+"start": 51.09,
+"end": 51.3,
+"line": 11
+},
+{
+"w": "rolling",
+"start": 51.3,
+"end": 51.68,
+"line": 11
+},
+{
+"w": "around",
+"start": 51.68,
+"end": 52.02,
+"line": 11
+},
+{
+"w": "a",
+"start": 52.02,
+"end": 52.24,
+"line": 11
+},
+{
+"w": "bowl",
+"start": 52.24,
+"end": 52.56,
+"line": 11
+},
+{
+"w": "It",
+"start": 52.56,
+"end": 52.6,
+"line": 11
+},
+{
+"w": "never",
+"start": 52.6,
+"end": 53.03,
+"line": 11
+},
+{
+"w": "quite",
+"start": 53.03,
+"end": 53.24,
+"line": 11
+},
+{
+"w": "gets",
+"start": 53.24,
+"end": 53.38,
+"line": 11
+},
+{
+"w": "out",
+"start": 53.38,
+"end": 53.74,
+"line": 11
+},
+{
+"w": "Miss",
+"start": 53.96,
+"end": 54.14,
+"line": 12
+},
+{
+"w": "the",
+"start": 54.14,
+"end": 54.22,
+"line": 12
+},
+{
+"w": "edge",
+"start": 54.22,
+"end": 54.55,
+"line": 12
+},
+{
+"w": "and",
+"start": 54.55,
+"end": 54.8,
+"line": 12
+},
+{
+"w": "you",
+"start": 54.8,
+"end": 55.01,
+"line": 12
+},
+{
+"w": "fall",
+"start": 55.01,
+"end": 55.2,
+"line": 12
+},
+{
+"w": "all",
+"start": 55.2,
+"end": 55.39,
+"line": 12
+},
+{
+"w": "the",
+"start": 55.39,
+"end": 55.57,
+"line": 12
+},
+{
+"w": "way",
+"start": 55.57,
+"end": 55.58,
+"line": 12
+},
+{
+"w": "back",
+"start": 55.58,
+"end": 55.92,
+"line": 12
+},
+{
+"w": "home",
+"start": 55.92,
+"end": 56.15,
+"line": 12
+},
+{
+"w": "Then",
+"start": 56.15,
+"end": 56.33,
+"line": 12
+},
+{
+"w": "back",
+"start": 56.33,
+"end": 56.5,
+"line": 12
+},
+{
+"w": "again",
+"start": 56.5,
+"end": 57.03,
+"line": 12
+},
+{
+"w": "Forever",
+"start": 57.03,
+"end": 57.62,
+"line": 12
+},
+{
+"w": "Unless",
+"start": 57.92,
+"end": 58.22,
+"line": 13
+},
+{
+"w": "there's",
+"start": 58.22,
+"end": 58.67,
+"line": 13
+},
+{
+"w": "air",
+"start": 58.67,
+"end": 58.72,
+"line": 13
+},
+{
+"w": "in",
+"start": 58.72,
+"end": 58.92,
+"line": 13
+},
+{
+"w": "the",
+"start": 58.92,
+"end": 59.18,
+"line": 13
+},
+{
+"w": "tunnel",
+"start": 59.18,
+"end": 59.6,
+"line": 13
+},
+{
+"w": "Then",
+"start": 59.6,
+"end": 59.65,
+"line": 13
+},
+{
+"w": "every",
+"start": 59.65,
+"end": 60.24,
+"line": 13
+},
+{
+"w": "trip",
+"start": 60.24,
+"end": 60.48,
+"line": 13
+},
+{
+"w": "is",
+"start": 60.48,
+"end": 60.48,
+"line": 13
+},
+{
+"w": "a",
+"start": 60.48,
+"end": 60.78,
+"line": 13
+},
+{
+"w": "little",
+"start": 60.78,
+"end": 60.98,
+"line": 13
+},
+{
+"w": "shorter",
+"start": 60.98,
+"end": 61.31,
+"line": 13
+},
+{
+"w": "until",
+"start": 61.31,
+"end": 61.67,
+"line": 13
+},
+{
+"w": "days",
+"start": 61.67,
+"end": 61.81,
+"line": 13
+},
+{
+"w": "later",
+"start": 61.81,
+"end": 62.21,
+"line": 13
+},
+{
+"w": "you're",
+"start": 62.21,
+"end": 62.45,
+"line": 13
+},
+{
+"w": "just",
+"start": 62.45,
+"end": 62.63,
+"line": 13
+},
+{
+"w": "floating",
+"start": 62.63,
+"end": 62.8,
+"line": 13
+},
+{
+"w": "in",
+"start": 62.8,
+"end": 63.13,
+"line": 13
+},
+{
+"w": "the",
+"start": 63.13,
+"end": 63.14,
+"line": 13
+},
+{
+"w": "middle",
+"start": 63.14,
+"end": 63.41,
+"line": 13
+},
+{
+"w": "of",
+"start": 63.41,
+"end": 63.65,
+"line": 13
+},
+{
+"w": "the",
+"start": 63.65,
+"end": 63.65,
+"line": 13
+},
+{
+"w": "Earth",
+"start": 63.65,
+"end": 64.02,
+"line": 13
+}
+]
