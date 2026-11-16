@@ -15,6 +15,10 @@ Owner: Krew Sutherland. Krew hates repeating themself — read this first.
   Read them before teaching or advising on business topics.
   - `notes/simon-squibb-30-years-business.md`: Simon Squibb's "30 Years of Business Knowledge".
 
+## Active projects (read the project file before working on one)
+- `projects/animated-shorts/`: animated YouTube Shorts made with Brism (started 2026-11-16).
+  Plan, YouTube rules, backups and open decisions are in its README; add to its Log when things change.
+
 ## Watching videos in cloud sessions: the `watch` skill
 - `.claude/skills/watch/` is the MIT-licensed watch skill from
   github.com/bradautomates/claude-video (copied at commit 03ceb42). When Krew sends a
