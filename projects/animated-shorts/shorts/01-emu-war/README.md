@@ -32,7 +32,7 @@ npx remotion render src/index.ts EmuShort out/emu/video.mp4 --codec h264 --crf 1
 ```
 
 ```bash
-ffmpeg -i out/emu/video.mp4 -i ../shorts/01-emu-war/audio/mix.m4a -map 0:v:0 -map 1:a:0 -c:v copy -c:a copy -shortest emu-war-final.mp4
+ffmpeg -i out/emu/video.mp4 -i ../shorts/01-emu-war/audio/mix.m4a -map 0:v:0 -map 1:a:0 -c:v copy -c:a copy -shortest ../shorts/01-emu-war/emu-war-final.mp4
 ```
 
 Expect ~10 min on a GPU. Without a GPU, `GL=swangle node video.mjs out.mp4 0 1989 0.5 0.5 2` makes a 540x960
@@ -41,8 +41,13 @@ preview in ~45 min (that's how the preview was made).
 ## Preview
 - `emu-war-preview.mp4`: 540x960 preview with the final sound mix (cloud render, 2026-11-16).
 
-## Upload
-- Title: **The Australian Army Lost a War to Emus**
-- Description: In 1932, Australia sent soldiers with machine guns to fight 20,000 emus. The emus won.
-  Sources: Australian War Memorial; Wikipedia "Emu War". #shorts #history #emuwar #australia #funnyhistory
-- No "altered or synthetic content" label needed (cartoon animation, not realistic).
+## Upload (auto-scheduled)
+The channel ("True & Ridiculous") and the YouTube uploader live in `projects/animated-shorts/autopost/` (set up by a
+sibling session on branch `claude/exciting-ptolemy-ju9nif`; merge it first). Title, description and tags for this Short
+are in `autopost/meta/01-emu-war.json`. After the final render, from `projects/animated-shorts/autopost/`:
+
+```bash
+python autopost.py add ../shorts/01-emu-war/emu-war-final.mp4 --meta meta/01-emu-war.json
+```
+
+It schedules one Short a day at 5 PM Mountain. No "altered or synthetic content" label (cartoon animation).
