@@ -3,6 +3,7 @@ import type { ChatHeat } from "../lib/chat";
 import { enqueueGrab } from "../lib/queues";
 import { defaultCaption, defaultTitle } from "../lib/social";
 import { getLiveVodId } from "../lib/twitch";
+import { backlogRoom } from "../lib/guards";
 
 const COOLDOWN_MS = 180_000;          // one moment per streamer per 3 min
 const REACTION_LAG_SEC = 12;          // stream delay + time for chat to react
@@ -26,11 +27,18 @@ export async function runSpikeCheck(chat: ChatHeat, now = Date.now(), lookupVod 
   if (!settings.spikeEnabled || settings.scoutPaused) return null;
   const live = await prisma.streamer.findMany({ where: { approved: true, isLive: true } });
   const notes: string[] = [];
+  let room: number | null = null; // looked up only once a spike shows up
 
   for (const s of live) {
     if (now - (lastSpike.get(s.id) ?? 0) < COOLDOWN_MS) continue;
     const sp = chat.spike(s.login, settings.spikeMultiplier, now);
     if (!sp) continue;
+    if (room == null) room = await backlogRoom();
+    if (room <= 0) {
+      // Line is full: skip without using up the streamer's cooldown.
+      notes.push(`${s.name}: ${sp.ratio}x spike, but the line is full, skipped`);
+      continue;
+    }
     lastSpike.set(s.id, now);
 
     const vodId = await lookupVod(s.twitchId, s.streamId, now).catch(() => null);
@@ -50,6 +58,7 @@ export async function runSpikeCheck(chat: ChatHeat, now = Date.now(), lookupVod 
       include: { clips: true },
     });
     await enqueueGrab(moment.id, moment.clips[0].id, { delayMs: VOD_CATCHUP_MS });
+    room--;
     notes.push(`${s.name}: ${sp.ratio}x chat spike (${sp.kind}) → grabbing in ${VOD_CATCHUP_MS / 60_000} min`);
   }
   return notes.length ? notes.join(" · ") : null;

@@ -1,8 +1,11 @@
 import fs from "node:fs";
 import { prisma } from "../lib/db";
 import { run } from "../lib/media";
-import { storagePath } from "../lib/paths";
-import { enqueueTranscribe } from "../lib/queues";
+import { storageDir, storagePath } from "../lib/paths";
+import { enqueueTranscribe, getStatuses, queue, setStatus, type AgentStatus } from "../lib/queues";
+import { freeGb, minFreeGb } from "../lib/guards";
+
+const DISK_RETRY_MS = 5 * 60_000;
 
 /** Grabber: download the source video. Prefers the Twitch clip; falls back to a ~45s VOD section. */
 export async function runGrab(clipId: string) {
@@ -13,6 +16,18 @@ export async function runGrab(clipId: string) {
     await prisma.clip.update({ where: { id: clipId }, data: { status: "rejected", stage: null, error: "Streamer is not approved" } });
     return "skipped: streamer not approved";
   }
+
+  // Disk guard: below MIN_FREE_GB, don't download. Try the same grab again in 5 min (the clip stays in the line).
+  const free = await freeGb(storageDir()).catch(() => Infinity), min = minFreeGb();
+  if (free < min) {
+    const msg = `${free.toFixed(1)} GB free — grabbing paused below ${min} GB`;
+    await setStatus("disk", false, msg);
+    await queue("grab").add("grab", { momentId: clip.momentId, clipId }, { jobId: `grab-${clipId}-disk-${Date.now()}`, delay: DISK_RETRY_MS });
+    await prisma.clip.update({ where: { id: clipId }, data: { stage: "grab" } });
+    return `low disk (${msg}), retrying in ${DISK_RETRY_MS / 60_000} min`;
+  }
+  const last = (await getStatuses().catch(() => ({} as Record<string, AgentStatus>))).disk;
+  if (last && !last.ok) await setStatus("disk", true, `${free.toFixed(1)} GB free — grabbing again`);
 
   const outBase = storagePath("raw", clipId);
   const ytdlp = process.env.YTDLP || "yt-dlp";

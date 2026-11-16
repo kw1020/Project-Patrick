@@ -5,6 +5,7 @@ import { markPosted, postToAccount, retryClip, setClipStatus, updateClipText } f
 export type ClipView = {
   id: string; status: string; stage: string | null; error: string | null; title: string; caption: string;
   duration: number | null; score: number | null; hook: string | null; judgeReason: string | null; hasVideo: boolean;
+  expired?: boolean; // the video was deleted by retention to save disk
   streamer: { name: string; login: string }; source: string; spikeScore: number; sourceUrl: string | null; sourceViews: number;
   posts: { platform: string; accountId: string | null; status: string; url: string | null; error: string | null }[]; postError: string | null;
 };
@@ -41,7 +42,8 @@ export function ClipCard({ clip, accounts }: { clip: ClipView; accounts: Account
           <video src={`/api/media/${clip.id}`} controls preload="metadata" playsInline className="h-full w-full object-contain" />
         ) : (
           <div className="grid h-full place-items-center p-6 text-center text-sm text-zinc-400">
-            {clip.status === "failed" ? <span className="text-red-300">{clip.error}</span> : <span className="animate-pulse">{STAGE[clip.stage ?? ""] ?? "Working…"}</span>}
+            {clip.expired ? <span>Video expired (deleted to save space)</span>
+              : clip.status === "failed" ? <span className="text-red-300">{clip.error}</span> : <span className="animate-pulse">{STAGE[clip.stage ?? ""] ?? "Working…"}</span>}
           </div>
         )}
         <div className="pointer-events-none absolute left-2 top-2 flex gap-1">
@@ -79,9 +81,9 @@ export function ClipCard({ clip, accounts }: { clip: ClipView; accounts: Account
             </button>
             <button className="btn-bad flex-1" disabled={busy} onClick={() => act(() => setClipStatus(clip.id, "rejected"))}>Reject</button>
           </>}
-          {clip.status === "rejected" && <button className="btn-ghost flex-1" disabled={busy} onClick={() => act(() => setClipStatus(clip.id, "pending"))}>Back to review</button>}
+          {clip.status === "rejected" && !clip.expired && <button className="btn-ghost flex-1" disabled={busy} onClick={() => act(() => setClipStatus(clip.id, "pending"))}>Back to review</button>}
           {clip.status === "failed" && <button className="btn-hot flex-1" disabled={busy} onClick={() => act(() => retryClip(clip.id))}>Retry</button>}
-          {clip.hasVideo && <a className="btn-ghost flex-1" href={`/api/media/${clip.id}?download=1`}>Download</a>}
+          {clip.hasVideo && !clip.expired && <a className="btn-ghost flex-1" href={`/api/media/${clip.id}?download=1`}>Download</a>}
           <button className="btn-ghost flex-1" onClick={copy}>{copied ? "Copied ✓" : "Copy caption"}</button>
         </div>
 

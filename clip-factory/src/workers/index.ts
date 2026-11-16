@@ -12,6 +12,7 @@ import { runCut, runTranscribe } from "./cutter";
 import { runJudge } from "./judge";
 import { migrateLegacySettings, runPost, runStatsSync } from "./poster";
 import { runSpikeCheck } from "./spike";
+import { startRetention } from "./retention";
 import { judgeConfigured } from "../lib/judge";
 
 const chat = new ChatHeat();
@@ -72,6 +73,7 @@ async function main() {
   await queue("clips").upsertJobScheduler("clips-every", { every }, { name: "clips", opts: { attempts: 1 } });
 
   await queue("post").upsertJobScheduler("views-every", { every: 15 * 60_000 }, { name: "views", opts: { attempts: 1 } });
+  const stopRetention = startRetention(); // disk retention: now, then hourly
 
   // Spike detector: checks the chat the Scout is reading, every 5 seconds.
   let checking = false;
@@ -91,6 +93,7 @@ async function main() {
   const shutdown = async () => {
     clearInterval(heat);
     clearInterval(spikes);
+    stopRetention();
     chat.stop();
     await Promise.all(workers.map((w) => w.close()));
     await prisma.$disconnect();

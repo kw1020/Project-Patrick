@@ -2,6 +2,7 @@ import { prisma, getSettings } from "../lib/db";
 import { getClips, getGameId, type TwitchClip } from "../lib/twitch";
 import { enqueueGrab } from "../lib/queues";
 import { defaultCaption, defaultTitle } from "../lib/social";
+import { backlogRoom } from "../lib/guards";
 
 const MAX_NEW_PER_RUN = 15;
 
@@ -33,9 +34,12 @@ export async function runClipsPoll() {
     (await prisma.moment.findMany({ where: { twitchClipId: { in: candidates.map((c) => c.id) } }, select: { twitchClipId: true } })).map((m) => m.twitchClipId),
   );
 
+  // Launch-day cap: only take as many as the line has room for (candidates are highest views first).
+  const room = await backlogRoom();
+  const limit = Math.min(MAX_NEW_PER_RUN, room);
   let added = 0;
   for (const c of candidates) {
-    if (known.has(c.id) || added >= MAX_NEW_PER_RUN) continue;
+    if (known.has(c.id) || added >= limit) continue;
     const s = byTwitchId.get(c.broadcaster_id)!;
     // Skip if the spike detector already caught this same moment from chat.
     if (c.video_id && c.vod_offset != null) {
@@ -58,5 +62,5 @@ export async function runClipsPoll() {
     await enqueueGrab(moment.id, moment.clips[0].id);
     added++;
   }
-  return `${candidates.length} eligible clips, ${added} new sent to the Grabber`;
+  return `${candidates.length} eligible clips, ${added} new sent to the Grabber${room < MAX_NEW_PER_RUN ? ` (line ${room ? `has room for ${room}` : "full, skipped new ones"})` : ""}`;
 }

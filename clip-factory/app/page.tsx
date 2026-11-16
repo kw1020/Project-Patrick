@@ -54,6 +54,14 @@ export default async function LivePage({ searchParams }: { searchParams: Promise
         </div>
       )}
 
+      {statuses.disk && !statuses.disk.ok && (
+        <div className="card border-red-500/50 bg-red-500/10 p-4 text-sm">
+          <b className="text-red-300">Disk almost full.</b> {statuses.disk.msg}. Clips wait in the line until space frees up
+          (old videos are cleaned up hourly) — delete files or free space on the storage disk to resume now.
+          <span className="ml-1 text-xs text-zinc-400">{ago(statuses.disk.at)}</span>
+        </div>
+      )}
+
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <AgentCard name="Scout" s={statuses.scout} />
         <AgentCard name="Clips poller" s={statuses.clips} />
