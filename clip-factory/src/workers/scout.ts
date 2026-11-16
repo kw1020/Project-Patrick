@@ -1,5 +1,5 @@
 import { prisma, getSettings } from "../lib/db";
-import { getGameId, getLiveStreams, getUsers } from "../lib/twitch";
+import { getGameId, getLiveStreams, getStreamsByUserIds, getUsers } from "../lib/twitch";
 import type { ChatHeat } from "../lib/chat";
 
 /** Scout: who's live in GTA 6 right now. Discovers everyone; chat is only joined for approved streamers. */
@@ -8,6 +8,16 @@ export async function runScout(chat: ChatHeat) {
   if (settings.scoutPaused) return "paused";
   const gameId = await getGameId();
   const streams = await getLiveStreams(gameId);
+
+  // /streams?game_id only returns the top 500: look up approved streamers directly so a small one is never missed.
+  // Their streams in another game are ignored (they end up not live, same as before).
+  const approvedIds = (await prisma.streamer.findMany({ where: { approved: true }, select: { twitchId: true } })).map((s) => s.twitchId);
+  if (approvedIds.length) {
+    const seen = new Set(streams.map((s) => s.user_id));
+    for (const st of await getStreamsByUserIds(approvedIds)) {
+      if (st.game_id === gameId && !seen.has(st.user_id)) { streams.push(st); seen.add(st.user_id); }
+    }
+  }
   const now = new Date();
 
   const existing = new Map(

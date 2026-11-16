@@ -31,15 +31,43 @@ export async function helix<T = any>(endpoint: string, params: Params = {}): Pro
     if (v === undefined) continue;
     for (const item of Array.isArray(v) ? v : [v]) url.searchParams.append(k, String(item));
   }
-  for (let attempt = 0; attempt < 2; attempt++) {
+  let refreshed = false, rateRetries = 0, serverRetries = 0;
+  for (;;) {
     const res = await fetch(url, {
       headers: { "Client-Id": process.env.TWITCH_CLIENT_ID!, Authorization: `Bearer ${await getToken()}` },
     });
-    if (res.status === 401 && attempt === 0) { token = null; continue; }
+    if (res.status === 401) {
+      if (refreshed) throw new Error(`Twitch ${endpoint} unauthorized`);
+      refreshed = true; token = null; continue;
+    }
+    if (res.status === 429 && rateRetries < 2) {
+      rateRetries++;
+      await sleep(rateLimitWait(res.headers.get("Ratelimit-Reset")));
+      continue;
+    }
+    if (res.status >= 500 && serverRetries < 1) {
+      serverRetries++;
+      await sleep(2000);
+      continue;
+    }
     if (!res.ok) throw new Error(`Twitch ${endpoint} failed: ${res.status} ${await res.text()}`);
     return (await res.json()) as any;
   }
-  throw new Error(`Twitch ${endpoint} unauthorized`);
+}
+
+/** ms to wait after a 429: until Ratelimit-Reset (unix seconds), 5s if missing, capped at 60s. */
+export function rateLimitWait(reset: string | null, now = Date.now()): number {
+  const sec = reset ? Number(reset) : NaN;
+  if (!Number.isFinite(sec)) return 5000;
+  return Math.min(60_000, Math.max(0, sec * 1000 - now));
+}
+
+let sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+/** Swap the retry sleep (tests). Returns the previous one. */
+export function setSleep(fn: (ms: number) => Promise<void>) {
+  const prev = sleep;
+  sleep = fn;
+  return prev;
 }
 
 /** Fetch every page (capped) of a paginated endpoint. */
@@ -81,6 +109,17 @@ export async function getGameId(): Promise<string> {
 
 export function getLiveStreams(gameId: string) {
   return helixAll<TwitchStream>("/streams", { game_id: gameId, first: 100, type: "live" }, 5);
+}
+
+/** Live streams for specific users (any game), 100 ids per call. */
+export async function getStreamsByUserIds(ids: string[]) {
+  const out: TwitchStream[] = [];
+  for (let i = 0; i < ids.length; i += 100) {
+    const chunk = ids.slice(i, i + 100);
+    const r = await helix<TwitchStream>("/streams", { user_id: chunk, first: 100, type: "live" });
+    out.push(...r.data);
+  }
+  return out;
 }
 
 export function getClips(params: { game_id?: string; broadcaster_id?: string; started_at: string; ended_at?: string }, maxPages = 2) {
