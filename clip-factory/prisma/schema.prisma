@@ -45,6 +45,7 @@ model Moment {
   sourceViews  Int      @default(0)
   vodId        String?
   vodOffset    Int? // seconds into the VOD
+  stats        String? // JSON: chat-spike numbers + sample chat lines (for the Judge)
   createdAt    DateTime @default(now())
   clips        Clip[]
 }
@@ -57,12 +58,18 @@ model Clip {
   finalPath  String?
   transcript String?
   duration   Float?
-  score      Float? // Judge score (Phase 2)
+  words       String? // JSON [{start,end,word}] for burned captions
+  winStart    Float?  // where the kept window starts in the raw file
+  score       Float?  // Judge score 1-10
+  hookText    String? // Judge's on-screen hook
+  hashtags    String? // space-separated
+  judgeReason String?
+  postError   String? // last YouTube upload error
   title      String?
   caption    String?
   // processing -> pending (waiting for review) -> approved | rejected -> posted ; failed on error
   status     String   @default("processing")
-  stage      String?  // grab | cut (while processing)
+  stage      String?  // grab | transcribe | judge | cut (while processing), post (uploading)
   error      String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
@@ -74,6 +81,7 @@ model Post {
   clipId   String
   clip     Clip     @relation(fields: [clipId], references: [id], onDelete: Cascade)
   platform String // youtube | tiktok | instagram
+  externalId String? // YouTube video id (for view counts)
   url      String?
   postedAt DateTime @default(now())
   views    Int?
@@ -82,8 +90,12 @@ model Post {
 // Single-row settings (id = "main").
 model Settings {
   id               String  @id @default("main")
-  spikeMultiplier  Float   @default(3) // Phase 2: msgs/sec >= N x 5-min average
-  minScore         Float   @default(6) // Phase 2: Judge auto-reject below this
+  spikeEnabled     Boolean @default(true)
+  spikeMultiplier  Float   @default(3) // chat msgs/sec >= N x 5-min average
+  judgeEnabled     Boolean @default(true)
+  minScore         Float   @default(6) // Judge auto-reject below this
+  ytAutoUpload     Boolean @default(false) // upload to YouTube when Krew approves
+  ytPrivacy        String  @default("public") // public | unlisted | private
   clipMinSec       Int     @default(15)
   clipMaxSec       Int     @default(45)
   minClipViews     Int     @default(25) // Twitch clips need at least this many views
@@ -91,4 +103,17 @@ model Settings {
   layout           String  @default("blur") // blur | facecam
   captions         Boolean @default(true)
   scoutPaused      Boolean @default(false)
+}
+
+// Connected posting accounts (Phase 2: one YouTube channel; Phase 3: more).
+model Account {
+  id           String    @id @default(cuid())
+  platform     String    @unique // youtube
+  channelId    String?
+  channelTitle String?
+  refreshToken String
+  accessToken  String?
+  expiresAt    DateTime?
+  error        String? // set when Google rejects the token (reconnect needed)
+  createdAt    DateTime  @default(now())
 }

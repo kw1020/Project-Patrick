@@ -2,7 +2,7 @@ import { Queue } from "bullmq";
 import IORedis from "ioredis";
 
 // One queue per production-line stage.
-export const QUEUES = { scout: "scout", clips: "clips", grab: "grab", cut: "cut" } as const;
+export const QUEUES = { scout: "scout", clips: "clips", grab: "grab", transcribe: "transcribe", judge: "judge", cut: "cut", post: "post" } as const;
 export type QueueName = keyof typeof QUEUES;
 
 let conn: IORedis | null = null;
@@ -24,11 +24,25 @@ export function queue(name: QueueName) {
   return q;
 }
 
-export async function enqueueGrab(momentId: string, clipId: string) {
-  await queue("grab").add("grab", { momentId, clipId }, { jobId: `grab-${clipId}` });
+/** delayMs: chat-spike grabs wait for the live VOD to catch up, then retry once a minute. */
+export async function enqueueGrab(momentId: string, clipId: string, opts: { delayMs?: number } = {}) {
+  await queue("grab").add("grab", { momentId, clipId }, opts.delayMs
+    ? { jobId: `grab-${clipId}`, delay: opts.delayMs, attempts: 4, backoff: { type: "fixed", delay: 60_000 } }
+    : { jobId: `grab-${clipId}-${Date.now()}` });
 }
-export async function enqueueCut(clipId: string) {
-  await queue("cut").add("cut", { clipId }, { jobId: `cut-${clipId}-${Date.now()}` });
+export async function enqueueTranscribe(clipId: string) {
+  await queue("transcribe").add("transcribe", { clipId }, { jobId: `tr-${clipId}-${Date.now()}` });
+}
+export async function enqueueJudge(clipId: string) {
+  await queue("judge").add("judge", { clipId }, { jobId: `judge-${clipId}-${Date.now()}`, attempts: 1 });
+}
+/** priority 1 = render first (clips headed for review); 10 = when idle (auto-rejected clips). */
+export async function enqueueCut(clipId: string, priority = 1) {
+  await queue("cut").add("cut", { clipId }, { jobId: `cut-${clipId}-${Date.now()}`, priority });
+}
+/** One attempt only: a retried upload could post the same video twice. */
+export async function enqueuePost(clipId: string) {
+  await queue("post").add("post", { clipId }, { jobId: `post-${clipId}-${Date.now()}`, attempts: 1 });
 }
 /** Ask the worker to run the scout + clips poll right now (e.g. after approving a streamer). */
 export async function pokeScout() {

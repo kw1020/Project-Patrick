@@ -21,14 +21,14 @@ function Heat({ rate, avg }: { rate: number; avg: number }) {
   );
 }
 
-function AgentCard({ name, s }: { name: string; s?: AgentStatus }) {
+function AgentCard({ name, s, idle }: { name: string; s?: AgentStatus; idle?: string }) {
   return (
     <div className="card px-4 py-3">
       <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-zinc-400">
         <span className={`h-2 w-2 rounded-full ${!s ? "bg-zinc-600" : s.ok ? "bg-emerald-400" : "bg-red-500"}`} />{name}
         <span className="ml-auto font-normal normal-case">{s ? ago(s.at) : "not run yet"}</span>
       </div>
-      <div className={`mt-1 text-sm ${s && !s.ok ? "text-red-300" : "text-zinc-200"}`}>{s?.msg ?? "Waiting for the worker…"}</div>
+      <div className={`mt-1 text-sm ${s && !s.ok ? "text-red-300" : "text-zinc-200"}`}>{s?.msg ?? idle ?? "Waiting for the worker…"}</div>
     </div>
   );
 }
@@ -57,15 +57,13 @@ export default async function LivePage({ searchParams }: { searchParams: Promise
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <AgentCard name="Scout" s={statuses.scout} />
         <AgentCard name="Clips poller" s={statuses.clips} />
+        <AgentCard name="Spike detector" s={statuses.spike} idle="Watching chat. No spikes yet." />
         <div className="card px-4 py-3">
           <div className="text-xs font-bold uppercase tracking-wide text-zinc-400">Production line</div>
-          <div className="mt-1 text-sm">{c.processing ?? 0} cutting · <Link href="/queue" className="font-bold text-hot">{c.pending ?? 0} to review</Link></div>
-          <div className="text-xs text-zinc-400">{c.approved ?? 0} approved · {c.posted ?? 0} posted · {c.failed ?? 0} failed</div>
+          <div className="mt-1 text-sm">{c.processing ?? 0} in the line · <Link href="/queue" className="font-bold text-hot">{c.pending ?? 0} to review</Link></div>
+          <div className="text-xs text-zinc-400">{c.approved ?? 0} approved · {c.posted ?? 0} posted · {c.rejected ?? 0} rejected · {c.failed ?? 0} failed</div>
+          {statuses.judge && <div className="mt-1 truncate text-xs text-zinc-500">Judge: {statuses.judge.msg}</div>}
         </div>
-        <form action={runScoutNow} className="card flex items-center justify-between gap-2 px-4 py-3">
-          <div className="text-sm text-zinc-300">Don&apos;t want to wait 2 min?</div>
-          <button className="btn-hot">Scan now</button>
-        </form>
       </section>
 
       <section>
@@ -74,9 +72,12 @@ export default async function LivePage({ searchParams }: { searchParams: Promise
             <h1 className="text-2xl font-black">Live in GTA 6</h1>
             <p className="text-sm text-zinc-400">{totalLive} streamers live right now. Only approved streamers get clipped.</p>
           </div>
+          <div className="flex items-center gap-2">
+          <form action={runScoutNow}><button className="btn-hot">Scan now</button></form>
           <div className="flex gap-1 rounded-lg border border-line p-1 text-sm">
             <Link href="/" className={`rounded-md px-3 py-1 ${!all ? "bg-panel font-bold" : "text-zinc-400"}`}>Approved</Link>
             <Link href="/?all=1" className={`rounded-md px-3 py-1 ${all ? "bg-panel font-bold" : "text-zinc-400"}`}>Everyone</Link>
+          </div>
           </div>
         </div>
 

@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
-import { enqueueCut, enqueueGrab, pokeScout } from "@/lib/queues";
+import { enqueueCut, enqueueGrab, enqueuePost, enqueueTranscribe, pokeScout } from "@/lib/queues";
+import { getYouTubeAccount } from "@/lib/youtube";
 import { getUsers, twitchConfigured } from "@/lib/twitch";
 import { parseFacecam } from "@/lib/media";
 
@@ -60,14 +61,34 @@ export async function updateClipText(id: string, title: string, caption: string)
 
 export async function setClipStatus(id: string, status: "pending" | "approved" | "rejected") {
   await prisma.clip.update({ where: { id }, data: { status } });
+  // Approving is the human sign-off. If auto-upload is on, that click also sends it to YouTube.
+  if (status === "approved") {
+    const [settings, yt] = await Promise.all([prisma.settings.findUnique({ where: { id: "main" } }), getYouTubeAccount()]);
+    if (settings?.ytAutoUpload && yt) await queueUpload(id);
+  }
+  refreshAll();
+}
+
+async function queueUpload(id: string) {
+  await prisma.clip.update({ where: { id }, data: { stage: "post", postError: null } });
+  await enqueuePost(id);
+}
+
+/** Manual "Upload to YouTube" on an approved clip. */
+export async function uploadToYouTube(id: string) {
+  const clip = await prisma.clip.findUniqueOrThrow({ where: { id } });
+  if (clip.status !== "approved" && clip.status !== "posted") throw new Error("Approve the clip first");
+  await queueUpload(id);
   refreshAll();
 }
 
 export async function retryClip(id: string) {
   const clip = await prisma.clip.findUniqueOrThrow({ where: { id } });
-  await prisma.clip.update({ where: { id }, data: { status: "processing", error: null, stage: clip.rawPath ? "cut" : "grab" } });
-  if (clip.rawPath) await enqueueCut(id);
-  else await enqueueGrab(clip.momentId, id);
+  const stage = !clip.rawPath ? "grab" : clip.words == null ? "transcribe" : "cut";
+  await prisma.clip.update({ where: { id }, data: { status: "processing", error: null, stage } });
+  if (stage === "grab") await enqueueGrab(clip.momentId, id);
+  else if (stage === "transcribe") await enqueueTranscribe(id);
+  else await enqueueCut(id);
   refreshAll();
 }
 
@@ -106,6 +127,10 @@ export async function saveSettings(form: FormData) {
       layout: form.get("layout") === "facecam" ? "facecam" : "blur",
       captions: form.get("captions") === "on",
       scoutPaused: form.get("scoutPaused") === "on",
+      spikeEnabled: form.get("spikeEnabled") === "on",
+      judgeEnabled: form.get("judgeEnabled") === "on",
+      ytAutoUpload: form.get("ytAutoUpload") === "on",
+      ytPrivacy: ["public", "unlisted", "private"].includes(String(form.get("ytPrivacy"))) ? String(form.get("ytPrivacy")) : "public",
     },
   });
   refreshAll();
@@ -113,5 +138,11 @@ export async function saveSettings(form: FormData) {
 
 export async function runScoutNow() {
   await pokeScout();
+  refreshAll();
+}
+
+export async function disconnectYouTube() {
+  await prisma.account.deleteMany({ where: { platform: "youtube" } });
+  await prisma.settings.update({ where: { id: "main" }, data: { ytAutoUpload: false } }).catch(() => {});
   refreshAll();
 }

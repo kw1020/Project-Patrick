@@ -13,7 +13,7 @@ export default async function PostedPage() {
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
           <h1 className="text-2xl font-black">Posted</h1>
-          <p className="text-sm text-zinc-400">What went out and where. Views are typed in by hand until Phase 2 pulls them automatically.</p>
+          <p className="text-sm text-zinc-400">What went out and where. YouTube views update on their own every 15 minutes; type in TikTok and Reels views by hand.</p>
         </div>
         <div className="card px-4 py-2 text-right"><div className="text-xl font-black">{total.toLocaleString()}</div><div className="text-xs text-zinc-400">total views · {posts.length} posts</div></div>
       </div>

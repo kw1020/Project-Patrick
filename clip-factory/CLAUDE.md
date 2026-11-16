@@ -4,19 +4,28 @@ Krew's GTA 6 clip pipeline (part of Project Patrick). Krew hates repeating thems
 original brief is below, and the status section says what's done. Read both before changing anything.
 
 ## Status (2026-11-16)
-- **Phase 1 built:** Scout, Twitch Clips poller, Grabber, Cutter, full dashboard (Live / Queue / Posted /
-  Streamers / Settings), docker compose. Tests: `npm test` (unit + real ffmpeg renders).
-- Chat heat is tracked (msgs/sec, 5-min avg, hype-word rate in `src/lib/chat.ts`), but nothing flags spikes yet.
-- **Next = Phase 2:** spike detector (read `ChatHeat.stats()`, create `Moment{source:"chat"}` with
-  `vodId`/`vodOffset` from the live stream's VOD; the Grabber already handles VOD sections), Judge
-  (`claude-sonnet-5-5`, JSON `{score, hook_text, title, hashtags, reason}`, auto-reject below
-  `Settings.minScore`; `Clip.score` exists), YouTube Data API upload after approval.
-- Not verified yet: a real Twitch run (needs Krew's Twitch keys). The Grabber's yt-dlp call and the
-  Helix calls are written against the documented APIs but haven't hit live data.
+- **Phase 1 built:** Scout, Twitch Clips poller, Grabber, Cutter, dashboard (Live / Queue / Posted /
+  Streamers / Settings), docker compose.
+- **Phase 2 built:** spike detector (`src/workers/spike.ts`, logic in `ChatHeat.spike()`), Judge
+  (`src/lib/judge.ts`, `claude-sonnet-5-5` via `client.beta.messages.parse` + zod, refusal fallbacks on),
+  YouTube connect/upload/views (`src/lib/youtube.ts`, `src/workers/poster.ts`).
+  Line order is now grab → transcribe → judge → cut, so the Judge's hook is burned into the video and
+  auto-rejected clips render last (low queue priority).
+- Tests: `npm test` (17: unit, real ffmpeg renders, spike worker against Redis, Judge + YouTube against
+  the stand-in servers in `test/mocks.ts`). `npx tsx test/mocks.ts 4010` prints env vars to run the whole
+  app against the stand-ins.
+- **Not verified against the real services yet** (no keys in the build sandbox): Twitch (Helix, chat,
+  yt-dlp clip + live-VOD section downloads), the real Claude API, the real YouTube API, a Docker build,
+  Whisper on real speech. First real run should check those in that order.
+- Spike timing constants to tune on real streams (`src/workers/spike.ts`): 12s reaction lag, 150s wait
+  for the live VOD, 180s cooldown per streamer.
+- **Next = Phase 3:** TikTok Content Posting API, analytics on which clips perform → Judge prompt,
+  multi-account (`Account` table is ready for more rows).
 
 ## Rules that must not break
 - The Grabber only pulls from `Streamer.approved = true`. Approving needs a written reason.
-- Nothing posts without Krew pressing Approve. No auto-posting.
+- Nothing posts without Krew pressing Approve. The Poster refuses clips that aren't approved; "auto-upload"
+  only means the Approve click also uploads. Uploads are single-attempt so a retry can't double-post.
 - Every caption credits the streamer (name + twitch.tv link); the credit is also burned into the video.
 - Secrets live in `.env` (gitignored). Never commit it.
 
@@ -24,6 +33,8 @@ original brief is below, and the status section says what's done. Read both befo
 - Tailwind 4: custom classes in `app/globals.css` must be `@utility`, not plain classes.
 - ioredis must match BullMQ's bundled version (5.11.1) or TypeScript breaks.
 - faster-whisper's own audio loader breaks on newer PyAV; `scripts/transcribe.py` reads the WAV itself.
+- YouTube (checked 2026-11-16): API uploads are no longer forced private; 100 uploads/day per project.
+- The dashboard has no login. Fine on localhost; add a passcode before hosting it anywhere public.
 - DB stores media paths relative to `STORAGE_DIR` so web + worker containers agree.
 
 ---

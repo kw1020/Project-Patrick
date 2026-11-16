@@ -1,0 +1,47 @@
+import { prisma, getSettings } from "../lib/db";
+import { judgeClip, judgeConfigured } from "../lib/judge";
+import { enqueueCut } from "../lib/queues";
+import { cleanHashtags, judgedCaption } from "../lib/social";
+
+/** Step 2 — Judge: Claude scores the clip and writes the hook, title and hashtags. Never blocks the line. */
+export async function runJudge(clipId: string) {
+  const clip = await prisma.clip.findUnique({ where: { id: clipId }, include: { moment: { include: { streamer: true } } } });
+  if (!clip) return "clip deleted";
+  const settings = await getSettings();
+  const { moment } = clip, streamer = moment.streamer;
+
+  const skip = async (why: string) => {
+    await prisma.clip.update({ where: { id: clipId }, data: { stage: "cut", judgeReason: why } });
+    await enqueueCut(clipId);
+    return `unscored (${why})`;
+  };
+  if (!settings.judgeEnabled) return skip("Judge is switched off in Settings");
+  if (!judgeConfigured()) return skip("No ANTHROPIC_API_KEY in .env, so this clip wasn't scored");
+
+  let stats = null;
+  try { stats = moment.stats ? JSON.parse(moment.stats) : null; } catch { /* ignore */ }
+
+  let verdict;
+  try {
+    verdict = await judgeClip({
+      streamer: streamer.name, durationSec: clip.duration ?? 0, source: moment.source === "chat" ? "chat" : "twitch_clip",
+      sourceTitle: moment.sourceTitle, sourceViews: moment.sourceViews, transcript: clip.transcript, stats, minScore: settings.minScore,
+    });
+  } catch (e) {
+    return skip(`Judge error: ${(e as Error).message}`.slice(0, 300));
+  }
+  if (!verdict) return skip("The Judge declined to score this clip");
+
+  const tags = cleanHashtags(verdict.hashtags, streamer.login);
+  const fresh = clip.status === "processing"; // don't overwrite text Krew already edited
+  await prisma.clip.update({
+    where: { id: clipId },
+    data: {
+      score: verdict.score, hookText: verdict.hook_text || null, judgeReason: verdict.reason, hashtags: tags.join(" "), stage: "cut",
+      ...(fresh && verdict.title ? { title: verdict.title, caption: judgedCaption(verdict.title, tags, streamer.name, streamer.login) } : {}),
+    },
+  });
+  const rejected = verdict.score < settings.minScore;
+  await enqueueCut(clipId, rejected ? 10 : 1);
+  return `${streamer.name}: ${verdict.score}/10${rejected ? " (below cut-off)" : ""}`;
+}

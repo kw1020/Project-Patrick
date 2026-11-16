@@ -37,6 +37,14 @@ export async function runClipsPoll() {
   for (const c of candidates) {
     if (known.has(c.id) || added >= MAX_NEW_PER_RUN) continue;
     const s = byTwitchId.get(c.broadcaster_id)!;
+    // Skip if the spike detector already caught this same moment from chat.
+    if (c.video_id && c.vod_offset != null) {
+      const dupe = await prisma.moment.findFirst({
+        where: { streamerId: s.id, source: "chat", vodId: c.video_id, vodOffset: { gte: c.vod_offset - 10, lte: c.vod_offset + Math.ceil(c.duration) + 10 } },
+        select: { id: true },
+      });
+      if (dupe) continue;
+    }
     const title = defaultTitle(c.title, s.name);
     const moment = await prisma.moment.create({
       data: {

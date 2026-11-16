@@ -2,7 +2,7 @@ import fs from "node:fs";
 import { prisma } from "../lib/db";
 import { run } from "../lib/media";
 import { storagePath } from "../lib/paths";
-import { enqueueCut } from "../lib/queues";
+import { enqueueTranscribe } from "../lib/queues";
 
 /** Grabber: download the source video. Prefers the Twitch clip; falls back to a ~45s VOD section. */
 export async function runGrab(clipId: string) {
@@ -33,7 +33,7 @@ export async function runGrab(clipId: string) {
   if (!file || !fs.existsSync(file)) throw new Error("yt-dlp finished but no file was written");
 
   const rel = "raw/" + file.split(/[\\/]/).pop();
-  await prisma.clip.update({ where: { id: clipId }, data: { rawPath: rel, stage: "cut", error: null } });
-  await enqueueCut(clipId);
+  await prisma.clip.update({ where: { id: clipId }, data: { rawPath: rel, stage: "transcribe", error: null } });
+  await enqueueTranscribe(clipId);
   return `downloaded ${rel}`;
 }

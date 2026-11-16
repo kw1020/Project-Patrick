@@ -4,7 +4,7 @@ import fs from "node:fs";
 import { prisma } from "../src/lib/db";
 import { run } from "../src/lib/media";
 import { ensureStorage, storagePath } from "../src/lib/paths";
-import { enqueueCut, redis } from "../src/lib/queues";
+import { enqueueTranscribe, redis } from "../src/lib/queues";
 import { defaultCaption, defaultTitle } from "../src/lib/social";
 
 const DEMO = [
@@ -42,11 +42,12 @@ async function main() {
         data: {
           streamerId: s.id, timestamp: new Date(), source: "twitch_clip", spikeScore: 900 - i * 300, sourceTitle: t, sourceViews: 900 - i * 300,
           sourceUrl: `https://twitch.tv/${s.login}`,
-          clips: { create: { title, caption: defaultCaption(title, s.name, s.login), rawPath: "raw/demo-source.mp4", stage: "cut" } },
+          ...(i === 1 ? { source: "chat", sourceTitle: null, sourceViews: 0, spikeScore: 4.2, stats: JSON.stringify({ kind: "volume", rate: 9.1, baseline: 2.2, ratio: 4.2, hypeShare: 0.6, viewers: d.viewers, chat: ["NO WAY", "KEKW", "clip it", "LMAOOO", "W", "he actually did it"] }) } : {}),
+          clips: { create: { title, caption: defaultCaption(title, s.name, s.login), rawPath: "raw/demo-source.mp4", stage: "transcribe" } },
         },
         include: { clips: true },
       });
-      await enqueueCut(m.clips[0].id);
+      await enqueueTranscribe(m.clips[0].id);
     }
   }
   console.log("Demo data added. The worker will cut the demo clips in a few seconds.");

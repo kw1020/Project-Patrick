@@ -105,7 +105,7 @@ export function chunkWords(words: Word[], maxWords = 3, maxChars = 18) {
 }
 
 /** ASS subtitle file: big bold word-chunk captions + a permanent streamer credit. */
-export function buildAss(opts: { words: Word[]; credit: string; duration: number; font?: string; layout: "blur" | "facecam" }) {
+export function buildAss(opts: { words: Word[]; credit: string; duration: number; font?: string; layout: "blur" | "facecam"; hook?: string | null }) {
   const font = opts.font || process.env.CAPTION_FONT || "DejaVu Sans";
   const capMarginV = opts.layout === "facecam" ? 360 : 470;
   const lines = [
@@ -120,11 +120,15 @@ export function buildAss(opts: { words: Word[]; credit: string; duration: number
     "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
     `Style: Cap,${font},86,&H00FFFFFF,&H00FFFFFF,&H00000000,&H64000000,-1,0,0,0,100,100,1,0,1,7,3,2,60,60,${capMarginV},1`,
     `Style: Credit,${font},40,&H30FFFFFF,&H00FFFFFF,&H00000000,&H64000000,-1,0,0,0,100,100,0,0,1,3,1,8,40,40,110,1`,
+    // Hook: white text on a pink box near the top, first few seconds only.
+    `Style: Hook,${font},62,&H00FFFFFF,&H00FFFFFF,&H00813DFF,&H00813DFF,-1,0,0,0,100,100,0,0,3,14,0,8,90,90,${opts.layout === "facecam" ? 175 : 250},1`,
     "",
     "[Events]",
     "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
     `Dialogue: 1,${assTime(0)},${assTime(opts.duration)},Credit,,0,0,0,,${assEscape(opts.credit)}`,
   ];
+  const hook = assEscape(opts.hook || "").slice(0, 70);
+  if (hook) lines.push(`Dialogue: 2,${assTime(0)},${assTime(Math.min(4.5, opts.duration))},Hook,,0,0,0,,{\\fad(0,250)}${hook}`);
   for (const c of chunkWords(opts.words)) {
     if (c.start >= opts.duration) continue;
     const text = assEscape(c.text).toUpperCase();

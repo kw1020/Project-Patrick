@@ -96,3 +96,11 @@ export async function getUsers(opts: { logins?: string[]; ids?: string[] }) {
   }
   return out;
 }
+
+/** The VOD being recorded for a live stream right now (null if past broadcasts are off). */
+export async function getLiveVodId(userId: string, streamId: string | null): Promise<string | null> {
+  const r = await helix<{ id: string; stream_id: string | null }>("/videos", { user_id: userId, type: "archive", first: 1 });
+  const v = r.data[0];
+  if (!v) return null;
+  return !streamId || v.stream_id === streamId ? v.id : null;
+}

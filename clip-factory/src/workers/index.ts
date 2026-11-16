@@ -8,7 +8,11 @@ import { twitchConfigured } from "../lib/twitch";
 import { runScout, flushChatHeat } from "./scout";
 import { runClipsPoll } from "./clips";
 import { runGrab } from "./grabber";
-import { runCut } from "./cutter";
+import { runCut, runTranscribe } from "./cutter";
+import { runJudge } from "./judge";
+import { runPost, runViewsSync } from "./poster";
+import { runSpikeCheck } from "./spike";
+import { judgeConfigured } from "../lib/judge";
 
 const chat = new ChatHeat();
 
@@ -16,6 +20,7 @@ async function checkTools() {
   for (const [cmd, args] of [["ffmpeg", ["-version"]], [process.env.YTDLP || "yt-dlp", ["--version"]]] as const) {
     try { await run(cmd, [...args]); } catch { console.error(`!! ${cmd} is not installed — the pipeline will fail until it is.`); }
   }
+  if (!judgeConfigured()) console.warn("-- ANTHROPIC_API_KEY is empty: clips will go to review unscored (no Judge).");
   if (!twitchConfigured()) console.error("!! TWITCH_CLIENT_ID / TWITCH_CLIENT_SECRET are empty in .env — Scout can't run.");
 }
 
@@ -23,13 +28,19 @@ function worker(name: keyof typeof QUEUES, concurrency: number, fn: (job: Job) =
   const w = new Worker(QUEUES[name], async (job) => {
     const msg = await fn(job);
     console.log(`[${name}] ${msg}`);
-    if (name === "scout" || name === "clips") await setStatus(name, true, msg);
+    if (name === "scout" || name === "clips" || name === "judge" || name === "post") await setStatus(name, true, msg);
     return msg;
   }, { connection: redis(), concurrency });
   w.on("failed", async (job, err) => {
     console.error(`[${name}] failed:`, err.message);
     if (name === "scout" || name === "clips") await setStatus(name, false, err.message);
     const clipId = job?.data?.clipId;
+    if (name === "post") {
+      // A failed upload leaves the clip approved, with the reason shown on its card.
+      await setStatus("post", false, err.message);
+      if (clipId) await prisma.clip.update({ where: { id: clipId }, data: { stage: null, postError: err.message.slice(0, 1000) } }).catch(() => {});
+      return;
+    }
     const finalAttempt = job && job.attemptsMade >= (job.opts.attempts ?? 1);
     if (clipId && finalAttempt) {
       await prisma.clip.update({ where: { id: clipId }, data: { status: "failed", error: `${name}: ${err.message}`.slice(0, 2000) } }).catch(() => {});
@@ -46,7 +57,10 @@ async function main() {
     worker("scout", 1, () => runScout(chat)),
     worker("clips", 1, () => runClipsPoll()),
     worker("grab", 2, (job) => runGrab(job.data.clipId)),
+    worker("transcribe", 1, (job) => runTranscribe(job.data.clipId)),
+    worker("judge", 3, (job) => runJudge(job.data.clipId)),
     worker("cut", 1, (job) => runCut(job.data.clipId)), // ffmpeg is CPU-heavy: one at a time
+    worker("post", 1, (job) => (job.name === "views" ? runViewsSync() : runPost(job.data.clipId))),
   ];
 
   // Scout + Clips poll every 2 minutes (and once right now).
@@ -54,11 +68,26 @@ async function main() {
   await queue("scout").upsertJobScheduler("scout-every", { every }, { name: "scout", opts: { attempts: 1 } });
   await queue("clips").upsertJobScheduler("clips-every", { every }, { name: "clips", opts: { attempts: 1 } });
 
+  await queue("post").upsertJobScheduler("views-every", { every: 15 * 60_000 }, { name: "views", opts: { attempts: 1 } });
+
+  // Spike detector: checks the chat the Scout is reading, every 5 seconds.
+  let checking = false;
+  const spikes = setInterval(async () => {
+    if (checking) return;
+    checking = true;
+    try {
+      const msg = await runSpikeCheck(chat);
+      if (msg) { console.log(`[spike] ${msg}`); await setStatus("spike", true, msg); }
+    } catch (e) { console.error("[spike]", (e as Error).message); }
+    finally { checking = false; }
+  }, 5_000);
+
   const heat = setInterval(() => flushChatHeat(chat).catch((e) => console.error("[chat]", e.message)), 10_000);
-  console.log(`Clip Factory workers up: scout + clips every ${every / 1000}s, grab x2, cut x1`);
+  console.log(`Clip Factory workers up: scout + clips every ${every / 1000}s, spike check every 5s, grab x2, transcribe, judge x3, cut, post`);
 
   const shutdown = async () => {
     clearInterval(heat);
+    clearInterval(spikes);
     chat.stop();
     await Promise.all(workers.map((w) => w.close()));
     await prisma.$disconnect();
