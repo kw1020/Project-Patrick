@@ -31,6 +31,20 @@ claude-animated-shorts skill instead (see "Main tool" below).** Brism notes kept
 - Runs on local Patrick (Kokoro + big disk). Set `REMOTION_TMP` to a big drive (~1.3 GB per bundle).
 - Cost per video: $0 beyond the Claude subscription Krew already has.
 
+## Test render (cloud session, 2026-11-16): it works
+- `remotion-setup/` holds a working Remotion project shell: `package.json` with exact versions,
+  `src/index.ts`, `src/Root.tsx` (BridgeShort + a "Cube" WebGL sanity test) and `stills.mjs`.
+  Setup: `npm install`, copy the skill's `templates/bridge/` to `src/videos/bridge/`, then
+  `node stills.mjs out/x_ 100,400 0.5`.
+- **Must pin `@react-three/postprocessing` to 3.0.4.** Version 3.2.x builds the effect composer one
+  tick late, so every single-frame render comes out as a blank sky-blue frame.
+- Missing Kenney `.glb` props just 404 and get skipped; the scene still renders.
+- Speed: in a cloud session (4 CPUs, no GPU, `GL=swangle`) a half-size frame takes ~15-45 s, so a full
+  short (~2,000 frames) would take ~19 h. **Render finals on local Patrick with a GPU (`GL=angle`).**
+  The skill's author gets ~4 fps at 2K on a GPU (~10 min per short).
+- `test-render-sheet.jpg`: six frames of the skill's own bridge example rendered here. It's the
+  author's example, for checking the look only; never post it.
+
 ## Other free backups
 - **claude-faceless-shorts-creator** (learnwithhasan, MIT, free): Claude Code + Remotion + ElevenLabs.
 
@@ -57,10 +71,13 @@ claude-animated-shorts skill instead (see "Main tool" below).** Brism notes kept
    which is Krew's bigger plan for Project Patrick.
 
 ## Open decisions (Krew)
-- Niche / style for the first channel.
+- Niche: **true history stories** (Krew said yes, 2026-11-16).
+- Approve scripts in `scripts/SCRIPTS-batch-01.md` (Emu War, 1904 marathon, Pisa, Vasa, Molasses Flood).
 - Channel name.
 - Voice: Krew's own voice or Patrick's Kokoro voice.
 
 ## Log
+- 2026-11-16: niche = true history. Wrote batch 01 (5 scripts, 62-66 s). Test-rendered the skill's
+  template in the cloud: works after pinning @react-three/postprocessing 3.0.4; too slow without a GPU.
 - 2026-11-16: Brism ruled out on price; switched to claude-animated-shorts.
 - 2026-11-16: project started; Brism researched; no Brism access yet (nothing in Patrick's Gmail).
