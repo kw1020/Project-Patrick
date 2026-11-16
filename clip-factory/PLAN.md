@@ -11,7 +11,7 @@ full `npm test` pass and `npx tsc --noEmit` is clean.
   real chatters → volume spike; one user spamming 50 msgs → none; bot/`!` commands flood → none; raid notice
   then flood → none for 120s, spike possible after; gift bomb → muted 60s; hype flood → hype spike; JOIN of 40
   channels is sent in batches ≤15 spaced ≥10s (fake timers / injected clock + fake socket).
-- [ ] **2. Judge prompt from file** — `src/lib/judge.ts` reads the SYSTEM block of `prompts/judge.md` (between
+- [x] **2. Judge prompt from file** — `src/lib/judge.ts` reads the SYSTEM block of `prompts/judge.md` (between
   `## SYSTEM` and `## END SYSTEM`) once at load; Dockerfile already copies the repo. Test: unit test that the
   loaded prompt equals the file block and the existing judge tests still pass.
 - [x] **3. Twitch robustness** — `helix()` retries 429 after `Ratelimit-Reset` (max 2 retries, max wait 60s)
