@@ -4,23 +4,55 @@ Krew's GTA 6 clip pipeline (part of Project Patrick). Krew hates repeating thems
 original brief is below, and the status section says what's done. Read both before changing anything.
 
 ## Status (2026-11-16)
-- **Phase 1 built:** Scout, Twitch Clips poller, Grabber, Cutter, dashboard (Live / Queue / Posted /
-  Streamers / Settings), docker compose.
-- **Phase 2 built:** spike detector (`src/workers/spike.ts`, logic in `ChatHeat.spike()`), Judge
-  (`src/lib/judge.ts`, `claude-sonnet-5-5` via `client.beta.messages.parse` + zod, refusal fallbacks on),
-  YouTube connect/upload/views (`src/lib/youtube.ts`, `src/workers/poster.ts`).
-  Line order is now grab → transcribe → judge → cut, so the Judge's hook is burned into the video and
-  auto-rejected clips render last (low queue priority).
-- Tests: `npm test` (17: unit, real ffmpeg renders, spike worker against Redis, Judge + YouTube against
-  the stand-in servers in `test/mocks.ts`). `npx tsx test/mocks.ts 4010` prints env vars to run the whole
-  app against the stand-ins.
-- **Not verified against the real services yet** (no keys in the build sandbox): Twitch (Helix, chat,
-  yt-dlp clip + live-VOD section downloads), the real Claude API, the real YouTube API, a Docker build,
-  Whisper on real speech. First real run should check those in that order.
-- Spike timing constants to tune on real streams (`src/workers/spike.ts`): 12s reaction lag, 150s wait
-  for the live VOD, 180s cooldown per streamer.
-- **Next = Phase 3:** TikTok Content Posting API, analytics on which clips perform → Judge prompt,
-  multi-account (`Account` table is ready for more rows).
+- **Built:** Phase 1 (Scout, Clips poller, Grabber, Cutter, dashboard), Phase 2 (spike detector, Judge,
+  YouTube upload), Phase 3 (TikTok drafts, multiple accounts, Analytics, Judge learns from results).
+- **Launch hardening in progress:** see `PLAN.md` (step-by-step, each with its test).
+- Tests: `npm test` (unit, real ffmpeg renders, workers against Redis, Judge/YouTube/TikTok against the
+  stand-in servers in `test/mocks.ts`). `npx tsx test/mocks.ts 4010` prints env vars to run the app on stand-ins.
+- **Never run against the real services** (no keys in the build sandbox): Twitch Helix/chat/yt-dlp, the real
+  Claude API, YouTube, TikTok, the Docker build, Whisper on real speech. `npm run doctor` (PLAN step 6) is
+  Krew's one-command check of all of these on his machine; run it before Thursday.
+
+## Launch-day load (why the limits below exist)
+- **Throughput:** one cut ≈ 30–40s CPU + Whisper ≈ 10–20s → about **1 clip/min**. Inputs must be capped to
+  match: the line stops taking new moments when ≥ `MAX_BACKLOG` (12) clips are in progress.
+- **Disk:** a 60s 1080p60 Twitch clip is 30–60 MB raw + ~10 MB final. Uncapped that's ~25 GB/hour.
+  Retention: raw deleted 12h after its clip is cut; finals of rejected/failed clips after 24h; finals of
+  posted clips after 7 days. Grabber pauses below `MIN_FREE_GB` (5) free and the Live page warns.
+- **Twitch Helix:** 800 points/min per app token. Retry 429s after `Ratelimit-Reset`. `/streams?game_id` only
+  returns the top 500 (5 pages); approved streamers are also looked up by `user_id` so a small approved
+  streamer is never missed.
+- **Twitch chat (anonymous):** max 20 JOINs per 10s → join in batches of ≤15 every 10s.
+- **SQLite:** web + worker write at once → WAL mode + busy timeout, batched chat-heat writes.
+- **yt-dlp** breaks when Twitch changes things: `docker compose build --pull --no-cache worker` on launch
+  morning gets the newest. Spike clips cut from an in-progress VOD are the least proven path.
+
+## Chat spike detector (design; code in `src/lib/chat.ts`, `src/workers/spike.ts`)
+Runs every 5s per approved live streamer whose chat we read (anonymous IRC with `twitch.tv/tags twitch.tv/commands`).
+
+**Counting (what goes into a 1-second bucket):**
+- Drop bots: known bot names (nightbot, streamelements, streamlabs, moobot, fossabot, wizebot, sery_bot,
+  soundalerts, botrixoficial, kofistreambot, own streamer's account) and any message starting with `!`.
+- Cap each chatter at **2 messages per 10s window** (stops one spammer or copy-paste flood from counting).
+- Track distinct chatters per bucket and hype messages (`LMAO`, `KEKW`, `OMEGALUL`, `LUL`, `Pog*`,
+  `clip it/that`, `no way`, a lone `W`).
+
+**Formula (all rates in counted messages/sec):**
+- `W` = counted messages in the last 10s ÷ 10.
+- `B` = **median** of the counted rate across the previous 10s windows in the last 5 min (needs ≥ 12
+  windows = 2 min of listening). Median, not mean, so an earlier spike doesn't raise the bar.
+- `S = W / max(B, 0.3)` (0.3 msg/s floor so a near-silent chat can't spike on a handful of messages).
+- **Volume spike:** `S ≥ k` (Settings → Spike sensitivity, default 3) **and** ≥ 6 distinct chatters in the window.
+- **Hype spike:** ≥ 50% of counted messages are hype **and** ≥ 6 hype messages from ≥ 4 distinct chatters
+  **and** `S ≥ max(1.5, k/2)`.
+
+**Muting (no spikes while chat is reacting to something that isn't gameplay):**
+- **Raid** (`USERNOTICE msg-id=raid`): mute 120s; raider messages also don't enter the baseline.
+- **Sub train / gift bomb:** ≥ 3 sub/resub/subgift notices in 30s, or one `submysterygift` with
+  `msg-param-mass-gift-count ≥ 5` → mute 60s.
+- **Warm-up:** no spikes in the first 2 min after joining a channel.
+- **Cooldown:** one moment per streamer per 3 min.
+- **Reaction lag:** the moment is placed 12s before detection; grab waits 150s for the live VOD to catch up.
 
 ## Rules that must not break
 - The Grabber only pulls from `Streamer.approved = true`. Approving needs a written reason.
