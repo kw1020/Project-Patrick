@@ -52,6 +52,10 @@ function worker(name: keyof typeof QUEUES, concurrency: number, fn: (job: Job) =
   return w;
 }
 
+// One bad promise (a dropped socket, a flaky API) must not take the whole line down on launch day.
+process.on("unhandledRejection", (e) => console.error("[unhandled]", e instanceof Error ? e.message : e));
+process.on("uncaughtException", (e) => console.error("[uncaught]", e.message));
+
 async function main() {
   await ensureSqliteTuned(); // WAL + busy timeout: web and worker write the same SQLite file
   ensureStorage();

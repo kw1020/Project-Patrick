@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { prisma } from "../lib/db";
 import { resolveStored, storagePath } from "../lib/paths";
-import { setStatus } from "../lib/queues";
+import { queue, setStatus } from "../lib/queues";
 
 // Retention (CLAUDE.md "Launch-day load" → Disk): keeps a launch-day firehose from filling the disk.
 const H = 3600_000;
@@ -83,6 +83,28 @@ export async function runRetention(now = Date.now()): Promise<string> {
   return `deleted ${raws} raw, ${finals} final, ${orphans} orphan file${orphans === 1 ? "" : "s"} · ${mb < 10 ? mb.toFixed(1) : Math.round(mb)} MB freed`;
 }
 
+/**
+ * Stuck-clip sweeper. A clip counts against MAX_BACKLOG while "processing"; if its job is lost
+ * (Redis wiped, worker killed mid-job beyond BullMQ's stall recovery) it would block the line forever.
+ * Any processing clip idle for 10+ min with no waiting/active/delayed job is marked failed (Retry button).
+ */
+export async function sweepStuck(now = Date.now(), idleMs = 10 * 60_000) {
+  const stale = await prisma.clip.findMany({ where: { status: "processing", updatedAt: { lt: new Date(now - idleMs) } }, select: { id: true, stage: true } });
+  if (!stale.length) return 0;
+  const live = new Set<string>();
+  for (const name of ["grab", "transcribe", "judge", "cut"] as const) {
+    const jobs = await queue(name).getJobs(["waiting", "active", "delayed", "prioritized", "waiting-children"]);
+    for (const j of jobs) if (j?.data?.clipId) live.add(j.data.clipId);
+  }
+  let n = 0;
+  for (const c of stale) {
+    if (live.has(c.id)) continue;
+    await prisma.clip.update({ where: { id: c.id }, data: { status: "failed", error: `Lost in the line at the ${c.stage ?? "?"} step (worker restarted?). Press Retry.` } });
+    n++;
+  }
+  return n;
+}
+
 /** Worker: run retention now and then every hour. Returns a stop function for shutdown. */
 export function startRetention(everyMs = H): () => void {
   let running = false;
@@ -100,5 +122,8 @@ export function startRetention(everyMs = H): () => void {
   };
   void tick();
   const t = setInterval(tick, everyMs);
-  return () => clearInterval(t);
+  const sweep = setInterval(() => {
+    sweepStuck().then((n) => { if (n) console.warn(`[sweep] ${n} stuck clip(s) marked failed`); }).catch((e) => console.error("[sweep]", (e as Error).message));
+  }, 5 * 60_000);
+  return () => { clearInterval(t); clearInterval(sweep); };
 }

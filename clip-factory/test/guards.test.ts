@@ -226,3 +226,22 @@ test("retention deletes the right files only and clears their DB paths", async (
   assert.ok(fs.existsSync(orphanNew));
   assert.ok(!fs.existsSync(workOld));
 });
+
+test("sweepStuck: an idle processing clip with no job is failed; one with a delayed job is left alone", async () => {
+  const { prisma } = await import("../src/lib/db");
+  const { sweepStuck } = await import("../src/workers/retention");
+  const { queue } = await import("../src/lib/queues");
+  const s = await prisma.streamer.create({ data: { twitchId: "t-sweep", login: "sweeper", name: "Sweeper", approved: true } });
+  const mk = async () => {
+    const m = await prisma.moment.create({ data: { streamerId: s.id, timestamp: new Date(), source: "twitch_clip" } });
+    return prisma.clip.create({ data: { momentId: m.id, status: "processing", stage: "grab" } });
+  };
+  const lost = await mk(), waiting = await mk();
+  await queue("grab").add("grab", { clipId: waiting.id }, { jobId: `sweep-test-${waiting.id}`, delay: 600_000 });
+  const later = Date.now() + 11 * 60_000;
+  assert.ok((await sweepStuck(later)) >= 1); // other tests in this file may leave stale clips too
+  assert.equal((await prisma.clip.findUniqueOrThrow({ where: { id: lost.id } })).status, "failed");
+  assert.equal((await prisma.clip.findUniqueOrThrow({ where: { id: waiting.id } })).status, "processing");
+  await (await queue("grab").getJob(`sweep-test-${waiting.id}`))?.remove();
+  await prisma.clip.deleteMany({ where: { id: { in: [lost.id, waiting.id] } } });
+});

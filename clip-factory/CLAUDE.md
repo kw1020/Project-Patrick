@@ -6,7 +6,11 @@ original brief is below, and the status section says what's done. Read both befo
 ## Status (2026-11-16)
 - **Built:** Phase 1 (Scout, Clips poller, Grabber, Cutter, dashboard), Phase 2 (spike detector, Judge,
   YouTube upload), Phase 3 (TikTok drafts, multiple accounts, Analytics, Judge learns from results).
-- **Launch hardening in progress:** see `PLAN.md` (step-by-step, each with its test).
+- **Launch hardening done (2026-11-16):** all 6 `PLAN.md` steps (spike detector v2, Judge prompt file,
+  Twitch 429/approved lookup, backlog + disk + retention, SQLite WAL, `npm run doctor`) plus launch-check
+  fixes: stuck-clip sweeper (`sweepStuck` in `src/workers/retention.ts`, every 5 min) and a worker crash guard.
+- Docker image never built (no daemon in the sandbox); a clean-copy `npm ci` + `next build` without `.env`
+  (what the Dockerfile does) passes.
 - Tests: `npm test` (unit, real ffmpeg renders, workers against Redis, Judge/YouTube/TikTok against the
   stand-in servers in `test/mocks.ts`). `npx tsx test/mocks.ts 4010` prints env vars to run the app on stand-ins.
 - **Never run against the real services** (no keys in the build sandbox): Twitch Helix/chat/yt-dlp, the real
