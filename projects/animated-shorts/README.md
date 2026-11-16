@@ -1,4 +1,4 @@
-# Project: Animated YouTube Shorts with Brism
+# Project: Animated YouTube Shorts
 
 Started 2026-11-16. Krew's call: post animated content on YouTube Shorts.
 
@@ -32,8 +32,6 @@ claude-animated-shorts skill instead (see "Main tool" below).** Brism notes kept
 - Cost per video: $0 beyond the Claude subscription Krew already has.
 
 ## Other free backups
-- **claude-animated-shorts** (github.com/mromidev, MIT, free): Claude skill that makes 55-70s vertical
-  3D cartoon story shorts with three.js + Remotion. No AI video model, so no per-video cost.
 - **claude-faceless-shorts-creator** (learnwithhasan, MIT, free): Claude Code + Remotion + ElevenLabs.
 
 ## Rules YouTube enforces (these decide if we get paid)
@@ -46,12 +44,12 @@ claude-animated-shorts skill instead (see "Main tool" below).** Brism notes kept
 - YPP for Shorts: 1,000 subs + 10M Shorts views in 90 days (or 4,000 watch hours long-form).
 
 ## Plan
-1. **Get Brism access** (Krew): join the waitlist at whop.com/brism/brism-57. Forward the welcome /
-   install email to krew2128@gmail.com so Patrick can read the setup steps.
+1. **Install the free skill on local Patrick**: clone github.com/mromidev/claude-animated-shorts to
+   `~/.claude/skills/cartoon-3d-short/`, install Remotion + `@remotion/three`, Node, Python 3, ffmpeg.
 2. **Pick one niche + one style** and stick to it for 30 videos. Candidates: survival builds
    (3D, "how X becomes a house"), Roblox-style story drama, map/history explainers, liminal horror.
 3. **Make a new channel** for it (not Krew's personal one), with name, logo, banner.
-4. **Cadence:** 1-3 Shorts a day for 30 days. Patrick writes scripts, Brism renders, Krew reviews
+4. **Cadence:** 1-3 Shorts a day for 30 days. Patrick writes scripts and renders, Krew reviews
    and posts (or schedules in YouTube Studio).
 5. **Track** views, retention (% viewed vs swiped away) and subs per video; double down on what
    works after ~15 videos.
@@ -61,7 +59,7 @@ claude-animated-shorts skill instead (see "Main tool" below).** Brism notes kept
 ## Open decisions (Krew)
 - Niche / style for the first channel.
 - Channel name.
-- Budget ceiling for Brism + voice tools.
+- Voice: Krew's own voice or Patrick's Kokoro voice.
 
 ## Log
 - 2026-11-16: Brism ruled out on price; switched to claude-animated-shorts.
