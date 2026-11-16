@@ -19,7 +19,7 @@ full `npm test` pass and `npx tsc --noEmit` is clean.
   tracked even outside the top 500. Files: `src/lib/twitch.ts`, `src/workers/scout.ts`. Test: `test/twitch.test.ts`
   with a stubbed `fetch`: 429 then 200 succeeds and waits; approved streamer missing from game pages is still
   marked live; non-GTA streams from the user_id lookup are ignored.
-- [ ] **4. Backlog + disk guards** — `MAX_BACKLOG` (env, default 12): clips poller and spike detector add
+- [x] **4. Backlog + disk guards** — `MAX_BACKLOG` (env, default 12): clips poller and spike detector add
   nothing new while ≥ that many clips are `processing` (poller still adds the highest-view clips first when
   there's room). `MIN_FREE_GB` (env, default 5): grabber delays (re-queues with 5 min delay, no failure) when free
   space on STORAGE_DIR is below it; status `disk` shown on the Live page. Hourly retention job per CLAUDE.md
@@ -28,7 +28,7 @@ full `npm test` pass and `npx tsc --noEmit` is clean.
   `src/workers/index.ts`, `app/page.tsx`, `src/components/ClipCard.tsx`. Test: `test/guards.test.ts` — backlog
   full → poller adds 0; retention deletes the right files only (old raw yes, fresh raw no, rejected final >24h
   yes, pending final no); low-disk path re-queues instead of failing (inject the free-space function).
-- [ ] **5. SQLite under load** — WAL + `busy_timeout=5000` set at startup in worker and web (shared helper in
+- [x] **5. SQLite under load** — WAL + `busy_timeout=5000` set at startup in worker and web (shared helper in
   `src/lib/db.ts`); chat-heat flush done in one transaction; `CUT_CONCURRENCY` env (default 1).
   Test: `test/db-load.test.ts` — 2 processes (or 2 Prisma clients) doing 300 interleaved writes each finish
   with no "database is locked".
