@@ -5,7 +5,7 @@ clips, and queues them for you to approve and post on TikTok / Shorts / Reels.
 
 **Phase 1 (built):** Scout · Twitch Clips poller · Grabber · Cutter · dashboard (Live, Queue, Posted, Streamers, Settings).
 **Phase 2 (built):** chat spike detector · Judge (Claude scores each clip, writes the hook/title/hashtags) · YouTube upload after you approve.
-**Phase 3 (next):** TikTok API · analytics feeding the Judge · multiple accounts.
+**Phase 3 (built):** TikTok drafts · multiple accounts · Analytics page · the Judge learns from your results.
 
 ## 1. One-time setup (≈10 min)
 
@@ -40,6 +40,65 @@ Whisper caption model (~150 MB) once.
    (paste the post link) so it shows up on the **Posted** page.
 
 Finished files are also in `storage/final/` on your computer.
+
+## Check everything before launch: `npm run doctor`
+
+Run this on your computer once your keys are in `.env` (Wednesday at the latest):
+
+```bash
+npm run doctor
+```
+
+It checks your keys, ffmpeg, yt-dlp, Whisper, Redis, the database, Twitch (logs in, finds the GTA 6
+category, counts live streams), downloads the top GTA 6 clip and turns it vertical into
+`storage/doctor/vertical.mp4` (open it and look), asks the Judge to score a test clip, and refreshes
+each connected YouTube/TikTok account. Every line is ✅ / ⚠️ / ❌ with a one-line fix. With Docker:
+
+```bash
+docker compose run --rm worker npm run doctor
+```
+
+## Launch day (Thursday)
+
+1. Get the newest yt-dlp (Twitch changes often break old versions):
+   ```bash
+   docker compose build --pull --no-cache
+   ```
+2. `docker compose up`, open http://localhost:3000, check the Live page cards are green.
+3. Approve your streamers early, before they go live, so their chat is read from the start (the spike
+   detector needs 2 minutes of normal chat before it can spot a spike).
+4. Raise **Min Twitch clip views** in Settings (e.g. 200) once clips pour in, so only the best get made.
+5. Built-in safety limits: the line takes no new moments while 12 clips are in progress, grabbing pauses
+   when less than 5 GB of disk is free (the Live page says so), and old video is deleted automatically
+   (raw after 12h, rejected after a day, posted after a week). Change with `MAX_BACKLOG` / `MIN_FREE_GB` in `.env`.
+6. A faster computer = more clips. One cut takes about a minute on a normal laptop. With 8+ CPU cores, set
+   `CUT_CONCURRENCY=2` in `.env`.
+
+## TikTok (≈15 min, once)
+
+TikTok only lets apps that passed its audit post publicly, and its rules rule out clip re-upload tools,
+so Clip Factory sends each approved clip to your TikTok **inbox as a draft**: open TikTok, tap the
+notification, paste the caption (Copy caption button), post. Limit: 5 waiting drafts per account per day.
+
+1. https://developers.tiktok.com → Manage apps → Connect an app. Add products **Login Kit** and
+   **Content Posting API**. Scopes: `user.info.basic`, `user.info.profile`, `video.upload`, `video.list`.
+2. Switch the app to **Sandbox**, create a sandbox, and add your TikTok account(s) under Target users
+   (up to 10). Sandbox needs no app review.
+3. Login Kit → platform **Desktop**, redirect URI `http://localhost:3000/api/tiktok/callback`.
+4. Put the Client key and Client secret in `.env` as `TIKTOK_CLIENT_KEY` / `TIKTOK_CLIENT_SECRET`, restart.
+5. Settings → **Connect a TikTok account**. Repeat to add more accounts. Tick "Send draft when I approve"
+   to send automatically on Approve.
+
+Not yet confirmed: whether TikTok's sandbox allows inbox drafts. If the first draft fails with a
+permission error, submit the app for review (TikTok says several days to two weeks).
+
+## Analytics + the Judge learning
+
+The **Analytics** page compares every post with that account's typical post (2× = twice its usual
+views) and breaks results down by Judge score, how the moment was found, streamer, account, length and
+posting time. Once 6 posts are a day old, the Judge is shown your best and worst posts with every new
+clip, so its scores follow what actually works on your accounts. The exact text it sees is at the bottom
+of the Analytics page. Turn it off in Settings → "Learn from my results".
 
 ## Phase 2: what changed in the line
 
