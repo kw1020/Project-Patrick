@@ -1,18 +1,19 @@
 "use client";
 import { useState, useTransition } from "react";
-import { markPosted, retryClip, setClipStatus, updateClipText, uploadToYouTube } from "../../app/actions";
+import { markPosted, postToAccount, retryClip, setClipStatus, updateClipText } from "../../app/actions";
 
 export type ClipView = {
   id: string; status: string; stage: string | null; error: string | null; title: string; caption: string;
   duration: number | null; score: number | null; hook: string | null; judgeReason: string | null; hasVideo: boolean;
   streamer: { name: string; login: string }; source: string; spikeScore: number; sourceUrl: string | null; sourceViews: number;
-  posts: { platform: string; url: string | null }[]; postError: string | null;
+  posts: { platform: string; accountId: string | null; status: string; url: string | null; error: string | null }[]; postError: string | null;
 };
+export type AccountView = { id: string; platform: string; label: string; autoPost: boolean; privacy: string };
 
 const STAGE: Record<string, string> = { grab: "Grabbing video…", transcribe: "Transcribing…", judge: "The Judge is scoring it…", cut: "Cutting + captioning…" };
 const PLATFORM: Record<string, string> = { youtube: "YouTube", tiktok: "TikTok", instagram: "Reels" };
 
-export function ClipCard({ clip, yt }: { clip: ClipView; yt: { connected: boolean; auto: boolean; privacy: string } }) {
+export function ClipCard({ clip, accounts }: { clip: ClipView; accounts: AccountView[] }) {
   const [title, setTitle] = useState(clip.title);
   const [caption, setCaption] = useState(clip.caption);
   const [saved, setSaved] = useState(true);
@@ -26,8 +27,10 @@ export function ClipCard({ clip, yt }: { clip: ClipView; yt: { connected: boolea
     await navigator.clipboard.writeText(caption);
     setCopied(true); setTimeout(() => setCopied(false), 1500);
   };
-  const onYouTube = clip.posts.some((p) => p.platform === "youtube");
   const uploading = clip.stage === "post";
+  const auto = accounts.filter((a) => a.autoPost);
+  const notYet = accounts.filter((a) => !clip.posts.some((p) => p.accountId === a.id && p.status !== "failed"));
+  const accountName = (id: string | null) => accounts.find((a) => a.id === id)?.label;
   const reviewed = clip.status === "approved" || clip.status === "posted";
   const scoreColor = clip.score == null ? "" : clip.score >= 8 ? "text-emerald-300" : clip.score >= 6 ? "text-sun" : "text-red-300";
 
@@ -72,7 +75,7 @@ export function ClipCard({ clip, yt }: { clip: ClipView; yt: { connected: boolea
         <div className="mt-auto flex flex-wrap gap-2 pt-1">
           {clip.status === "pending" && <>
             <button className="btn-ok flex-1" disabled={busy} onClick={() => act(() => setClipStatus(clip.id, "approved"))}>
-              {yt.connected && yt.auto ? `Approve + post to YouTube (${yt.privacy})` : "Approve"}
+              {auto.length ? `Approve + send to ${auto.length === 1 ? auto[0].label : `${auto.length} accounts`}` : "Approve"}
             </button>
             <button className="btn-bad flex-1" disabled={busy} onClick={() => act(() => setClipStatus(clip.id, "rejected"))}>Reject</button>
           </>}
@@ -86,17 +89,26 @@ export function ClipCard({ clip, yt }: { clip: ClipView; yt: { connected: boolea
           <div className="mt-1 space-y-2 border-t border-line pt-3">
             {clip.posts.length > 0 && (
               <div className="flex flex-wrap gap-1.5 text-xs">
-                {clip.posts.map((p, i) => p.url
-                  ? <a key={i} href={p.url} target="_blank" className="rounded-full bg-emerald-500/15 px-2 py-1 font-bold text-emerald-300">✓ {PLATFORM[p.platform] ?? p.platform} ↗</a>
-                  : <span key={i} className="rounded-full bg-emerald-500/15 px-2 py-1 font-bold text-emerald-300">✓ {PLATFORM[p.platform] ?? p.platform}</span>)}
+                {clip.posts.map((p, i) => {
+                  const name = `${PLATFORM[p.platform] ?? p.platform}${accountName(p.accountId) ? ` · ${accountName(p.accountId)}` : ""}`;
+                  if (p.status === "draft") return <span key={i} title="Open TikTok, tap the inbox notification, paste the caption, post." className="rounded-full bg-sun/15 px-2 py-1 font-bold text-sun">⏳ {name}: draft in your TikTok inbox</span>;
+                  if (p.status === "failed") return <span key={i} title={p.error ?? ""} className="rounded-full bg-red-500/15 px-2 py-1 font-bold text-red-300">✕ {name}: {p.error}</span>;
+                  return p.url
+                    ? <a key={i} href={p.url} target="_blank" className="rounded-full bg-emerald-500/15 px-2 py-1 font-bold text-emerald-300">✓ {name} ↗</a>
+                    : <span key={i} className="rounded-full bg-emerald-500/15 px-2 py-1 font-bold text-emerald-300">✓ {name}</span>;
+                })}
               </div>
             )}
-            {uploading && <div className="animate-pulse text-xs text-sun">Uploading to YouTube…</div>}
-            {clip.postError && <div className="text-xs text-red-300">YouTube upload failed: {clip.postError}</div>}
-            {yt.connected && !onYouTube && !uploading && (
-              <button className="btn-hot w-full" disabled={busy} onClick={() => act(() => uploadToYouTube(clip.id))}>
-                {clip.postError ? "Retry YouTube upload" : `Upload to YouTube (${yt.privacy})`}
-              </button>
+            {uploading && <div className="animate-pulse text-xs text-sun">Sending…</div>}
+            {clip.postError && <div className="text-xs text-red-300">Posting failed: {clip.postError}</div>}
+            {!uploading && notYet.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {notYet.map((a) => (
+                  <button key={a.id} className="btn-hot flex-1" disabled={busy} onClick={() => act(() => postToAccount(clip.id, a.id))}>
+                    {a.platform === "tiktok" ? `TikTok draft → ${a.label}` : `YouTube → ${a.label} (${a.privacy})`}
+                  </button>
+                ))}
+              </div>
             )}
             <form action={(fd) => act(() => markPosted(clip.id, fd))} className="flex gap-2">
               <select name="platform" className="field w-24 shrink-0">

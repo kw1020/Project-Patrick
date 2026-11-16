@@ -3,12 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { enqueueCut, enqueueGrab, enqueuePost, enqueueTranscribe, pokeScout } from "@/lib/queues";
-import { getYouTubeAccount } from "@/lib/youtube";
 import { getUsers, twitchConfigured } from "@/lib/twitch";
 import { parseFacecam } from "@/lib/media";
 
 function refreshAll() {
-  for (const p of ["/", "/queue", "/posted", "/streamers", "/settings"]) revalidatePath(p);
+  for (const p of ["/", "/queue", "/posted", "/analytics", "/streamers", "/settings"]) revalidatePath(p);
 }
 
 // ---------- Streamers ----------
@@ -61,24 +60,24 @@ export async function updateClipText(id: string, title: string, caption: string)
 
 export async function setClipStatus(id: string, status: "pending" | "approved" | "rejected") {
   await prisma.clip.update({ where: { id }, data: { status } });
-  // Approving is the human sign-off. If auto-upload is on, that click also sends it to YouTube.
+  // Approving is the human sign-off. Accounts set to "post when I approve" get it now.
   if (status === "approved") {
-    const [settings, yt] = await Promise.all([prisma.settings.findUnique({ where: { id: "main" } }), getYouTubeAccount()]);
-    if (settings?.ytAutoUpload && yt) await queueUpload(id);
+    const auto = await prisma.account.findMany({ where: { autoPost: true, error: null } });
+    for (const a of auto) await queueUpload(id, a.id);
   }
   refreshAll();
 }
 
-async function queueUpload(id: string) {
-  await prisma.clip.update({ where: { id }, data: { stage: "post", postError: null } });
-  await enqueuePost(id);
+async function queueUpload(clipId: string, accountId: string) {
+  await prisma.clip.update({ where: { id: clipId }, data: { stage: "post", postError: null } });
+  await enqueuePost(clipId, accountId);
 }
 
-/** Manual "Upload to YouTube" on an approved clip. */
-export async function uploadToYouTube(id: string) {
-  const clip = await prisma.clip.findUniqueOrThrow({ where: { id } });
+/** Manual "send to <account>" on an approved clip. */
+export async function postToAccount(clipId: string, accountId: string) {
+  const clip = await prisma.clip.findUniqueOrThrow({ where: { id: clipId } });
   if (clip.status !== "approved" && clip.status !== "posted") throw new Error("Approve the clip first");
-  await queueUpload(id);
+  await queueUpload(clipId, accountId);
   refreshAll();
 }
 
@@ -129,8 +128,7 @@ export async function saveSettings(form: FormData) {
       scoutPaused: form.get("scoutPaused") === "on",
       spikeEnabled: form.get("spikeEnabled") === "on",
       judgeEnabled: form.get("judgeEnabled") === "on",
-      ytAutoUpload: form.get("ytAutoUpload") === "on",
-      ytPrivacy: ["public", "unlisted", "private"].includes(String(form.get("ytPrivacy"))) ? String(form.get("ytPrivacy")) : "public",
+      judgeLearns: form.get("judgeLearns") === "on",
     },
   });
   refreshAll();
@@ -141,8 +139,17 @@ export async function runScoutNow() {
   refreshAll();
 }
 
-export async function disconnectYouTube() {
-  await prisma.account.deleteMany({ where: { platform: "youtube" } });
-  await prisma.settings.update({ where: { id: "main" }, data: { ytAutoUpload: false } }).catch(() => {});
+export async function saveAccount(id: string, form: FormData) {
+  const privacy = String(form.get("privacy") || "public");
+  await prisma.account.update({
+    where: { id },
+    data: { autoPost: form.get("autoPost") === "on", privacy: ["public", "unlisted", "private"].includes(privacy) ? privacy : "public" },
+  });
+  refreshAll();
+}
+
+/** Posts made through this account stay on the Posted page; they just stop syncing. */
+export async function disconnectAccount(id: string) {
+  await prisma.account.delete({ where: { id } });
   refreshAll();
 }

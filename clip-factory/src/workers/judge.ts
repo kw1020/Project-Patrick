@@ -1,5 +1,6 @@
 import { prisma, getSettings } from "../lib/db";
 import { judgeClip, judgeConfigured } from "../lib/judge";
+import { buildLessons } from "../lib/learning";
 import { enqueueCut } from "../lib/queues";
 import { cleanHashtags, judgedCaption } from "../lib/social";
 
@@ -21,12 +22,13 @@ export async function runJudge(clipId: string) {
   let stats = null;
   try { stats = moment.stats ? JSON.parse(moment.stats) : null; } catch { /* ignore */ }
 
+  const lessons = settings.judgeLearns ? await buildLessons().catch(() => null) : null;
   let verdict;
   try {
     verdict = await judgeClip({
       streamer: streamer.name, durationSec: clip.duration ?? 0, source: moment.source === "chat" ? "chat" : "twitch_clip",
       sourceTitle: moment.sourceTitle, sourceViews: moment.sourceViews, transcript: clip.transcript, stats, minScore: settings.minScore,
-    });
+    }, lessons?.text ?? null);
   } catch (e) {
     return skip(`Judge error: ${(e as Error).message}`.slice(0, 300));
   }

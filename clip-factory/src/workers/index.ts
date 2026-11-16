@@ -10,7 +10,7 @@ import { runClipsPoll } from "./clips";
 import { runGrab } from "./grabber";
 import { runCut, runTranscribe } from "./cutter";
 import { runJudge } from "./judge";
-import { runPost, runViewsSync } from "./poster";
+import { migrateLegacySettings, runPost, runStatsSync } from "./poster";
 import { runSpikeCheck } from "./spike";
 import { judgeConfigured } from "../lib/judge";
 
@@ -28,13 +28,15 @@ function worker(name: keyof typeof QUEUES, concurrency: number, fn: (job: Job) =
   const w = new Worker(QUEUES[name], async (job) => {
     const msg = await fn(job);
     console.log(`[${name}] ${msg}`);
-    if (name === "scout" || name === "clips" || name === "judge" || name === "post") await setStatus(name, true, msg);
+    if (name === "scout" || name === "clips" || name === "judge") await setStatus(name, true, msg);
+    if (name === "post") await setStatus(job.name === "views" ? "stats" : "post", true, msg);
     return msg;
   }, { connection: redis(), concurrency });
   w.on("failed", async (job, err) => {
     console.error(`[${name}] failed:`, err.message);
     if (name === "scout" || name === "clips") await setStatus(name, false, err.message);
     const clipId = job?.data?.clipId;
+    if (name === "post" && job?.name === "views") { await setStatus("stats", false, err.message); return; }
     if (name === "post") {
       // A failed upload leaves the clip approved, with the reason shown on its card.
       await setStatus("post", false, err.message);
@@ -52,6 +54,7 @@ function worker(name: keyof typeof QUEUES, concurrency: number, fn: (job: Job) =
 async function main() {
   ensureStorage();
   await checkTools();
+  await migrateLegacySettings().catch((e) => console.error("[migrate]", e.message));
 
   const workers = [
     worker("scout", 1, () => runScout(chat)),
@@ -60,7 +63,7 @@ async function main() {
     worker("transcribe", 1, (job) => runTranscribe(job.data.clipId)),
     worker("judge", 3, (job) => runJudge(job.data.clipId)),
     worker("cut", 1, (job) => runCut(job.data.clipId)), // ffmpeg is CPU-heavy: one at a time
-    worker("post", 1, (job) => (job.name === "views" ? runViewsSync() : runPost(job.data.clipId))),
+    worker("post", 1, (job) => (job.name === "views" ? runStatsSync() : runPost(job.data.clipId, job.data.accountId))),
   ];
 
   // Scout + Clips poll every 2 minutes (and once right now).

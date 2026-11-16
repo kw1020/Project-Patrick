@@ -6,6 +6,7 @@ const LINKS = [
   { href: "/", label: "Live" },
   { href: "/queue", label: "Queue" },
   { href: "/posted", label: "Posted" },
+  { href: "/analytics", label: "Analytics" },
   { href: "/streamers", label: "Streamers" },
   { href: "/settings", label: "Settings" },
 ];

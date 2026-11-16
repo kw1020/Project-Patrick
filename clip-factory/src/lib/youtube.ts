@@ -1,5 +1,6 @@
-// YouTube: OAuth connect, Shorts upload (resumable), view counts. Plain fetch against Google's REST API.
+// YouTube: OAuth connect (any number of channels), Shorts upload (resumable), stats. Plain fetch against Google's REST API.
 import fs from "node:fs";
+import type { Account } from "@prisma/client";
 import { prisma } from "./db";
 
 // Overridable so tests can point at a mock server.
@@ -23,7 +24,7 @@ export function authUrl(state: string) {
   const u = new URL(AUTH_URL());
   u.search = new URLSearchParams({
     client_id: process.env.YOUTUBE_CLIENT_ID!, redirect_uri: redirectUri(), response_type: "code",
-    scope: SCOPES.join(" "), access_type: "offline", prompt: "consent", state,
+    scope: SCOPES.join(" "), access_type: "offline", prompt: "consent select_account", state,
   }).toString();
   return u.toString();
 }
@@ -39,7 +40,7 @@ async function tokenRequest(params: Record<string, string>) {
   return j;
 }
 
-/** Finish the connect flow: trade the code for tokens, look up the channel, save the account. */
+/** Finish the connect flow. Connecting a channel that's already there refreshes it; a new one is added. */
 export async function connectWithCode(code: string) {
   const t = await tokenRequest({ code, grant_type: "authorization_code", redirect_uri: redirectUri() });
   if (!t.refresh_token) throw new Error("Google didn't return a refresh token. Remove the app at myaccount.google.com/permissions and connect again.");
@@ -47,26 +48,24 @@ export async function connectWithCode(code: string) {
   const item = ch.items?.[0];
   if (!item) throw new Error("That Google account has no YouTube channel.");
   const data = {
-    channelId: item.id as string, channelTitle: item.snippet?.title as string, refreshToken: t.refresh_token,
+    channelTitle: item.snippet?.title as string, refreshToken: t.refresh_token,
     accessToken: t.access_token!, expiresAt: new Date(Date.now() + (t.expires_in ?? 3600) * 1000), error: null,
   };
-  return prisma.account.upsert({ where: { platform: "youtube" }, update: data, create: { platform: "youtube", ...data } });
+  return prisma.account.upsert({
+    where: { platform_channelId: { platform: "youtube", channelId: item.id } },
+    update: data,
+    create: { platform: "youtube", channelId: item.id, ...data },
+  });
 }
 
-export function getYouTubeAccount() {
-  return prisma.account.findUnique({ where: { platform: "youtube" } });
-}
-
-async function accessToken() {
-  const acct = await getYouTubeAccount();
-  if (!acct) throw new Error("YouTube isn't connected. Connect it on the Settings page.");
+async function accessToken(acct: Account) {
   if (acct.accessToken && acct.expiresAt && acct.expiresAt.getTime() > Date.now() + 60_000) return acct.accessToken;
   try {
     const t = await tokenRequest({ refresh_token: acct.refreshToken, grant_type: "refresh_token" });
     await prisma.account.update({ where: { id: acct.id }, data: { accessToken: t.access_token!, expiresAt: new Date(Date.now() + (t.expires_in ?? 3600) * 1000), error: null } });
     return t.access_token!;
   } catch (e) {
-    const msg = `${(e as Error).message}. Reconnect YouTube on the Settings page.`;
+    const msg = `${(e as Error).message}. Reconnect ${acct.channelTitle ?? "this channel"} on the Settings page.`;
     await prisma.account.update({ where: { id: acct.id }, data: { error: msg } });
     throw new Error(msg);
   }
@@ -82,8 +81,8 @@ async function ytFetch(token: string, path: string) {
 export type UploadInput = { file: string; title: string; description: string; tags: string[]; privacy: "public" | "unlisted" | "private" };
 
 /** Upload a finished clip. Vertical + under 60s, so YouTube treats it as a Short. Returns the video id. */
-export async function uploadVideo(input: UploadInput): Promise<string> {
-  const token = await accessToken();
+export async function uploadVideo(acct: Account, input: UploadInput): Promise<string> {
+  const token = await accessToken(acct);
   const size = fs.statSync(input.file).size;
   const meta = {
     snippet: { title: input.title.replace(/[<>]/g, "").slice(0, 100), description: input.description.replace(/[<>]/g, "").slice(0, 4900), tags: input.tags.slice(0, 15), categoryId: "20" /* Gaming */ },
@@ -108,14 +107,19 @@ export async function uploadVideo(input: UploadInput): Promise<string> {
   return j.id as string;
 }
 
-/** View counts for up to 50 video ids per call (1 quota unit each call). */
-export async function fetchViews(ids: string[]): Promise<Map<string, number>> {
-  const out = new Map<string, number>();
+export type VideoStats = { views: number; likes: number | null; comments: number | null };
+
+/** Views/likes/comments for up to 50 video ids per call (1 quota unit each call). */
+export async function fetchStats(acct: Account, ids: string[]): Promise<Map<string, VideoStats>> {
+  const out = new Map<string, VideoStats>();
   if (!ids.length) return out;
-  const token = await accessToken();
+  const token = await accessToken(acct);
   for (let i = 0; i < ids.length; i += 50) {
     const j = await ytFetch(token, `/videos?part=statistics&id=${ids.slice(i, i + 50).join(",")}`);
-    for (const v of j.items ?? []) out.set(v.id, Number(v.statistics?.viewCount ?? 0));
+    for (const v of j.items ?? []) {
+      const s = v.statistics ?? {};
+      out.set(v.id, { views: Number(s.viewCount ?? 0), likes: s.likeCount != null ? Number(s.likeCount) : null, comments: s.commentCount != null ? Number(s.commentCount) : null });
+    }
   }
   return out;
 }

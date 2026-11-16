@@ -123,11 +123,12 @@ test("hook text is burned in for the first seconds", () => {
 test("youtube: connect, upload only approved clips, credit enforced, views synced", async () => {
   const { prisma } = await import("../src/lib/db");
   const yt = await import("../src/lib/youtube");
-  const { runPost, runViewsSync } = await import("../src/workers/poster");
+  const { runPost, runStatsSync } = await import("../src/workers/poster");
 
   const u = new URL(yt.authUrl("abc"));
   assert.equal(u.searchParams.get("redirect_uri"), "http://localhost:3000/api/youtube/callback");
   assert.equal(u.searchParams.get("access_type"), "offline");
+  assert.match(u.searchParams.get("prompt") ?? "", /select_account/, "lets Krew pick a second channel");
   const acct = await yt.connectWithCode("code123");
   assert.equal(acct.channelTitle, "Krew Clips (mock)");
 
@@ -137,10 +138,10 @@ test("youtube: connect, upload only approved clips, credit enforced, views synce
   const m = await prisma.moment.create({ data: { streamerId: s.id, timestamp: new Date(), source: "twitch_clip" } });
   const clip = await prisma.clip.create({ data: { momentId: m.id, finalPath: "final/c1.mp4", title: "Big <moment>", caption: "edited caption with no credit", hashtags: "#GTA6 #gaming", status: "pending" } });
 
-  await assert.rejects(runPost(clip.id), /isn't approved/, "pending clips never upload");
+  await assert.rejects(runPost(clip.id, acct.id), /isn't approved/, "pending clips never upload");
   await prisma.clip.update({ where: { id: clip.id }, data: { status: "approved" } });
   mock.requests.length = 0;
-  assert.match(await runPost(clip.id), /uploaded .* \(public\): vid123/);
+  assert.match(await runPost(clip.id, acct.id), /uploaded .* \(public\): vid123/);
 
   const init = mock.requests.find((r) => r.path.startsWith("/upload/"))!;
   const meta = JSON.parse(init.body.toString());
@@ -155,7 +156,7 @@ test("youtube: connect, upload only approved clips, credit enforced, views synce
   const after = await prisma.clip.findUniqueOrThrow({ where: { id: clip.id }, include: { posts: true } });
   assert.equal(after.status, "posted");
   assert.equal(after.posts[0].url, "https://youtube.com/shorts/vid123");
-  assert.equal(await runPost(clip.id), "already on YouTube", "never uploads twice");
-  assert.match(await runViewsSync(), /1 updated/);
+  assert.match(await runPost(clip.id, acct.id), /already sent/, "never uploads twice");
+  assert.match(await runStatsSync(), /1 updated/);
   assert.equal((await prisma.post.findFirstOrThrow()).views, 4321);
 });

@@ -1,11 +1,12 @@
 // Stand-in Anthropic + Google/YouTube servers for tests (no real keys or network).
 import http from "node:http";
 
-export type Mock = { url: string; requests: { method: string; path: string; headers: http.IncomingHttpHeaders; body: Buffer }[]; close: () => Promise<void>; verdict: Record<string, unknown> };
+export type Mock = { tiktokStatus: Record<string, unknown>; refreshCount: number; url: string; requests: { method: string; path: string; headers: http.IncomingHttpHeaders; body: Buffer }[]; close: () => Promise<void>; verdict: Record<string, unknown> };
 
 export async function startMocks(port = 0): Promise<Mock> {
   const mock: Mock = {
-    url: "", requests: [], close: async () => {},
+    url: "", requests: [], close: async () => {}, refreshCount: 0,
+    tiktokStatus: { status: "SEND_TO_USER_INBOX", publicaly_available_post_id: [] },
     verdict: { score: 8.4, hook_text: "He jumped the bridge?!", title: "Impossible bridge jump in GTA 6", hashtags: ["GTA6", "#gaming", "vice city", "GTA6"], reason: "Clear payoff and chat exploded." },
   };
   const server = http.createServer((req, res) => {
@@ -22,6 +23,19 @@ export async function startMocks(port = 0): Promise<Mock> {
         return json(200, { id: "msg_mock", type: "message", role: "assistant", model: "claude-sonnet-5-5", stop_reason: "end_turn", stop_sequence: null,
           content: [{ type: "text", text: JSON.stringify(verdict) }], usage: { input_tokens: 10, output_tokens: 10 } });
       }
+      // ---- TikTok ----
+      const tt = (data: unknown) => json(200, { data, error: { code: "ok", message: "", log_id: "x" } });
+      if (path.startsWith("/v2/oauth/token/")) {
+        const f = new URLSearchParams(body.toString());
+        if (f.get("grant_type") === "refresh_token") mock.refreshCount++;
+        return json(200, { access_token: `act.mock${mock.refreshCount}`, refresh_token: `rft.mock${mock.refreshCount}`, expires_in: 7200, open_id: "open-123", scope: "user.info.basic,user.info.profile,video.upload,video.list", token_type: "Bearer" });
+      }
+      if (path.startsWith("/v2/user/info/")) return tt({ user: { open_id: "open-123", display_name: "Krew", username: "krewclips" } });
+      if (path.startsWith("/v2/post/publish/inbox/video/init/")) return tt({ publish_id: "v_inbox_file~v2.1", upload_url: `${mock.url}/tt-upload/1` });
+      if (path.startsWith("/tt-upload/")) { res.writeHead(201); return res.end(); }
+      if (path.startsWith("/v2/post/publish/status/fetch/")) return tt(mock.tiktokStatus);
+      if (path.startsWith("/v2/video/query/")) return tt({ videos: [{ id: "7300000000000000001", view_count: 12000, like_count: 900, comment_count: 40 }] });
+
       if (path.startsWith("/token")) return json(200, { access_token: "ya29.mock", refresh_token: "1//mock-refresh", expires_in: 3600 });
       if (path.startsWith("/youtube/v3/channels")) return json(200, { items: [{ id: "UCmock", snippet: { title: "Krew Clips (mock)" } }] });
       if (path.startsWith("/youtube/v3/videos")) return json(200, { items: [{ id: "vid123", statistics: { viewCount: "4321" } }] });
@@ -40,6 +54,7 @@ export async function startMocks(port = 0): Promise<Mock> {
 export function mockEnv(url: string) {
   return {
     ANTHROPIC_BASE_URL: url, ANTHROPIC_API_KEY: "sk-ant-mock",
+    TIKTOK_CLIENT_KEY: "mock-key", TIKTOK_CLIENT_SECRET: "mock-secret", TIKTOK_AUTH_URL: `${url}/tt-auth`, TIKTOK_API_URL: url,
     YOUTUBE_CLIENT_ID: "mock-client", YOUTUBE_CLIENT_SECRET: "mock-secret",
     GOOGLE_OAUTH_URL: `${url}/auth`, GOOGLE_TOKEN_URL: `${url}/token`, YOUTUBE_API_URL: `${url}/youtube/v3`, YOUTUBE_UPLOAD_URL: `${url}/upload/youtube/v3/videos`,
   };

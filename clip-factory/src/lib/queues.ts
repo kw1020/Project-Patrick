@@ -41,8 +41,8 @@ export async function enqueueCut(clipId: string, priority = 1) {
   await queue("cut").add("cut", { clipId }, { jobId: `cut-${clipId}-${Date.now()}`, priority });
 }
 /** One attempt only: a retried upload could post the same video twice. */
-export async function enqueuePost(clipId: string) {
-  await queue("post").add("post", { clipId }, { jobId: `post-${clipId}-${Date.now()}`, attempts: 1 });
+export async function enqueuePost(clipId: string, accountId: string) {
+  await queue("post").add("post", { clipId, accountId }, { jobId: `post-${clipId}-${accountId}-${Date.now()}`, attempts: 1 });
 }
 /** Ask the worker to run the scout + clips poll right now (e.g. after approving a streamer). */
 export async function pokeScout() {

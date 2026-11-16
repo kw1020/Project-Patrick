@@ -59,11 +59,14 @@ function render(i: JudgeInput) {
 }
 
 /** Ask Claude to score a clip. Returns null when the model declines or returns nothing usable. */
-export async function judgeClip(input: JudgeInput, client = new Anthropic()): Promise<Verdict | null> {
+export async function judgeClip(input: JudgeInput, lessons: string | null = null, client = new Anthropic()): Promise<Verdict | null> {
+  // The fixed instructions come first and are cached; the lessons block only changes when stats sync.
+  const system: Anthropic.Beta.Messages.BetaTextBlockParam[] = [{ type: "text", text: SYSTEM, ...(lessons ? {} : { cache_control: { type: "ephemeral" as const } }) }];
+  if (lessons) system.push({ type: "text", text: `<results_from_krews_accounts>\n${lessons}\n</results_from_krews_accounts>`, cache_control: { type: "ephemeral" } });
   const res = await client.beta.messages.parse({
     model: JUDGE_MODEL,
     max_tokens: 8000,
-    system: SYSTEM,
+    system,
     messages: [{ role: "user", content: render(input) }],
     output_config: { effort: "low", format: zodOutputFormat(Verdict) },
     // If a safety classifier declines the request, re-run it on Anthropic's recommended fallback model.

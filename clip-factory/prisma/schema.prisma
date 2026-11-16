@@ -80,11 +80,20 @@ model Post {
   id       String   @id @default(cuid())
   clipId   String
   clip     Clip     @relation(fields: [clipId], references: [id], onDelete: Cascade)
-  platform String // youtube | tiktok | instagram
-  externalId String? // YouTube video id (for view counts)
-  url      String?
-  postedAt DateTime @default(now())
-  views    Int?
+  platform   String // youtube | tiktok | instagram
+  accountId  String?
+  account    Account? @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  status     String   @default("live") // live | draft (TikTok: waiting in Krew's inbox) | failed
+  publishId  String?  // TikTok upload id (to follow the draft)
+  externalId String?  // YouTube / TikTok video id (for view counts)
+  url        String?
+  postedAt   DateTime @default(now())
+  views      Int?
+  likes      Int?
+  comments   Int?
+  syncedAt   DateTime?
+  error      String?
+  stats      PostStat[]
 }
 
 // Single-row settings (id = "main").
@@ -94,8 +103,10 @@ model Settings {
   spikeMultiplier  Float   @default(3) // chat msgs/sec >= N x 5-min average
   judgeEnabled     Boolean @default(true)
   minScore         Float   @default(6) // Judge auto-reject below this
-  ytAutoUpload     Boolean @default(false) // upload to YouTube when Krew approves
-  ytPrivacy        String  @default("public") // public | unlisted | private
+  judgeLearns      Boolean @default(true) // feed results from Krew's accounts into the Judge
+  // Phase 2 single-account settings; Phase 3 moved these onto each Account. Kept so old databases update cleanly.
+  ytAutoUpload     Boolean @default(false)
+  ytPrivacy        String  @default("public")
   clipMinSec       Int     @default(15)
   clipMaxSec       Int     @default(45)
   minClipViews     Int     @default(25) // Twitch clips need at least this many views
@@ -105,15 +116,32 @@ model Settings {
   scoutPaused      Boolean @default(false)
 }
 
-// Connected posting accounts (Phase 2: one YouTube channel; Phase 3: more).
+// Connected posting accounts. Several per platform (e.g. two YouTube channels, a TikTok).
 model Account {
   id           String    @id @default(cuid())
-  platform     String    @unique // youtube
-  channelId    String?
-  channelTitle String?
+  platform     String    // youtube | tiktok
+  channelId    String?   // YouTube channel id / TikTok open_id
+  channelTitle String?   // shown in the dashboard
+  username     String?   // TikTok @handle (for post links)
   refreshToken String
   accessToken  String?
   expiresAt    DateTime?
-  error        String? // set when Google rejects the token (reconnect needed)
+  autoPost     Boolean   @default(false) // post (YouTube) / send draft (TikTok) when Krew approves
+  privacy      String    @default("public") // YouTube: public | unlisted | private
+  error        String?   // set when the platform rejects the token (reconnect needed)
   createdAt    DateTime  @default(now())
+  posts        Post[]
+
+  @@unique([platform, channelId])
+}
+
+// View-count history for each post (one row per sync where something changed).
+model PostStat {
+  id       String   @id @default(cuid())
+  postId   String
+  post     Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  at       DateTime @default(now())
+  views    Int
+  likes    Int?
+  comments Int?
 }

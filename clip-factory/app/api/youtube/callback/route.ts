@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest) {
   const q = req.nextUrl.searchParams;
   const back = (msg: string) => {
-    const res = NextResponse.redirect(`${appUrl()}/settings?yt=${encodeURIComponent(msg)}`);
+    const res = NextResponse.redirect(`${appUrl()}/settings?msg=${encodeURIComponent(msg)}`);
     res.cookies.delete("yt_state");
     return res;
   };
