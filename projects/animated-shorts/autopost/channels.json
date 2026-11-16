@@ -1,0 +1,29 @@
+{
+  "_note": "One Short a day per live channel. A channel posts once enabled=true and start_date (if set) has arrived. Channel 2 switches on after week 1 of channel 1 (Krew, 2026-11-16).",
+  "channels": {
+    "history": {
+      "name": "True & Ridiculous",
+      "handle": "@TrueAndRidiculous",
+      "niche": "crazy true history stories, animated (claude-animated-shorts)",
+      "enabled": true,
+      "start_date": null,
+      "timezone": "America/Denver",
+      "post_time": "17:00",
+      "min_lead_minutes": 90,
+      "max_days_ahead": 30,
+      "warn_when_days_left": 3
+    },
+    "channel2": {
+      "name": "TBD at the week-1 review",
+      "handle": "",
+      "niche": "TBD at the week-1 review (pick from what channel 1's first 7 Shorts teach us)",
+      "enabled": false,
+      "start_date": null,
+      "timezone": "America/Denver",
+      "post_time": "18:00",
+      "min_lead_minutes": 90,
+      "max_days_ahead": 30,
+      "warn_when_days_left": 3
+    }
+  }
+}

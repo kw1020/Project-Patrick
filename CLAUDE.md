@@ -30,3 +30,11 @@ Owner: Krew Sutherland. Krew hates repeating themself — read this first.
   settings and the file shared as "anyone with the link"; then pass the link to watch.py.
 - If those aren't set up, fall back to local Patrick, or screenshots / a Google Doc.
 - Patrick's Gmail (connected here) is krew2128@gmail.com; Krew sends from krew252@gmail.com.
+
+## YouTube channels + daily autopost (2026-11-16)
+- Channel 1: **True & Ridiculous** (@TrueAndRidiculous), animated true-history Shorts. Kit in
+  `projects/animated-shorts/channel/`. Krew: one channel first, add a **second after week one**
+  (`channel2` slot in `projects/animated-shorts/autopost/channels.json`, off until then).
+- `projects/animated-shorts/autopost/`: posts **one Short a day, 5 PM Mountain**, via the YouTube Data API.
+  Runs on local Patrick (Windows task, daily 3 PM). After every render: `python autopost.py add <mp4> --meta <json>`.
+  Topic backlog: `projects/animated-shorts/scripts/TOPICS-backlog.md`.
