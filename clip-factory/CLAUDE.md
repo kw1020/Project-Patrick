@@ -13,7 +13,11 @@ original brief is below, and the status section says what's done. Read both befo
   (what the Dockerfile does) passes.
 - Tests: `npm test` (unit, real ffmpeg renders, workers against Redis, Judge/YouTube/TikTok against the
   stand-in servers in `test/mocks.ts`). `npx tsx test/mocks.ts 4010` prints env vars to run the app on stand-ins.
-- **Never run against the real services** (no keys in the build sandbox): Twitch Helix/chat/yt-dlp, the real
+- **First real run on Krew's Windows PC (2026-11-17), `npm run doctor` in Docker: 0 broken.** Verified for real:
+  Docker build, Redis, DB, Twitch token, GTA 6 category (id `1867279146`, 179 live streams pre-launch),
+  yt-dlp download of a real Twitch clip, ffmpeg 9:16 render. Still unverified: Judge (no key yet), chat/spike
+  path, YouTube/TikTok, Whisper on real speech.
+- Earlier status line, kept for history — **never run against the real services** (no keys in the build sandbox): Twitch Helix/chat/yt-dlp, the real
   Claude API, YouTube, TikTok, the Docker build, Whisper on real speech. `npm run doctor` (PLAN step 6) is
   Krew's one-command check of all of these on his machine; run it before Thursday.
 
