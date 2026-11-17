@@ -18,7 +18,11 @@ original brief is below, and the status section says what's done. Read both befo
   Twitch code paths filter `platform: "twitch"`. All credit links come from `creatorUrl`/`creatorCreditText` in
   `src/lib/social.ts`. Sandbox smoke test: flat channel listing worked for real; per-video `-J` hit YouTube's bot check,
   so the `heatmap` shape is from yt-dlp's docs (fake yt-dlp in `test/youtube-scan.test.ts`). Unverified on Krew's PC.
-- Docker image never built (no daemon in the sandbox); a clean-copy `npm ci` + `next build` without `.env`
+- **Windows launcher verified on Krew's PC (2026-11-17):** installed via `git clone` into `Documents\Project-Patrick`;
+  `Clip Factory.bat` → `scripts/windows/start.ps1` (git pull --ff-only, Docker check, `docker compose up -d --build`,
+  waits for /api/health, opens the dashboard, makes desktop shortcuts). Updates = Stop + reopen. Push to branch
+  `claude/adoring-mendel-at7ood` = what Krew gets on next launch, so never push a broken build there.
+- Docker image never built in the sandbox (no daemon); it builds fine on Krew's PC; a clean-copy `npm ci` + `next build` without `.env`
   (what the Dockerfile does) passes.
 - Tests: `npm test` (unit, real ffmpeg renders, workers against Redis, Judge/YouTube/TikTok against the
   stand-in servers in `test/mocks.ts`). `npx tsx test/mocks.ts 4010` prints env vars to run the app on stand-ins.
