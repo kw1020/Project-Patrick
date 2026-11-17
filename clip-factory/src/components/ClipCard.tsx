@@ -1,12 +1,13 @@
 "use client";
 import { useState, useTransition } from "react";
 import { markPosted, postToAccount, retryClip, setClipStatus, updateClipText } from "../../app/actions";
+import { creatorCreditText, creatorUrl } from "../lib/social";
 
 export type ClipView = {
   id: string; status: string; stage: string | null; error: string | null; title: string; caption: string;
   duration: number | null; score: number | null; hook: string | null; judgeReason: string | null; hasVideo: boolean;
   expired?: boolean; // the video was deleted by retention to save disk
-  streamer: { name: string; login: string }; source: string; spikeScore: number; sourceUrl: string | null; sourceViews: number;
+  streamer: { name: string; login: string; platform: string }; source: string; vodOffset?: number | null; spikeScore: number; sourceUrl: string | null; sourceViews: number;
   posts: { platform: string; accountId: string | null; status: string; url: string | null; error: string | null }[]; postError: string | null;
 };
 export type AccountView = { id: string; platform: string; label: string; autoPost: boolean; privacy: string };
@@ -49,16 +50,16 @@ export function ClipCard({ clip, accounts }: { clip: ClipView; accounts: Account
         <div className="pointer-events-none absolute left-2 top-2 flex gap-1">
           {clip.score != null && <span className={`rounded-md bg-black/75 px-2 py-1 text-xs font-black ${scoreColor}`}>{clip.score}/10</span>}
           {clip.duration != null && <span className="rounded-md bg-black/75 px-2 py-1 text-xs font-bold">{Math.round(clip.duration)}s</span>}
-          <span className="rounded-md bg-black/75 px-2 py-1 text-xs font-bold text-zinc-300">{clip.source === "chat" ? `Chat spike ${clip.spikeScore}x` : "Twitch clip"}</span>
+          <span className="rounded-md bg-black/75 px-2 py-1 text-xs font-bold text-zinc-300">{clip.source === "chat" ? `Chat spike ${clip.spikeScore}x` : clip.source === "youtube" ? "YouTube peak" : "Twitch clip"}</span>
         </div>
       </div>
 
       <div className="flex flex-1 flex-col gap-2 p-3">
         <div className="flex items-center justify-between gap-2 text-xs text-zinc-400">
-          <a href={`https://twitch.tv/${clip.streamer.login}`} target="_blank" className="font-bold text-zinc-200 hover:text-hot">{clip.streamer.name}</a>
+          <a href={creatorUrl(clip.streamer)} target="_blank" className="font-bold text-zinc-200 hover:text-hot">{clip.streamer.name}</a>
           {clip.sourceUrl && (
-            <a href={clip.sourceUrl} target="_blank" className="hover:text-white">
-              {clip.source === "chat" ? "Watch on Twitch ↗" : `${clip.sourceViews.toLocaleString()} views on Twitch ↗`}
+            <a href={clip.source === "youtube" ? `${clip.sourceUrl}&t=${Math.max(0, (clip.vodOffset ?? 25) - 25)}s` : clip.sourceUrl} target="_blank" className="hover:text-white">
+              {clip.source === "chat" ? "Watch on Twitch ↗" : clip.source === "youtube" ? "Watch on YouTube ↗" : `${clip.sourceViews.toLocaleString()} views on Twitch ↗`}
             </a>
           )}
         </div>
@@ -70,8 +71,8 @@ export function ClipCard({ clip, accounts }: { clip: ClipView; accounts: Account
         )}
         <input className="field font-semibold" value={title} onChange={(e) => { setTitle(e.target.value); setSaved(false); }} onBlur={save} maxLength={100} />
         <textarea className="field min-h-28 text-xs leading-relaxed" value={caption} onChange={(e) => { setCaption(e.target.value); setSaved(false); }} onBlur={save} />
-        {!caption.includes(`twitch.tv/${clip.streamer.login}`) && (
-          <div className="text-xs text-sun">⚠ Caption must credit twitch.tv/{clip.streamer.login}</div>
+        {!caption.includes(creatorCreditText(clip.streamer)) && (
+          <div className="text-xs text-sun">⚠ Caption must credit {creatorCreditText(clip.streamer)}</div>
         )}
 
         <div className="mt-auto flex flex-wrap gap-2 pt-1">

@@ -4,7 +4,7 @@ import { Avatar } from "@/components/Avatar";
 import { getStatuses, soft, type AgentStatus } from "@/lib/queues";
 import { twitchConfigured } from "@/lib/twitch";
 import { ago, liveFor, num } from "@/lib/format";
-import { isGta6 } from "@/lib/social";
+import { creatorUrl, isGta6 } from "@/lib/social";
 import { AutoRefresh } from "@/components/AutoRefresh";
 import { runScoutNow } from "./actions";
 
@@ -37,11 +37,11 @@ function AgentCard({ name, s, idle }: { name: string; s?: AgentStatus; idle?: st
 export default async function LivePage({ searchParams }: { searchParams: Promise<{ all?: string }> }) {
   const { all } = await searchParams;
   const [streams, statuses, counts] = await Promise.all([
-    prisma.streamer.findMany({ where: { isLive: true, ...(all ? {} : { approved: true }) }, orderBy: [{ viewers: "desc" }], take: 200 }),
+    prisma.streamer.findMany({ where: { platform: "twitch", isLive: true, ...(all ? {} : { approved: true }) }, orderBy: [{ viewers: "desc" }], take: 200 }),
     soft(getStatuses(), {} as Record<string, AgentStatus>),
     prisma.clip.groupBy({ by: ["status"], _count: true }),
   ]);
-  const totalLive = await prisma.streamer.count({ where: { isLive: true } });
+  const totalLive = await prisma.streamer.count({ where: { platform: "twitch", isLive: true } });
   const c = Object.fromEntries(counts.map((x) => [x.status, x._count])) as Record<string, number>;
 
   return (
@@ -63,10 +63,11 @@ export default async function LivePage({ searchParams }: { searchParams: Promise
         </div>
       )}
 
-      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <AgentCard name="Scout" s={statuses.scout} />
         <AgentCard name="Clips poller" s={statuses.clips} />
         <AgentCard name="Spike detector" s={statuses.spike} idle="Watching chat. No spikes yet." />
+        <AgentCard name="YouTube scanner" s={statuses.youtube} idle="Runs every 30 min for approved YouTube channels." />
         <div className="card px-4 py-3">
           <div className="text-xs font-bold uppercase tracking-wide text-zinc-400">Production line</div>
           <div className="mt-1 text-sm">{c.processing ?? 0} in the line · <Link href="/queue" className="font-bold text-hot">{c.pending ?? 0} to review</Link></div>
@@ -101,7 +102,7 @@ export default async function LivePage({ searchParams }: { searchParams: Promise
                 <Avatar src={s.profileImage} name={s.name} size={44} />
                 <div className="min-w-0 flex-1 basis-56">
                   <div className="flex items-center gap-2">
-                    <a href={`https://twitch.tv/${s.login}`} target="_blank" className="font-bold hover:text-hot">{s.name}</a>
+                    <a href={creatorUrl(s)} target="_blank" className="font-bold hover:text-hot">{s.name}</a>
                     <span className="rounded bg-red-600 px-1.5 text-[10px] font-black uppercase">Live</span>
                     <span className="text-xs text-zinc-500">{liveFor(s.liveSince)}</span>
                     {s.gameName && !isGta6(s.gameName) && <span className="rounded bg-zinc-800 px-1.5 text-[11px] font-semibold text-zinc-300">{s.gameName}</span>}

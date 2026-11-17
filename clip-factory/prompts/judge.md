@@ -31,6 +31,9 @@ Found as: a chat spike (volume|hype). Chat hit <rate> messages/sec against a nor
    — or —
 Found as: a clip a viewer made on Twitch, <views> views so far
 Viewer's clip title: <title>
+   — or —
+Found as: the most-replayed part of a YouTube video (<views> views, replay score <0–1>)
+Video title: <title>
 
 <transcript>…</transcript>
 <chat_sample>…up to 40 lines…</chat_sample>

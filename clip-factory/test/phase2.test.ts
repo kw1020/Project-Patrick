@@ -111,7 +111,7 @@ test("judge: sends transcript + chat stats to Claude, parses and clamps the verd
 test("hashtags are cleaned and the credit line is always in the caption", () => {
   const tags = cleanHashtags(["GTA6", "#gaming", "vice city", "gta6", "<script>"], "kai_cenat");
   assert.deepEqual(tags, ["#GTA6", "#gaming", "#vicecity", "#script", "#kai_cenat"]);
-  assert.match(judgedCaption("Title", tags, "Kai", "kai_cenat"), /Credit: Kai — https:\/\/twitch\.tv\/kai_cenat/);
+  assert.match(judgedCaption("Title", tags, { name: "Kai", login: "kai_cenat" }), /Credit: Kai — https:\/\/twitch\.tv\/kai_cenat/);
 });
 
 test("hook text is burned in for the first seconds", () => {

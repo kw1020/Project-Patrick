@@ -1,7 +1,7 @@
 import { prisma, getSettings } from "../lib/db";
 import type { ChatHeat } from "../lib/chat";
 import { enqueueGrab } from "../lib/queues";
-import { defaultCaption, defaultTitle } from "../lib/social";
+import { defaultCaption, defaultTitle, GTA6_NAME } from "../lib/social";
 import { getLiveVodId } from "../lib/twitch";
 import { backlogRoom } from "../lib/guards";
 
@@ -25,7 +25,7 @@ async function liveVod(twitchId: string, streamId: string | null, now: number) {
 export async function runSpikeCheck(chat: ChatHeat, now = Date.now(), lookupVod = liveVod): Promise<string | null> {
   const settings = await getSettings();
   if (!settings.spikeEnabled || settings.scoutPaused) return null;
-  const live = await prisma.streamer.findMany({ where: { approved: true, isLive: true } });
+  const live = await prisma.streamer.findMany({ where: { approved: true, isLive: true, platform: "twitch" } });
   const notes: string[] = [];
   let room: number | null = null; // looked up only once a spike shows up
 
@@ -47,13 +47,14 @@ export async function runSpikeCheck(chat: ChatHeat, now = Date.now(), lookupVod 
       continue;
     }
     const vodOffset = Math.max(0, Math.round((now - s.liveSince.getTime()) / 1000) - REACTION_LAG_SEC);
-    const title = defaultTitle(null, s.name);
+    const game = s.gameName || GTA6_NAME; // any-game mode: what they're playing right now
+    const title = defaultTitle(null, s.name, game);
     const moment = await prisma.moment.create({
       data: {
-        streamerId: s.id, timestamp: new Date(now - REACTION_LAG_SEC * 1000), spikeScore: sp.ratio, source: "chat",
+        streamerId: s.id, timestamp: new Date(now - REACTION_LAG_SEC * 1000), spikeScore: sp.ratio, source: "chat", gameName: game,
         vodId, vodOffset, sourceUrl: `https://www.twitch.tv/videos/${vodId}?t=${Math.max(0, vodOffset - 30)}s`,
         stats: JSON.stringify({ ...sp, viewers: s.viewers, chat: chat.samples(s.login, 20, 40, now) }),
-        clips: { create: { title, caption: defaultCaption(title, s.name, s.login), status: "processing", stage: "grab" } },
+        clips: { create: { title, caption: defaultCaption(title, s, game), status: "processing", stage: "grab" } },
       },
       include: { clips: true },
     });

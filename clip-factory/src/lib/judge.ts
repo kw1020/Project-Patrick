@@ -20,7 +20,8 @@ export type JudgeInput = {
   streamer: string;
   game?: string | null;
   durationSec: number;
-  source: "chat" | "twitch_clip";
+  source: "chat" | "twitch_clip" | "youtube";
+  replayScore?: number; // YouTube: heatmap value at the peak (0-1, 1 = the most replayed part)
   sourceTitle?: string | null;
   sourceViews?: number;
   transcript: string | null;
@@ -74,7 +75,10 @@ function render(i: JudgeInput) {
     `Clip length: ${Math.round(i.durationSec)}s`,
     `Auto-reject cut-off: below ${i.minScore}`,
   ];
-  if (i.source === "twitch_clip") {
+  if (i.source === "youtube") {
+    lines.push(`Found as: the most-replayed part of a YouTube video (${i.sourceViews ?? 0} views, replay score ${i.replayScore ?? "?"})`);
+    if (i.sourceTitle) lines.push(`Video title: ${i.sourceTitle}`);
+  } else if (i.source === "twitch_clip") {
     lines.push(`Found as: a clip a viewer made on Twitch, ${i.sourceViews ?? 0} views so far`);
     if (i.sourceTitle) lines.push(`Viewer's clip title: ${i.sourceTitle}`);
   } else {

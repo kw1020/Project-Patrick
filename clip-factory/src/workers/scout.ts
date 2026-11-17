@@ -13,7 +13,7 @@ export async function runScout(chat: ChatHeat) {
   // /streams?game_id only returns the top 500: look up approved streamers directly so a small one is never missed.
   // "gta6" mode: their streams in another game are ignored (they end up not live). "any" mode: kept, any game.
   const anyGame = settings.gameMode === "any";
-  const approvedIds = (await prisma.streamer.findMany({ where: { approved: true }, select: { twitchId: true } })).map((s) => s.twitchId);
+  const approvedIds = (await prisma.streamer.findMany({ where: { approved: true, platform: "twitch" }, select: { twitchId: true } })).map((s) => s.twitchId);
   if (approvedIds.length) {
     const seen = new Set(streams.map((s) => s.user_id));
     // Fail-soft: if this extra lookup fails, keep the game-wide list rather than losing the whole scan.
@@ -24,6 +24,13 @@ export async function runScout(chat: ChatHeat) {
     for (const st of extra) {
       if ((anyGame || st.game_id === gameId) && !seen.has(st.user_id)) { streams.push(st); seen.add(st.user_id); }
     }
+  }
+  // A YouTube channel row can hold the same login (its @handle): never let a Twitch stream collide with it.
+  const ytLogins = new Set((await prisma.streamer.findMany({ where: { platform: { not: "twitch" } }, select: { login: true } })).map((s) => s.login));
+  if (ytLogins.size) {
+    const clash = streams.filter((st) => ytLogins.has(st.user_login));
+    for (const st of clash) console.warn(`[scout] skipping Twitch ${st.user_login}: that name belongs to an approved YouTube channel`);
+    if (clash.length) streams.splice(0, streams.length, ...streams.filter((st) => !ytLogins.has(st.user_login)));
   }
   const now = new Date();
 
@@ -43,18 +50,18 @@ export async function runScout(chat: ChatHeat) {
     }),
   );
   await prisma.streamer.updateMany({
-    where: { isLive: true, twitchId: { notIn: streams.map((s) => s.user_id) } },
+    where: { platform: "twitch", isLive: true, twitchId: { notIn: streams.map((s) => s.user_id) } },
     data: { isLive: false, viewers: 0, chatRate: 0, chatAvg: 0 },
   });
 
   // Profile pictures for new faces (one /users call per 100, capped).
-  const missing = await prisma.streamer.findMany({ where: { profileImage: null, isLive: true }, orderBy: { viewers: "desc" }, take: 200, select: { twitchId: true } });
+  const missing = await prisma.streamer.findMany({ where: { platform: "twitch", profileImage: null, isLive: true }, orderBy: { viewers: "desc" }, take: 200, select: { twitchId: true } });
   if (missing.length) {
     const users = await getUsers({ ids: missing.map((m) => m.twitchId) });
     await prisma.$transaction(users.map((u) => prisma.streamer.update({ where: { twitchId: u.id }, data: { profileImage: u.profile_image_url } })));
   }
 
-  const approvedLive = await prisma.streamer.findMany({ where: { approved: true, isLive: true }, select: { login: true } });
+  const approvedLive = await prisma.streamer.findMany({ where: { platform: "twitch", approved: true, isLive: true }, select: { login: true } });
   chat.setChannels(approvedLive.map((s) => s.login));
   const otherGames = streams.filter((st) => st.game_id !== gameId).length;
   return `${streams.length - otherGames} live in GTA 6, ${approvedLive.length} approved live${otherGames ? ` (${otherGames} in other games)` : ""}`;
@@ -62,7 +69,7 @@ export async function runScout(chat: ChatHeat) {
 
 /** Write chat heat for approved live streamers (every 10s). */
 export async function flushChatHeat(chat: ChatHeat) {
-  const live = await prisma.streamer.findMany({ where: { approved: true, isLive: true }, select: { id: true, login: true } });
+  const live = await prisma.streamer.findMany({ where: { platform: "twitch", approved: true, isLive: true }, select: { id: true, login: true } });
   if (!live.length) return;
   // One transaction instead of N writes: fewer lock grabs while the web app is writing too.
   await prisma.$transaction(live.map((s) => {

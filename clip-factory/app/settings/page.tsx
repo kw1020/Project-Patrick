@@ -87,6 +87,14 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         </div>
 
         <div className="card space-y-4 p-5">
+          <Head>YouTube scanner</Head>
+          <Row label="Scan approved YouTube channels" hint="Every 30 min: cuts the most-replayed moments of their newest long videos (no API key needed)."><input name="ytScanEnabled" type="checkbox" defaultChecked={s.ytScanEnabled} className={check} /></Row>
+          <Row label="Newest videos per channel" hint="How many of each channel's latest uploads to look at."><input name="ytVideosPerChannel" type="number" defaultValue={s.ytVideosPerChannel} className="field w-32" /></Row>
+          <Row label="Moments per video" hint="Most-replayed peaks to clip from each video (at least 60s apart)."><input name="ytMomentsPerVideo" type="number" defaultValue={s.ytMomentsPerVideo} className="field w-32" /></Row>
+          <Row label="Max video age (days)" hint="Older uploads are skipped."><input name="ytMaxVideoAgeDays" type="number" defaultValue={s.ytMaxVideoAgeDays} className="field w-32" /></Row>
+        </div>
+
+        <div className="card space-y-4 p-5">
           <Row label="Which games" hint="Any game: approved streamers are clipped whatever they play. The GTA 6 scan still runs either way.">
             <select name="gameMode" defaultValue={s.gameMode} className="field w-72"><option value="gta6">GTA 6 only</option><option value="any">Any game (approved streamers)</option></select>
           </Row>

@@ -27,7 +27,8 @@ export async function runJudge(clipId: string) {
   let verdict;
   try {
     verdict = await judgeClip({
-      streamer: streamer.name, game, durationSec: clip.duration ?? 0, source: moment.source === "chat" ? "chat" : "twitch_clip",
+      streamer: streamer.name, game, durationSec: clip.duration ?? 0, source: moment.source === "chat" ? "chat" : moment.source === "youtube" ? "youtube" : "twitch_clip",
+      replayScore: moment.source === "youtube" ? moment.spikeScore : undefined,
       sourceTitle: moment.sourceTitle, sourceViews: moment.sourceViews, transcript: clip.transcript, stats, minScore: settings.minScore,
     }, lessons?.text ?? null);
   } catch (e) {
@@ -41,7 +42,7 @@ export async function runJudge(clipId: string) {
     where: { id: clipId },
     data: {
       score: verdict.score, hookText: verdict.hook_text || null, judgeReason: verdict.reason, hashtags: tags.join(" "), stage: "cut",
-      ...(fresh && verdict.title ? { title: verdict.title, caption: judgedCaption(verdict.title, tags, streamer.name, streamer.login) } : {}),
+      ...(fresh && verdict.title ? { title: verdict.title, caption: judgedCaption(verdict.title, tags, streamer) } : {}),
     },
   });
   const rejected = verdict.score < settings.minScore;

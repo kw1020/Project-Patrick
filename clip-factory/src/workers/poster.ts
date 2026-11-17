@@ -3,7 +3,7 @@ import { prisma } from "../lib/db";
 import { resolveStored } from "../lib/paths";
 import { draftStatus, fetchTikTokStats, MAX_PENDING_DRAFTS, tiktokVideoUrl, uploadDraft } from "../lib/tiktok";
 import { fetchStats, uploadVideo } from "../lib/youtube";
-import { defaultTitle, gameHashtags, momentGame } from "../lib/social";
+import { creatorCreditText, creditLine, defaultTitle, gameHashtags, momentGame } from "../lib/social";
 
 /** Poster: sends an APPROVED clip to one connected account. Refuses anything Krew hasn't approved. */
 export async function runPost(clipId: string, accountId: string) {
@@ -30,7 +30,7 @@ export async function runPost(clipId: string, accountId: string) {
 
   // YouTube. The credit must be in what gets posted, even if the caption was edited.
   let description = clip.caption || clip.title || "";
-  if (!description.includes(`twitch.tv/${streamer.login}`)) description += `\n\n🎥 Credit: ${streamer.name} — https://twitch.tv/${streamer.login}`;
+  if (!description.includes(creatorCreditText(streamer))) description += `\n\n${creditLine(streamer)}`;
   if (!/#shorts\b/i.test(description)) description += "\n#Shorts";
   const game = momentGame(clip.moment);
   const tags = (clip.hashtags || gameHashtags(game).join(" ")).split(/\s+/).map((t) => t.replace(/^#/, "")).filter(Boolean);

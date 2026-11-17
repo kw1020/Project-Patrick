@@ -1,5 +1,21 @@
 // Captions for the post itself (TikTok / Shorts / Reels). Always credits the streamer.
 
+/** Who made the original: a Twitch streamer or a YouTube channel (a Streamer row). */
+export type Creator = { platform?: string | null; login: string; name: string };
+
+/** The ONE place a creator's channel link is built. Twitch → twitch.tv/<login>, YouTube → youtube.com/@<handle>. */
+export function creatorUrl(c: Creator) {
+  return c.platform === "youtube" ? `https://youtube.com/@${c.login}` : `https://twitch.tv/${c.login}`;
+}
+/** The credit as burned into the video and required in every caption, e.g. "twitch.tv/name" / "youtube.com/@name". */
+export function creatorCreditText(c: Creator) {
+  return creatorUrl(c).replace(/^https:\/\//, "");
+}
+/** The caption credit line. */
+export function creditLine(c: Creator) {
+  return `🎥 Credit: ${c.name} — ${creatorUrl(c)}`;
+}
+
 export const GTA6_NAME = "Grand Theft Auto VI";
 
 /** True for Twitch's GTA 6 category name (and the usual ways people write it). */
@@ -40,14 +56,15 @@ export function defaultTitle(sourceTitle: string | null | undefined, streamerNam
   return (t && t.length > 3 ? t : label ? `${streamerName} in ${label}` : `${streamerName} clip`).slice(0, 90);
 }
 
-export function defaultCaption(title: string, streamerName: string, login: string, game: string | null = GTA6_NAME) {
-  const tag = login.replace(/[^a-z0-9_]/gi, "");
+export function defaultCaption(title: string, creator: Creator, game: string | null = GTA6_NAME) {
+  const tag = creator.login.replace(/[^a-z0-9_]/gi, "");
+  const platformTags = creator.platform === "youtube" ? ["youtube", "fyp"] : ["twitch", "gaming", "fyp"];
   return [
     title,
     "",
-    `🎥 Credit: ${streamerName} — https://twitch.tv/${login}`,
+    creditLine(creator),
     "",
-    [...gameHashtags(game), tag, "twitch", "gaming", "fyp"].map((t) => "#" + t).join(" "),
+    [...gameHashtags(game), tag, ...platformTags].filter(Boolean).map((t) => "#" + t).join(" "),
   ].join("\n");
 }
 
@@ -65,6 +82,6 @@ export function cleanHashtags(tags: string[], login: string, game: string | null
 }
 
 /** Caption from the Judge's output. The credit line is added here, in code, so it can never be dropped. */
-export function judgedCaption(title: string, hashtags: string[], streamerName: string, login: string) {
-  return [title, "", `🎥 Credit: ${streamerName} — https://twitch.tv/${login}`, "", hashtags.join(" ")].join("\n");
+export function judgedCaption(title: string, hashtags: string[], creator: Creator) {
+  return [title, "", creditLine(creator), "", hashtags.join(" ")].join("\n");
 }

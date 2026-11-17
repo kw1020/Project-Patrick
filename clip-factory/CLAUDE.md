@@ -12,6 +12,12 @@ original brief is below, and the status section says what's done. Read both befo
 - **Any-game mode (2026-11-17):** Settings `gameMode` gta6|any. In "any", approved Twitch streamers are tracked
   live (Streamer.gameName) and their clips taken in every game (Moment.gameName, names via Helix `/games?id=`, cached);
   GTA-wide discovery unchanged. Text helpers in `src/lib/social.ts` (`momentGame`, `gameHashtags`) are game-aware.
+- **YouTube scanner (2026-11-17):** approved YouTube channels are `Streamer` rows with `platform: "youtube"`,
+  `twitchId: "yt:<channelId>"`, `login` = @handle. `src/workers/youtube.ts` (queue "youtube", every 30 min) reads
+  yt-dlp's `heatmap` (`src/lib/ytdlp.ts`, `pickPeaks`) → Moments with source "youtube"; seen videos in `YouTubeVideo`.
+  Twitch code paths filter `platform: "twitch"`. All credit links come from `creatorUrl`/`creatorCreditText` in
+  `src/lib/social.ts`. Sandbox smoke test: flat channel listing worked for real; per-video `-J` hit YouTube's bot check,
+  so the `heatmap` shape is from yt-dlp's docs (fake yt-dlp in `test/youtube-scan.test.ts`). Unverified on Krew's PC.
 - Docker image never built (no daemon in the sandbox); a clean-copy `npm ci` + `next build` without `.env`
   (what the Dockerfile does) passes.
 - Tests: `npm test` (unit, real ffmpeg renders, workers against Redis, Judge/YouTube/TikTok against the
@@ -69,7 +75,8 @@ Runs every 5s per approved live streamer whose chat we read (anonymous IRC with 
 - The Grabber only pulls from `Streamer.approved = true`. Approving needs a written reason.
 - Nothing posts without Krew pressing Approve. The Poster refuses clips that aren't approved; "auto-upload"
   only means the Approve click also uploads. Uploads are single-attempt so a retry can't double-post.
-- Every caption credits the streamer (name + twitch.tv link); the credit is also burned into the video.
+- Every caption credits the creator (name + twitch.tv / youtube.com/@ link, always via `creatorUrl` in `src/lib/social.ts`);
+  the credit is also burned into the video.
 - Secrets live in `.env` (gitignored). Never commit it.
 
 ## Gotchas found while building
@@ -79,6 +86,8 @@ Runs every 5s per approved live streamer whose chat we read (anonymous IRC with 
 - faster-whisper's own audio loader breaks on newer PyAV; `scripts/transcribe.py` reads the WAV itself.
 - YouTube (checked 2026-11-16): API uploads are no longer forced private; 100 uploads/day per project.
 - The dashboard has no login. Fine on localhost; add a passcode before hosting it anywhere public.
+- yt-dlp (2026.10) warns that YouTube extraction without a JS runtime (deno) is deprecated; if the YouTube scanner
+  starts failing on Krew's PC, add deno to the Docker image.
 - DB stores media paths relative to `STORAGE_DIR` so web + worker containers agree.
 
 ---

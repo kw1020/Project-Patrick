@@ -43,7 +43,7 @@ async function main() {
           streamerId: s.id, timestamp: new Date(), source: "twitch_clip", spikeScore: 900 - i * 300, sourceTitle: t, sourceViews: 900 - i * 300,
           sourceUrl: `https://twitch.tv/${s.login}`,
           ...(i === 1 ? { source: "chat", sourceTitle: null, sourceViews: 0, spikeScore: 4.2, stats: JSON.stringify({ kind: "volume", rate: 9.1, baseline: 2.2, ratio: 4.2, hypeShare: 0.6, viewers: d.viewers, chat: ["NO WAY", "KEKW", "clip it", "LMAOOO", "W", "he actually did it"] }) } : {}),
-          clips: { create: { title, caption: defaultCaption(title, s.name, s.login), rawPath: "raw/demo-source.mp4", stage: "transcribe" } },
+          clips: { create: { title, caption: defaultCaption(title, s), rawPath: "raw/demo-source.mp4", stage: "transcribe" } },
         },
         include: { clips: true },
       });

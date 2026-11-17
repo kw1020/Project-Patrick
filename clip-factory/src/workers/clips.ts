@@ -10,7 +10,7 @@ const MAX_NEW_PER_RUN = 15;
 export async function runClipsPoll() {
   const settings = await getSettings();
   if (settings.scoutPaused) return "paused";
-  const approved = await prisma.streamer.findMany({ where: { approved: true } });
+  const approved = await prisma.streamer.findMany({ where: { approved: true, platform: "twitch" } });
   if (!approved.length) return "no approved streamers yet — add some on the Streamers page";
   const byTwitchId = new Map(approved.map((s) => [s.twitchId, s]));
 
@@ -64,7 +64,7 @@ export async function runClipsPoll() {
         streamerId: s.id, timestamp: new Date(c.created_at), spikeScore: c.view_count, source: "twitch_clip",
         twitchClipId: c.id, sourceUrl: c.url, sourceTitle: c.title, sourceViews: c.view_count, gameName: game,
         vodId: c.video_id || null, vodOffset: c.vod_offset ?? null,
-        clips: { create: { title, caption: defaultCaption(title, s.name, s.login, game), status: "processing", stage: "grab" } },
+        clips: { create: { title, caption: defaultCaption(title, s, game), status: "processing", stage: "grab" } },
       },
       include: { clips: true },
     });

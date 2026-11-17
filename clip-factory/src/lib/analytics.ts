@@ -47,7 +47,7 @@ export function breakdown(rows: PerfRow[], keyOf: (r: PerfRow) => string | null)
 
 export const scoreBucket = (r: PerfRow) => (r.score == null ? "Not scored" : r.score >= 8 ? "Judge 8–10" : r.score >= 6 ? "Judge 6–7.9" : "Judge under 6");
 export const lengthBucket = (r: PerfRow) => (r.duration == null ? null : r.duration < 25 ? "Under 25s" : r.duration < 35 ? "25–35s" : "35s+");
-export const sourceLabel = (r: PerfRow) => (r.source === "chat" ? "Chat spike" : "Twitch clip");
+export const sourceLabel = (r: PerfRow) => (r.source === "chat" ? "Chat spike" : r.source === "youtube" ? "YouTube peak" : "Twitch clip");
 
 /** Spearman rank correlation between Judge score and performance (-1..1), or null with too few scored posts. */
 export function judgeCorrelation(rows: PerfRow[]) {

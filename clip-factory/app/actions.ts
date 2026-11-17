@@ -2,12 +2,17 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
-import { enqueueCut, enqueueGrab, enqueuePost, enqueueTranscribe, pokeScout } from "@/lib/queues";
+import { enqueueCut, enqueueGrab, enqueuePost, enqueueTranscribe, pokeScout, pokeYouTube } from "@/lib/queues";
+import { resolveChannel } from "@/lib/ytdlp";
 import { getUsers, twitchConfigured } from "@/lib/twitch";
 import { parseFacecam } from "@/lib/media";
 
 function refreshAll() {
-  for (const p of ["/", "/queue", "/posted", "/analytics", "/streamers", "/settings"]) revalidatePath(p);
+  try {
+    for (const p of ["/", "/queue", "/posted", "/analytics", "/streamers", "/settings"]) revalidatePath(p);
+  } catch {
+    /* called outside a Next.js request (tests, scripts): no pages to refresh */
+  }
 }
 
 // ---------- Streamers ----------
@@ -20,6 +25,8 @@ export async function addStreamer(_prev: { error?: string; ok?: string } | null,
   if (!twitchConfigured()) return { error: "Add TWITCH_CLIENT_ID and TWITCH_CLIENT_SECRET to .env first." };
   const [u] = await getUsers({ logins: [login] });
   if (!u) return { error: `No Twitch user called "${login}".` };
+  if (await prisma.streamer.findFirst({ where: { login: u.login, platform: { not: "twitch" } }, select: { id: true } }))
+    return { error: `"${u.login}" is already in the list as a YouTube channel.` };
   await prisma.streamer.upsert({
     where: { twitchId: u.id },
     update: { approved: true, approvalNote: note, login: u.login, name: u.display_name, profileImage: u.profile_image_url },
@@ -30,11 +37,36 @@ export async function addStreamer(_prev: { error?: string; ok?: string } | null,
   return { ok: `${u.display_name} approved. Looking for their clips now.` };
 }
 
+/** Approve a YouTube channel (@handle or channel link). Resolved with yt-dlp; no API key needed. */
+export async function addYouTubeChannel(_prev: { error?: string; ok?: string } | null, form: FormData) {
+  const input = String(form.get("channel") || "").trim();
+  const note = String(form.get("note") || "").trim();
+  if (!input) return { error: "Paste the channel's @handle or link." };
+  if (!note) return { error: "Add a note on why they're approved (runs a clipping campaign, allows clippers…)." };
+  let ch;
+  try {
+    ch = await resolveChannel(input);
+  } catch (e) {
+    return { error: (e as Error).message };
+  }
+  const twitchId = `yt:${ch.channelId}`;
+  const clash = await prisma.streamer.findFirst({ where: { login: ch.handle, twitchId: { not: twitchId } }, select: { platform: true } });
+  if (clash) return { error: `A ${clash.platform === "youtube" ? "YouTube channel" : "Twitch streamer"} called "${ch.handle}" is already in the list.` };
+  await prisma.streamer.upsert({
+    where: { twitchId },
+    update: { approved: true, approvalNote: note, login: ch.handle, name: ch.title, profileImage: ch.avatar, platform: "youtube" },
+    create: { twitchId, platform: "youtube", login: ch.handle, name: ch.title, profileImage: ch.avatar, approved: true, approvalNote: note },
+  });
+  await pokeYouTube().catch(() => {});
+  refreshAll();
+  return { ok: `${ch.title} (youtube.com/@${ch.handle}) approved. Scanning their newest videos now.` };
+}
+
 export async function setApproved(id: string, approved: boolean, note?: string) {
   const data: { approved: boolean; approvalNote?: string } = { approved };
   if (note !== undefined) data.approvalNote = note;
-  await prisma.streamer.update({ where: { id }, data });
-  if (approved) await pokeScout().catch(() => {});
+  const s = await prisma.streamer.update({ where: { id }, data });
+  if (approved) await (s.platform === "youtube" ? pokeYouTube() : pokeScout()).catch(() => {});
   refreshAll();
 }
 
@@ -127,6 +159,10 @@ export async function saveSettings(form: FormData) {
       captions: form.get("captions") === "on",
       scoutPaused: form.get("scoutPaused") === "on",
       gameMode: form.get("gameMode") === "any" ? "any" : "gta6",
+      ytScanEnabled: form.get("ytScanEnabled") === "on",
+      ytVideosPerChannel: Math.round(n("ytVideosPerChannel", 1, 15, 3)),
+      ytMomentsPerVideo: Math.round(n("ytMomentsPerVideo", 1, 10, 3)),
+      ytMaxVideoAgeDays: Math.round(n("ytMaxVideoAgeDays", 1, 365, 14)),
       spikeEnabled: form.get("spikeEnabled") === "on",
       judgeEnabled: form.get("judgeEnabled") === "on",
       judgeLearns: form.get("judgeLearns") === "on",

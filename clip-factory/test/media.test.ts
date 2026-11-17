@@ -56,7 +56,7 @@ test("ChatHeat rates", () => {
 test("social caption always credits the streamer", () => {
   const t = defaultTitle("", "Kai");
   assert.equal(t, "Kai in GTA 6");
-  assert.match(defaultCaption(t, "Kai", "kai_cenat"), /twitch\.tv\/kai_cenat/);
+  assert.match(defaultCaption(t, { name: "Kai", login: "kai_cenat" }), /twitch\.tv\/kai_cenat/);
 });
 
 test("renderVertical makes 1080x1920 clips in both layouts (real ffmpeg)", { timeout: 180_000 }, async () => {

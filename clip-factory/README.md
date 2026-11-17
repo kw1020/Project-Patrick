@@ -164,6 +164,25 @@ play. The Live page shows the game next to anyone not in GTA 6. Titles and hasht
 (`#Fortnite` instead of `#GTA6`), and the Judge is told the game. Back to *GTA 6 only* any time.
 Same rule as always: only approve streamers who allow clipping or run a clipping campaign.
 
+## YouTube scanner
+
+Clips the **most-replayed** moments of approved YouTube creators' new videos. No API key: it uses
+yt-dlp and the "Most replayed" graph YouTube shows on the seek bar.
+
+1. **Only approve creators who allow clipping or run a clipping campaign** (Whop/Vyro campaigns,
+   "clips welcome" in their About page…). Same rule as Twitch: the note is your proof.
+2. Streamers → **Approve a YouTube channel** → paste `@handle` (or the channel link) + why → Approve.
+   It shows up in the approved list with a red *YouTube* badge.
+3. Every 30 min (and right after you approve) the scanner looks at each channel's newest long
+   videos (Videos tab, so no Shorts), and for each one it hasn't seen: picks the top peaks
+   (at least 60s apart, not the first 15s or last 20s) and cuts ~45s around each. Videos without a
+   "Most replayed" graph yet are skipped (checked again 6h later), never guessed.
+4. Clips land in the Queue with a *YouTube peak* badge. Caption and burned-in credit say
+   `youtube.com/@handle`. Nothing posts until you press Approve.
+
+Settings → **YouTube scanner**: on/off, videos per channel (3), moments per video (3), max video
+age in days (14). It respects the same backlog cap as the Twitch side. The Live page shows its last run.
+
 ## Run without Docker (dev)
 
 Needs Node 20+, Redis, ffmpeg, `pip install yt-dlp faster-whisper`.

@@ -4,6 +4,7 @@ import { buildAss, extractAudio, hasAudio, parseFacecam, pickWindow, probeDurati
 import { resolveStored, storagePath } from "../lib/paths";
 import { enqueueJudge } from "../lib/queues";
 import { transcribe } from "../lib/transcribe";
+import { creatorCreditText } from "../lib/social";
 
 /** Step 1 — pick the 15–45s window and transcribe it (the Judge reads the transcript before we spend CPU rendering). */
 export async function runTranscribe(clipId: string) {
@@ -55,7 +56,7 @@ export async function runCut(clipId: string) {
 
   const assPath = storagePath("work", `${clipId}.ass`);
   try {
-    fs.writeFileSync(assPath, buildAss({ words, credit: `twitch.tv/${streamer.login}`, duration: length, layout, hook: clip.hookText }));
+    fs.writeFileSync(assPath, buildAss({ words, credit: creatorCreditText(streamer), duration: length, layout, hook: clip.hookText }));
     const finalRel = `final/${clipId}.mp4`;
     await renderVertical({ input: raw, output: storagePath(finalRel), start, length, facecam, assPath });
 
