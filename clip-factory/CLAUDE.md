@@ -22,7 +22,11 @@ original brief is below, and the status section says what's done. Read both befo
   `Clip Factory.bat` → `scripts/windows/start.ps1` (git pull --ff-only, Docker check, `docker compose up -d --build`,
   waits for /api/health, opens the dashboard, makes desktop shortcuts). Updates = Stop + reopen. Push to branch
   `claude/adoring-mendel-at7ood` = what Krew gets on next launch, so never push a broken build there.
-- **Tray app (2026-11-17, UNVERIFIED on Windows):** `Clip Factory.bat` (must stay <= 97 bytes, see
+- **Verified on Krew's PC (2026-11-17, v1.5.0):** the Setup .bat (run locally; browsers block downloading .bat files,
+  so don't send it as a download — tell Krew to `git pull` then run `clip-factory\setup\Clip Factory Setup.bat`),
+  the tray started Clip Factory and opened the dashboard as an app window, Twitch Suggestions found 25 real candidates,
+  YouTube scanner ran. The CF tray icon was hidden under the ^ overflow (Windows default for new icons).
+- **Tray app (2026-11-17):** `Clip Factory.bat` (must stay <= 97 bytes, see
   `test/windows-scripts.test.ts`) starts `scripts/windows/tray.ps1` hidden: WinForms NotifyIcon, mutex
   `Local\ClipFactoryTray`, 1s timer state machine running each step (git pull, docker info, compose up/down)
   as a hidden `cmd /c` child, async /api/health polls, log `storage/launcher.log`, restarts itself if a pull
