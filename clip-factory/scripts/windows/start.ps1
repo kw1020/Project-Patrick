@@ -1,0 +1,100 @@
+# Clip Factory launcher: update -> start Docker -> build + start in the background -> open the dashboard.
+# Started by "Clip Factory.bat". PowerShell reads this whole file before running it, so `git pull`
+# replacing this file mid-run is safe.
+$ErrorActionPreference = "Continue"
+try { $Host.UI.RawUI.WindowTitle = "Clip Factory" } catch {}
+$root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)   # the clip-factory folder
+Set-Location $root
+
+function Say($msg, $color = "Gray") { Write-Host $msg -ForegroundColor $color }
+function Stop-Here($code) { Read-Host "Press Enter to close"; exit $code }
+
+Say ""
+Say "  CLIP FACTORY" Magenta
+Say ""
+
+# 1. Update (only works when installed with Git; see README "Install with automatic updates")
+$repoRoot = Split-Path -Parent $root
+if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
+  Say "Git isn't installed, so I can't check for updates. Starting the version you have." Yellow
+} elseif (-not (Test-Path (Join-Path $repoRoot ".git"))) {
+  Say "This copy was downloaded as a ZIP, so it can't update itself. Starting the version you have." Yellow
+} else {
+  Say "Checking for updates..."
+  $before = (git -C $repoRoot rev-parse HEAD) 2>$null
+  $out = (git -C $repoRoot pull --ff-only 2>&1) | Out-String
+  $pullCode = $LASTEXITCODE
+  $after = (git -C $repoRoot rev-parse HEAD) 2>$null
+  if ($pullCode -ne 0) {
+    Say "Couldn't update (no internet, or files changed by hand). Starting the version you have." Yellow
+    Say $out DarkGray
+  } elseif ($before -ne $after) {
+    Say "Updated to the newest version. Rebuilding (a few minutes)..." Green
+  } else {
+    Say "Already up to date." Green
+  }
+}
+
+# 2. Keys
+if (-not (Test-Path ".env")) {
+  Copy-Item ".env.example" ".env"
+  Say "Made your .env file. Paste your Twitch keys after the = signs, save, then open Clip Factory again." Yellow
+  Start-Process notepad ".env"
+  Stop-Here 0
+}
+
+# 3. Docker
+docker info *> $null
+if ($LASTEXITCODE -ne 0) {
+  Say "Starting Docker Desktop..."
+  $dd = Join-Path $env:ProgramFiles "Docker\Docker\Docker Desktop.exe"
+  if (Test-Path $dd) { Start-Process $dd } else { Say "Couldn't find Docker Desktop. Open it yourself." Yellow }
+  for ($i = 0; $i -lt 90; $i++) {
+    Start-Sleep -Seconds 2
+    docker info *> $null
+    if ($LASTEXITCODE -eq 0) { break }
+  }
+  if ($LASTEXITCODE -ne 0) {
+    Say "Docker didn't start. Open Docker Desktop, wait for 'Engine running', then open Clip Factory again." Red
+    Stop-Here 1
+  }
+}
+
+# 4. Build (cached: only changed parts rebuild) and start in the background
+Say "Starting Clip Factory..."
+docker compose up -d --build
+if ($LASTEXITCODE -ne 0) {
+  Say "Something went wrong while starting. Take a screenshot of this window and send it to Claude." Red
+  Stop-Here 1
+}
+
+# 5. Wait for the dashboard, then open it
+Say "Waiting for the dashboard..."
+$ready = $false
+for ($i = 0; $i -lt 120; $i++) {
+  try {
+    $r = Invoke-WebRequest -UseBasicParsing -TimeoutSec 2 -Uri "http://localhost:3000/api/health"
+    if ($r.StatusCode -eq 200) { $ready = $true; break }
+  } catch {}
+  Start-Sleep -Seconds 2
+}
+if ($ready) { Start-Process "http://localhost:3000" } else { Say "The dashboard is slow to start. Try http://localhost:3000 in a minute." Yellow }
+
+# 6. Desktop shortcuts (first run only)
+$desktop = [Environment]::GetFolderPath("Desktop")
+$ws = New-Object -ComObject WScript.Shell
+foreach ($pair in @(@("Clip Factory", "Clip Factory.bat"), @("Stop Clip Factory", "Stop Clip Factory.bat"))) {
+  $lnk = Join-Path $desktop ($pair[0] + ".lnk")
+  if (-not (Test-Path $lnk)) {
+    $s = $ws.CreateShortcut($lnk)
+    $s.TargetPath = Join-Path $root $pair[1]
+    $s.WorkingDirectory = $root
+    $s.Save()
+    Say ("Added '" + $pair[0] + "' to your desktop.") Green
+  }
+}
+
+Say ""
+Say "Clip Factory is running: http://localhost:3000" Green
+Say "You can close this window. It keeps running in the background until you use 'Stop Clip Factory'." Gray
+Start-Sleep -Seconds 10

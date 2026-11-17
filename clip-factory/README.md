@@ -41,6 +41,23 @@ Whisper caption model (~150 MB) once.
 
 Finished files are also in `storage/final/` on your computer.
 
+## Install with automatic updates (Windows, once)
+
+After this, you never download a ZIP again: the **Clip Factory** desktop icon checks for updates,
+downloads only what changed, rebuilds, starts, and opens the dashboard.
+
+1. Install Git (PowerShell): `winget install --id Git.Git -e --source winget`, then close and reopen PowerShell.
+2. `cd $HOME\Documents`
+3. `git clone -b claude/adoring-mendel-at7ood https://github.com/kw1020/Project-Patrick.git`
+   (a browser window asks you to sign in to GitHub the first time).
+4. Copy your keys from the old ZIP folder into `Documents\Project-Patrick\clip-factory\.env`.
+5. Open `Documents\Project-Patrick\clip-factory` and double-click **Clip Factory** (the .bat file).
+   It adds **Clip Factory** and **Stop Clip Factory** icons to your desktop.
+
+Your approved streamers, settings and clips history carry over (same Docker volumes, because the folder is
+still called `clip-factory`). Clips run in the background; close the window any time. To update: just
+open Clip Factory again.
+
 ## Check everything before launch: `npm run doctor`
 
 Run this on your computer once your keys are in `.env` (Wednesday at the latest):
