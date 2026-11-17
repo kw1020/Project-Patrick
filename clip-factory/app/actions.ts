@@ -7,6 +7,7 @@ import { resolveChannel } from "@/lib/ytdlp";
 import { getUsers, twitchConfigured } from "@/lib/twitch";
 import { parseFacecam } from "@/lib/media";
 import { approvalReasonFromEvidence } from "@/lib/permission";
+import { loginTakenBy } from "@/lib/streamers";
 import { approveResolved, DEFAULT_APPROVAL_NOTE, resolveCreators, type ApprovePick, type ApproveResult, type ResolveResult } from "@/lib/creator-lookup";
 
 function refreshAll() {
@@ -26,8 +27,9 @@ export async function addStreamer(_prev: { error?: string; ok?: string } | null,
   if (!twitchConfigured()) return { error: "Add TWITCH_CLIENT_ID and TWITCH_CLIENT_SECRET to .env first." };
   const [u] = await getUsers({ logins: [login] });
   if (!u) return { error: `No Twitch user called "${login}".` };
-  if (await prisma.streamer.findFirst({ where: { login: u.login, platform: { not: "twitch" } }, select: { id: true } }))
-    return { error: `"${u.login}" is already in the list as a YouTube channel.` };
+  // Only the same platform can clash: a YouTube channel with this name is fine (since v1.7.1).
+  if (await loginTakenBy("twitch", u.login, u.id))
+    return { error: `${u.display_name} not added: another Twitch account in Clip Factory already uses the name "${u.login}" (probably an old name change).` };
   await prisma.streamer.upsert({
     where: { twitchId: u.id },
     update: { approved: true, approvalNote: note || DEFAULT_APPROVAL_NOTE, login: u.login, name: u.display_name, profileImage: u.profile_image_url },
@@ -50,8 +52,8 @@ export async function addYouTubeChannel(_prev: { error?: string; ok?: string } |
     return { error: (e as Error).message };
   }
   const twitchId = `yt:${ch.channelId}`;
-  const clash = await prisma.streamer.findFirst({ where: { login: ch.handle, twitchId: { not: twitchId } }, select: { platform: true } });
-  if (clash) return { error: `A ${clash.platform === "youtube" ? "YouTube channel" : "Twitch streamer"} called "${ch.handle}" is already in the list.` };
+  // Only another YouTube channel can clash: a Twitch streamer with the same name is fine (since v1.7.1).
+  if (await loginTakenBy("youtube", ch.handle, twitchId)) return { error: `A YouTube channel called "${ch.handle}" is already in the list.` };
   await prisma.streamer.upsert({
     where: { twitchId },
     update: { approved: true, approvalNote: note || DEFAULT_APPROVAL_NOTE, login: ch.handle, name: ch.title, profileImage: ch.avatar, platform: "youtube" },

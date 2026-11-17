@@ -42,7 +42,7 @@ const clips = (broadcaster: string, n: number, top: number) => Array.from({ leng
   game_id: "", title: "", view_count: i === 0 ? top : 10, created_at: new Date().toISOString(), thumbnail_url: "", duration: 30, vod_offset: null,
 }));
 
-// Top of all Twitch, over two pages. "approved1" is approved, "ytchan" is a YouTube login, "snoozed" was dismissed.
+// Top of all Twitch, over two pages. "approved1" is approved, "ytchan" is also a YouTube login (fine since v1.7.1), "snoozed" was dismissed.
 const PAGE1 = [stream("big1", "bigone", 50_000, "Just Chatting"), stream("approved1", "approvedguy", 40_000, "GTA"), stream("snoozed", "snoozedguy", 30_000, "Valorant")];
 const PAGE2 = [stream("big2", "bigtwo", 18_200, "Fortnite"), stream("ytc", "ytchan", 15_000, "Minecraft"), stream("nope", "nopeguy", 12_000, "Chess"), stream("woke", "wokeguy", 9_000, "Art")];
 const BIOS: Record<string, string> = {
@@ -103,14 +103,16 @@ test("scan: ranked pending suggestions, exclusions, evidence bonus, reasons, no 
   const { runSuggestScan, suggestionScore } = await import("../src/workers/suggest");
   const calls = stubTwitch();
   const msg = await runSuggestScan();
-  assert.match(msg, /5 suggestions \(5 new\)/);
+  assert.match(msg, /6 suggestions \(6 new\)/);
   assert.equal(calls.filter((u) => u.pathname.endsWith("/streams")).length, 2);
   assert.equal(calls.filter((u) => u.pathname.endsWith("/users")).length, 1);
 
   const pending = await prisma.suggestion.findMany({ where: { status: "pending" }, orderBy: { score: "desc" }, include: { streamer: true } });
-  assert.deepEqual(pending.map((p) => p.streamer.twitchId), ["big1", "big2", "nope", "woke", "gta1"]);
+  assert.deepEqual(pending.map((p) => p.streamer.twitchId), ["big1", "big2", "nope", "ytc", "woke", "gta1"]);
 
-  const [b1, b2, nope, , gta] = pending;
+  const [b1, b2, nope, ytc, , gta] = pending;
+  // Same login as the approved YouTube channel "ytchan": its own Twitch row, suggested (v1.7.1).
+  assert.deepEqual({ login: ytc.streamer.login, platform: ytc.streamer.platform, approved: ytc.streamer.approved }, { login: "ytchan", platform: "twitch", approved: false });
   assert.equal(b1.evidence, "Clips welcome! Tag me on TikTok");
   assert.equal(b1.evidenceSource, "bio");
   assert.ok(Math.abs(b1.score - suggestionScore({ viewers: 50_000, clipCount: 100, topClipViews: 52_000, evidence: false }) - 2) < 1e-9);
@@ -125,11 +127,11 @@ test("scan: ranked pending suggestions, exclusions, evidence bonus, reasons, no 
   assert.equal(nope.evidence, null, "a 'no clips' in the bio cancels");
   assert.deepEqual(JSON.parse(gta.reasons), ["500 watching now (Grand Theft Auto VI)"]);
 
-  // Excluded: approved, YouTube login, dismissed inside 30 days (still dismissed, not re-suggested).
+  // Excluded: approved, dismissed inside 30 days (still dismissed, not re-suggested).
   const snoozed = await prisma.suggestion.findFirstOrThrow({ where: { streamer: { twitchId: "snoozed" } } });
   assert.equal(snoozed.status, "dismissed");
-  assert.equal(await prisma.suggestion.count({ where: { streamer: { twitchId: { in: ["approved1", "ytc"] } } } }), 0);
-  assert.equal(await prisma.streamer.count({ where: { twitchId: "ytc" } }), 0);
+  assert.equal(await prisma.suggestion.count({ where: { streamer: { twitchId: { in: ["approved1", "yt:UC1"] } } } }), 0);
+  assert.equal(await prisma.streamer.count({ where: { login: "ytchan" } }), 2, "Twitch + YouTube row, same name");
 
   // Never approves; never marks anyone offline or live.
   assert.deepEqual((await prisma.streamer.findMany({ where: { approved: true }, orderBy: { login: "asc" } })).map((s) => s.login), ["approvedguy", "ytchan"]);
@@ -142,7 +144,7 @@ test("scan: ranked pending suggestions, exclusions, evidence bonus, reasons, no 
   // Rerun right away: fresh suggestions aren't re-fetched or duplicated.
   const calls2 = stubTwitch();
   await runSuggestScan();
-  assert.equal(await prisma.suggestion.count({ where: { status: "pending" } }), 5);
+  assert.equal(await prisma.suggestion.count({ where: { status: "pending" } }), 6);
   assert.equal(calls2.filter((u) => u.pathname.endsWith("/clips")).length, 0);
   assert.equal((await prisma.suggestion.findFirstOrThrow({ where: { streamer: { twitchId: "big1" } } })).score, b1.score);
 
@@ -151,7 +153,7 @@ test("scan: ranked pending suggestions, exclusions, evidence bonus, reasons, no 
   const calls3 = stubTwitch();
   await runSuggestScan();
   assert.ok(calls3.filter((u) => u.pathname.endsWith("/clips")).length >= 5, "re-scored after an hour");
-  assert.equal(await prisma.suggestion.count(), 6);
+  assert.equal(await prisma.suggestion.count(), 7);
   assert.deepEqual((await prisma.suggestion.findMany({ where: { status: "pending" } })).map((s) => s.id).sort(), pending.map((p) => p.id).sort());
 });
 

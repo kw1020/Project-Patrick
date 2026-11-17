@@ -9,10 +9,13 @@ datasource db {
 
 // Every GTA 6 streamer the Scout has seen, plus approved YouTube channels. Only approved ones get clipped.
 // YouTube rows: platform "youtube", twitchId "yt:<channelId>", login = @handle without the @, name = channel title.
+// twitchId is the unique identity. login is unique PER PLATFORM (kept by the app, see src/lib/streamers.ts), so the
+// same name can be a Twitch streamer and a YouTube channel at once. Only a plain index here: a database-level
+// @@unique([platform, login]) makes `prisma db push` stop with a data-loss warning on existing databases.
 model Streamer {
   id            String    @id @default(cuid())
   twitchId      String    @unique
-  login         String    @unique
+  login         String
   name          String
   platform      String    @default("twitch") // twitch | youtube
   approved      Boolean   @default(false)
@@ -34,6 +37,8 @@ model Streamer {
   moments       Moment[]
   videos        YouTubeVideo[]
   suggestion    Suggestion?
+
+  @@index([platform, login])
 }
 
 // A moment worth clipping. Phase 1 source = twitch_clip; Phase 2 adds chat spikes.

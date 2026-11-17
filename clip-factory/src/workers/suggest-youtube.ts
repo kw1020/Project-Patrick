@@ -1,6 +1,7 @@
 import { prisma } from "../lib/db";
 import { findDescriptionEvidence, type PermissionEvidence } from "../lib/permission";
 import { compact } from "../lib/format";
+import { loginTakenBy } from "../lib/streamers";
 
 // YouTube suggestions: big YouTube channels Krew could approve, from YouTube's own "trending" charts.
 // Like the Twitch part, this NEVER approves anyone. It only writes Suggestion rows (platform "youtube");
@@ -181,11 +182,11 @@ async function scan(region: string): Promise<string> {
     if (r.kind === "fresh") { keepIds.push(r.streamerId); continue; }
     const c = r.s;
     const twitchId = `yt:${c.channelId}`;
-    // Same rule as "Add YouTube channel": a different row (Twitch streamer or another channel) already owns this login.
-    const clash = await prisma.streamer.findFirst({ where: { login: c.handle, twitchId: { not: twitchId } }, select: { platform: true } });
-    if (clash) {
+    // Same rule as "Add YouTube channel": only another YouTube channel holding this @handle clashes. A Twitch streamer
+    // with the same name is fine (login is unique per platform since v1.7.1).
+    if (await loginTakenBy("youtube", c.handle, twitchId)) {
       clashes++;
-      console.warn(`[suggest] YouTube @${c.handle} skipped: a ${clash.platform === "youtube" ? "YouTube channel" : "Twitch streamer"} with that name is already in the list`);
+      console.warn(`[suggest] YouTube @${c.handle} skipped: another YouTube channel with that name is already in the list`);
       continue;
     }
     let streamer;

@@ -1,5 +1,10 @@
 # Clip Factory patch notes
 
+## 1.7.1 — 2026-11-17
+- Creators with the same name on Twitch and YouTube can now be added on both, like Kai Cenat or IShowSpeed.
+- If you added your top creators already, open Streamers, then Add a list, Load top 21, Find them and Approve all again. That adds their YouTube channels.
+- Nothing you approved before changes. Running Approve all again never adds anyone twice.
+
 ## 1.7.0 — 2026-11-17
 - Approving a creator is now one click. No reason needed; you can still add a note if you want.
 - New Workroom page: watch every clip move through the line live, from finding to posted.

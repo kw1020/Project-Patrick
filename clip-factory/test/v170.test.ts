@@ -205,7 +205,7 @@ test("a name that hangs runs out of time without breaking the table", async () =
   assert.match(r.notes.join(" "), /too long/);
 });
 
-test("approving ticked matches creates the right rows; a Twitch/YouTube name clash approves Twitch and explains the YouTube one", async () => {
+test("approving ticked matches creates the right rows; the same name on Twitch and YouTube gets both (v1.7.1)", async () => {
   process.env.YOUTUBE_API_KEY = "yt-key";
   stub();
   const { prisma } = await import("../src/lib/db");
@@ -224,15 +224,15 @@ test("approving ticked matches creates the right rows; a Twitch/YouTube name cla
   await queue("scout").drain(); await queue("youtube").drain();
   const res = await actions.approveCreators([pick(0, true, true), pick(1, false, true), pick(2, true, false)], "");
   assert.equal(res.twitchApproved, 2);
-  assert.equal(res.youtubeApproved, 1);
+  assert.equal(res.youtubeApproved, 2);
+  assert.ok(res.items.every((i) => i.ok), JSON.stringify(res.items));
 
   const kai = await prisma.streamer.findUniqueOrThrow({ where: { twitchId: "2" } });
   assert.deepEqual({ login: kai.login, name: kai.name, img: kai.profileImage, platform: kai.platform, approved: kai.approved, note: kai.approvalNote },
     { login: "kaicenat", name: "KaiCenat", img: "http://kai-fresh.png", platform: "twitch", approved: true, note: "Approved by Krew" });
-  assert.equal(await prisma.streamer.count({ where: { twitchId: `yt:${UC("kai")}` } }), 0, "YouTube Kai not added (login clash)");
-  const clash = res.items.find((i) => i.name === "Kai Cenat" && i.platform === "youtube")!;
-  assert.equal(clash.ok, false);
-  assert.match(clash.message, /Twitch streamer "kaicenat" already uses that name/);
+  const ytKai = await prisma.streamer.findUniqueOrThrow({ where: { twitchId: `yt:${UC("kai")}` } });
+  assert.deepEqual({ login: ytKai.login, platform: ytKai.platform, approved: ytKai.approved }, { login: "kaicenat", platform: "youtube", approved: true }, "YouTube Kai added next to Twitch Kai");
+  assert.equal(await prisma.streamer.count({ where: { login: "kaicenat" } }), 2);
 
   const big = await prisma.streamer.findUniqueOrThrow({ where: { twitchId: `yt:${UC("b")}` } });
   assert.deepEqual({ login: big.login, name: big.name, platform: big.platform, approved: big.approved }, { login: "bigyt", name: "Big YT", platform: "youtube", approved: true });

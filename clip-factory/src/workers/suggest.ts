@@ -81,14 +81,13 @@ async function runTwitchSuggestScan(): Promise<string> {
 
   const streams = await helixAll<TwitchStream>("/streams", { first: 100, type: "live" }, PAGES);
 
-  const [approved, otherPlatforms, existing, seenByScout] = await Promise.all([
-    prisma.streamer.findMany({ where: { approved: true }, select: { twitchId: true } }),
-    prisma.streamer.findMany({ where: { platform: { not: "twitch" } }, select: { login: true } }),
+  // A YouTube channel with the same name doesn't block a Twitch suggestion (login is unique per platform since v1.7.1).
+  const [approved, existing, seenByScout] = await Promise.all([
+    prisma.streamer.findMany({ where: { approved: true, platform: "twitch" }, select: { twitchId: true } }),
     prisma.suggestion.findMany({ where: { platform: "twitch" }, include: { streamer: { select: { twitchId: true } } } }),
     prisma.streamer.findMany({ where: { platform: "twitch", approved: false, lastSeenAt: { gte: new Date(now.getTime() - SEEN_DAYS * DAY) } } }),
   ]);
   const approvedIds = new Set(approved.map((s) => s.twitchId));
-  const ytLogins = new Set(otherPlatforms.map((s) => s.login));
   const skip = new Set<string>();
   for (const s of existing) {
     const fresh = s.status === "pending" && now.getTime() - s.updatedAt.getTime() < FRESH_MS;
@@ -106,7 +105,7 @@ async function runTwitchSuggestScan(): Promise<string> {
     cands.set(s.twitchId, { twitchId: s.twitchId, login: s.login, name: s.name, viewers: s.isLive ? s.viewers : s.peakViewers, live: s.isLive, gameName: s.gameName, title: s.streamTitle });
   }
   const pool = [...cands.values()]
-    .filter((c) => !approvedIds.has(c.twitchId) && !ytLogins.has(c.login) && !skip.has(c.twitchId))
+    .filter((c) => !approvedIds.has(c.twitchId) &&!skip.has(c.twitchId))
     .sort((a, b) => b.viewers - a.viewers)
     .slice(0, DEEP_CHECK);
 
@@ -162,8 +161,7 @@ async function runTwitchSuggestScan(): Promise<string> {
         create: { twitchId: c.twitchId, platform: "twitch", approved: false, peakViewers: c.viewers, ...info },
       });
     } catch (e) {
-      console.warn(`[suggest] couldn't save ${c.login}:`, (e as Error).message); // e.g. login clash after a rename
-      continue;
+      console.warn(`[suggest] couldn't save ${c.login}:`, (e as Error).message);      continue;
     }
     const data = {
       platform: "twitch", score, reasons: JSON.stringify(reasons), evidence: ev?.snippet ?? null, evidenceSource: ev?.source ?? null,

@@ -244,7 +244,7 @@ test("Twitch Scout and Clips poller never touch YouTube rows", async () => {
     if (u.hostname === "id.twitch.tv") return json({ access_token: "tok", expires_in: 3600 });
     helixCalls.push(u);
     if (u.pathname.endsWith("/streams") && u.searchParams.get("game_id"))
-      // A Twitch streamer whose login equals the YouTube handle must not clash with the YouTube row.
+      // A Twitch streamer whose login equals the YouTube handle gets its own Twitch row (v1.7.1: no longer skipped).
       return json({ data: [{ id: "s1", user_id: "tw1", user_login: "GoodChan", user_name: "GoodChan", game_id: "gta6-id", game_name: "Grand Theft Auto VI", title: "t", viewer_count: 5, started_at: new Date().toISOString(), thumbnail_url: "" }], pagination: {} });
     return json({ data: [], pagination: {} });
   }) as typeof fetch;
@@ -259,7 +259,9 @@ test("Twitch Scout and Clips poller never touch YouTube rows", async () => {
   const yt = await prisma.streamer.findUniqueOrThrow({ where: { twitchId: `yt:${GOOD}` } });
   assert.equal(yt.isLive, false);
   assert.equal(yt.platform, "youtube");
-  assert.equal(await prisma.streamer.count({ where: { twitchId: "tw1" } }), 0);
+  const tw = await prisma.streamer.findUniqueOrThrow({ where: { twitchId: "tw1" } });
+  assert.deepEqual({ login: tw.login, platform: tw.platform, approved: tw.approved, isLive: tw.isLive }, { login: yt.login, platform: "twitch", approved: false, isLive: true });
+  assert.equal(yt.approved, true, "YouTube row untouched");
   assert.ok(!channels.flat().includes("GoodChan"));
 });
 

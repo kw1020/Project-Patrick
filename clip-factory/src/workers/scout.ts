@@ -25,13 +25,8 @@ export async function runScout(chat: ChatHeat) {
       if ((anyGame || st.game_id === gameId) && !seen.has(st.user_id)) { streams.push(st); seen.add(st.user_id); }
     }
   }
-  // A YouTube channel row can hold the same login (its @handle): never let a Twitch stream collide with it.
-  const ytLogins = new Set((await prisma.streamer.findMany({ where: { platform: { not: "twitch" } }, select: { login: true } })).map((s) => s.login));
-  if (ytLogins.size) {
-    const clash = streams.filter((st) => ytLogins.has(st.user_login));
-    for (const st of clash) console.warn(`[scout] skipping Twitch ${st.user_login}: that name belongs to an approved YouTube channel`);
-    if (clash.length) streams.splice(0, streams.length, ...streams.filter((st) => !ytLogins.has(st.user_login)));
-  }
+  // Rows are matched by Twitch user id, so a YouTube channel with the same @handle as a Twitch login never collides
+  // (login is unique per platform since v1.7.1).
   const now = new Date();
 
   const existing = new Map(

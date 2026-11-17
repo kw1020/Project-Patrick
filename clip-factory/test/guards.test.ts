@@ -47,7 +47,7 @@ after(async () => {
 
 async function streamer(login: string) {
   const { prisma } = await import("../src/lib/db");
-  return prisma.streamer.upsert({ where: { login }, update: {}, create: { twitchId: "t-" + login, login, name: login.toUpperCase(), approved: true } });
+  return prisma.streamer.upsert({ where: { twitchId: "t-" + login }, update: {}, create: { twitchId: "t-" + login, login, name: login.toUpperCase(), approved: true } });
 }
 async function clip(login: string, data: Record<string, unknown> = {}) {
   const { prisma } = await import("../src/lib/db");

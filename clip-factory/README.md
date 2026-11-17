@@ -267,8 +267,8 @@ Streamers page → **Add a list of creators**: type names, one per line (or **Lo
 @handle, then a search, biggest matching channel wins; without a key: `youtube.com/@NameWithoutSpaces`).
 Exact matches come ticked; a "closest match" is left unticked for you to check. Press **Approve all
 ticked** or a row's **Approve**. Nothing is approved until you press one of those.
-If a YouTube @handle is the same as a Twitch streamer already in Clip Factory (e.g. both "kaicenat"), the
-Twitch one is approved and the YouTube one is skipped with a note (one name per creator for now).
+A creator with the same name on both (e.g. "kaicenat") gets both approved: names only have to be unique per
+platform. Running it again is safe: rows that are already approved are left exactly as they are.
 Kick isn't supported yet.
 
 ## Run without Docker (dev)

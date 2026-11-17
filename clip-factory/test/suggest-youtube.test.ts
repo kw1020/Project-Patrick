@@ -47,7 +47,7 @@ const vid = (id: string, channelId: string, title: string, views: number) => ({ 
 const CHARTS: Record<string, unknown[]> = {
   "": [vid("trend1", "UCbig", "I survived 100 days in GTA 6 and this is what happened at the end", 8_100_000), vid("trend2", "UCbig", "GTA 6 map tour", 2_000_000)],
   "20": [vid("trend1", "UCbig", "I survived 100 days in GTA 6 and this is what happened at the end", 8_100_000), vid("mid1", "UCmid", "Vice City speedrun", 450_000)],
-  "24": [vid("nh1", "UCnohandle", "No handle", 5_000_000), vid("ap1", "UCappr", "Approved one", 9_000_000), vid("cl1", "UCclash", "Clash", 3_000_000)],
+  "24": [vid("nh1", "UCnohandle", "No handle", 5_000_000), vid("ap1", "UCappr", "Approved one", 9_000_000), vid("cl1", "UCclash", "Clash", 3_000_000), vid("tk1", "UCtaken", "Taken", 4_000_000)],
   "23": [vid("sn1", "UCsnooze", "Snoozed", 1_000_000), vid("no1", "UCnope", "Nope", 700_000), vid("hd1", "UChidden", "Hidden subs", 6_000_000)],
 };
 const ch = (id: string, title: string, customUrl: string | undefined, description: string, stats: Record<string, unknown>) =>
@@ -58,6 +58,7 @@ const CHANNELS: Record<string, unknown> = {
   UCnohandle: ch("UCnohandle", "No Handle", undefined, "Clips welcome", { subscriberCount: "9000000", viewCount: "1", videoCount: "1" }),
   UCappr: ch("UCappr", "Approved", "@approvedyt", "", { subscriberCount: "1", viewCount: "1", videoCount: "1" }),
   UCclash: ch("UCclash", "Clash", "@twitchguy", "", { subscriberCount: "7000000", viewCount: "1", videoCount: "1" }),
+  UCtaken: ch("UCtaken", "Taken", "@takenhandle", "", { subscriberCount: "8000000", viewCount: "1", videoCount: "1" }),
   UCsnooze: ch("UCsnooze", "Snoozed", "@snoozed", "", { subscriberCount: "1", viewCount: "1", videoCount: "1" }),
   UCnope: ch("UCnope", "Nope", "@nope", "No clips please. Clips welcome on my Patreon only", { subscriberCount: "5000000", viewCount: "1", videoCount: "1" }),
   UChidden: ch("UChidden", "Hidden", "@hidden", "Variety", { hiddenSubscriberCount: true, viewCount: "2000000000", videoCount: "50" }),
@@ -93,9 +94,11 @@ async function seed() {
   await prisma.streamer.deleteMany({});
   await prisma.settings.upsert({ where: { id: "main" }, update: { scoutPaused: false, ytSuggestRegion: "US" }, create: { id: "main" } });
   await prisma.streamer.create({ data: { twitchId: "yt:UCappr", platform: "youtube", login: "approvedyt", name: "Approved", approved: true, approvalNote: "campaign" } });
-  // A Twitch streamer already owns the login "twitchguy" → the YouTube @twitchguy must be skipped, not crash.
+  // A Twitch streamer owns the login "twitchguy": since v1.7.1 the YouTube @twitchguy is still suggested (per-platform logins).
   const tw = await prisma.streamer.create({ data: { twitchId: "tw1", login: "twitchguy", name: "TwitchGuy" } });
   await prisma.suggestion.create({ data: { streamerId: tw.id, score: 5, reasons: "[]" } }); // a pending Twitch suggestion
+  // Another YouTube channel already holds @takenhandle (same-platform clash) → YouTube @takenhandle is skipped, not crash.
+  await prisma.streamer.create({ data: { twitchId: "yt:UColdtaken", platform: "youtube", login: "takenhandle", name: "Old Taken" } });
   const sn = await prisma.streamer.create({ data: { twitchId: "yt:UCsnooze", platform: "youtube", login: "snoozed", name: "Snoozed" } });
   await prisma.suggestion.create({ data: { streamerId: sn.id, platform: "youtube", score: 99, reasons: "[]", status: "dismissed", dismissedUntil: new Date(Date.now() + 20 * DAY) } });
 }
@@ -117,7 +120,7 @@ test("permission: YouTube description wording", async () => {
   assert.equal(approvalReasonFromEvidence({ evidence: "Clips welcome!", evidenceSource: "description" }), 'Channel description says: "Clips welcome!"');
 });
 
-test("scan: ranked, exclusions, no-handle and clash skipped, evidence, reasons, Twitch rows untouched", async () => {
+test("scan: ranked, exclusions, no-handle and same-platform clash skipped, Twitch name not a clash, evidence, reasons, Twitch rows untouched", async () => {
   await seed();
   process.env.YOUTUBE_API_KEY = "yt-key";
   const { prisma } = await import("../src/lib/db");
@@ -125,7 +128,7 @@ test("scan: ranked, exclusions, no-handle and clash skipped, evidence, reasons, 
   const { youtubeSuggestionScore } = await import("../src/workers/suggest-youtube");
   const calls = stubYouTube();
   const msg = await runSuggestScan();
-  assert.match(msg, /^Twitch: keys missing \(skipped\) · YouTube: 4 suggestions \(4 new\)/);
+  assert.match(msg, /^Twitch: keys missing \(skipped\) · YouTube: 5 suggestions \(5 new\)/);
   assert.match(msg, /1 without an @handle skipped/);
   assert.match(msg, /1 name clash skipped/);
   assert.equal(calls.filter((u) => u.pathname.endsWith("/videos")).length, 4);
@@ -135,8 +138,10 @@ test("scan: ranked, exclusions, no-handle and clash skipped, evidence, reasons, 
   assert.ok(!asked.includes("UCappr") && !asked.includes("UCsnooze"), "approved + snoozed not even looked up");
 
   const pending = await prisma.suggestion.findMany({ where: { status: "pending", platform: "youtube" }, orderBy: { score: "desc" }, include: { streamer: true } });
-  assert.deepEqual(pending.map((p) => p.streamer.login), ["bigchannel", "hidden", "nope", "midchannel"]);
-  const [big, hidden, nope, mid] = pending;
+  assert.deepEqual(pending.map((p) => p.streamer.login), ["bigchannel", "twitchguy", "hidden", "nope", "midchannel"]);
+  const [big, sameName, hidden, nope, mid] = pending;
+  // Same login as the Twitch row "twitchguy", but its own YouTube row (v1.7.1).
+  assert.deepEqual({ platform: sameName.streamer.platform, twitchId: sameName.streamer.twitchId }, { platform: "youtube", twitchId: "yt:UCclash" });
 
   assert.equal(big.streamer.platform, "youtube");
   assert.equal(big.streamer.twitchId, "yt:UCbig");
@@ -160,8 +165,10 @@ test("scan: ranked, exclusions, no-handle and clash skipped, evidence, reasons, 
   assert.equal(mid.evidence, "You can clip my videos and post them anywhere, just credit me");
 
   // Excluded / skipped.
-  assert.equal(await prisma.streamer.count({ where: { twitchId: { in: ["yt:UCnohandle", "yt:UCclash"] } } }), 0);
-  assert.equal((await prisma.streamer.findUniqueOrThrow({ where: { login: "twitchguy" } })).platform, "twitch");
+  assert.equal(await prisma.streamer.count({ where: { twitchId: { in: ["yt:UCnohandle", "yt:UCtaken"] } } }), 0);
+  const twRow = await prisma.streamer.findUniqueOrThrow({ where: { twitchId: "tw1" } });
+  assert.deepEqual({ platform: twRow.platform, login: twRow.login, name: twRow.name }, { platform: "twitch", login: "twitchguy", name: "TwitchGuy" });
+  assert.equal((await prisma.streamer.findUniqueOrThrow({ where: { twitchId: "yt:UColdtaken" } })).name, "Old Taken");
   assert.equal((await prisma.suggestion.findFirstOrThrow({ where: { streamer: { twitchId: "yt:UCsnooze" } } })).status, "dismissed");
   assert.equal(await prisma.suggestion.count({ where: { streamer: { twitchId: "yt:UCappr" } } }), 0);
   assert.equal(await prisma.suggestion.count({ where: { platform: "twitch", status: "pending" } }), 1, "Twitch suggestion left alone");
@@ -171,14 +178,14 @@ test("scan: ranked, exclusions, no-handle and clash skipped, evidence, reasons, 
   const { getStatuses } = await import("../src/lib/queues");
   const st = await getStatuses();
   assert.equal(st.suggest_youtube.ok, true);
-  assert.match(st.suggest_youtube.msg, /^4 suggestions/);
+  assert.match(st.suggest_youtube.msg, /^5 suggestions/);
 
   // Rerun at once: fresh ones aren't re-looked-up or duplicated.
   const calls2 = stubYouTube();
   await runSuggestScan();
   const again = calls2.filter((u) => u.pathname.endsWith("/channels")).flatMap((u) => u.searchParams.get("id")!.split(","));
-  assert.deepEqual(again.sort(), ["UCclash", "UCnohandle"], "only the skipped ones are looked up again");
-  assert.equal(await prisma.suggestion.count({ where: { platform: "youtube", status: "pending" } }), 4);
+  assert.deepEqual(again.sort(), ["UCnohandle", "UCtaken"], "only the skipped ones are looked up again");
+  assert.equal(await prisma.suggestion.count({ where: { platform: "youtube", status: "pending" } }), 5);
 });
 
 test("approving a YouTube suggestion is one click (no reason), uses the normal approve path and pokes the YouTube scanner", async () => {

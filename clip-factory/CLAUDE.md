@@ -13,7 +13,7 @@ original brief is below, and the status section says what's done. Read both befo
   live (Streamer.gameName) and their clips taken in every game (Moment.gameName, names via Helix `/games?id=`, cached);
   GTA-wide discovery unchanged. Text helpers in `src/lib/social.ts` (`momentGame`, `gameHashtags`) are game-aware.
 - **YouTube scanner (2026-11-17):** approved YouTube channels are `Streamer` rows with `platform: "youtube"`,
-  `twitchId: "yt:<channelId>"`, `login` = @handle. `src/workers/youtube.ts` (queue "youtube", every 30 min) reads
+  `twitchId: "yt:<channelId>"`, `login` = @handle (may equal a Twitch row's login since v1.7.1). `src/workers/youtube.ts` (queue "youtube", every 30 min) reads
   yt-dlp's `heatmap` (`src/lib/ytdlp.ts`, `pickPeaks`) → Moments with source "youtube"; seen videos in `YouTubeVideo`.
   Twitch code paths filter `platform: "twitch"`. All credit links come from `creatorUrl`/`creatorCreditText` in
   `src/lib/social.ts`. Sandbox smoke test: flat channel listing worked for real; per-video `-J` hit YouTube's bot check,
@@ -47,14 +47,24 @@ original brief is below, and the status section says what's done. Read both befo
   processing; new additive column `Clip.stageAt`, set on every `stage` write, falls back to updatedAt; clips/hour = clips created
   in the last 3h that came out cut); "Add a list of creators" card (`src/lib/creator-lookup.ts`: Helix `/search/channels`,
   YouTube `forHandle` → `search` with the key or yt-dlp without; 4 at a time, 60s total; only exact matches pre-ticked;
-  `KREW_TOP_21` in `src/lib/starter-creators.ts`). Name clash (YouTube @handle = an existing login, e.g. Twitch "kaicenat")
-  follows the existing rule: the YouTube channel is NOT added and the table says why (no login suffix, because `login` is the
-  credit link). Unverified against real Helix search / YouTube API.
+  `KREW_TOP_21` in `src/lib/starter-creators.ts`). (The v1.7.0 "name clash" rule that skipped a YouTube channel whose
+  @handle equalled a Twitch login is gone since v1.7.1, see below.) Unverified against real Helix search / YouTube API.
+- **v1.7.1 (2026-11-17): login unique PER PLATFORM.** `Streamer.login` is no longer `@unique`; the schema has a plain
+  `@@index([platform, login])` and `twitchId` stays `@unique` (the real identity). A DB-level `@@unique([platform, login])` was
+  tried and `prisma db push` refuses it on existing DBs ("A unique constraint ... will be added" = data-loss warning, needs
+  `--accept-data-loss`, even on an empty table), so per-platform uniqueness is kept by the app: every add flow calls
+  `loginTakenBy(platform, login, twitchId)` (`src/lib/streamers.ts`) and only refuses a SAME-platform clash (old Twitch row
+  after a rename / another YouTube channel on that @handle). Never look a streamer up by login alone: use twitchId/id, or
+  login + platform. Add flows (`addStreamer`, `addYouTubeChannel`, `approveResolved`), YouTube suggestions and the Scout no longer
+  skip cross-platform name matches. `approveResolved` is idempotent: already-approved rows are left untouched ("already
+  approved"), so re-running "Approve all ticked" only adds the missing YouTube rows. `test/v171.test.ts` includes a real
+  `db push` upgrade from the 04b05d1 schema with rows (no prompt, rows kept). (Alternative if a real constraint is ever wanted:
+  create `Streamer_platform_login_key` with raw SQL before `db push`; then push is clean too — tested, not shipped.)
 - Docker image never built in the sandbox (no daemon); it builds fine on Krew's PC; a clean-copy `npm ci` + `next build` without `.env`
   (what the Dockerfile does) passes.
 - **Suggestions (2026-11-17):** `src/workers/suggest.ts` (queue "suggest", hourly + once ~1 min after start,
   "Scan now" on Streamers) → `Suggestion` rows (one per streamer, top 25 pending). Candidates: top 300 live on all of
-  Twitch + unapproved streamers the Scout saw in 7 days; excludes approved, non-Twitch logins, fresh pending (<50 min),
+  Twitch + unapproved streamers the Scout saw in 7 days; excludes approved Twitch rows, fresh pending (<50 min),
   dismissed until `dismissedUntil` ("Not now" = 30 days). Top 40 by viewers get `/users` + one `/clips` page (7 days).
   `score = 2·log10(viewers+1) + 1.5·log10(clipCount+1) + 1.5·log10(topClipViews+1) + 2 if permission evidence`.
   Evidence = `src/lib/permission.ts` regexes on bio then title; any "no clips"/"don't clip" in either cancels.
@@ -64,8 +74,8 @@ original brief is below, and the status section says what's done. Read both befo
 - **YouTube suggestions (2026-11-17):** `src/workers/suggest-youtube.ts`, run inside the same hourly suggest job after
   Twitch (each half try/caught; per-half status `suggest_twitch` / `suggest_youtube` in Redis). Needs `YOUTUBE_API_KEY`
   (Data API v3, plain key; base URL `YOUTUBE_API_URL`); missing → skipped + setup card on the YouTube tab. `/videos?chart=mostPopular`
-  (overall + categories 20/24/23, `Settings.ytSuggestRegion`) → `/channels` (50 ids/call); no `customUrl` → skipped; a login
-  owned by another row → skipped with a log line. `score = 2·log10(subs+1) + 1.5·log10(topTrendingVideoViews+1) +
+  (overall + categories 20/24/23, `Settings.ytSuggestRegion`) → `/channels` (50 ids/call); no `customUrl` → skipped; a @handle
+  owned by another YouTube row → skipped with a log line (a Twitch row with the same name is fine since v1.7.1). `score = 2·log10(subs+1) + 1.5·log10(topTrendingVideoViews+1) +
   3·log10(trendingVideoCount+1) + 2 if evidence` (hidden subs → channel viewCount/1000, said in reasons). Evidence only from
   the channel description (`findDescriptionEvidence`). `Suggestion.platform` keeps separate top-25s; YouTube rows store
   `subscribers/videoId/videoTitle/videoViews`. Approve → `setApproved` (pokes the YouTube scanner). Unverified against the real API.

@@ -8,10 +8,11 @@
 //   /channels, biggest subscriber count among channels whose title/handle loosely matches. Without a key: yt-dlp
 //   on youtube.com/@<NameWithoutSpaces>.
 // Rows are stored exactly like the single-add flows: Twitch rows by Helix user id; YouTube rows with
-// twitchId "yt:<channelId>", login = @handle lowercased. Streamer.login is unique across both platforms, so when a
-// Twitch streamer already owns the same name the YouTube channel is NOT added (same rule as "Approve a YouTube
-// channel" and YouTube suggestions) and the result says so in plain words.
+// twitchId "yt:<channelId>", login = @handle lowercased. Streamer.login is unique PER PLATFORM (v1.7.1), so a creator
+// with the same name on Twitch and YouTube gets both rows. Only a same-platform clash (an old row still holding the
+// name after a rename) stops an add, and the result says so in plain words.
 import { prisma } from "./db";
+import { loginTakenBy } from "./streamers";
 import { getUsers, helix, twitchConfigured } from "./twitch";
 import { resolveChannel } from "./ytdlp";
 import { YouTubeApiError, youtubeKeyConfigured, ytApi } from "../workers/suggest-youtube";
@@ -202,7 +203,10 @@ export type ApprovePick = {
 export type ApproveItem = { name: string; platform: "twitch" | "youtube"; ok: boolean; message: string };
 export type ApproveResult = { items: ApproveItem[]; twitchApproved: number; youtubeApproved: number };
 
-/** Approve ticked matches. Twitch first, so on a name clash the Twitch streamer wins and the YouTube one gets a note. */
+/**
+ * Approve ticked matches. A creator found on both platforms gets BOTH rows (login is unique per platform since v1.7.1).
+ * Idempotent: rows that are already approved are left untouched, so re-running "Approve all ticked" only adds what's missing.
+ */
 export async function approveResolved(picks: ApprovePick[], note: string): Promise<ApproveResult> {
   const items: ApproveItem[] = [];
   const say = (name: string, platform: "twitch" | "youtube", ok: boolean, message: string) => items.push({ name, platform, ok, message });
@@ -221,10 +225,12 @@ export async function approveResolved(picks: ApprovePick[], note: string): Promi
     const u = fresh.get(t.id) ?? { login: String(t.login).toLowerCase(), name: String(t.name), avatar: t.avatar ?? null };
     if (!/^[a-z0-9_]{1,25}$/.test(u.login)) { say(p.name, "twitch", false, `"${u.login}" doesn't look like a Twitch username.`); continue; }
     try {
-      const yt = await prisma.streamer.findFirst({ where: { login: u.login, platform: { not: "twitch" } }, select: { id: true } });
-      if (yt) { say(p.name, "twitch", false, `"${u.login}" is already in the list as a YouTube channel, so the Twitch one wasn't added.`); continue; }
+      // Already approved (e.g. by an earlier "Approve all"): leave the row exactly as it is, so re-running is safe.
+      const have = await prisma.streamer.findUnique({ where: { twitchId: t.id }, select: { approved: true, name: true } });
+      if (have?.approved) { say(p.name, "twitch", true, `${have.name} is already approved on Twitch.`); continue; }
       // An older row for a different Twitch account still holds this name (someone renamed). Don't guess which is right.
-      const stale = await prisma.streamer.findFirst({ where: { login: u.login, twitchId: { not: t.id } }, select: { id: true } });
+      // A YouTube channel with the same name is fine (login is unique per platform since v1.7.1).
+      const stale = await loginTakenBy("twitch", u.login, t.id);
       if (stale) { say(p.name, "twitch", false, `${u.name} not added: another Twitch account in Clip Factory already uses the name "${u.login}" (probably an old name change), so it wasn't added.`); continue; }
       const s = await prisma.streamer.upsert({
         where: { twitchId: t.id },
@@ -246,11 +252,11 @@ export async function approveResolved(picks: ApprovePick[], note: string): Promi
     if (!/^UC[\w-]{22}$/.test(String(y.channelId)) || !/^[a-z0-9._-]{3,30}$/.test(handle)) { say(p.name, "youtube", false, "That YouTube match looks wrong. Add it with “Approve a YouTube channel” instead."); continue; }
     const twitchId = `yt:${y.channelId}`;
     try {
-      const clash = await prisma.streamer.findFirst({ where: { login: handle, twitchId: { not: twitchId } }, select: { platform: true } });
-      if (clash) {
-        say(p.name, "youtube", false, clash.platform === "youtube"
-          ? `YouTube @${handle} not added: another YouTube channel already uses that name in Clip Factory.`
-          : `YouTube @${handle} not added: the Twitch streamer "${handle}" already uses that name in Clip Factory (one name per creator for now). Their Twitch clips still come in.`);
+      const have = await prisma.streamer.findUnique({ where: { twitchId }, select: { approved: true, platform: true } });
+      if (have?.approved && have.platform === "youtube") { say(p.name, "youtube", true, `YouTube @${handle} is already approved.`); continue; }
+      // Only another YouTube channel can clash; a Twitch streamer with the same name is fine (since v1.7.1).
+      if (await loginTakenBy("youtube", handle, twitchId)) {
+        say(p.name, "youtube", false, `YouTube @${handle} not added: another YouTube channel already uses that name in Clip Factory.`);
         continue;
       }
       const s = await prisma.streamer.upsert({
