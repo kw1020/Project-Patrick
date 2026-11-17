@@ -56,6 +56,21 @@ export async function startMocks(port = 0): Promise<Mock> {
         return json(404, { error: "Not Found", status: 404, message: "mock: no helix " + ep });
       }
       if (path.startsWith("/token")) return json(200, { access_token: "ya29.mock", refresh_token: "1//mock-refresh", expires_in: 3600 });
+      // ---- YouTube Data API with a plain API key (Suggestions): trending chart + channel details ----
+      if (path.startsWith("/youtube/v3/") && new URL(path, "http://x").searchParams.get("key")) {
+        const u = new URL(path, "http://x");
+        if (u.pathname === "/youtube/v3/videos" && u.searchParams.get("chart") === "mostPopular") return json(200, { items: [
+          { id: "trend1", snippet: { channelId: "UCbig", title: "I survived 100 days in GTA 6" }, statistics: { viewCount: "8100000" } },
+          { id: "trend2", snippet: { channelId: "UCmid", title: "Vice City speedrun" }, statistics: { viewCount: "450000" } },
+        ] });
+        if (u.pathname === "/youtube/v3/channels" && u.searchParams.get("id")) {
+          const all: Record<string, unknown> = {
+            UCbig: { id: "UCbig", snippet: { title: "Big Channel", customUrl: "@bigchannel", description: "Clips welcome! Join the clipping program", thumbnails: { default: { url: "" } } }, statistics: { subscriberCount: "12400000", viewCount: "3000000000", videoCount: "800" } },
+            UCmid: { id: "UCmid", snippet: { title: "Mid Channel", customUrl: "@midchannel", description: "Gaming videos", thumbnails: {} }, statistics: { subscriberCount: "250000", viewCount: "40000000", videoCount: "300" } },
+          };
+          return json(200, { items: u.searchParams.get("id")!.split(",").map((id) => all[id]).filter(Boolean) });
+        }
+      }
       if (path.startsWith("/youtube/v3/channels")) return json(200, { items: [{ id: "UCmock", snippet: { title: "Krew Clips (mock)" } }] });
       if (path.startsWith("/youtube/v3/videos")) return json(200, { items: [{ id: "vid123", statistics: { viewCount: "4321" } }] });
       if (path.startsWith("/upload") && req.method === "POST") return json(200, {}, { Location: `${mock.url}/upload-session/abc` });
@@ -74,7 +89,7 @@ export function mockEnv(url: string) {
   return {
     ANTHROPIC_BASE_URL: url, ANTHROPIC_API_KEY: "sk-ant-mock",
     TIKTOK_CLIENT_KEY: "mock-key", TIKTOK_CLIENT_SECRET: "mock-secret", TIKTOK_AUTH_URL: `${url}/tt-auth`, TIKTOK_API_URL: url,
-    YOUTUBE_CLIENT_ID: "mock-client", YOUTUBE_CLIENT_SECRET: "mock-secret",
+    YOUTUBE_API_KEY: "mock-yt-key", YOUTUBE_CLIENT_ID: "mock-client", YOUTUBE_CLIENT_SECRET: "mock-secret",
     GOOGLE_OAUTH_URL: `${url}/auth`, GOOGLE_TOKEN_URL: `${url}/token`, YOUTUBE_API_URL: `${url}/youtube/v3`, YOUTUBE_UPLOAD_URL: `${url}/upload/youtube/v3/videos`,
     TWITCH_CLIENT_ID: "mock-twitch-id", TWITCH_CLIENT_SECRET: "mock-twitch-secret", TWITCH_API_URL: `${url}/helix`, TWITCH_AUTH_URL: `${url}/oauth2/token`,
   };

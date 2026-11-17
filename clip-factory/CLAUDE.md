@@ -41,6 +41,14 @@ original brief is below, and the status section says what's done. Read both befo
   It NEVER approves: Approve on a card calls `approveSuggestion` → `setApproved` with Krew's typed reason (pre-filled
   only with the real quote). Never touches `isLive`/`viewers` (the Scout owns them); `Suggestion.viewers/gameName`
   hold the snapshot. Unverified against real Helix (bio `description` field and all-Twitch `/streams` paging per docs).
+- **YouTube suggestions (2026-11-17):** `src/workers/suggest-youtube.ts`, run inside the same hourly suggest job after
+  Twitch (each half try/caught; per-half status `suggest_twitch` / `suggest_youtube` in Redis). Needs `YOUTUBE_API_KEY`
+  (Data API v3, plain key; base URL `YOUTUBE_API_URL`); missing → skipped + setup card on the YouTube tab. `/videos?chart=mostPopular`
+  (overall + categories 20/24/23, `Settings.ytSuggestRegion`) → `/channels` (50 ids/call); no `customUrl` → skipped; a login
+  owned by another row → skipped with a log line. `score = 2·log10(subs+1) + 1.5·log10(topTrendingVideoViews+1) +
+  3·log10(trendingVideoCount+1) + 2 if evidence` (hidden subs → channel viewCount/1000, said in reasons). Evidence only from
+  the channel description (`findDescriptionEvidence`). `Suggestion.platform` keeps separate top-25s; YouTube rows store
+  `subscribers/videoId/videoTitle/videoViews`. Approve → `setApproved` (pokes the YouTube scanner). Unverified against the real API.
 - Tests: `npm test` (unit, real ffmpeg renders, workers against Redis, Judge/YouTube/TikTok against the
   stand-in servers in `test/mocks.ts`). `npx tsx test/mocks.ts 4010` prints env vars to run the app on stand-ins.
 - **First real run on Krew's Windows PC (2026-11-17), `npm run doctor` in Docker: 0 broken.** Verified for real:

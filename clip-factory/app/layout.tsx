@@ -9,7 +9,7 @@ export const metadata: Metadata = { title: "Clip Factory", description: "GTA 6 c
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const [pending, suggestions] = await Promise.all([
     prisma.clip.count({ where: { status: "pending" } }).catch(() => 0),
-    prisma.suggestion.count({ where: { status: "pending", streamer: { approved: false, platform: "twitch" } } }).catch(() => 0),
+    prisma.suggestion.count({ where: { status: "pending", streamer: { approved: false } } }).catch(() => 0),
   ]);
   return (
     <html lang="en">

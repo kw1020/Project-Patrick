@@ -2,6 +2,8 @@ import { prisma, getSettings } from "../lib/db";
 import { helix, helixAll, getUsers, twitchConfigured, type TwitchClip, type TwitchStream } from "../lib/twitch";
 import { findPermissionEvidence, type PermissionEvidence } from "../lib/permission";
 import { compact } from "../lib/format";
+import { setStatus } from "../lib/queues";
+import { runYouTubeSuggestScan } from "./suggest-youtube";
 
 // Suggestions: streamers Krew could approve — mainly big ones whose viewers clip a lot.
 // This NEVER approves anyone. It only writes Suggestion rows; Krew approves on the Streamers page with a reason.
@@ -38,10 +40,40 @@ export function suggestionReasons(c: { viewers: number; live: boolean; gameName:
   return out;
 }
 
+/**
+ * The hourly Suggestions job: Twitch first, then YouTube (src/workers/suggest-youtube.ts). Each half has its
+ * own try/catch so one failing never stops the other; each half's line is also saved as its own status
+ * ("suggest_twitch" / "suggest_youtube") for the Streamers page tabs. Throws (→ red status) only when a half
+ * hit an unexpected error, after both halves ran.
+ */
 export async function runSuggestScan(): Promise<string> {
   const settings = await getSettings();
   if (settings.scoutPaused) return "paused";
-  if (!twitchConfigured()) return "Twitch keys missing";
+  const parts: { name: string; key: string; run: () => Promise<string> }[] = [
+    { name: "Twitch", key: "suggest_twitch", run: runTwitchSuggestScan },
+    { name: "YouTube", key: "suggest_youtube", run: () => runYouTubeSuggestScan(settings.ytSuggestRegion || "US") },
+  ];
+  const lines: string[] = [];
+  let failed = false;
+  for (const p of parts) {
+    let ok = true, msg: string;
+    try {
+      msg = await p.run();
+    } catch (e) {
+      ok = false; failed = true;
+      msg = `failed: ${(e as Error).message}`;
+      console.warn(`[suggest] ${p.name} part failed:`, (e as Error).message);
+    }
+    await setStatus(p.key, ok, msg).catch(() => {});
+    lines.push(`${p.name}: ${msg}`);
+  }
+  const all = lines.join(" · ");
+  if (failed) throw new Error(all);
+  return all;
+}
+
+async function runTwitchSuggestScan(): Promise<string> {
+  if (!twitchConfigured()) return "keys missing (skipped)";
   const now = new Date();
 
   // Already-approved streamers are never suggested; keep their old pending suggestion out of the feed.
@@ -52,7 +84,7 @@ export async function runSuggestScan(): Promise<string> {
   const [approved, otherPlatforms, existing, seenByScout] = await Promise.all([
     prisma.streamer.findMany({ where: { approved: true }, select: { twitchId: true } }),
     prisma.streamer.findMany({ where: { platform: { not: "twitch" } }, select: { login: true } }),
-    prisma.suggestion.findMany({ include: { streamer: { select: { twitchId: true } } } }),
+    prisma.suggestion.findMany({ where: { platform: "twitch" }, include: { streamer: { select: { twitchId: true } } } }),
     prisma.streamer.findMany({ where: { platform: "twitch", approved: false, lastSeenAt: { gte: new Date(now.getTime() - SEEN_DAYS * DAY) } } }),
   ]);
   const approvedIds = new Set(approved.map((s) => s.twitchId));
@@ -134,7 +166,7 @@ export async function runSuggestScan(): Promise<string> {
       continue;
     }
     const data = {
-      score, reasons: JSON.stringify(reasons), evidence: ev?.snippet ?? null, evidenceSource: ev?.source ?? null,
+      platform: "twitch", score, reasons: JSON.stringify(reasons), evidence: ev?.snippet ?? null, evidenceSource: ev?.source ?? null,
       viewers: c.viewers, gameName: c.gameName, status: "pending", dismissedUntil: null,
     };
     const before = await prisma.suggestion.findUnique({ where: { streamerId: streamer.id }, select: { status: true } });
@@ -143,7 +175,7 @@ export async function runSuggestScan(): Promise<string> {
     keepIds.push(streamer.id);
   }
   // Pending suggestions that fell out of the top 25 aren't kept (dismissed ones stay, to remember "Not now").
-  await prisma.suggestion.deleteMany({ where: { status: "pending", streamerId: { notIn: keepIds } } });
+  await prisma.suggestion.deleteMany({ where: { platform: "twitch", status: "pending", streamerId: { notIn: keepIds } } });
 
   return `${keepIds.length} suggestions (${added} new) · checked ${pool.length} of ${cands.size} streamers`;
 }

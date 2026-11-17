@@ -1,4 +1,5 @@
-// Permission evidence: does a streamer's own Twitch bio or stream title say clips / reposts are allowed?
+// Permission evidence: does a streamer's own Twitch bio or stream title (or a YouTube channel's own description)
+// say clips / reposts are allowed?
 // Pure functions, no I/O. Used by the Suggestions scanner. This never approves anyone: it only finds a quote
 // Krew can check (and use as his approval reason) before he approves.
 
@@ -8,7 +9,7 @@ export type PermissionHit = {
   /** The match with a little surrounding context from the same line, at most 160 chars. */
   snippet: string;
 };
-export type PermissionEvidence = PermissionHit & { source: "bio" | "title" };
+export type PermissionEvidence = PermissionHit & { source: "bio" | "title" | "description" };
 
 const MAX_SNIPPET = 160;
 const CONTEXT = 50;
@@ -19,6 +20,10 @@ const POSITIVE: RegExp[] = [
   /\bfeel\s+free\s+to\s+(?:clip|repost|re-?upload)\w*/i,
   /\bclippers?\s+(?:are\s+)?(?:always\s+|very\s+)?(?:welcome|wanted|needed|allowed|encouraged)\b/i,
   /\bclip(?:ping)?\s+(?:campaign|program|programme|contest|competition)s?\b/i,
+  // YouTube descriptions: "clippers program", "you can clip my videos", "clip my videos and post them".
+  /\bclippers?\s+(?:campaign|program|programme)s?\b/i,
+  /\b(?:you\s+can|you\s+may|anyone\s+can|free\s+to|allowed\s+to|welcome\s+to|go\s+ahead\s+and)\s+clip\s+(?:my|our)\s+(?:videos?|content|streams?|vods?)\b/i,
+  /\bclip\s+(?:my|our)\s+(?:videos?|content|streams?)\s+(?:and|&)\s+(?:post|upload|repost|earn|get\s+paid)\w*/i,
   /\brepost(?:s|ing)?\s+(?:are\s+|is\s+)?(?:always\s+)?(?:allowed|welcome|encouraged|okay|ok|fine)\b/i,
   /\bcontent\s+rewards\b/i,
   /\bwhop\.com\/[^\s)\]]{0,60}/i,
@@ -27,7 +32,7 @@ const POSITIVE: RegExp[] = [
 // Phrases that say the opposite. Any of these anywhere in the same text cancels every positive in it
 // (better to miss a real permission than to quote a fake one).
 const NEGATIVE: RegExp[] = [
-  /\b(?:no|not|never|don'?t|dont|do\s+not|please\s+don'?t|without)\s+(?:any\s+|more\s+|my\s+)?(?:clip|clips|clipping|clippers?|repost|reposts|reposting|re-?uploads?|re-?uploading)\b/i,
+  /\b(?:no|not|never|don'?t|dont|do\s+not|please\s+don'?t|without|can'?t|cannot|may\s+not|must\s+not)\s+(?:any\s+|more\s+|my\s+)?(?:clip|clips|clipping|clippers?|repost|reposts|reposting|re-?uploads?|re-?uploading)\b/i,
   /\b(?:clip|clips|clipping|clippers?|repost|reposts|reposting|re-?uploads?)\s+(?:are\s+|is\s+)?(?:not|never|aren'?t|isn'?t)\b/i,
   /\b(?:clip|clips|clipping|clippers?|repost|reposts|reposting|re-?uploads?)\s+(?:are\s+|is\s+)?(?:prohibited|forbidden|banned|disallowed|not\s+allowed)\b/i,
   /\b(?:aren'?t|isn'?t|not)\s+(?:allowed|permitted)\s+to\s+(?:clip|repost|re-?upload)/i,
@@ -84,8 +89,15 @@ export function findPermissionEvidence(bio: string | null | undefined, title: st
   return null;
 }
 
+/** YouTube: only the channel's own description counts (video titles are not the creator's permission). */
+export function findDescriptionEvidence(description: string | null | undefined): PermissionEvidence | null {
+  const d = findPermission(description); // already null when the description says "no clips" anywhere
+  return d ? { ...d, source: "description" } : null;
+}
+
 /** The approval reason Krew sees pre-filled. Only ever built from a real quote. */
 export function approvalReasonFromEvidence(ev: { evidence: string | null; evidenceSource: string | null }): string {
   if (!ev.evidence) return "";
-  return `${ev.evidenceSource === "title" ? "Stream title says" : "Bio says"}: "${ev.evidence}"`;
+  const who = ev.evidenceSource === "title" ? "Stream title says" : ev.evidenceSource === "description" ? "Channel description says" : "Bio says";
+  return `${who}: "${ev.evidence}"`;
 }

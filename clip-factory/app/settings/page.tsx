@@ -92,6 +92,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           <Row label="Newest videos per channel" hint="How many of each channel's latest uploads to look at."><input name="ytVideosPerChannel" type="number" defaultValue={s.ytVideosPerChannel} className="field w-32" /></Row>
           <Row label="Moments per video" hint="Most-replayed peaks to clip from each video (at least 60s apart)."><input name="ytMomentsPerVideo" type="number" defaultValue={s.ytMomentsPerVideo} className="field w-32" /></Row>
           <Row label="Max video age (days)" hint="Older uploads are skipped."><input name="ytMaxVideoAgeDays" type="number" defaultValue={s.ytMaxVideoAgeDays} className="field w-32" /></Row>
+          <Row label="Suggestions country" hint="2-letter code (US, GB, CA…) of the YouTube trending charts used for YouTube suggestions."><input name="ytSuggestRegion" defaultValue={s.ytSuggestRegion} maxLength={2} className="field w-32 uppercase" /></Row>
         </div>
 
         <div className="card space-y-4 p-5">

@@ -200,6 +200,24 @@ async function main() {
       : { status: "warn", detail: "0 approved — nothing will be clipped", fix: "Open the dashboard and approve some on the Streamers page." };
   }, "Fix the Database line above first.");
 
+  // ---------- 4b. YouTube suggestions (API key) ----------
+  section("YouTube suggestions");
+  const yts = await import("../src/workers/suggest-youtube");
+  if (!yts.youtubeKeyConfigured()) {
+    print("YouTube API key", { status: "warn", detail: "YOUTUBE_API_KEY missing — the Streamers page shows Twitch suggestions only",
+      fix: "Free key: console.cloud.google.com → APIs & Services → Library → YouTube Data API v3 → Enable → Credentials → Create credentials → API key; put it in .env as YOUTUBE_API_KEY= and restart." });
+  } else {
+    await check("YouTube API key", 30_000, async () => {
+      let region = "US";
+      try { region = (await getSettings()).ytSuggestRegion || "US"; } catch { /* the Database line says why */ }
+      const j = await yts.ytApi<{ items?: { snippet?: { title?: string } }[] }>("/videos", { part: "snippet", chart: "mostPopular", regionCode: region, maxResults: "1" });
+      const top = j.items?.[0]?.snippet?.title;
+      return { status: "ok", detail: `key works (trending #1 in ${region}: "${oneLine(top ?? "—", 60)}")` };
+    }, (msg) => /quota/i.test(msg)
+      ? "Today's free quota is used up; it resets at midnight Pacific. Run the doctor again tomorrow."
+      : "Check YOUTUBE_API_KEY in .env, and that YouTube Data API v3 is enabled for its Google project.");
+  }
+
   // ---------- 5. Download + render ----------
   section("Download + render");
   if (noDownload) {

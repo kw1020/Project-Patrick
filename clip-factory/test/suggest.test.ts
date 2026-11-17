@@ -198,5 +198,5 @@ test("scan is skipped when paused or without Twitch keys", async () => {
   await prisma.settings.update({ where: { id: "main" }, data: { scoutPaused: false } });
   const id = process.env.TWITCH_CLIENT_ID;
   delete process.env.TWITCH_CLIENT_ID;
-  try { assert.equal(await runSuggestScan(), "Twitch keys missing"); } finally { process.env.TWITCH_CLIENT_ID = id; }
+  try { assert.match(await runSuggestScan(), /^Twitch: keys missing/); } finally { process.env.TWITCH_CLIENT_ID = id; }
 });

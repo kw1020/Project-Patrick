@@ -17,6 +17,7 @@ export function num(n: number) {
 /** 18200 → "18.2K", 52000 → "52K", 1250000 → "1.3M". */
 export function compact(n: number) {
   const f = (v: number, unit: string) => `${v >= 100 ? Math.round(v) : Number(v.toFixed(1))}${unit}`;
+  if (n >= 1_000_000_000) return f(n / 1_000_000_000, "B");
   if (n >= 1_000_000) return f(n / 1_000_000, "M");
   if (n >= 1000) return f(n / 1000, "K");
   return String(Math.round(n));

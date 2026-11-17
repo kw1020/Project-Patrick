@@ -125,6 +125,7 @@ model Settings {
   ytVideosPerChannel Int     @default(3)
   ytMomentsPerVideo  Int     @default(3)
   ytMaxVideoAgeDays  Int     @default(14)
+  ytSuggestRegion    String  @default("US") // YouTube suggestions: country of the "trending" charts (ISO 3166-1 alpha-2)
 }
 
 // Connected posting accounts. Several per platform (e.g. two YouTube channels, a TikTok).
@@ -173,14 +174,20 @@ model YouTubeVideo {
 // Streamers the Suggestions scanner thinks Krew could approve (big + clippable). Never approves anyone:
 // Krew approves from the Streamers page with a written reason. One row per streamer.
 // status: pending (shown) | dismissed ("Not now", hidden until dismissedUntil) | approved
+// platform: twitch | youtube (each keeps its own top 25). YouTube ones come from the trending charts (YouTube Data API key).
 model Suggestion {
   id             String    @id @default(cuid())
   streamerId     String    @unique
   streamer       Streamer  @relation(fields: [streamerId], references: [id], onDelete: Cascade)
+  platform       String    @default("twitch")
   score          Float
   reasons        String    // JSON array of short plain-English strings
-  evidence       String?   // exact quote from their bio / stream title that says clips are allowed (<= 160 chars)
-  evidenceSource String?   // bio | title
+  evidence       String?   // exact quote from their bio / stream title / channel description that says clips are allowed (<= 160 chars)
+  evidenceSource String?   // bio | title | description
+  subscribers    Int?      // YouTube: subscriber count when scored (null = hidden by the channel)
+  videoId        String?   // YouTube: their biggest trending video when scored
+  videoTitle     String?
+  videoViews     Int?
   viewers        Int       @default(0) // viewers when scored (the Scout resets Streamer.viewers for non-GTA streams)
   gameName       String?   // category when scored
   status         String    @default("pending")

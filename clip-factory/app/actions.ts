@@ -91,11 +91,14 @@ export async function approveSuggestion(id: string, _prev: { error?: string; ok?
   if (!note) return { error: "Write why they're approved (their bio / panels / Discord says clips are OK, paid campaign…)." };
   const sug = await prisma.suggestion.findUnique({ where: { id }, include: { streamer: true } });
   if (!sug) return { error: "That suggestion is gone (the list refreshed). Reload the page." };
-  if (sug.streamer.platform !== "twitch") return { error: "Only Twitch streamers can be approved from here." };
+  const yt = sug.streamer.platform === "youtube";
+  if (!yt && sug.streamer.platform !== "twitch") return { error: "This kind of channel can't be approved from here." };
+  if (yt && !sug.streamer.twitchId.startsWith("yt:")) return { error: "That YouTube channel's record looks wrong. Add it with “Add a YouTube channel” instead." };
+  // Same path as every approval: setApproved pokes the Scout (Twitch) or the YouTube scanner (YouTube).
   await setApproved(sug.streamerId, true, note.slice(0, 500));
   await prisma.suggestion.update({ where: { id }, data: { status: "approved" } });
   refreshAll();
-  return { ok: `${sug.streamer.name} approved. Looking for their clips now.` };
+  return { ok: yt ? `${sug.streamer.name} approved. Scanning their newest videos now.` : `${sug.streamer.name} approved. Looking for their clips now.` };
 }
 
 export async function dismissSuggestion(id: string) {
@@ -187,6 +190,7 @@ export async function saveSettings(form: FormData) {
       ytVideosPerChannel: Math.round(n("ytVideosPerChannel", 1, 15, 3)),
       ytMomentsPerVideo: Math.round(n("ytMomentsPerVideo", 1, 10, 3)),
       ytMaxVideoAgeDays: Math.round(n("ytMaxVideoAgeDays", 1, 365, 14)),
+      ytSuggestRegion: /^[A-Za-z]{2}$/.test(String(form.get("ytSuggestRegion") || "").trim()) ? String(form.get("ytSuggestRegion")).trim().toUpperCase() : "US",
       spikeEnabled: form.get("spikeEnabled") === "on",
       judgeEnabled: form.get("judgeEnabled") === "on",
       judgeLearns: form.get("judgeLearns") === "on",

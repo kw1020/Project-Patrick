@@ -40,7 +40,7 @@ export default async function LivePage({ searchParams }: { searchParams: Promise
     prisma.streamer.findMany({ where: { platform: "twitch", isLive: true, ...(all ? {} : { approved: true }) }, orderBy: [{ viewers: "desc" }], take: 200 }),
     soft(getStatuses(), {} as Record<string, AgentStatus>),
     prisma.clip.groupBy({ by: ["status"], _count: true }),
-    prisma.suggestion.count({ where: { status: "pending", streamer: { approved: false, platform: "twitch" } } }),
+    prisma.suggestion.count({ where: { status: "pending", streamer: { approved: false } } }),
   ]);
   const totalLive = await prisma.streamer.count({ where: { platform: "twitch", isLive: true } });
   const c = Object.fromEntries(counts.map((x) => [x.status, x._count])) as Record<string, number>;

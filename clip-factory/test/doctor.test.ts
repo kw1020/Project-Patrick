@@ -60,6 +60,8 @@ test("doctor: full run against the stand-ins (--no-download)", { timeout: 120_00
   assert.match(out, /^⚠️ +Approved streamers — 0 approved/m);
   assert.match(out, /Streamers page/);
   assert.match(out, /^⚠️ +Download \+ render — skipped/m);
+  assert.match(out, /^✅ YouTube API key — key works \(trending #1 in US: "I survived 100 days in GTA 6"\)/m);
+  assert.ok(mock.requests.some((r) => r.path.includes("chart=mostPopular") && r.path.includes("key=mock-yt-key")), "one mostPopular call with the key");
   assert.match(out, /^✅ YouTube: Krew Clips — sign-in refreshed/m);
   assert.match(out, /^✅ TikTok: @krewclips — sign-in refreshed/m);
   assert.ok(mock.requests.some((r) => r.path.startsWith("/oauth2/token")), "used the Twitch token endpoint");

@@ -223,6 +223,27 @@ with a written reason.
 - The Streamers tab shows a badge with how many suggestions are waiting; the Live page has a
   *Suggestions* card. Paused Scout (Settings) pauses this too.
 
+### YouTube suggestions
+
+The **YouTube** tab next to **Twitch** suggests big YouTube channels the same way (never approved
+automatically, approving needs your reason). Each hour, in the same scan, it reads YouTube's trending
+charts (overall + Gaming + Entertainment + Comedy, country from Settings → *Suggestions country*, default US),
+looks up those channels and keeps the best 25. Cards show subscribers, the trending video, why
+("12.4M subscribers", "trending now: '…' (8.1M views)", "2 videos trending") and whether the
+**channel description** says clips are OK (green quote = pre-filled reason; amber = check their About page
+first). Channels without an @handle are skipped. Approving adds the channel to the YouTube scanner right away.
+
+It needs a free **YouTube API key** (each scan uses ~6 of the 10,000 free daily units):
+
+1. Go to [console.cloud.google.com](https://console.cloud.google.com) and create or select a project.
+2. APIs & Services → Library → search **YouTube Data API v3** → **Enable**.
+3. APIs & Services → Credentials → **Create credentials** → **API key**.
+4. (Optional) **Restrict key** → API restrictions → YouTube Data API v3 → Save.
+5. Put it in `.env` as `YOUTUBE_API_KEY=your-key` (nothing else on the line) and restart Clip Factory.
+
+Without the key the YouTube tab shows these steps and the Twitch part runs as normal. `npm run doctor`
+checks the key. "Daily API quota used up" fixes itself at midnight Pacific.
+
 ## Run without Docker (dev)
 
 Needs Node 20+, Redis, ffmpeg, `pip install yt-dlp faster-whisper`.
