@@ -477,7 +477,7 @@ test("db push upgrade from the v1.7.1 schema (5486a81) with rows: no prompt, row
   const now = fs.readFileSync(SCHEMA, "utf8");
   // v1.7.1 = today's schema without the v1.7.2 lines.
   const old = now
-    .replace(/^ {2}(paused|approvedAt|category|clipFunny|clipGaming)\s.*\n/gm, "")
+    .replace(/^ {2}(paused|approvedAt|category|clipFunny|clipGaming|winLength|editStyle|editNote)\s.*\n/gm, "") // + v1.7.3 columns
     .replace(/^\/\/ \| off_funny.*\n/m, "");
   for (const f of ["paused", "approvedAt", "category", "clipFunny", "clipGaming"]) assert.doesNotMatch(old, new RegExp(`^\\s+${f}\\s`, "m"), f);
   const git = spawnSync("git", ["show", "5486a81:clip-factory/prisma/schema.prisma"], { encoding: "utf8", cwd: path.join(__dirname, "..") });

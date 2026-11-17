@@ -3,6 +3,7 @@ import { judgeConfigured, JUDGE_MODEL } from "@/lib/judge";
 import { MIN_POSTS_TO_LEARN } from "@/lib/learning";
 import { tiktokConfigured, tiktokRedirectUri } from "@/lib/tiktok";
 import { redirectUri, youtubeConfigured } from "@/lib/youtube";
+import { EDIT_STYLES, parseEditStyle } from "@/lib/edit-styles";
 import { disconnectAccount, saveAccount, saveSettings } from "../actions";
 
 export const dynamic = "force-dynamic";
@@ -96,6 +97,16 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           <Row label="Look back (hours)" hint="How old a Twitch clip can be."><input name="clipLookbackHrs" type="number" defaultValue={s.clipLookbackHrs} className="field w-32" /></Row>
           <Row label="Vertical layout" hint="Facecam needs the box set per streamer; falls back to blur.">
             <select name="layout" defaultValue={s.layout} className="field w-56"><option value="blur">Blurred background</option><option value="facecam">Facecam on top</option></select>
+          </Row>
+          <Row label="Editing style" hint="How new clips are edited. You can re-cut any clip in another style from its card in the Queue.">
+            <div className="space-y-1.5">
+              {EDIT_STYLES.map((x) => (
+                <label key={x.key} className="flex items-start gap-2 text-sm">
+                  <input type="radio" name="editStyle" value={x.key} defaultChecked={parseEditStyle(s.editStyle) === x.key} className="mt-0.5 h-4 w-4 accent-[#ff3d81]" />
+                  <span><span className="font-semibold">{x.label}</span> <span className="text-xs text-zinc-500">{x.hint}</span></span>
+                </label>
+              ))}
+            </div>
           </Row>
           <Row label="Burn captions"><input name="captions" type="checkbox" defaultChecked={s.captions} className={check} /></Row>
         </div>

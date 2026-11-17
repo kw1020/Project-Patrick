@@ -1,5 +1,12 @@
 # Clip Factory patch notes
 
+## 1.7.3 — 2026-11-17
+- New editing styles: Hype, Clean and Meme. Pick one in Settings, under Clips. Hype is the new default.
+- Captions now pop in word by word and light up the word being said.
+- Silences are cut out automatically (jump cuts), so clips get to the point faster.
+- Zooms on the big moment, whoosh and boom sound effects, and a progress bar along the bottom.
+- Re-cut any clip in another style from its card in the Queue.
+
 ## 1.7.2 — 2026-11-17
 - Clip Factory now clips funny moments too, not just gaming. Funny clips can come from any stream, like Just Chatting or IRL.
 - Every clip gets a Funny or Gaming label. Turn either kind on or off in Settings, under "What to clip".

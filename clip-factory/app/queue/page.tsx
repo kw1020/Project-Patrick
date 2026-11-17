@@ -31,6 +31,7 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
   const views: ClipView[] = clips.map((k) => ({
     id: k.id, status: k.status, stage: k.stage, error: k.error, title: k.title ?? "", caption: k.caption ?? "",
     duration: k.duration, score: k.score, hook: k.hookText, judgeReason: k.judgeReason, hasVideo: Boolean(k.finalPath),
+    canRecut: Boolean(k.rawPath), editStyle: k.editStyle, editNote: k.editNote, version: k.updatedAt.getTime(),
     // Cut once, then removed by the retention job to save disk.
     expired: !k.finalPath && k.duration != null && ["rejected", "posted", "failed"].includes(k.status) && !k.stage,
     streamer: { name: k.moment.streamer.name, login: k.moment.streamer.login, platform: k.moment.streamer.platform },

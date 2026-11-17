@@ -1,6 +1,7 @@
 "use client";
 import { useState, useTransition } from "react";
-import { markPosted, postToAccount, retryClip, setClipStatus, updateClipText } from "../../app/actions";
+import { markPosted, postToAccount, recutClip, retryClip, setClipStatus, updateClipText } from "../../app/actions";
+import { EDIT_STYLES, editStyleLabel } from "../lib/edit-styles";
 import { creatorCreditText, creatorUrl } from "../lib/social";
 import { CategoryChip } from "./CategoryChip";
 
@@ -8,6 +9,8 @@ export type ClipView = {
   id: string; status: string; stage: string | null; error: string | null; title: string; caption: string;
   duration: number | null; score: number | null; hook: string | null; judgeReason: string | null; hasVideo: boolean;
   expired?: boolean; // the video was deleted by retention to save disk
+  canRecut?: boolean; // the raw video is still there, so it can be re-cut in another editing style
+  editStyle?: string | null; editNote?: string | null; version?: number; // version busts the browser's video cache after a re-cut
   streamer: { name: string; login: string; platform: string }; source: string; vodOffset?: number | null; spikeScore: number; sourceUrl: string | null; sourceViews: number;
   category?: string | null; // funny | gaming (null on older clips)
   posts: { platform: string; accountId: string | null; status: string; url: string | null; error: string | null }[]; postError: string | null;
@@ -36,13 +39,15 @@ export function ClipCard({ clip, accounts }: { clip: ClipView; accounts: Account
   const notYet = accounts.filter((a) => !clip.posts.some((p) => p.accountId === a.id && p.status !== "failed"));
   const accountName = (id: string | null) => accounts.find((a) => a.id === id)?.label;
   const reviewed = clip.status === "approved" || clip.status === "posted";
+  const recutting = clip.stage === "cut" && clip.status !== "processing";
+  const styleName = editStyleLabel(clip.editStyle);
   const scoreColor = clip.score == null ? "" : clip.score >= 8 ? "text-emerald-300" : clip.score >= 6 ? "text-sun" : "text-red-300";
 
   return (
     <div className={`card flex flex-col overflow-hidden ${busy ? "opacity-60" : ""}`}>
       <div className="relative aspect-[9/16] w-full bg-black">
         {clip.hasVideo ? (
-          <video src={`/api/media/${clip.id}`} controls preload="metadata" playsInline className="h-full w-full object-contain" />
+          <video key={clip.version} src={`/api/media/${clip.id}${clip.version ? `?v=${clip.version}` : ""}`} controls preload="metadata" playsInline className="h-full w-full object-contain" />
         ) : (
           <div className="grid h-full place-items-center p-6 text-center text-sm text-zinc-400">
             {clip.expired ? <span>Video expired (deleted to save space)</span>
@@ -52,6 +57,7 @@ export function ClipCard({ clip, accounts }: { clip: ClipView; accounts: Account
         <div className="pointer-events-none absolute inset-x-2 top-2 flex flex-wrap gap-1">
           {clip.score != null && <span className={`rounded-md bg-black/75 px-2 py-1 text-xs font-black ${scoreColor}`}>{clip.score}/10</span>}
           {clip.duration != null && <span className="rounded-md bg-black/75 px-2 py-1 text-xs font-bold">{Math.round(clip.duration)}s</span>}
+          {styleName && <span className="rounded-md bg-black/75 px-2 py-1 text-xs font-bold text-zinc-300">{styleName}</span>}
           <span className="rounded-md bg-black/75 px-2 py-1 text-xs font-bold text-zinc-300">{clip.source === "chat" ? `Chat spike ${clip.spikeScore}x` : clip.source === "youtube" ? "YouTube peak" : "Twitch clip"}</span>
           {clip.category && <span className="rounded-md bg-black/75"><CategoryChip category={clip.category} className="inline-block px-2 py-1 text-xs" /></span>}
         </div>
@@ -90,6 +96,19 @@ export function ClipCard({ clip, accounts }: { clip: ClipView; accounts: Account
           {clip.hasVideo && !clip.expired && <a className="btn-ghost flex-1" href={`/api/media/${clip.id}?download=1`}>Download</a>}
           <button className="btn-ghost flex-1" onClick={copy}>{copied ? "Copied ✓" : "Copy caption"}</button>
         </div>
+        {recutting && <div className="animate-pulse text-xs text-sun">Re-cutting… the new version replaces this video in about a minute.</div>}
+        {clip.editNote && !recutting && <div className="text-xs text-zinc-500" title={clip.editNote}>Plain edit used (the styled edit hit a problem).</div>}
+        {clip.canRecut && clip.status !== "processing" && (
+          <details className="text-xs">
+            <summary className="cursor-pointer select-none text-zinc-400 hover:text-white">Re-cut ▾</summary>
+            <div className="mt-2 flex gap-2">
+              {EDIT_STYLES.map((x) => (
+                <button key={x.key} title={x.hint} className={`btn-ghost flex-1 ${clip.editStyle === x.key ? "ring-1 ring-hot" : ""}`} disabled={busy || recutting}
+                  onClick={() => act(() => recutClip(clip.id, x.key))}>{x.label}</button>
+              ))}
+            </div>
+          </details>
+        )}
 
         {reviewed && (
           <div className="mt-1 space-y-2 border-t border-line pt-3">

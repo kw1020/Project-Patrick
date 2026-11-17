@@ -74,6 +74,9 @@ model Clip {
   duration   Float?
   words       String? // JSON [{start,end,word}] for burned captions
   winStart    Float?  // where the kept window starts in the raw file
+  winLength   Float?  // length of that window (duration = the edited clip, shorter after jump cuts); null on older rows -> duration
+  editStyle   String? // hype | clean | meme: the style it was last cut with (v1.7.3)
+  editNote    String? // set when the styled edit failed and the plain edit was used instead
   score       Float?  // Judge score 1-10
   hookText    String? // Judge's on-screen hook
   hashtags    String? // space-separated
@@ -138,6 +141,7 @@ model Settings {
   ytMomentsPerVideo  Int     @default(3)
   ytMaxVideoAgeDays  Int     @default(14)
   ytSuggestRegion    String  @default("US") // YouTube suggestions: country of the "trending" charts (ISO 3166-1 alpha-2)
+  editStyle          String  @default("hype") // hype | clean | meme (v1.7.3 editing styles)
 }
 
 // Connected posting accounts. Several per platform (e.g. two YouTube channels, a TikTok).

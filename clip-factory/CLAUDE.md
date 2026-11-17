@@ -73,6 +73,24 @@ original brief is below, and the status section says what's done. Read both befo
   (`src/lib/creators.ts`): approved creators with stats, live first then most clips, search + All/Twitch/YouTube/Live chips, Pause
   (`setPaused`; paused = skipped by clips poller, spike detector, YouTube scanner and no chat join, but still tracked live) and a two-step Remove.
   Judge prompt now opens "You score short clips from streamers and YouTubers" (funny non-gaming clips are first-class). Unverified on real chat.
+- **v1.7.3 (2026-11-17): editing styles** (Krew: "clips seem a little bland"). Settings `editStyle` hype|clean|meme (default hype);
+  Clip `editStyle` (style it was last cut with, null = plain fallback), `winLength` (the window; `duration` is now the EDITED length, so
+  re-cuts read `winLength ?? duration`), `editNote` (warning when the plain fallback was used). All additive; `test/edit.test.ts` runs a real
+  `db push` from the 0684afb schema with rows. Code: `src/lib/edit.ts` (pure builders + `renderStyled`), style list in
+  `src/lib/edit-styles.ts` (no Node imports, the client card uses it). One ffmpeg render per clip: fps=30 first, jump cuts as
+  `trim/atrim` + `concat` (segments snapped to 1/30s), fg zoom = `scale eval=frame` to even sizes + `crop` whose x/y repeat the same
+  expression (crop's in_w is the FIRST frame's size, so default centring breaks), blurred bg never zooms, `eq`+`unsharp`, ASS
+  (credit top y=110, hook y=250 / 190 facecam, captions centred at y=1190 = 62%) drawn after the zoom, progress bar = an 8px `color`
+  source overlaid with x='-W+W*t/D' (drawbox can't animate its width in ffmpeg 6.1), `loudnorm` I=-14 + SFX via `adelay`+`amix`.
+  Jump cuts (`planJumpCuts`): gaps > 0.6s between words, 0.15s pad, biggest first, never under `clipMinSec`, never across the peak,
+  none with < 6 words; leading/trailing silence is kept (may be gameplay). Peak (`pickPeak`): chat spike from a VOD = the moment
+  (raw time min(30, vodOffset)); else the loudest second from one `astats` pass (~0.2s). Punch = 0.25s smoothstep in, 1.2s hold, 0.25s out.
+  SFX (whoosh = filtered noise with `asendcmd` opening a low-pass, boom = 130->55 Hz sine drop) are made by ffmpeg once into
+  `STORAGE_DIR/sfx/*-v1.wav`. Any styled-render error -> `renderOrFallback` makes the plain v1.7.1 edit and sets `editNote`.
+  Queue card "Re-cut ▾" (`recutClip`) = stage "cut" + `enqueueCut(id, 1, style)` (job data `style`), status kept (a failed clip goes back
+  to processing); only while `rawPath` exists. **Measured (this sandbox, 4 cores, 45s 1080p60 source, -preset veryfast):** plain v1.7.1
+  render 19.2-20.2s; hype 17.8-18.5s, clean 15.9-16.2s, meme 18.7-19.6s, hype facecam 19.8s (outputs 32.7s after jump cuts; doing fps=30
+  before scaling pays for the effects). Proof contact sheets in the session scratchpad only. Unverified on Krew's PC and on real Twitch audio.
 - Docker image never built in the sandbox (no daemon); it builds fine on Krew's PC; a clean-copy `npm ci` + `next build` without `.env`
   (what the Dockerfile does) passes.
 - **Suggestions (2026-11-17):** `src/workers/suggest.ts` (queue "suggest", hourly + once ~1 min after start,

@@ -70,7 +70,7 @@ async function main() {
     worker("grab", 2, (job) => runGrab(job.data.clipId)),
     worker("transcribe", 1, (job) => runTranscribe(job.data.clipId)),
     worker("judge", 3, (job) => runJudge(job.data.clipId)),
-    worker("cut", Number(process.env.CUT_CONCURRENCY || 1), (job) => runCut(job.data.clipId)), // ffmpeg is CPU-heavy: one at a time
+    worker("cut", Number(process.env.CUT_CONCURRENCY || 1), (job) => runCut(job.data.clipId, job.data.style)), // ffmpeg is CPU-heavy: one at a time
     worker("youtube", 1, () => runYouTubeScan()),
     worker("suggest", 1, () => runSuggestScan()),
     worker("post", 1, (job) => (job.name === "views" ? runStatsSync() : runPost(job.data.clipId, job.data.accountId))),

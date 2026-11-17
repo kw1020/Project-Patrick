@@ -41,6 +41,20 @@ Whisper caption model (~150 MB) once.
 
 Finished files are also in `storage/final/` on your computer.
 
+### Editing styles
+
+Settings -> Clips -> **Editing style** picks how new clips are edited (default **Hype**):
+
+- **Hype**: captions pop in word by word with the spoken word in yellow, silences cut out (jump cuts), a zoom
+  on every cut and a zoom punch on the loudest moment, a whoosh on the hook and a boom on the punch, pink progress bar.
+- **Clean**: white word-by-word captions and jump cuts, a simple fade-in hook, no zooms or sound effects.
+- **Meme**: bigger tilted captions with the spoken word in green, harder zoom punch, yellow hook, sound effects.
+
+Every style keeps the `twitch.tv/name` / `youtube.com/@name` credit burned in at the top. Jump cuts never make a clip
+shorter than the minimum clip length and are skipped when there is little talking. To try another style on one clip,
+open **Re-cut** on its Queue card (works while the original video is still kept, about 12 hours). If a styled edit ever
+fails, the clip is made with the plain edit instead and the card says so.
+
 ## Install with automatic updates (Windows, once)
 
 After this, you never download a ZIP again: the **Clip Factory** desktop icon checks for updates,

@@ -6,6 +6,7 @@ import { enqueueCut, enqueueGrab, enqueuePost, enqueueTranscribe, pokeScout, pok
 import { resolveChannel } from "@/lib/ytdlp";
 import { getUsers, twitchConfigured } from "@/lib/twitch";
 import { parseFacecam } from "@/lib/media";
+import { parseEditStyle } from "@/lib/edit-styles";
 import { approvalReasonFromEvidence } from "@/lib/permission";
 import { loginTakenBy } from "@/lib/streamers";
 import { approveResolved, DEFAULT_APPROVAL_NOTE, resolveCreators, type ApprovePick, type ApproveResult, type ResolveResult } from "@/lib/creator-lookup";
@@ -188,6 +189,20 @@ export async function retryClip(id: string) {
   refreshAll();
 }
 
+/**
+ * Re-cut a clip in another editing style (Queue card "Re-cut"). Needs the raw video (deleted 12h after the cut).
+ * The review status stays as it is (the cutter only decides review/auto-reject on a clip's first cut).
+ */
+export async function recutClip(id: string, style: string) {
+  const clip = await prisma.clip.findUniqueOrThrow({ where: { id } });
+  if (!clip.rawPath) throw new Error("The original video is gone (deleted to save space), so this clip can't be re-cut.");
+  if (clip.words == null) return retryClip(id); // never transcribed: run the whole line again
+  const s = parseEditStyle(style);
+  await prisma.clip.update({ where: { id }, data: { stage: "cut", stageAt: new Date(), error: null, ...(clip.status === "failed" ? { status: "processing" } : {}) } });
+  await enqueueCut(id, 1, s);
+  refreshAll();
+}
+
 export async function markPosted(id: string, form: FormData) {
   const platform = String(form.get("platform") || "tiktok");
   const url = String(form.get("url") || "").trim() || null;
@@ -234,6 +249,7 @@ export async function saveSettings(form: FormData) {
       spikeEnabled: form.get("spikeEnabled") === "on",
       judgeEnabled: form.get("judgeEnabled") === "on",
       judgeLearns: form.get("judgeLearns") === "on",
+      editStyle: parseEditStyle(form.get("editStyle")),
     },
   });
   refreshAll();
