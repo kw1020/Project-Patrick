@@ -7,6 +7,10 @@ Owner: Krew Sutherland. Krew hates repeating themself — read this first.
   `watch_video` (added 2026-09-19), Kokoro voice, Patrick's Gmail and calendar.
   Its memory backups land in Google Drive daily as `patrick-mind-YYYYMMDD-HHMM.zip`
   (chatlog/, patrick_memory.md, profile.md, goals.md, jobs.json).
+- **2026-11-17: Krew wants local Patrick shut down FOR GOOD.** Do not suggest falling back
+  to local Patrick or restarting it. Only bring it back if Krew explicitly says so.
+  Cloud sessions can't reach Krew's computer (no Remote Control folder shared), so
+  stopping it has to happen on that computer (autostart off, API key revoked, Google access revoked).
 - **Cloud Claude Code sessions** (like this repo's sessions) do NOT have `watch_video`;
   they use the `watch` skill below instead.
 
@@ -28,5 +32,5 @@ Owner: Krew Sutherland. Krew hates repeating themself — read this first.
   **10 MB** and drive.google.com is blocked by default, so a big Drive video needs
   drive.google.com + drive.usercontent.google.com allowed in the environment's network
   settings and the file shared as "anyone with the link"; then pass the link to watch.py.
-- If those aren't set up, fall back to local Patrick, or screenshots / a Google Doc.
+- If those aren't set up, use screenshots or a Google Doc (local Patrick is shut down).
 - Patrick's Gmail (connected here) is krew2128@gmail.com; Krew sends from krew252@gmail.com.
