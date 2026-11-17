@@ -2,7 +2,7 @@ import { Queue } from "bullmq";
 import IORedis from "ioredis";
 
 // One queue per production-line stage.
-export const QUEUES = { scout: "scout", clips: "clips", grab: "grab", transcribe: "transcribe", judge: "judge", cut: "cut", post: "post", youtube: "youtube" } as const;
+export const QUEUES = { scout: "scout", clips: "clips", grab: "grab", transcribe: "transcribe", judge: "judge", cut: "cut", post: "post", youtube: "youtube", suggest: "suggest" } as const;
 export type QueueName = keyof typeof QUEUES;
 
 let conn: IORedis | null = null;
@@ -53,6 +53,11 @@ export async function pokeScout() {
 /** Ask the worker to run the YouTube scanner now (e.g. after approving a channel). */
 export async function pokeYouTube() {
   await queue("youtube").add("youtube", {}, { removeOnComplete: true });
+}
+
+/** Ask the worker to run the Suggestions scan now ("Scan now" on the Streamers page). */
+export async function pokeSuggest() {
+  await queue("suggest").add("suggest", {}, { removeOnComplete: true, attempts: 1 });
 }
 
 // Last-run status per agent, shown on the dashboard ("Scout ran 40s ago: 37 streams").

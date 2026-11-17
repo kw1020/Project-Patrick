@@ -183,6 +183,23 @@ yt-dlp and the "Most replayed" graph YouTube shows on the seek bar.
 Settings → **YouTube scanner**: on/off, videos per channel (3), moments per video (3), max video
 age in days (14). It respects the same backlog cap as the Twitch side. The Live page shows its last run.
 
+## Suggestions
+
+Streamers page → **Suggested for you**: people the agents think are worth approving, mainly big
+streamers whose viewers clip a lot. **Nobody is approved automatically** — you still approve each one,
+with a written reason.
+
+- Every hour (first scan ~1 min after Clip Factory starts; **Scan now** runs one right away) it looks at
+  the top 300 live streams on all of Twitch plus everyone the GTA Scout has seen this week, checks the
+  40 biggest (clips viewers made in the last 7 days, top clip views, their Twitch bio) and keeps the best 25.
+- Each card says why ("18.2K watching now (Just Chatting)", "viewers made 340 clips this week",
+  "top clip 52K views") and whether their **bio or stream title** says clips are OK. Green = there's a
+  quote (e.g. "Clips welcome!"), and Approve pre-fills it as your reason. Amber = nothing public found:
+  check their About panels / Discord first and type the reason yourself.
+- **Approve…** → reason → Confirm (same as the Approve form). **Not now** hides them for 30 days.
+- The Streamers tab shows a badge with how many suggestions are waiting; the Live page has a
+  *Suggestions* card. Paused Scout (Settings) pauses this too.
+
 ## Run without Docker (dev)
 
 Needs Node 20+, Redis, ffmpeg, `pip install yt-dlp faster-whisper`.

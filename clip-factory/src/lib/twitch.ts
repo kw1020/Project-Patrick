@@ -94,7 +94,7 @@ export type TwitchClip = {
   video_id: string; game_id: string; title: string; view_count: number; created_at: string;
   thumbnail_url: string; duration: number; vod_offset: number | null;
 };
-export type TwitchUser = { id: string; login: string; display_name: string; profile_image_url: string };
+export type TwitchUser = { id: string; login: string; display_name: string; profile_image_url: string; description?: string };
 
 /** GTA 6's Twitch category id. Override with TWITCH_GAME_ID if Twitch names it differently. */
 export async function getGameId(): Promise<string> {

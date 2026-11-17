@@ -36,10 +36,11 @@ function AgentCard({ name, s, idle }: { name: string; s?: AgentStatus; idle?: st
 
 export default async function LivePage({ searchParams }: { searchParams: Promise<{ all?: string }> }) {
   const { all } = await searchParams;
-  const [streams, statuses, counts] = await Promise.all([
+  const [streams, statuses, counts, suggestionCount] = await Promise.all([
     prisma.streamer.findMany({ where: { platform: "twitch", isLive: true, ...(all ? {} : { approved: true }) }, orderBy: [{ viewers: "desc" }], take: 200 }),
     soft(getStatuses(), {} as Record<string, AgentStatus>),
     prisma.clip.groupBy({ by: ["status"], _count: true }),
+    prisma.suggestion.count({ where: { status: "pending", streamer: { approved: false, platform: "twitch" } } }),
   ]);
   const totalLive = await prisma.streamer.count({ where: { platform: "twitch", isLive: true } });
   const c = Object.fromEntries(counts.map((x) => [x.status, x._count])) as Record<string, number>;
@@ -63,11 +64,20 @@ export default async function LivePage({ searchParams }: { searchParams: Promise
         </div>
       )}
 
-      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
         <AgentCard name="Scout" s={statuses.scout} />
         <AgentCard name="Clips poller" s={statuses.clips} />
         <AgentCard name="Spike detector" s={statuses.spike} idle="Watching chat. No spikes yet." />
         <AgentCard name="YouTube scanner" s={statuses.youtube} idle="Runs every 30 min for approved YouTube channels." />
+        <Link href="/streamers" className="card block px-4 py-3 hover:border-zinc-500">
+          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-zinc-400">
+            <span className={`h-2 w-2 rounded-full ${!statuses.suggest ? "bg-zinc-600" : statuses.suggest.ok ? "bg-emerald-400" : "bg-red-500"}`} />Suggestions
+          </div>
+          <div className={`mt-1 text-sm ${statuses.suggest && !statuses.suggest.ok ? "text-red-300" : "text-zinc-200"}`}>
+            {statuses.suggest && !statuses.suggest.ok ? statuses.suggest.msg
+              : `${suggestionCount} new suggestion${suggestionCount === 1 ? "" : "s"} · ${statuses.suggest ? `last scan ${ago(statuses.suggest.at)}` : "first scan ~1 min after start"}`}
+          </div>
+        </Link>
         <div className="card px-4 py-3">
           <div className="text-xs font-bold uppercase tracking-wide text-zinc-400">Production line</div>
           <div className="mt-1 text-sm">{c.processing ?? 0} in the line · <Link href="/queue" className="font-bold text-hot">{c.pending ?? 0} to review</Link></div>

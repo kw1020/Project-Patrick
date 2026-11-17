@@ -13,6 +13,7 @@ import { runJudge } from "./judge";
 import { migrateLegacySettings, runPost, runStatsSync } from "./poster";
 import { runSpikeCheck } from "./spike";
 import { runYouTubeScan } from "./youtube";
+import { runSuggestScan } from "./suggest";
 import { startRetention } from "./retention";
 import { judgeConfigured } from "../lib/judge";
 
@@ -30,13 +31,13 @@ function worker(name: keyof typeof QUEUES, concurrency: number, fn: (job: Job) =
   const w = new Worker(QUEUES[name], async (job) => {
     const msg = await fn(job);
     console.log(`[${name}] ${msg}`);
-    if (name === "scout" || name === "clips" || name === "judge" || name === "youtube") await setStatus(name, true, msg);
+    if (name === "scout" || name === "clips" || name === "judge" || name === "youtube" || name === "suggest") await setStatus(name, true, msg);
     if (name === "post") await setStatus(job.name === "views" ? "stats" : "post", true, msg);
     return msg;
   }, { connection: redis(), concurrency });
   w.on("failed", async (job, err) => {
     console.error(`[${name}] failed:`, err.message);
-    if (name === "scout" || name === "clips" || name === "youtube") await setStatus(name, false, err.message);
+    if (name === "scout" || name === "clips" || name === "youtube" || name === "suggest") await setStatus(name, false, err.message);
     const clipId = job?.data?.clipId;
     if (name === "post" && job?.name === "views") { await setStatus("stats", false, err.message); return; }
     if (name === "post") {
@@ -71,6 +72,7 @@ async function main() {
     worker("judge", 3, (job) => runJudge(job.data.clipId)),
     worker("cut", Number(process.env.CUT_CONCURRENCY || 1), (job) => runCut(job.data.clipId)), // ffmpeg is CPU-heavy: one at a time
     worker("youtube", 1, () => runYouTubeScan()),
+    worker("suggest", 1, () => runSuggestScan()),
     worker("post", 1, (job) => (job.name === "views" ? runStatsSync() : runPost(job.data.clipId, job.data.accountId))),
   ];
 
@@ -81,6 +83,12 @@ async function main() {
 
   // YouTube scanner every 30 minutes (and once right now).
   await queue("youtube").upsertJobScheduler("youtube-every", { every: Number(process.env.YOUTUBE_INTERVAL_MS || 30 * 60_000) }, { name: "youtube", opts: { attempts: 1 } });
+
+  // Suggestions scan every hour, and once about a minute after startup (after the Scout's first pass).
+  // startDate only applies when the scheduler is first created; on later restarts it keeps its hourly slot.
+  const suggestEvery = Number(process.env.SUGGEST_INTERVAL_MS || 60 * 60_000);
+  await queue("suggest").upsertJobScheduler("suggest-every", { every: suggestEvery, startDate: Date.now() + suggestEvery }, { name: "suggest", opts: { attempts: 1 } });
+  await queue("suggest").add("suggest", {}, { delay: 60_000, attempts: 1, removeOnComplete: true });
 
   await queue("post").upsertJobScheduler("views-every", { every: 15 * 60_000 }, { name: "views", opts: { attempts: 1 } });
   const stopRetention = startRetention(); // disk retention: now, then hourly
@@ -98,7 +106,7 @@ async function main() {
   }, 5_000);
 
   const heat = setInterval(() => flushChatHeat(chat).catch((e) => console.error("[chat]", e.message)), 10_000);
-  console.log(`Clip Factory workers up: scout + clips every ${every / 1000}s, YouTube scan every 30 min, spike check every 5s, grab x2, transcribe, judge x3, cut, post`);
+  console.log(`Clip Factory workers up: scout + clips every ${every / 1000}s, YouTube scan every 30 min, suggestions hourly, spike check every 5s, grab x2, transcribe, judge x3, cut, post`);
 
   const shutdown = async () => {
     clearInterval(heat);

@@ -33,6 +33,7 @@ model Streamer {
   updatedAt     DateTime  @updatedAt
   moments       Moment[]
   videos        YouTubeVideo[]
+  suggestion    Suggestion?
 }
 
 // A moment worth clipping. Phase 1 source = twitch_clip; Phase 2 adds chat spikes.
@@ -167,4 +168,23 @@ model YouTubeVideo {
   status     String
   note       String?
   checkedAt  DateTime  @default(now())
+}
+
+// Streamers the Suggestions scanner thinks Krew could approve (big + clippable). Never approves anyone:
+// Krew approves from the Streamers page with a written reason. One row per streamer.
+// status: pending (shown) | dismissed ("Not now", hidden until dismissedUntil) | approved
+model Suggestion {
+  id             String    @id @default(cuid())
+  streamerId     String    @unique
+  streamer       Streamer  @relation(fields: [streamerId], references: [id], onDelete: Cascade)
+  score          Float
+  reasons        String    // JSON array of short plain-English strings
+  evidence       String?   // exact quote from their bio / stream title that says clips are allowed (<= 160 chars)
+  evidenceSource String?   // bio | title
+  viewers        Int       @default(0) // viewers when scored (the Scout resets Streamer.viewers for non-GTA streams)
+  gameName       String?   // category when scored
+  status         String    @default("pending")
+  dismissedUntil DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 }

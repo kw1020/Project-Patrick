@@ -24,6 +24,15 @@ original brief is below, and the status section says what's done. Read both befo
   `claude/adoring-mendel-at7ood` = what Krew gets on next launch, so never push a broken build there.
 - Docker image never built in the sandbox (no daemon); it builds fine on Krew's PC; a clean-copy `npm ci` + `next build` without `.env`
   (what the Dockerfile does) passes.
+- **Suggestions (2026-11-17):** `src/workers/suggest.ts` (queue "suggest", hourly + once ~1 min after start,
+  "Scan now" on Streamers) → `Suggestion` rows (one per streamer, top 25 pending). Candidates: top 300 live on all of
+  Twitch + unapproved streamers the Scout saw in 7 days; excludes approved, non-Twitch logins, fresh pending (<50 min),
+  dismissed until `dismissedUntil` ("Not now" = 30 days). Top 40 by viewers get `/users` + one `/clips` page (7 days).
+  `score = 2·log10(viewers+1) + 1.5·log10(clipCount+1) + 1.5·log10(topClipViews+1) + 2 if permission evidence`.
+  Evidence = `src/lib/permission.ts` regexes on bio then title; any "no clips"/"don't clip" in either cancels.
+  It NEVER approves: Approve on a card calls `approveSuggestion` → `setApproved` with Krew's typed reason (pre-filled
+  only with the real quote). Never touches `isLive`/`viewers` (the Scout owns them); `Suggestion.viewers/gameName`
+  hold the snapshot. Unverified against real Helix (bio `description` field and all-Twitch `/streams` paging per docs).
 - Tests: `npm test` (unit, real ffmpeg renders, workers against Redis, Judge/YouTube/TikTok against the
   stand-in servers in `test/mocks.ts`). `npx tsx test/mocks.ts 4010` prints env vars to run the app on stand-ins.
 - **First real run on Krew's Windows PC (2026-11-17), `npm run doctor` in Docker: 0 broken.** Verified for real:

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
-import { enqueueCut, enqueueGrab, enqueuePost, enqueueTranscribe, pokeScout, pokeYouTube } from "@/lib/queues";
+import { enqueueCut, enqueueGrab, enqueuePost, enqueueTranscribe, pokeScout, pokeSuggest, pokeYouTube } from "@/lib/queues";
 import { resolveChannel } from "@/lib/ytdlp";
 import { getUsers, twitchConfigured } from "@/lib/twitch";
 import { parseFacecam } from "@/lib/media";
@@ -81,6 +81,30 @@ export async function saveStreamer(id: string, form: FormData) {
 
 export async function removeStreamer(id: string) {
   await prisma.streamer.update({ where: { id }, data: { approved: false, approvalNote: null } });
+  refreshAll();
+}
+
+// ---------- Suggestions ----------
+// The scanner only suggests. Approving is Krew's click + his written reason, through setApproved like any other approval.
+export async function approveSuggestion(id: string, _prev: { error?: string; ok?: string } | null, form: FormData) {
+  const note = String(form.get("note") || "").trim();
+  if (!note) return { error: "Write why they're approved (their bio / panels / Discord says clips are OK, paid campaign…)." };
+  const sug = await prisma.suggestion.findUnique({ where: { id }, include: { streamer: true } });
+  if (!sug) return { error: "That suggestion is gone (the list refreshed). Reload the page." };
+  if (sug.streamer.platform !== "twitch") return { error: "Only Twitch streamers can be approved from here." };
+  await setApproved(sug.streamerId, true, note.slice(0, 500));
+  await prisma.suggestion.update({ where: { id }, data: { status: "approved" } });
+  refreshAll();
+  return { ok: `${sug.streamer.name} approved. Looking for their clips now.` };
+}
+
+export async function dismissSuggestion(id: string) {
+  await prisma.suggestion.update({ where: { id }, data: { status: "dismissed", dismissedUntil: new Date(Date.now() + 30 * 86_400_000) } });
+  refreshAll();
+}
+
+export async function scanSuggestionsNow() {
+  await pokeSuggest();
   refreshAll();
 }
 

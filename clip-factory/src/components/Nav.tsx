@@ -11,7 +11,7 @@ const LINKS = [
   { href: "/settings", label: "Settings" },
 ];
 
-export function Nav({ pending }: { pending: number }) {
+export function Nav({ pending, suggestions = 0 }: { pending: number; suggestions?: number }) {
   const path = usePathname();
   return (
     <nav className="flex gap-1 overflow-x-auto">
@@ -23,6 +23,9 @@ export function Nav({ pending }: { pending: number }) {
             {l.label}
             {l.href === "/queue" && pending > 0 && (
               <span className="ml-1.5 rounded-full bg-hot px-1.5 py-0.5 text-[11px] font-bold text-white">{pending}</span>
+            )}
+            {l.href === "/streamers" && suggestions > 0 && (
+              <span title="New suggestions" className="ml-1.5 rounded-full bg-sun px-1.5 py-0.5 text-[11px] font-bold text-black">{suggestions}</span>
             )}
           </Link>
         );
