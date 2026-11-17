@@ -86,8 +86,7 @@ Runs every 5s per approved live streamer whose chat we read (anonymous IRC with 
 - faster-whisper's own audio loader breaks on newer PyAV; `scripts/transcribe.py` reads the WAV itself.
 - YouTube (checked 2026-11-16): API uploads are no longer forced private; 100 uploads/day per project.
 - The dashboard has no login. Fine on localhost; add a passcode before hosting it anywhere public.
-- yt-dlp (2026.10) warns that YouTube extraction without a JS runtime (deno) is deprecated; if the YouTube scanner
-  starts failing on Krew's PC, add deno to the Docker image.
+- yt-dlp (2026.10) needs a JS runtime for YouTube: the Dockerfile copies deno 2.1.4 in and installs `yt-dlp[default]`.
 - DB stores media paths relative to `STORAGE_DIR` so web + worker containers agree.
 
 ---
