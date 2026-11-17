@@ -13,8 +13,11 @@ const Verdict = z.object({
   title: z.string().describe("Post title, max 80 characters"),
   hashtags: z.array(z.string()).describe("4-6 hashtags without the # sign"),
   reason: z.string().describe("One or two plain sentences on why this score"),
+  category: z.enum(["funny", "gaming"]).describe("funny: comedy, banter, reactions, funny fails (any stream, not only games). gaming: plays, clutches, chases, game moments"),
 });
 export type Verdict = z.infer<typeof Verdict>;
+/** The structured-output schema (exported for tests). */
+export const VerdictSchema = Verdict;
 
 export type JudgeInput = {
   streamer: string;
@@ -25,8 +28,9 @@ export type JudgeInput = {
   sourceTitle?: string | null;
   sourceViews?: number;
   transcript: string | null;
-  stats?: { kind?: string; ratio?: number; rate?: number; baseline?: number; hypeShare?: number; viewers?: number; chat?: string[] } | null;
+  stats?: { kind?: string; ratio?: number; rate?: number; baseline?: number; hypeShare?: number; laughShare?: number; viewers?: number; chat?: string[] } | null;
   minScore: number;
+  category?: string | null; // the pipeline's first guess (chat laughs / Twitch category / title), evidence only
 };
 
 export function judgeConfigured() {
@@ -84,7 +88,9 @@ function render(i: JudgeInput) {
   } else {
     const s = i.stats ?? {};
     lines.push(`Found as: a chat spike (${s.kind ?? "volume"}). Chat hit ${s.rate?.toFixed(1) ?? "?"} messages/sec against a normal ${s.baseline?.toFixed(2) ?? "?"} (${s.ratio ?? "?"}x), ${Math.round((s.hypeShare ?? 0) * 100)}% of messages were hype words or emotes, ${s.viewers ?? "?"} viewers.`);
+    if (s.laughShare != null) lines.push(`Laughs (LMAO, KEKW, 😂, "I can't"…) were ${Math.round(s.laughShare * 100)}% of chat's reactions; the rest were gameplay hype (W, Pog, "no way").`);
   }
+  if (i.category === "funny" || i.category === "gaming") lines.push(`First guess at the type: ${i.category} (from chat, the Twitch category or the title)`);
   lines.push("", "<transcript>", i.transcript?.trim() || "(no speech detected)", "</transcript>");
   if (i.stats?.chat?.length) lines.push("", "<chat_sample>", ...i.stats.chat.slice(0, 40), "</chat_sample>");
   return lines.join("\n");
@@ -113,5 +119,6 @@ export async function judgeClip(input: JudgeInput, lessons: string | null = null
     title: v.title.replace(/[<>\n]/g, " ").trim().slice(0, 90),
     hashtags: v.hashtags,
     reason: v.reason.trim().slice(0, 500),
+    category: v.category === "funny" ? "funny" : "gaming",
   };
 }

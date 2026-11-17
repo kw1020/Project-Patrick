@@ -25,6 +25,7 @@ export type WorkItem = {
   title: string;
   since: string;          // ISO: when it entered its current column (time in this step)
   score: number | null;
+  category?: string | null; // funny | gaming (null on older clips)
   error?: string | null;
   url?: string | null;    // posted link
   where?: string;         // Posting / Posted: which platform
@@ -65,8 +66,8 @@ const LIMIT = 12;
 const MIN = 60_000;
 
 type ClipRow = {
-  id: string; title: string | null; score: number | null; stage: string | null; stageAt: Date | null; updatedAt: Date; error: string | null;
-  moment: { source: string; sourceTitle: string | null; streamer: { name: string; login: string; platform: string; profileImage: string | null } };
+  id: string; title: string | null; score: number | null; stage: string | null; stageAt: Date | null; updatedAt: Date; error: string | null; category: string | null;
+  moment: { source: string; sourceTitle: string | null; category: string | null; streamer: { name: string; login: string; platform: string; profileImage: string | null } };
 };
 
 function clipItem(c: ClipRow, extra: Partial<WorkItem> = {}): WorkItem {
@@ -76,7 +77,7 @@ function clipItem(c: ClipRow, extra: Partial<WorkItem> = {}): WorkItem {
     creator: { name: s.name, avatar: s.profileImage, login: s.login, platform: s.platform },
     source: c.moment.source, sourceLabel: sourceLabel(c.moment.source),
     title: c.title || c.moment.sourceTitle || "Untitled moment",
-    since: (c.stageAt ?? c.updatedAt).toISOString(), score: c.score, error: c.error,
+    since: (c.stageAt ?? c.updatedAt).toISOString(), score: c.score, error: c.error, category: c.category ?? c.moment.category,
     ...extra,
   };
 }
@@ -109,7 +110,7 @@ export async function getWorkroom(now: Date = new Date()): Promise<Workroom> {
     key: `moment-${m.id}`, clipId: null,
     creator: { name: m.streamer.name, avatar: m.streamer.profileImage, login: m.streamer.login, platform: m.streamer.platform },
     source: m.source, sourceLabel: sourceLabel(m.source), title: m.sourceTitle || `${m.streamer.name} moment`,
-    since: m.createdAt.toISOString(), score: null,
+    since: m.createdAt.toISOString(), score: null, category: m.category,
   }));
   for (const c of processing) columns[columnForStage(c.stage)].push(clipItem(c));
   columns.ready = ready.map((c) => clipItem(c));

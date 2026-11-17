@@ -1,5 +1,13 @@
 # Clip Factory patch notes
 
+## 1.7.2 — 2026-11-17
+- Clip Factory now clips funny moments too, not just gaming. Funny clips can come from any stream, like Just Chatting or IRL.
+- Every clip gets a Funny or Gaming label. Turn either kind on or off in Settings, under "What to clip".
+- When chat bursts out laughing (LMAO, KEKW, crying emojis), that moment is caught and labelled Funny.
+- The Queue has new All, Funny and Gaming tabs so you can review one kind at a time.
+- New Creators page: everyone you approved on Twitch and YouTube, who is live, and how many clips and views each one made.
+- On the Creators page you can pause a creator (no new clips for now), see their clips, or remove them.
+
 ## 1.7.1 — 2026-11-17
 - Creators with the same name on Twitch and YouTube can now be added on both, like Kai Cenat or IShowSpeed.
 - If you added your top creators already, open Streamers, then Add a list, Load top 21, Find them and Approve all again. That adds their YouTube channels.

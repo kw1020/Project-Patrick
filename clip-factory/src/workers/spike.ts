@@ -4,8 +4,11 @@ import { enqueueGrab } from "../lib/queues";
 import { defaultCaption, defaultTitle, GTA6_NAME } from "../lib/social";
 import { getLiveVodId } from "../lib/twitch";
 import { backlogRoom } from "../lib/guards";
+import { categoryOff, skippedNote, type Category } from "../lib/category";
 
 const COOLDOWN_MS = 180_000;          // one moment per streamer per 3 min
+const SKIP_QUIET_MS = 30_000;         // a spike of a switched-off kind is counted once, not every 5s while the window lasts
+const lastSkip = new Map<string, number>();
 const REACTION_LAG_SEC = 12;          // stream delay + time for chat to react
 const VOD_CATCHUP_MS = 150_000;       // live VODs trail the stream; wait before grabbing
 
@@ -25,14 +28,23 @@ async function liveVod(twitchId: string, streamId: string | null, now: number) {
 export async function runSpikeCheck(chat: ChatHeat, now = Date.now(), lookupVod = liveVod): Promise<string | null> {
   const settings = await getSettings();
   if (!settings.spikeEnabled || settings.scoutPaused) return null;
-  const live = await prisma.streamer.findMany({ where: { approved: true, isLive: true, platform: "twitch" } });
+  // Paused creators (Creators page) stay approved but make no new moments.
+  const live = await prisma.streamer.findMany({ where: { approved: true, paused: false, isLive: true, platform: "twitch" } });
   const notes: string[] = [];
+  const skipped: Record<Category, number> = { funny: 0, gaming: 0 };
   let room: number | null = null; // looked up only once a spike shows up
 
   for (const s of live) {
     if (now - (lastSpike.get(s.id) ?? 0) < COOLDOWN_MS) continue;
+    if (now - (lastSkip.get(s.id) ?? 0) < SKIP_QUIET_MS) continue;
     const sp = chat.spike(s.login, settings.spikeMultiplier, now);
     if (!sp) continue;
+    if (categoryOff(settings, sp.category)) {
+      // Settings → "What to clip" has this kind off: no moment. Short quiet time so one spike is counted once.
+      lastSkip.set(s.id, now);
+      skipped[sp.category]++;
+      continue;
+    }
     if (room == null) room = await backlogRoom();
     if (room <= 0) {
       // Line is full: skip without using up the streamer's cooldown.
@@ -52,15 +64,17 @@ export async function runSpikeCheck(chat: ChatHeat, now = Date.now(), lookupVod 
     const moment = await prisma.moment.create({
       data: {
         streamerId: s.id, timestamp: new Date(now - REACTION_LAG_SEC * 1000), spikeScore: sp.ratio, source: "chat", gameName: game,
-        vodId, vodOffset, sourceUrl: `https://www.twitch.tv/videos/${vodId}?t=${Math.max(0, vodOffset - 30)}s`,
+        vodId, vodOffset, sourceUrl: `https://www.twitch.tv/videos/${vodId}?t=${Math.max(0, vodOffset - 30)}s`, category: sp.category,
         stats: JSON.stringify({ ...sp, viewers: s.viewers, chat: chat.samples(s.login, 20, 40, now) }),
-        clips: { create: { title, caption: defaultCaption(title, s, game), status: "processing", stage: "grab", stageAt: new Date() } },
+        clips: { create: { title, caption: defaultCaption(title, s, game), status: "processing", stage: "grab", stageAt: new Date(), category: sp.category } },
       },
       include: { clips: true },
     });
     await enqueueGrab(moment.id, moment.clips[0].id, { delayMs: VOD_CATCHUP_MS });
     room--;
-    notes.push(`${s.name}: ${sp.ratio}x chat spike (${sp.kind}) → grabbing in ${VOD_CATCHUP_MS / 60_000} min`);
+    notes.push(`${s.name}: ${sp.ratio}x ${sp.category} chat spike (${sp.kind}) → grabbing in ${VOD_CATCHUP_MS / 60_000} min`);
   }
+  const skip = skippedNote(skipped);
+  if (skip) notes.push(skip);
   return notes.length ? notes.join(" · ") : null;
 }

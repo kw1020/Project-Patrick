@@ -56,15 +56,16 @@ export async function runScout(chat: ChatHeat) {
     await prisma.$transaction(users.map((u) => prisma.streamer.update({ where: { twitchId: u.id }, data: { profileImage: u.profile_image_url } })));
   }
 
-  const approvedLive = await prisma.streamer.findMany({ where: { platform: "twitch", approved: true, isLive: true }, select: { login: true } });
-  chat.setChannels(approvedLive.map((s) => s.login));
+  // Paused creators are still tracked live (Creators page shows it) but their chat isn't read.
+  const approvedLive = await prisma.streamer.findMany({ where: { platform: "twitch", approved: true, isLive: true }, select: { login: true, paused: true } });
+  chat.setChannels(approvedLive.filter((s) => !s.paused).map((s) => s.login));
   const otherGames = streams.filter((st) => st.game_id !== gameId).length;
   return `${streams.length - otherGames} live in GTA 6, ${approvedLive.length} approved live${otherGames ? ` (${otherGames} in other games)` : ""}`;
 }
 
 /** Write chat heat for approved live streamers (every 10s). */
 export async function flushChatHeat(chat: ChatHeat) {
-  const live = await prisma.streamer.findMany({ where: { platform: "twitch", approved: true, isLive: true }, select: { id: true, login: true } });
+  const live = await prisma.streamer.findMany({ where: { platform: "twitch", approved: true, paused: false, isLive: true }, select: { id: true, login: true } });
   if (!live.length) return;
   // One transaction instead of N writes: fewer lock grabs while the web app is writing too.
   await prisma.$transaction(live.map((s) => {

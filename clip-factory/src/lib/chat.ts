@@ -2,7 +2,16 @@
 // Tracks counted messages/sec per channel and detects chat spikes with false-spike guards.
 // Design: CLAUDE.md → "Chat spike detector".
 
-export const HYPE = /(\b(lmf?ao+|kekw|omegalul|lul+|pog(gers|champ)?|clip (it|that)|no way+)\b|^w+$)/i;
+/** Laugh messages (funny moments): LMAO, KEKW, OMEGALUL, LUL, "I can't", "dead", hahaha, LOL, 😂 / 🤣 / 💀. */
+export const LAUGH = /(\b(lmf?ao+|kekw|omegalul|lulw?|lul+|icant|i ?can[’']?t|dead|h(?:ah+){2,}a*)\b|\bL[oO]+L+\b|😂|🤣|💀)/i;
+/** Gameplay hype (gaming moments): a lone W, Pog*, "clip it/that", "no way", "let's go", "holy". */
+export const GAME_HYPE = /(\b(pog(gers|champ|u)?|clip (it|that)|no way+|let'?s go+|holy)\b|^w+$)/i;
+/** Any hype (laugh or gameplay): what the spike detector's hype share counts. Kept for older callers. */
+export const HYPE = new RegExp(`${LAUGH.source}|${GAME_HYPE.source}`, "i");
+/** A spike is "funny" when laughs are at least this share of the reactions (laugh + gameplay hype)... */
+const FUNNY_SHARE = 0.5;
+/** ...and there are at least this many laugh messages in the window. */
+const MIN_LAUGHS = 4;
 
 /** Accounts whose messages never count (plus the channel's own account). */
 export const BOTS = new Set([
@@ -25,11 +34,30 @@ const GIFT_BOMB = 5;            // submysterygift mass-gift-count that mutes
 const JOIN_BATCH = 15;          // Twitch anon limit is 20 JOINs / 10s
 const JOIN_GAP_MS = 10_000;
 
-type Bucket = { n: number; hype: number; users: Set<string>; hypeUsers: Set<string> };
+type Bucket = { n: number; hype: number; laugh: number; game: number; users: Set<string>; hypeUsers: Set<string> };
 export type Spike = {
   kind: "volume" | "hype"; rate: number; baseline: number; ratio: number;
   hypeShare: number; messages: number; chatters: number;
+  /** laugh messages ÷ (laugh + gameplay-hype messages) in the window; 0 when chat had no reactions */
+  laughShare: number;
+  /** "funny" when laughs are ≥ 50% of the reactions (and ≥ 4 laughs), else "gaming" */
+  category: "funny" | "gaming";
 };
+
+/** Classify one chat line: "laugh", "game" (gameplay hype) or null. A line with both counts as a laugh. */
+export function reaction(text: string): "laugh" | "game" | null {
+  const t = text.trim();
+  if (LAUGH.test(t)) return "laugh";
+  if (GAME_HYPE.test(t)) return "game";
+  return null;
+}
+
+/** Spike category from the window's laugh / gameplay-hype message counts. */
+export function spikeCategory(laugh: number, game: number): { laughShare: number; category: "funny" | "gaming" } {
+  const total = laugh + game;
+  const laughShare = total ? Math.round((laugh / total) * 100) / 100 : 0;
+  return { laughShare, category: laugh >= MIN_LAUGHS && laugh / Math.max(1, total) >= FUNNY_SHARE ? "funny" : "gaming" };
+}
 
 /** The bits of a WebSocket we use (injectable for tests). */
 export interface ChatSocket {
@@ -159,10 +187,14 @@ export class ChatHeat {
     if (!b) this.buckets.set(chan, (b = new Map()));
     const sec = Math.floor(now / 1000);
     let cur = b.get(sec);
-    if (!cur) b.set(sec, (cur = { n: 0, hype: 0, users: new Set(), hypeUsers: new Set() }));
+    if (!cur) b.set(sec, (cur = { n: 0, hype: 0, laugh: 0, game: 0, users: new Set(), hypeUsers: new Set() }));
     cur.n++;
     cur.users.add(who);
-    if (HYPE.test(text.trim())) { cur.hype++; cur.hypeUsers.add(who); }
+    const kind = reaction(text);
+    if (kind) {
+      cur.hype++; cur.hypeUsers.add(who);
+      if (kind === "laugh") cur.laugh++; else cur.game++;
+    }
 
     let r = this.recent.get(chan);
     if (!r) this.recent.set(chan, (r = []));
@@ -243,12 +275,12 @@ export class ChatHeat {
     const sec = Math.floor(now / 1000), t0sec = Math.floor(t0 / 1000);
 
     // Current window: buckets sec-9 .. sec.
-    let n = 0, hype = 0;
+    let n = 0, hype = 0, laugh = 0, game = 0;
     const users = new Set<string>(), hypeUsers = new Set<string>();
     for (let s = sec - WINDOW + 1; s <= sec; s++) {
       const v = b.get(s);
       if (!v) continue;
-      n += v.n; hype += v.hype;
+      n += v.n; hype += v.hype; laugh += v.laugh; game += v.game;
       v.users.forEach((u) => users.add(u));
       v.hypeUsers.forEach((u) => hypeUsers.add(u));
     }
@@ -274,6 +306,7 @@ export class ChatHeat {
     const out = {
       rate, baseline, ratio: Math.round(Math.min(99, S) * 10) / 10,
       hypeShare: n ? Math.round((hype / n) * 100) / 100 : 0, messages: n, chatters: users.size,
+      ...spikeCategory(laugh, game),
     };
     if (S >= multiplier && users.size >= MIN_CHATTERS) return { kind: "volume", ...out };
     if (n && hype / n >= 0.5 && hype >= 6 && hypeUsers.size >= 4 && S >= Math.max(1.5, multiplier / 2)) return { kind: "hype", ...out };

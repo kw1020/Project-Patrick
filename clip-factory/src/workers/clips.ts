@@ -3,6 +3,7 @@ import { getClips, getGameId, getGameNames, type TwitchClip } from "../lib/twitc
 import { enqueueGrab } from "../lib/queues";
 import { defaultCaption, defaultTitle, GTA6_NAME } from "../lib/social";
 import { backlogRoom } from "../lib/guards";
+import { categoryOff, skippedNote, twitchClipCategory, type Category } from "../lib/category";
 
 const MAX_NEW_PER_RUN = 15;
 
@@ -10,8 +11,9 @@ const MAX_NEW_PER_RUN = 15;
 export async function runClipsPoll() {
   const settings = await getSettings();
   if (settings.scoutPaused) return "paused";
-  const approved = await prisma.streamer.findMany({ where: { approved: true, platform: "twitch" } });
-  if (!approved.length) return "no approved streamers yet — add some on the Streamers page";
+  // Paused creators (Creators page) stay approved but are skipped.
+  const approved = await prisma.streamer.findMany({ where: { approved: true, paused: false, platform: "twitch" } });
+  if (!approved.length) return "no approved streamers yet (or all paused) — add some on the Streamers page";
   const byTwitchId = new Map(approved.map((s) => [s.twitchId, s]));
 
   const gameId = await getGameId();
@@ -45,8 +47,16 @@ export async function runClipsPoll() {
   const gameOf = (c: TwitchClip) => (c.game_id === gameId ? GTA6_NAME : names.get(c.game_id) ?? null);
 
   let added = 0;
+  const skipped: Record<Category, number> = { funny: 0, gaming: 0 };
   for (const c of candidates) {
-    if (known.has(c.id) || added >= limit) continue;
+    if (known.has(c.id)) continue;
+    // Settings → "What to clip": a switched-off kind never becomes a moment (needs the game name, so after the lookup).
+    const knownGame = gameOf(c);
+    if (knownGame) {
+      const cat = twitchClipCategory(knownGame, c.title);
+      if (categoryOff(settings, cat)) { skipped[cat]++; continue; }
+    }
+    if (added >= limit) continue;
     const s = byTwitchId.get(c.broadcaster_id)!;
     // Skip if the spike detector already caught this same moment from chat.
     if (c.video_id && c.vod_offset != null) {
@@ -59,17 +69,19 @@ export async function runClipsPoll() {
     const game = gameOf(c);
     if (!game) continue; // game name lookup failed: try again next poll rather than mislabel it
     const title = defaultTitle(c.title, s.name, game);
+    const category = twitchClipCategory(game, c.title);
     const moment = await prisma.moment.create({
       data: {
         streamerId: s.id, timestamp: new Date(c.created_at), spikeScore: c.view_count, source: "twitch_clip",
         twitchClipId: c.id, sourceUrl: c.url, sourceTitle: c.title, sourceViews: c.view_count, gameName: game,
-        vodId: c.video_id || null, vodOffset: c.vod_offset ?? null,
-        clips: { create: { title, caption: defaultCaption(title, s, game), status: "processing", stage: "grab", stageAt: new Date() } },
+        vodId: c.video_id || null, vodOffset: c.vod_offset ?? null, category,
+        clips: { create: { title, caption: defaultCaption(title, s, game), status: "processing", stage: "grab", stageAt: new Date(), category } },
       },
       include: { clips: true },
     });
     await enqueueGrab(moment.id, moment.clips[0].id);
     added++;
   }
-  return `${candidates.length} eligible clips, ${added} new sent to the Grabber${room < MAX_NEW_PER_RUN ? ` (line ${room ? `has room for ${room}` : "full, skipped new ones"})` : ""}`;
+  const skip = skippedNote(skipped);
+  return `${candidates.length} eligible clips, ${added} new sent to the Grabber${room < MAX_NEW_PER_RUN ? ` (line ${room ? `has room for ${room}` : "full, skipped new ones"})` : ""}${skip ? ` · ${skip}` : ""}`;
 }

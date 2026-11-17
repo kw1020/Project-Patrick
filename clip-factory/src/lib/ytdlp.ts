@@ -66,7 +66,10 @@ export async function listChannelVideos(channelId: string, n: number): Promise<Y
 }
 
 export type Heat = { start_time: number; end_time: number; value: number };
-export type YtVideo = { id: string; title: string; duration: number | null; views: number; uploadDate: Date | null; heatmap: Heat[] | null };
+export type YtVideo = {
+  id: string; title: string; duration: number | null; views: number; uploadDate: Date | null; heatmap: Heat[] | null;
+  categories: string[]; // YouTube's category for the video ("Gaming", "Comedy", "Entertainment"…), when yt-dlp gives it
+};
 
 /** Full metadata for one video, no download: duration, views, title, upload date, heatmap. */
 export async function videoInfo(id: string): Promise<YtVideo> {
@@ -77,6 +80,7 @@ export async function videoInfo(id: string): Promise<YtVideo> {
   return {
     id: j.id ?? id, title: String(j.title ?? ""), duration: num(j.duration), views: num(j.view_count) ?? 0,
     uploadDate: ytDate(j), heatmap: heat.length ? heat : null,
+    categories: [...(Array.isArray(j.categories) ? j.categories : []), j.category].filter((c): c is string => typeof c === "string" && c.trim() !== ""),
   };
 }
 

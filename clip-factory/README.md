@@ -271,6 +271,28 @@ A creator with the same name on both (e.g. "kaicenat") gets both approved: names
 platform. Running it again is safe: rows that are already approved are left exactly as they are.
 Kick isn't supported yet.
 
+## Funny and gaming moments
+
+Every moment and clip is labelled **Funny** (comedy, banter, reactions, funny fails; doesn't have to be a
+game) or **Gaming** (plays, clutches, chases). The first guess comes from the source: a chat spike where
+laughs (LMAO, KEKW, "I can't", 😂 💀…) are at least half of chat's reactions is funny; a Twitch clip from
+Just Chatting / IRL / podcasts / music / art (or with "lmao", "dead", 💀 in its title) is funny; a YouTube
+peak is gaming when YouTube files the video under Gaming or its title says gameplay, GTA, Fortnite… and
+funny otherwise. The Judge then labels the clip itself, and its label wins.
+Settings → **What to clip** has a switch for each kind. Switched off: no new moments of that kind, and
+clips already in the line that the Judge labels that kind go to Rejected ("Funny clips are off in Settings").
+"Which games" still decides which Twitch streamers are followed; pick **Any game** to get Just Chatting
+funny moments. The Queue has **All · Funny · Gaming** tabs and Analytics a **By type** chart.
+
+## Creators page
+
+The **Creators** tab shows everyone you approved, Twitch and YouTube: picture, a live dot and the game when
+they're live, when you approved them and your note, and their numbers (moments found, clips made, clips you
+approved, posted, views, last clip). Live creators come first, then the ones with the most clips. Search by
+name or filter All · Twitch · YouTube · Live now. Per creator: **Open channel**, **See clips** (the Queue
+showing only them), **Pause** (stays approved, but no new clips until you press Resume) and **Remove**
+(asks once more on the card before taking them off the approved list; clips already made stay).
+
 ## Run without Docker (dev)
 
 Needs Node 20+, Redis, ffmpeg, `pip install yt-dlp faster-whisper`.

@@ -234,8 +234,8 @@ export async function approveResolved(picks: ApprovePick[], note: string): Promi
       if (stale) { say(p.name, "twitch", false, `${u.name} not added: another Twitch account in Clip Factory already uses the name "${u.login}" (probably an old name change), so it wasn't added.`); continue; }
       const s = await prisma.streamer.upsert({
         where: { twitchId: t.id },
-        update: { approved: true, approvalNote: note, login: u.login, name: u.name, profileImage: u.avatar },
-        create: { twitchId: t.id, login: u.login, name: u.name, profileImage: u.avatar, approved: true, approvalNote: note },
+        update: { approved: true, approvedAt: new Date(), approvalNote: note, login: u.login, name: u.name, profileImage: u.avatar },
+        create: { twitchId: t.id, login: u.login, name: u.name, profileImage: u.avatar, approved: true, approvedAt: new Date(), approvalNote: note },
       });
       await prisma.suggestion.updateMany({ where: { streamerId: s.id }, data: { status: "approved" } });
       twitchApproved++;
@@ -261,8 +261,8 @@ export async function approveResolved(picks: ApprovePick[], note: string): Promi
       }
       const s = await prisma.streamer.upsert({
         where: { twitchId },
-        update: { approved: true, approvalNote: note, login: handle, name: y.title || handle, ...(y.avatar ? { profileImage: y.avatar } : {}), platform: "youtube" },
-        create: { twitchId, platform: "youtube", login: handle, name: y.title || handle, profileImage: y.avatar ?? null, approved: true, approvalNote: note },
+        update: { approved: true, approvedAt: new Date(), approvalNote: note, login: handle, name: y.title || handle, ...(y.avatar ? { profileImage: y.avatar } : {}), platform: "youtube" },
+        create: { twitchId, platform: "youtube", login: handle, name: y.title || handle, profileImage: y.avatar ?? null, approved: true, approvedAt: new Date(), approvalNote: note },
       });
       await prisma.suggestion.updateMany({ where: { streamerId: s.id }, data: { status: "approved" } });
       youtubeApproved++;

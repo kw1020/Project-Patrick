@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { AutoRefresh } from "@/components/AutoRefresh";
 import { Avatar } from "@/components/Avatar";
+import { CategoryChip } from "@/components/CategoryChip";
 import { COLUMNS, getWorkroom, stageAge, type ColumnKey, type WorkItem } from "@/lib/workroom";
 import { retryClip } from "../actions";
 
@@ -34,6 +35,7 @@ function Card({ item, now, col }: { item: WorkItem; now: Date; col: ColumnKey })
       <div className="mt-1.5 line-clamp-2 text-xs text-zinc-300 [overflow-wrap:anywhere]">{item.title}</div>
       <div className="mt-1.5 flex flex-wrap items-center gap-1">
         <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${SOURCE_CLS[item.source] ?? "bg-zinc-800 text-zinc-300"}`}>{item.sourceLabel}</span>
+        <CategoryChip category={item.category} />
         {item.score != null && <span className={`rounded bg-black/40 px-1.5 py-0.5 text-[10px] font-black ${scoreCls}`}>{item.score}/10</span>}
         {item.where && <span className="truncate text-[10px] text-zinc-500">{item.where}</span>}
       </div>

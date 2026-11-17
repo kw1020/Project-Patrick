@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getSettings, prisma } from "@/lib/db";
-import { breakdown, judgeCorrelation, lengthBucket, performance, scoreBucket, sourceLabel } from "@/lib/analytics";
+import { breakdown, judgeCorrelation, lengthBucket, performance, scoreBucket, sourceLabel, typeLabel } from "@/lib/analytics";
 import { buildLessons, MIN_POSTS_TO_LEARN } from "@/lib/learning";
 import { getStatuses, soft, type AgentStatus } from "@/lib/queues";
 import { ago, num } from "@/lib/format";
@@ -54,6 +54,7 @@ export default async function AnalyticsPage() {
 
       <section className="grid gap-4 lg:grid-cols-2">
         <Bars title="By Judge score" rows={breakdown(rows, scoreBucket)} note="If 8–10 isn't on top, the Judge needs more examples (it's learning from these)." />
+        <Bars title="By type" rows={breakdown(rows, typeLabel)} note="Funny moments vs gaming moments. Clips from before v1.7.2 have no type and are left out." />
         <Bars title="By how the moment was found" rows={breakdown(rows, sourceLabel)} />
         <Bars title="By streamer" rows={breakdown(rows, (r) => r.streamer).slice(0, 10)} />
         <Bars title="By account" rows={breakdown(rows, (r) => r.account)} />

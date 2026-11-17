@@ -60,6 +60,19 @@ original brief is below, and the status section says what's done. Read both befo
   approved"), so re-running "Approve all ticked" only adds the missing YouTube rows. `test/v171.test.ts` includes a real
   `db push` upgrade from the 04b05d1 schema with rows (no prompt, rows kept). (Alternative if a real constraint is ever wanted:
   create `Streamer_platform_login_key` with raw SQL before `db push`; then push is clean too — tested, not shipped.)
+- **v1.7.2 (2026-11-17): funny + gaming moments, Creators page.** `Moment.category`/`Clip.category` ("funny"|"gaming", null on
+  older rows), Settings `clipFunny`/`clipGaming`, `Streamer.paused` + `Streamer.approvedAt` (all additive, nullable/defaulted; `test/v172.test.ts`
+  runs a real `db push` from the 5486a81 schema with rows). First guess per source in `src/lib/category.ts`: chat = laugh share (see the spike
+  section); Twitch clip = non-game Twitch category (Just Chatting, IRL, Talk Shows & Podcasts, Pools Hot Tubs & Beaches, Music, Art, ASMR,
+  Special Events; Sports = gaming) or laugh words in the clip title → funny; YouTube = yt-dlp `categories`: Gaming → gaming, Comedy → funny,
+  else gaming words in the title (gameplay, GTA, Fortnite, Minecraft, speedrun…) → gaming, else funny. The Judge returns `category` (zod enum)
+  and its label replaces the guess on the Clip. Switched-off kind: no new moments (status lines say "skipped N funny (off in Settings)";
+  YouTube videos get status `off_funny`/`off_gaming` and are looked at again once it's back on); clips already in the line whose
+  (Judge) category is off are auto-rejected by the Cutter with judgeReason "Funny clips are off in Settings". Queue `?cat=all|funny|gaming`
+  and `?creator=<Streamer.id>` (`src/lib/queue-filter.ts`); chips on ClipCard/Workroom; Analytics "By type". `/creators`
+  (`src/lib/creators.ts`): approved creators with stats, live first then most clips, search + All/Twitch/YouTube/Live chips, Pause
+  (`setPaused`; paused = skipped by clips poller, spike detector, YouTube scanner and no chat join, but still tracked live) and a two-step Remove.
+  Judge prompt now opens "You score short clips from streamers and YouTubers" (funny non-gaming clips are first-class). Unverified on real chat.
 - Docker image never built in the sandbox (no daemon); it builds fine on Krew's PC; a clean-copy `npm ci` + `next build` without `.env`
   (what the Dockerfile does) passes.
 - **Suggestions (2026-11-17):** `src/workers/suggest.ts` (queue "suggest", hourly + once ~1 min after start,
@@ -112,6 +125,16 @@ Runs every 5s per approved live streamer whose chat we read (anonymous IRC with 
 - Cap each chatter at **2 messages per 10s window** (stops one spammer or copy-paste flood from counting).
 - Track distinct chatters per bucket and hype messages (`LMAO`, `KEKW`, `OMEGALUL`, `LUL`, `Pog*`,
   `clip it/that`, `no way`, a lone `W`).
+- Since v1.7.2 hype is split in two (`src/lib/chat.ts`): **`LAUGH`** (lmao/lmfao, kekw, omegalul, lul/lulw, icant/"i can't",
+  "dead", hahah+, LOL any case, 😂 🤣 💀) and **`GAME_HYPE`** (lone W, Pog/PogU/Poggers/PogChamp, "clip it/that", "no way",
+  "let's go"/"lets go", "holy"). `HYPE` = the union and is what the hype share/hype spike below counts (so the hype spike rule
+  is unchanged apart from the bigger word list). A line matching both counts as a laugh (`reaction()`).
+
+**Category (v1.7.2, classification only, does not change when a spike fires):** in the spike window,
+`laughShare = laugh ÷ (laugh + gameHype)` messages; the spike is **"funny"** when `laughShare ≥ 0.5` **and** ≥ 4 laugh messages,
+else **"gaming"** (`spikeCategory()`). `spike()` returns `laughShare` + `category`; the worker stores it on `Moment.category`/`Clip.category`
+and in `Moment.stats` (the Judge sees the laugh share). A spike of a kind switched off in Settings → "What to clip" makes no moment
+(counted in the status line; that streamer is quiet for 30s so one spike counts once; it does NOT use the 3-min cooldown).
 
 **Formula (all rates in counted messages/sec):**
 - `W` = counted messages in the last 10s ÷ 10.

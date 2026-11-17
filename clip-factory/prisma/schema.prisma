@@ -20,6 +20,7 @@ model Streamer {
   platform      String    @default("twitch") // twitch | youtube
   approved      Boolean   @default(false)
   approvalNote  String?
+  approvedAt    DateTime? // when Krew last approved them (Creators page); null on rows approved before v1.7.2 -> createdAt
   facecam       String?   // "x,y,w,h" fractions of the frame, for the facecam-on-top layout
   profileImage  String?
   isLive        Boolean   @default(false)
@@ -32,6 +33,7 @@ model Streamer {
   lastSeenAt    DateTime?
   chatRate      Float     @default(0) // messages/sec, last minute (approved + live only)
   chatAvg       Float     @default(0) // messages/sec, 5-min rolling average
+  paused        Boolean   @default(false) // still approved, but the clips poller / spike detector / YouTube scanner skip them (Creators page)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   moments       Moment[]
@@ -57,6 +59,7 @@ model Moment {
   vodId        String?
   vodOffset    Int? // seconds into the VOD
   stats        String? // JSON: chat-spike numbers + sample chat lines (for the Judge)
+  category     String?  // funny | gaming (first guess: chat laughs, Twitch category, clip/video title); null on older rows
   createdAt    DateTime @default(now())
   clips        Clip[]
 }
@@ -75,6 +78,7 @@ model Clip {
   hookText    String? // Judge's on-screen hook
   hashtags    String? // space-separated
   judgeReason String?
+  category    String? // funny | gaming: the moment's guess at first, replaced by the Judge's label; null on older rows
   postError   String? // last YouTube upload error
   title      String?
   caption    String?
@@ -127,6 +131,8 @@ model Settings {
   captions         Boolean @default(true)
   scoutPaused      Boolean @default(false)
   gameMode         String  @default("gta6") // gta6 | any (approved streamers in any game)
+  clipFunny        Boolean @default(true) // "What to clip": funny moments (don't have to be gaming)
+  clipGaming       Boolean @default(true) // "What to clip": gaming moments
   ytScanEnabled      Boolean @default(true) // YouTube scanner: most-replayed parts of approved channels' new videos
   ytVideosPerChannel Int     @default(3)
   ytMomentsPerVideo  Int     @default(3)
@@ -166,6 +172,7 @@ model PostStat {
 
 // YouTube videos the scanner has looked at, so each one is fetched once.
 // status: done (peaks sent) | partial (line was full, rest next scan) | old | no_heatmap (re-checked every 6h)
+// | off_funny / off_gaming (that kind of clip was off in Settings; looked at again once it is switched back on)
 model YouTubeVideo {
   id         String    @id // YouTube video id
   streamerId String

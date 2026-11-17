@@ -12,7 +12,7 @@ import { approveResolved, DEFAULT_APPROVAL_NOTE, resolveCreators, type ApprovePi
 
 function refreshAll() {
   try {
-    for (const p of ["/", "/queue", "/workroom", "/posted", "/analytics", "/streamers", "/settings"]) revalidatePath(p);
+    for (const p of ["/", "/queue", "/workroom", "/posted", "/analytics", "/streamers", "/creators", "/settings"]) revalidatePath(p);
   } catch {
     /* called outside a Next.js request (tests, scripts): no pages to refresh */
   }
@@ -32,8 +32,8 @@ export async function addStreamer(_prev: { error?: string; ok?: string } | null,
     return { error: `${u.display_name} not added: another Twitch account in Clip Factory already uses the name "${u.login}" (probably an old name change).` };
   await prisma.streamer.upsert({
     where: { twitchId: u.id },
-    update: { approved: true, approvalNote: note || DEFAULT_APPROVAL_NOTE, login: u.login, name: u.display_name, profileImage: u.profile_image_url },
-    create: { twitchId: u.id, login: u.login, name: u.display_name, profileImage: u.profile_image_url, approved: true, approvalNote: note || DEFAULT_APPROVAL_NOTE },
+    update: { approved: true, approvedAt: new Date(), approvalNote: note || DEFAULT_APPROVAL_NOTE, login: u.login, name: u.display_name, profileImage: u.profile_image_url },
+    create: { twitchId: u.id, login: u.login, name: u.display_name, profileImage: u.profile_image_url, approved: true, approvedAt: new Date(), approvalNote: note || DEFAULT_APPROVAL_NOTE },
   });
   await pokeScout().catch(() => {});
   refreshAll();
@@ -56,8 +56,8 @@ export async function addYouTubeChannel(_prev: { error?: string; ok?: string } |
   if (await loginTakenBy("youtube", ch.handle, twitchId)) return { error: `A YouTube channel called "${ch.handle}" is already in the list.` };
   await prisma.streamer.upsert({
     where: { twitchId },
-    update: { approved: true, approvalNote: note || DEFAULT_APPROVAL_NOTE, login: ch.handle, name: ch.title, profileImage: ch.avatar, platform: "youtube" },
-    create: { twitchId, platform: "youtube", login: ch.handle, name: ch.title, profileImage: ch.avatar, approved: true, approvalNote: note || DEFAULT_APPROVAL_NOTE },
+    update: { approved: true, approvedAt: new Date(), approvalNote: note || DEFAULT_APPROVAL_NOTE, login: ch.handle, name: ch.title, profileImage: ch.avatar, platform: "youtube" },
+    create: { twitchId, platform: "youtube", login: ch.handle, name: ch.title, profileImage: ch.avatar, approved: true, approvedAt: new Date(), approvalNote: note || DEFAULT_APPROVAL_NOTE },
   });
   await pokeYouTube().catch(() => {});
   refreshAll();
@@ -69,7 +69,7 @@ export async function addYouTubeChannel(_prev: { error?: string; ok?: string } |
  * else the permission quote from their suggestion card when there was one, else "Approved by Krew".
  */
 export async function setApproved(id: string, approved: boolean, note?: string) {
-  const data: { approved: boolean; approvalNote?: string } = { approved };
+  const data: { approved: boolean; approvalNote?: string; approvedAt?: Date } = { approved, ...(approved ? { approvedAt: new Date() } : {}) };
   const typed = typeof note === "string" ? note.trim().slice(0, 500) : "";
   if (typed) data.approvalNote = typed;
   else if (approved) {
@@ -111,7 +111,14 @@ export async function saveStreamer(id: string, form: FormData) {
 }
 
 export async function removeStreamer(id: string) {
-  await prisma.streamer.update({ where: { id }, data: { approved: false, approvalNote: null } });
+  await prisma.streamer.update({ where: { id }, data: { approved: false, approvalNote: null, paused: false } });
+  refreshAll();
+}
+
+/** Creators page: Pause keeps the creator approved but the clips poller, spike detector and YouTube scanner skip them. */
+export async function setPaused(id: string, paused: boolean) {
+  const s = await prisma.streamer.update({ where: { id }, data: { paused } });
+  if (!paused && s.approved) await (s.platform === "youtube" ? pokeYouTube() : pokeScout()).catch(() => {});
   refreshAll();
 }
 
@@ -217,6 +224,8 @@ export async function saveSettings(form: FormData) {
       captions: form.get("captions") === "on",
       scoutPaused: form.get("scoutPaused") === "on",
       gameMode: form.get("gameMode") === "any" ? "any" : "gta6",
+      clipFunny: form.get("clipFunny") === "on",
+      clipGaming: form.get("clipGaming") === "on",
       ytScanEnabled: form.get("ytScanEnabled") === "on",
       ytVideosPerChannel: Math.round(n("ytVideosPerChannel", 1, 15, 3)),
       ytMomentsPerVideo: Math.round(n("ytMomentsPerVideo", 1, 10, 3)),

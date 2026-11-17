@@ -44,6 +44,7 @@ export default async function StreamersPage({ searchParams }: { searchParams: Pr
                   <div className="flex items-center gap-1.5">
                     <a href={creatorUrl(s)} target="_blank" className="font-bold hover:text-hot">{s.name}</a>
                     {s.platform === "youtube" && <span className="rounded bg-red-600/20 px-1.5 text-[10px] font-black uppercase text-red-300">YouTube</span>}
+                    {s.paused && <span title="Paused on the Creators page: no new clips" className="rounded bg-sun/15 px-1.5 text-[10px] font-black uppercase text-sun">Paused</span>}
                   </div>
                   <div className="text-xs text-zinc-400">{s.platform === "youtube" ? `@${s.login}` : s.isLive ? <span className="text-red-400">● live · {num(s.viewers)}</span> : `seen ${ago(s.lastSeenAt)}`} · {s._count.moments} clips</div>
                 </div>

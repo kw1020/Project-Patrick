@@ -61,6 +61,20 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
       </div>
 
       <form action={saveSettings} className="space-y-6">
+        <div className="card space-y-4 p-5" data-testid="what-to-clip">
+          <Head>What to clip</Head>
+          <Row label="Funny moments (doesn't have to be gaming)" hint="Laughing chat, banter, reactions, funny fails. Just Chatting, IRL and podcasts count."><input name="clipFunny" type="checkbox" defaultChecked={s.clipFunny} className={check} /></Row>
+          <Row label="Gaming moments" hint="Big plays, clutches, chases and other game moments."><input name="clipGaming" type="checkbox" defaultChecked={s.clipGaming} className={check} /></Row>
+          <p className="text-xs text-zinc-500">
+            Every clip gets a Funny or Gaming label (the Judge decides when it&apos;s on). Switching one off stops new moments of that kind and sets aside clips already in the line that turn out to be that kind.
+            &ldquo;Which games&rdquo; below still decides which Twitch streamers are followed. Funny moments often come from Just Chatting, so &ldquo;Any game&rdquo; gets you the most funny clips.
+          </p>
+          {s.clipFunny && s.gameMode === "gta6" && (
+            <div className="rounded-lg bg-sun/10 px-3 py-2 text-sm text-amber-200">Funny moments are on, but &ldquo;Which games&rdquo; is GTA 6 only, so Twitch funny moments only come from GTA streams. Pick &ldquo;Any game&rdquo; to get Just Chatting and IRL ones too.</div>
+          )}
+          {!s.clipFunny && !s.clipGaming && <div className="rounded-lg bg-red-500/15 px-3 py-2 text-sm text-red-300">Both are off, so no new clips will be made.</div>}
+        </div>
+
         <div className="card space-y-4 p-5">
           <Head>Spike detector</Head>
           <Row label="Detect chat spikes" hint="Makes clips from live moments when an approved streamer's chat blows up."><input name="spikeEnabled" type="checkbox" defaultChecked={s.spikeEnabled} className={check} /></Row>

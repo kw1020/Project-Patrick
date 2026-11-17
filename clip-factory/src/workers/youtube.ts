@@ -2,6 +2,7 @@ import { prisma, getSettings } from "../lib/db";
 import { enqueueGrab } from "../lib/queues";
 import { defaultCaption, defaultTitle } from "../lib/social";
 import { backlogRoom } from "../lib/guards";
+import { categoryOff, offReason, skippedNote, youtubeCategory, type Category } from "../lib/category";
 import { listChannelVideos, pickPeaks, videoInfo, videoUrl, ytError } from "../lib/ytdlp";
 
 const MAX_NEW_PER_RUN = 15;
@@ -16,8 +17,10 @@ export async function runYouTubeScan() {
   const settings = await getSettings();
   if (settings.scoutPaused) return "paused";
   if (!settings.ytScanEnabled) return "off (Settings → YouTube scanner)";
-  const channels = await prisma.streamer.findMany({ where: { approved: true, platform: "youtube" } });
-  if (!channels.length) return "no approved YouTube channels yet — add one on the Streamers page";
+  // Paused creators (Creators page) stay approved but are skipped.
+  const channels = await prisma.streamer.findMany({ where: { approved: true, paused: false, platform: "youtube" } });
+  if (!channels.length) return "no approved YouTube channels yet (or all paused) — add one on the Streamers page";
+  const skipped: Record<Category, number> = { funny: 0, gaming: 0 };
 
   const room = await backlogRoom();
   const limit = Math.min(MAX_NEW_PER_RUN, room);
@@ -39,6 +42,9 @@ export async function runYouTubeScan() {
       const seen = await prisma.youTubeVideo.findUnique({ where: { id: v.id } });
       if (seen && (seen.status === "done" || seen.status === "old")) continue;
       if (seen?.status === "no_heatmap" && Date.now() - seen.checkedAt.getTime() < NO_HEATMAP_RECHECK_MS) continue;
+      // Skipped because its kind was off in Settings: looked at again only once that kind is back on.
+      const offCat = seen?.status.match(/^off_(funny|gaming)$/)?.[1] as Category | undefined;
+      if (offCat && categoryOff(settings, offCat)) continue;
       if (added >= limit) { full = true; break scan; }
       const mark = (status: string, note: string | null, title: string | null, uploadedAt: Date | null) =>
         prisma.youTubeVideo.upsert({
@@ -65,6 +71,12 @@ export async function runYouTubeScan() {
 
       const url = videoUrl(v.id);
       const peaks = pickPeaks(info.heatmap, info.duration ?? v.duration, settings.ytMomentsPerVideo);
+      const category = youtubeCategory(info.title, info.categories);
+      if (categoryOff(settings, category)) {
+        await mark(`off_${category}`, offReason(category), info.title, info.uploadDate);
+        skipped[category] += peaks.length;
+        continue;
+      }
       const existing = await prisma.moment.findMany({ where: { source: "youtube", sourceUrl: url }, select: { vodOffset: true } });
       const fresh = peaks.filter((p) => !existing.some((m) => m.vodOffset != null && Math.abs(m.vodOffset - p.center) < DEDUPE_SEC));
       let made = 0;
@@ -74,8 +86,8 @@ export async function runYouTubeScan() {
         const moment = await prisma.moment.create({
           data: {
             streamerId: ch.id, timestamp: info.uploadDate ?? new Date(), spikeScore: p.value, source: "youtube",
-            sourceUrl: url, sourceTitle: info.title, sourceViews: info.views, vodId: v.id, vodOffset: p.center,
-            clips: { create: { title, caption: defaultCaption(title, ch, null), status: "processing", stage: "grab", stageAt: new Date() } },
+            sourceUrl: url, sourceTitle: info.title, sourceViews: info.views, vodId: v.id, vodOffset: p.center, category,
+            clips: { create: { title, caption: defaultCaption(title, ch, null), status: "processing", stage: "grab", stageAt: new Date(), category } },
           },
           include: { clips: true },
         });
@@ -90,6 +102,8 @@ export async function runYouTubeScan() {
 
   const parts = [`${channels.length} channel${channels.length === 1 ? "" : "s"}, ${checked} videos checked, ${added} peaks sent to the Grabber`];
   if (full) parts.push(room ? `line has room for ${room}, rest next scan` : "line full, skipped new ones");
+  const skip = skippedNote(skipped);
+  if (skip) parts.push(skip);
   if (notes.length) parts.push(notes.slice(0, 3).join("; ") + (notes.length > 3 ? ` (+${notes.length - 3} more)` : ""));
   return parts.join(" · ");
 }

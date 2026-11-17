@@ -2,12 +2,14 @@
 import { useState, useTransition } from "react";
 import { markPosted, postToAccount, retryClip, setClipStatus, updateClipText } from "../../app/actions";
 import { creatorCreditText, creatorUrl } from "../lib/social";
+import { CategoryChip } from "./CategoryChip";
 
 export type ClipView = {
   id: string; status: string; stage: string | null; error: string | null; title: string; caption: string;
   duration: number | null; score: number | null; hook: string | null; judgeReason: string | null; hasVideo: boolean;
   expired?: boolean; // the video was deleted by retention to save disk
   streamer: { name: string; login: string; platform: string }; source: string; vodOffset?: number | null; spikeScore: number; sourceUrl: string | null; sourceViews: number;
+  category?: string | null; // funny | gaming (null on older clips)
   posts: { platform: string; accountId: string | null; status: string; url: string | null; error: string | null }[]; postError: string | null;
 };
 export type AccountView = { id: string; platform: string; label: string; autoPost: boolean; privacy: string };
@@ -47,10 +49,11 @@ export function ClipCard({ clip, accounts }: { clip: ClipView; accounts: Account
               : clip.status === "failed" ? <span className="text-red-300">{clip.error}</span> : <span className="animate-pulse">{STAGE[clip.stage ?? ""] ?? "Working…"}</span>}
           </div>
         )}
-        <div className="pointer-events-none absolute left-2 top-2 flex gap-1">
+        <div className="pointer-events-none absolute inset-x-2 top-2 flex flex-wrap gap-1">
           {clip.score != null && <span className={`rounded-md bg-black/75 px-2 py-1 text-xs font-black ${scoreColor}`}>{clip.score}/10</span>}
           {clip.duration != null && <span className="rounded-md bg-black/75 px-2 py-1 text-xs font-bold">{Math.round(clip.duration)}s</span>}
           <span className="rounded-md bg-black/75 px-2 py-1 text-xs font-bold text-zinc-300">{clip.source === "chat" ? `Chat spike ${clip.spikeScore}x` : clip.source === "youtube" ? "YouTube peak" : "Twitch clip"}</span>
+          {clip.category && <span className="rounded-md bg-black/75"><CategoryChip category={clip.category} className="inline-block px-2 py-1 text-xs" /></span>}
         </div>
       </div>
 

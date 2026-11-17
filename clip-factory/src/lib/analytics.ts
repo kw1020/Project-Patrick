@@ -6,6 +6,7 @@ export type PerfRow = {
   perf: number; // views ÷ the account's median views (1 = typical, 3 = three times typical)
   streamer: string; source: string; score: number | null; hook: string | null; title: string | null;
   transcript: string | null; duration: number | null;
+  category: string | null; // funny | gaming (null on older clips)
 };
 
 function median(xs: number[]) {
@@ -30,7 +31,7 @@ export async function performance(minAgeHrs = 24): Promise<PerfRow[]> {
       postId: p.id, clipId: p.clipId, platform: p.platform, account: p.account?.channelTitle ?? p.platform, views: p.views!, likes: p.likes, postedAt: p.postedAt,
       perf: Math.round((p.views! / Math.max(1, med)) * 100) / 100,
       streamer: p.clip.moment.streamer.name, source: p.clip.moment.source, score: p.clip.score, hook: p.clip.hookText, title: p.clip.title,
-      transcript: p.clip.transcript, duration: p.clip.duration,
+      transcript: p.clip.transcript, duration: p.clip.duration, category: p.clip.category ?? p.clip.moment.category,
     };
   });
 }
@@ -47,6 +48,7 @@ export function breakdown(rows: PerfRow[], keyOf: (r: PerfRow) => string | null)
 
 export const scoreBucket = (r: PerfRow) => (r.score == null ? "Not scored" : r.score >= 8 ? "Judge 8–10" : r.score >= 6 ? "Judge 6–7.9" : "Judge under 6");
 export const lengthBucket = (r: PerfRow) => (r.duration == null ? null : r.duration < 25 ? "Under 25s" : r.duration < 35 ? "25–35s" : "35s+");
+export const typeLabel = (r: PerfRow) => (r.category === "funny" ? "Funny" : r.category === "gaming" ? "Gaming" : null);
 export const sourceLabel = (r: PerfRow) => (r.source === "chat" ? "Chat spike" : r.source === "youtube" ? "YouTube peak" : "Twitch clip");
 
 /** Spearman rank correlation between Judge score and performance (-1..1), or null with too few scored posts. */

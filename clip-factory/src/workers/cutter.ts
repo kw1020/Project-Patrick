@@ -5,6 +5,7 @@ import { resolveStored, storagePath } from "../lib/paths";
 import { enqueueJudge } from "../lib/queues";
 import { transcribe } from "../lib/transcribe";
 import { creatorCreditText } from "../lib/social";
+import { categoryOff, isCategory, offReason } from "../lib/category";
 
 /** Step 1 — pick the 15–45s window and transcribe it (the Judge reads the transcript before we spend CPU rendering). */
 export async function runTranscribe(clipId: string) {
@@ -62,10 +63,17 @@ export async function runCut(clipId: string) {
 
     // First time through: the Judge's score decides review vs auto-reject. Re-cuts keep Krew's decision.
     const fresh = clip.status === "processing" || clip.status === "failed";
-    const autoReject = settings.judgeEnabled && clip.score != null && clip.score < settings.minScore;
+    // Settings → "What to clip": a clip whose kind (the Judge's label, else the first guess) is switched off is set aside too.
+    const kindOff = isCategory(clip.category) && categoryOff(settings, clip.category);
+    const autoReject = kindOff || (settings.judgeEnabled && clip.score != null && clip.score < settings.minScore);
+    const kindReason = kindOff && isCategory(clip.category) && !(clip.judgeReason ?? "").startsWith(offReason(clip.category))
+      ? { judgeReason: clip.judgeReason ? `${offReason(clip.category)} (${clip.judgeReason})` : offReason(clip.category) } : {};
     await prisma.clip.update({
       where: { id: clipId },
-      data: { finalPath: finalRel, duration: length, stage: null, stageAt: new Date(), error: null, status: fresh ? (autoReject ? "rejected" : "pending") : clip.status },
+      data: {
+        finalPath: finalRel, duration: length, stage: null, stageAt: new Date(), error: null, status: fresh ? (autoReject ? "rejected" : "pending") : clip.status,
+        ...(fresh ? kindReason : {}),
+      },
     });
     return `cut ${length}s ${layout}${words.length ? " + captions" : ""}${clip.hookText ? " + hook" : ""}${fresh && autoReject ? " (auto-rejected)" : ""}`;
   } finally {

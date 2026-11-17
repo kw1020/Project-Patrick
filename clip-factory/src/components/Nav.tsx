@@ -9,6 +9,7 @@ const LINKS = [
   { href: "/posted", label: "Posted" },
   { href: "/analytics", label: "Analytics" },
   { href: "/streamers", label: "Streamers" },
+  { href: "/creators", label: "Creators" },
   { href: "/settings", label: "Settings" },
 ];
 

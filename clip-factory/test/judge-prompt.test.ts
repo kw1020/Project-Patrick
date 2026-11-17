@@ -19,6 +19,11 @@ test("JUDGE_SYSTEM is the SYSTEM block of prompts/judge.md", () => {
   const file = fs.readFileSync(path.join(__dirname, "..", "prompts", "judge.md"), "utf8");
   const block = file.split("\n## SYSTEM\n")[1].split("\n## END SYSTEM")[0].trim();
   assert.equal(JUDGE_SYSTEM, block);
-  assert.ok(JUDGE_SYSTEM.startsWith("You score short gameplay clips"));
+  // Since v1.7.2 funny moments (Just Chatting, IRL, any video) are first-class, not only gameplay.
+  assert.ok(JUDGE_SYSTEM.startsWith("You score short clips from streamers and YouTubers"));
+  assert.doesNotMatch(JUDGE_SYSTEM, /gameplay clips/);
+  assert.match(JUDGE_SYSTEM, /Just Chatting/);
+  assert.match(JUDGE_SYSTEM, /"funny"/);
+  assert.match(JUDGE_SYSTEM, /"gaming"/);
   assert.ok(!JUDGE_SYSTEM.includes("## "), "no headings in the prompt");
 });
