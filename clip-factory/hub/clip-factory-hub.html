@@ -1,0 +1,205 @@
+<title>Clip Factory</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;800;900&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: a control-room column — big "open" action, then run commands, then the checklist and links. Deliberately dark, matching the Clip Factory app. */
+:root {
+  color-scheme: dark;
+  --ink: #0b0b10;
+  --panel: #15151d;
+  --line: #262633;
+  --text: #ecebf3;
+  --muted: #9a98ab;
+  --hot: #ff3d81;
+  --sun: #ffb547;
+  --ok: #34d399;
+  --display: "Archivo", "Arial Black", system-ui, sans-serif;
+  --body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+* { box-sizing: border-box; }
+body { background: var(--ink); color: var(--text); font-family: var(--body); font-size: 15px; line-height: 1.55; }
+.wrap { max-width: 920px; margin: 0 auto; padding-block: 28px 56px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 22px; }
+a { color: inherit; }
+:focus-visible { outline: 2px solid var(--sun); outline-offset: 2px; border-radius: 6px; }
+
+header { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; justify-content: space-between; }
+.brand { display: flex; align-items: center; gap: 12px; }
+.logo { width: 44px; height: 44px; border-radius: 11px; background: linear-gradient(135deg, var(--hot), var(--sun)); display: grid; place-items: center; font-family: var(--display); font-weight: 900; color: #0b0b10; font-size: 17px; }
+h1 { font-family: var(--display); font-weight: 900; font-size: clamp(26px, 5vw, 34px); letter-spacing: -0.02em; margin: 0; line-height: 1; }
+.tag { font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); border: 1px solid var(--line); padding: 4px 8px; border-radius: 999px; }
+
+.hero { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 22px; display: grid; gap: 14px; }
+.hero p { margin: 0; color: var(--muted); max-width: 62ch; }
+.open { display: inline-flex; align-items: center; gap: 10px; background: var(--hot); color: #fff; text-decoration: none; font-weight: 700; font-size: 17px; padding: 14px 22px; border-radius: 12px; width: fit-content; }
+.open:hover { filter: brightness(1.1); }
+.pages { display: flex; flex-wrap: wrap; gap: 8px; }
+.pages a { text-decoration: none; font-size: 13px; font-weight: 600; padding: 7px 12px; border-radius: 9px; border: 1px solid var(--line); color: var(--text); }
+.pages a:hover { border-color: var(--hot); }
+
+h2 { font-family: var(--display); font-weight: 800; font-size: 19px; margin: 0 0 4px; letter-spacing: -0.01em; text-wrap: balance; }
+.sub { color: var(--muted); font-size: 13px; margin: 0 0 12px; }
+section { min-width: 0; }
+
+.cmds { display: grid; gap: 10px; }
+.cmd { display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; align-items: center; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+.cmd .what { font-weight: 600; font-size: 14px; }
+.cmd .when { color: var(--muted); font-size: 12.5px; grid-column: 1 / -1; }
+.cmd code { grid-column: 1; font-family: var(--mono); font-size: 13px; color: var(--sun); overflow-x: auto; white-space: nowrap; min-width: 0; }
+.copy { grid-column: 2; grid-row: 1 / span 2; font: 600 12.5px var(--body); background: transparent; color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 7px 12px; cursor: pointer; }
+.copy:hover { border-color: var(--hot); }
+.copy.done { border-color: var(--ok); color: var(--ok); }
+
+.cols { display: grid; grid-template-columns: 1.15fr 1fr; gap: 22px; }
+@media (max-width: 720px) { .cols { grid-template-columns: 1fr; } }
+
+.checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.checks label { display: flex; gap: 12px; align-items: flex-start; padding: 9px 10px; border-radius: 10px; cursor: pointer; }
+.checks label:hover { background: var(--panel); }
+.checks input { width: 18px; height: 18px; margin-top: 2px; accent-color: var(--hot); flex: none; }
+.checks .t { font-weight: 600; font-size: 14px; }
+.checks .d { display: block; color: var(--muted); font-size: 12.5px; }
+.checks input:checked + span .t { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--line); }
+.progress { height: 6px; background: var(--line); border-radius: 999px; overflow: hidden; margin-bottom: 10px; }
+.progress i { display: block; height: 100%; width: 0; background: var(--ok); transition: width .3s; }
+.count { font-size: 12px; color: var(--muted); margin-bottom: 6px; font-variant-numeric: tabular-nums; }
+
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: grid; gap: 10px; }
+.card ol, .card ul { margin: 0; padding-left: 20px; display: grid; gap: 6px; font-size: 14px; }
+.links { display: grid; gap: 6px; }
+.links a { display: flex; justify-content: space-between; gap: 10px; text-decoration: none; padding: 9px 12px; border-radius: 9px; border: 1px solid var(--line); font-size: 14px; }
+.links a span { color: var(--muted); font-size: 12px; }
+.links a:hover { border-color: var(--hot); }
+.pill { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; padding: 3px 8px; border-radius: 999px; }
+.pill.build { background: rgba(255,181,71,.14); color: var(--sun); }
+.pill.live { background: rgba(52,211,153,.14); color: var(--ok); }
+.rule { border-left: 3px solid var(--hot); padding: 10px 14px; background: var(--panel); border-radius: 0 10px 10px 0; font-size: 13.5px; color: var(--muted); }
+.rule b { color: var(--text); }
+@media (prefers-reduced-motion: reduce) { .progress i { transition: none; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <div class="logo" aria-hidden="true">CF</div>
+      <div>
+        <h1>Clip Factory</h1>
+      </div>
+    </div>
+    <span class="tag">Krew · Project Patrick</span>
+  </header>
+
+  <div class="hero">
+    <a class="open" href="http://localhost:3000" target="_blank" rel="noopener">Open the dashboard ↗</a>
+    <p>The dashboard runs on your PC, so this button works on the computer that's running Clip Factory, while the blue window with <code style="font-family:var(--mono);color:var(--sun)">docker compose up</code> is open.</p>
+    <nav class="pages" aria-label="Dashboard pages">
+      <a href="http://localhost:3000/" target="_blank" rel="noopener">Live</a>
+      <a href="http://localhost:3000/queue" target="_blank" rel="noopener">Queue</a>
+      <a href="http://localhost:3000/posted" target="_blank" rel="noopener">Posted</a>
+      <a href="http://localhost:3000/analytics" target="_blank" rel="noopener">Analytics</a>
+      <a href="http://localhost:3000/streamers" target="_blank" rel="noopener">Streamers</a>
+      <a href="http://localhost:3000/settings" target="_blank" rel="noopener">Settings</a>
+    </nav>
+  </div>
+
+  <section>
+    <h2>Run it</h2>
+    <p class="sub">In the clip-factory folder: right-click empty space → Open in Terminal, then paste one command.</p>
+    <div class="cmds">
+      <div class="cmd"><div class="what">Start Clip Factory</div><button class="copy" type="button" data-copy="docker compose up">Copy</button><code>docker compose up</code><div class="when">Leave the window open. Ctrl + C stops it.</div></div>
+      <div class="cmd"><div class="what">Check everything</div><button class="copy" type="button" data-copy="docker compose run --rm worker npm run doctor">Copy</button><code>docker compose run --rm worker npm run doctor</code><div class="when">Prints ✅ / ⚠️ / ❌ with a fix for each line. Run it after changing keys.</div></div>
+      <div class="cmd"><div class="what">Update (newest yt-dlp + Claude's changes)</div><button class="copy" type="button" data-copy="docker compose build --pull">Copy</button><code>docker compose build --pull</code><div class="when">Do this on launch morning, and after downloading a new version of the code.</div></div>
+      <div class="cmd"><div class="what">Edit your keys</div><button class="copy" type="button" data-copy="notepad .env">Copy</button><code>notepad .env</code><div class="when">Each key right after its = sign. Never screenshot or share this file.</div></div>
+    </div>
+  </section>
+
+  <div class="cols">
+    <section>
+      <h2>Getting to launch</h2>
+      <p class="sub">Tick things off as you go. Saved in this browser.</p>
+      <div class="count" id="count"></div>
+      <div class="progress" aria-hidden="true"><i id="bar"></i></div>
+      <ul class="checks" id="checks">
+        <li><label><input type="checkbox" id="c-docker" data-default="1"><span><span class="t">Docker Desktop running</span><span class="d">"Engine running" in green.</span></span></label></li>
+        <li><label><input type="checkbox" id="c-code" data-default="1"><span><span class="t">Code downloaded and unzipped</span><span class="d">Use the real folder, not the inside of the ZIP.</span></span></label></li>
+        <li><label><input type="checkbox" id="c-twitch" data-default="1"><span><span class="t">Twitch keys in .env</span><span class="d">Doctor shows ✅ for Twitch.</span></span></label></li>
+        <li><label><input type="checkbox" id="c-doctor" data-default="1"><span><span class="t">Doctor: 0 broken</span><span class="d">First real run passed on Nov 17.</span></span></label></li>
+        <li><label><input type="checkbox" id="c-approve"><span><span class="t">Approve 3 streamers who allow clipping</span><span class="d">Streamers page. Write why: clipping campaign, "clips welcome" panel, or they said yes.</span></span></label></li>
+        <li><label><input type="checkbox" id="c-first"><span><span class="t">First clip in the Queue</span><span class="d">About 5 minutes after approving. Watch it, then Approve or Reject.</span></span></label></li>
+        <li><label><input type="checkbox" id="c-claude"><span><span class="t">Anthropic key for the Judge</span><span class="d">Optional. About 1 cent per clip; set a $1 monthly limit.</span></span></label></li>
+        <li><label><input type="checkbox" id="c-youtube"><span><span class="t">Connect a YouTube channel</span><span class="d">Settings → Connect. Steps in README.</span></span></label></li>
+        <li><label><input type="checkbox" id="c-tiktok"><span><span class="t">Connect TikTok</span><span class="d">Clips arrive as drafts in your TikTok inbox.</span></span></label></li>
+        <li><label><input type="checkbox" id="c-launch"><span><span class="t">Thursday: update, start, raise min clip views</span><span class="d">docker compose build --pull, then up. Settings → Min Twitch clip views ≈ 200.</span></span></label></li>
+      </ul>
+    </section>
+
+    <section style="display:grid;gap:16px;align-content:start">
+      <div class="card">
+        <h2>Open it like an app in Chrome</h2>
+        <ol>
+          <li>Open <b>localhost:3000</b> in Chrome.</li>
+          <li>Menu <b>⋮</b> → <b>Cast, save and share</b> → <b>Install page as app…</b> (older Chrome: <b>More tools → Create shortcut</b>, tick "Open as window").</li>
+          <li>Clip Factory gets its own window and a desktop icon.</li>
+        </ol>
+      </div>
+      <div class="card">
+        <h2>What's new <span class="pill build">Building now</span></h2>
+        <ul>
+          <li><b>Any game.</b> Approved streamers get clipped whatever they're playing, not just GTA 6.</li>
+          <li><b>YouTube scanner.</b> Approve a channel by @handle; it cuts the most-replayed moments of their newest videos.</li>
+        </ul>
+        <div class="rule"><b>Only approved creators get clipped.</b> Big creators often run paid clipping campaigns (pay per 1,000 views). That's the money route, and it keeps your accounts safe from copyright strikes.</div>
+      </div>
+      <div class="card">
+        <h2>Keys and accounts</h2>
+        <div class="links">
+          <a href="https://dev.twitch.tv/console/apps" target="_blank" rel="noopener">Twitch developer apps <span>keys</span></a>
+          <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">Anthropic console <span>Judge key · spend limit</span></a>
+          <a href="https://console.cloud.google.com" target="_blank" rel="noopener">Google Cloud <span>YouTube upload</span></a>
+          <a href="https://developers.tiktok.com" target="_blank" rel="noopener">TikTok developers <span>drafts</span></a>
+          <a href="https://github.com/kw1020/Project-Patrick/tree/claude/adoring-mendel-at7ood/clip-factory" target="_blank" rel="noopener">The code on GitHub <span>README</span></a>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script>
+(function () {
+  // Copy buttons
+  document.querySelectorAll(".copy").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var text = b.getAttribute("data-copy");
+      var done = function () { b.textContent = "Copied"; b.classList.add("done"); setTimeout(function () { b.textContent = "Copy"; b.classList.remove("done"); }, 1500); };
+      var fallback = function () {
+        var code = b.parentElement.querySelector("code");
+        var r = document.createRange(); r.selectNodeContents(code);
+        var s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+        b.textContent = "Press Ctrl+C";
+      };
+      try { navigator.clipboard.writeText(text).then(done, fallback); } catch (e) { fallback(); }
+    });
+  });
+
+  // Checklist, remembered in this browser only
+  var KEY = "clip-factory-checklist-v1";
+  var saved = null;
+  try { saved = JSON.parse(localStorage.getItem(KEY) || "null"); } catch (e) {}
+  var boxes = Array.prototype.slice.call(document.querySelectorAll("#checks input"));
+  boxes.forEach(function (b) { b.checked = saved && b.id in saved ? !!saved[b.id] : b.getAttribute("data-default") === "1"; });
+  function update() {
+    var n = boxes.filter(function (b) { return b.checked; }).length;
+    document.getElementById("count").textContent = n + " of " + boxes.length + " done";
+    document.getElementById("bar").style.width = (n / boxes.length * 100) + "%";
+  }
+  boxes.forEach(function (b) {
+    b.addEventListener("change", function () {
+      var state = {}; boxes.forEach(function (x) { state[x.id] = x.checked; });
+      try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
+      update();
+    });
+  });
+  update();
+})();
+</script>
