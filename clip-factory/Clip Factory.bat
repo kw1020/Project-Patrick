@@ -1,2 +1,1 @@
-@echo off
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\windows\start.ps1"
+@start "" powershell -NoP -Exec Bypass -W Hidden -File "%~dp0scripts\windows\tray.ps1"

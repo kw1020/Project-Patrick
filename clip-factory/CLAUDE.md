@@ -22,6 +22,14 @@ original brief is below, and the status section says what's done. Read both befo
   `Clip Factory.bat` → `scripts/windows/start.ps1` (git pull --ff-only, Docker check, `docker compose up -d --build`,
   waits for /api/health, opens the dashboard, makes desktop shortcuts). Updates = Stop + reopen. Push to branch
   `claude/adoring-mendel-at7ood` = what Krew gets on next launch, so never push a broken build there.
+- **Tray app (2026-11-17, UNVERIFIED on Windows):** `Clip Factory.bat` (must stay <= 97 bytes, see
+  `test/windows-scripts.test.ts`) starts `scripts/windows/tray.ps1` hidden: WinForms NotifyIcon, mutex
+  `Local\ClipFactoryTray`, 1s timer state machine running each step (git pull, docker info, compose up/down)
+  as a hidden `cmd /c` child, async /api/health polls, log `storage/launcher.log`, restarts itself if a pull
+  changed tray.ps1/common.ps1. Opens the dashboard as a Chrome/Edge `--app` window (`common.ps1`, shared with
+  `start.ps1`). Desktop shortcut + optional Startup shortcut -> powershell tray.ps1. `stop.ps1` writes
+  `storage/launcher-stopped.flag` so the tray shows "stopped"; a 2nd launch writes `launcher-open.flag`.
+  Visible fallback: `Clip Factory (show details).bat` -> `start.ps1`.
 - Docker image never built in the sandbox (no daemon); it builds fine on Krew's PC; a clean-copy `npm ci` + `next build` without `.env`
   (what the Dockerfile does) passes.
 - **Suggestions (2026-11-17):** `src/workers/suggest.ts` (queue "suggest", hourly + once ~1 min after start,

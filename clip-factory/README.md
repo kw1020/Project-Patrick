@@ -52,11 +52,34 @@ downloads only what changed, rebuilds, starts, and opens the dashboard.
    (a browser window asks you to sign in to GitHub the first time).
 4. Copy your keys from the old ZIP folder into `Documents\Project-Patrick\clip-factory\.env`.
 5. Open `Documents\Project-Patrick\clip-factory` and double-click **Clip Factory** (the .bat file).
-   It adds **Clip Factory** and **Stop Clip Factory** icons to your desktop.
+   It puts a **Clip Factory** icon on your desktop. Use that from then on.
 
 Your approved streamers, settings and clips history carry over (same Docker volumes, because the folder is
-still called `clip-factory`). Clips run in the background; close the window any time. To update: just
-open Clip Factory again.
+still called `clip-factory`).
+
+**Using it day to day.** The **Clip Factory** icon starts a small tray app: a pink **CF** icon at the
+bottom-right of the screen, by the clock. No black window. It checks for updates, starts Docker, starts
+Clip Factory in the background and opens the dashboard in its **own app window** (no tabs, no address
+bar). Closing that window does not stop anything: clips keep coming in. Hover over the CF icon to see if
+it's *starting*, *running*, *stopped* or has an *error*.
+
+- **Can't see the CF icon?** Windows hides new tray icons. Click the small **^** arrow by the clock, then
+  drag the CF icon down onto the taskbar so it always shows.
+- **Click the CF icon** to open the app window again.
+- **Right-click the CF icon** for the menu:
+  - **Open Clip Factory**: opens the app window.
+  - **Start** / **Stop**: Stop shuts it down; your clips, streamers and settings are kept.
+  - **Update now**: stops, downloads the newest version, rebuilds and starts again (a few minutes).
+  - **Start when Windows starts**: tick it and Clip Factory starts by itself when you sign in
+    (quietly, no window). Untick to turn it off.
+  - **Show log**: opens a text file of what the launcher did (`clip-factory\storage\launcher.log`).
+    Send it to Claude when something goes wrong.
+  - **Quit (keep running in background)**: removes the CF icon; clips keep coming in.
+  - **Stop and quit**: stops Clip Factory and removes the icon.
+- Opening Clip Factory again while it's already running just opens the app window.
+- **Stop Clip Factory** (desktop icon, if you have it) still works too.
+- Something wrong and the log doesn't help? Double-click **Clip Factory (show details).bat** in the
+  `clip-factory` folder: it does the same steps in a visible window, so you can screenshot it.
 
 ## Check everything before launch: `npm run doctor`
 

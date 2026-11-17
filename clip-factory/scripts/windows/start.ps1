@@ -1,10 +1,12 @@
 # Clip Factory launcher: update -> start Docker -> build + start in the background -> open the dashboard.
-# Started by "Clip Factory.bat". PowerShell reads this whole file before running it, so `git pull`
-# replacing this file mid-run is safe.
+# Visible fallback for troubleshooting: started by "Clip Factory (show details).bat".
+# (The normal "Clip Factory" icon starts the tray app, tray.ps1, which does the same steps hidden.)
+# PowerShell reads this whole file before running it, so `git pull` replacing this file mid-run is safe.
 $ErrorActionPreference = "Continue"
 try { $Host.UI.RawUI.WindowTitle = "Clip Factory" } catch {}
 $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)   # the clip-factory folder
 Set-Location $root
+. (Join-Path $PSScriptRoot "common.ps1")
 
 function Say($msg, $color = "Gray") { Write-Host $msg -ForegroundColor $color }
 function Stop-Here($code) { Read-Host "Press Enter to close"; exit $code }
@@ -78,23 +80,32 @@ for ($i = 0; $i -lt 120; $i++) {
   } catch {}
   Start-Sleep -Seconds 2
 }
-if ($ready) { Start-Process "http://localhost:3000" } else { Say "The dashboard is slow to start. Try http://localhost:3000 in a minute." Yellow }
+if ($ready) { Open-ClipFactoryWindow "http://localhost:3000" } else { Say "The dashboard is slow to start. Try http://localhost:3000 in a minute." Yellow }
 
-# 6. Desktop shortcuts (first run only)
+# 6. Desktop shortcuts: "Clip Factory" starts the tray app (updated if it still points at the old .bat),
+#    "Stop Clip Factory" is only added when missing.
 $desktop = [Environment]::GetFolderPath("Desktop")
-$ws = New-Object -ComObject WScript.Shell
-foreach ($pair in @(@("Clip Factory", "Clip Factory.bat"), @("Stop Clip Factory", "Stop Clip Factory.bat"))) {
-  $lnk = Join-Path $desktop ($pair[0] + ".lnk")
-  if (-not (Test-Path $lnk)) {
-    $s = $ws.CreateShortcut($lnk)
-    $s.TargetPath = Join-Path $root $pair[1]
-    $s.WorkingDirectory = $root
-    $s.Save()
-    Say ("Added '" + $pair[0] + "' to your desktop.") Green
+$ico = Join-Path $root "storage\clip-factory.ico"
+try {
+  if (-not (Test-Path (Join-Path $root "storage"))) { New-Item -ItemType Directory -Path (Join-Path $root "storage") -Force | Out-Null }
+  if (-not (Test-Path $ico)) { Save-ClipFactoryIcon $ico }
+} catch { Say ("Couldn't make the icon file: " + $_.Exception.Message) DarkGray }
+try {
+  if (Set-ClipFactoryShortcut (Join-Path $desktop "Clip Factory.lnk") (Join-Path $PSScriptRoot "tray.ps1") $root $ico "") {
+    Say "Desktop icon 'Clip Factory' now starts the tray app." Green
   }
+} catch { Say ("Couldn't make the desktop icon: " + $_.Exception.Message) DarkGray }
+$stopLnk = Join-Path $desktop "Stop Clip Factory.lnk"
+if (-not (Test-Path $stopLnk)) {
+  $ws = New-Object -ComObject WScript.Shell
+  $s = $ws.CreateShortcut($stopLnk)
+  $s.TargetPath = Join-Path $root "Stop Clip Factory.bat"
+  $s.WorkingDirectory = $root
+  $s.Save()
+  Say "Added 'Stop Clip Factory' to your desktop." Green
 }
 
 Say ""
 Say "Clip Factory is running: http://localhost:3000" Green
-Say "You can close this window. It keeps running in the background until you use 'Stop Clip Factory'." Gray
+Say "You can close this window. It keeps running in the background until you use Stop (tray icon) or 'Stop Clip Factory'." Gray
 Start-Sleep -Seconds 10
