@@ -43,6 +43,9 @@ $script:lastOpen = (Get-Date).AddMinutes(-1)
 $script:ticking = $false
 $script:quitting = $false
 $script:balloonAction = "none"
+$script:openPage = ""          # page to open when the window opens by itself ("" = dashboard, "/whats-new")
+$script:version = ""           # from CHANGELOG.md, e.g. "1.6.0"
+$script:previousInstall = $false   # Clip Factory ran on this PC before this tray started (not a fresh install)
 $script:mutex = $null
 $script:notify = $null
 $script:timer = $null
@@ -215,7 +218,9 @@ function Stop-CurrentJob {
 
 function Update-Ui {
   if ($null -eq $script:notify) { return }
-  $t = "Clip Factory " + $script:dash + " "
+  $t = "Clip Factory "
+  if ($script:version) { $t = $t + "v" + $script:version + " " }
+  $t = $t + $script:dash + " "
   switch ($script:state) {
     "starting" { $t = $t + "starting" + $script:ell }
     "running"  { $t = $t + "running" }
@@ -233,6 +238,7 @@ function Update-Ui {
   $script:miStop.Enabled = ($script:state -eq "running" -or $script:state -eq "error")
   $script:miUpdate.Enabled = (-not $busy)
   $script:miAutostart.Checked = (Test-Path -LiteralPath (Get-StartupLnk))
+  if ($script:version) { $script:miWhatsNew.Text = "What's new (v" + $script:version + ")" } else { $script:miWhatsNew.Text = "What's new" }
 }
 
 function Set-State([string]$state, [string]$detail) {
@@ -242,7 +248,7 @@ function Set-State([string]$state, [string]$detail) {
   Update-Ui
 }
 
-# action: "open" (open the app window), "log" (open the log), "none"
+# action: "open" (open the app window), "whatsnew" (open the What's new page), "log" (open the log), "none"
 function Show-Balloon([string]$text, [string]$kind, [string]$action) {
   if ($null -eq $script:notify) { return }
   $script:balloonAction = $action
@@ -262,15 +268,18 @@ function Get-StartupLnk {
 }
 
 # "Open Clip Factory": open the window now if running, else start (or keep starting) and open when ready.
-function Request-Open([bool]$fromClick) {
+# page: "" for the dashboard, or a path such as "/whats-new".
+function Request-Open([bool]$fromClick, [string]$page) {
   if ($fromClick) {
     if (((Get-Date) - $script:lastOpen).TotalSeconds -lt 2) { return }
   }
   $script:lastOpen = Get-Date
+  if (-not $page) { $page = "" }
   if ($script:state -eq "running" -or ($script:state -eq "error" -and $script:phase -eq "monitor")) {
-    Open-ClipFactoryWindow $script:url
+    Open-ClipFactoryWindow ($script:url + $page)
     return
   }
+  $script:openPage = $page
   if ($script:state -eq "stopped" -or $script:state -eq "error") {
     $script:openWhenReady = $true
     Show-Balloon "Starting Clip Factory. Its window opens by itself when it's ready." "info" "none"
@@ -363,9 +372,26 @@ function Set-Running {
   Set-State "running" ""
   if ($script:openWhenReady) {
     $script:openWhenReady = $false
-    Open-ClipFactoryWindow $script:url
+    Open-ClipFactoryWindow ($script:url + $script:openPage)
   }
-  Show-Balloon "Clip Factory is running." "info" "open"
+  $script:openPage = ""
+  if (-not (Show-UpdateNote)) { Show-Balloon "Clip Factory is running." "info" "open" }
+}
+
+# After an update changed the version: "Updated to Clip Factory v1.6.0 - click to see what's new".
+# storage\launcher-version.txt holds the last version shown, so this also covers updates made by
+# start.ps1, the setup file, or an older tray that restarted itself. Returns $true when it showed the note.
+function Show-UpdateNote {
+  $v = $script:version
+  if (-not $v) { return $false }
+  $seen = Get-SeenVersion $script:root
+  if ($seen -eq $v) { return $false }
+  Set-SeenVersion $script:root $v
+  # No saved version on a fresh install: nothing was "updated".
+  if ((-not $seen) -and (-not $script:previousInstall)) { return $false }
+  Write-Log ("Updated to v" + $v + " (was " + $seen + "). Showing what's new.")
+  Show-Balloon ("Updated to Clip Factory v" + $v + " " + $script:dash + " click to see what's new") "info" "whatsnew"
+  return $true
 }
 
 # Restart this tray with the freshly pulled tray.ps1 (skips the pull, carries on starting).
@@ -402,6 +428,8 @@ function Complete-Job($r) {
   $now = Get-Date
   switch ($script:phase) {
     "git-pull" {
+      $script:version = Get-ClipFactoryVersion $script:root
+      Update-Ui
       if ($r.Ok) {
         $after = Get-Head
         if ($after -and $script:headBefore -and ($after -ne $script:headBefore)) {
@@ -541,6 +569,7 @@ function Invoke-Tick {
 # ---------------------------------------------------------------- main
 
 try {
+  $script:previousInstall = ((Test-Path -LiteralPath $script:logPath) -or (Test-Path -LiteralPath $script:icoPath))
   if (-not (Test-Path -LiteralPath $script:storage)) { New-Item -ItemType Directory -Path $script:storage -Force | Out-Null }
   . (Join-Path $script:winDir "common.ps1")
   Add-Type -AssemblyName System.Windows.Forms
@@ -565,7 +594,8 @@ try {
   Limit-Log
   Get-ChildItem -LiteralPath $script:storage -Filter "launcher-step-*.log" -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
   Remove-Item -LiteralPath $script:openFlag -Force -ErrorAction SilentlyContinue
-  Write-Log ("---- Tray started (version " + (Get-Head) + ")")
+  $script:version = Get-ClipFactoryVersion $script:root
+  Write-Log ("---- Tray started (v" + $script:version + ", commit " + (Get-Head) + ")")
 
   # Icon (drawn in code) + a .ico copy for the shortcuts.
   $script:bmp = New-ClipFactoryBitmap 32
@@ -595,6 +625,7 @@ try {
   $script:miStop = New-Object System.Windows.Forms.ToolStripMenuItem("Stop")
   $script:miUpdate = New-Object System.Windows.Forms.ToolStripMenuItem("Update now")
   $script:miAutostart = New-Object System.Windows.Forms.ToolStripMenuItem("Start when Windows starts")
+  $script:miWhatsNew = New-Object System.Windows.Forms.ToolStripMenuItem("What's new")
   $script:miLog = New-Object System.Windows.Forms.ToolStripMenuItem("Show log")
   $script:miQuit = New-Object System.Windows.Forms.ToolStripMenuItem("Quit (keep running in background)")
   $script:miStopQuit = New-Object System.Windows.Forms.ToolStripMenuItem("Stop and quit")
@@ -604,6 +635,7 @@ try {
   [void]$menu.Items.Add($script:miStop)
   [void]$menu.Items.Add($script:miUpdate)
   [void]$menu.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator))
+  [void]$menu.Items.Add($script:miWhatsNew)
   [void]$menu.Items.Add($script:miAutostart)
   [void]$menu.Items.Add($script:miLog)
   [void]$menu.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator))
@@ -611,10 +643,11 @@ try {
   [void]$menu.Items.Add($script:miStopQuit)
 
   $script:miOpen.Add_Click({ Invoke-Safe { Request-Open $false } })
-  $script:miStart.Add_Click({ Invoke-Safe { $script:openWhenReady = $true; Start-ClipFactory $false "starting" } })
+  $script:miStart.Add_Click({ Invoke-Safe { $script:openWhenReady = $true; $script:openPage = ""; Start-ClipFactory $false "starting" } })
   $script:miStop.Add_Click({ Invoke-Safe { Start-ComposeDown "none" } })
   $script:miUpdate.Add_Click({ Invoke-Safe {
     $script:openWhenReady = $true
+    $script:openPage = ""
     if ($script:state -eq "stopped") { Start-ClipFactory $true "updating" } else { Start-ComposeDown "update" }
   } })
   $script:miAutostart.Add_Click({ Invoke-Safe {
@@ -628,6 +661,7 @@ try {
     }
     Update-Ui
   } })
+  $script:miWhatsNew.Add_Click({ Invoke-Safe { Request-Open $false "/whats-new" } })
   $script:miLog.Add_Click({ Invoke-Safe { Open-Log } })
   $script:miQuit.Add_Click({ Invoke-Safe { Exit-Tray } })
   $script:miStopQuit.Add_Click({ Invoke-Safe { Start-ComposeDown "quit" } })
@@ -646,6 +680,7 @@ try {
   $script:notify.Add_BalloonTipClicked({ Invoke-Safe {
     if ($script:balloonAction -eq "log") { Open-Log }
     if ($script:balloonAction -eq "open") { Request-Open $false }
+    if ($script:balloonAction -eq "whatsnew") { Request-Open $false "/whats-new" }
   } })
   $script:notify.Visible = $true
 

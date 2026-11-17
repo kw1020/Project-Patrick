@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { prisma } from "@/lib/db";
 import { Nav } from "@/components/Nav";
+import { VersionChip } from "@/components/VersionChip";
+import { getVersion } from "@/lib/version";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Clip Factory", description: "GTA 6 clip pipeline" };
@@ -20,6 +22,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               <span className="grid h-8 w-8 place-items-center rounded-lg bg-gradient-to-br from-hot to-sun text-sm text-black">CF</span>
               <span className="text-lg">Clip Factory</span>
               <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] font-bold uppercase text-zinc-400">GTA 6</span>
+              <VersionChip version={getVersion()} />
             </div>
             <Nav pending={pending} suggestions={suggestions} />
           </div>

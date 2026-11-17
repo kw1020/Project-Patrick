@@ -30,6 +30,14 @@ original brief is below, and the status section says what's done. Read both befo
   `start.ps1`). Desktop shortcut + optional Startup shortcut -> powershell tray.ps1. `stop.ps1` writes
   `storage/launcher-stopped.flag` so the tray shows "stopped"; a 2nd launch writes `launcher-open.flag`.
   Visible fallback: `Clip Factory (show details).bat` -> `start.ps1`.
+- **Version + patch notes (2026-11-17, v1.6.0):** `CHANGELOG.md` is the only source of the version (first `## x.y.z — date`
+  heading; 3-6 plain-English ASCII bullets per entry, newest first; `test/version.test.ts` enforces it). `src/lib/version.ts`
+  (`getVersion`/`getChangelog`) feeds the header chip `v1.6.0` (`src/components/VersionChip.tsx`, "NEW" dot until
+  /whats-new is opened, localStorage `cf-seen-version`) and the `/whats-new` page. Tray: version in tooltip + "What's new (vX)"
+  menu item; after a version change it shows "Updated to Clip Factory vX — click to see what's new" once Clip Factory is running
+  (compares with `storage/launcher-version.txt`, so updates by start.ps1/the setup file/a self-restarted tray count; a fresh
+  install, i.e. no launcher.log or .ico in storage, stays quiet). `start.ps1` prints the new version's notes; the setup file
+  prints "Clip Factory vX is installed". PowerShell parts UNVERIFIED on Windows.
 - Docker image never built in the sandbox (no daemon); it builds fine on Krew's PC; a clean-copy `npm ci` + `next build` without `.env`
   (what the Dockerfile does) passes.
 - **Suggestions (2026-11-17):** `src/workers/suggest.ts` (queue "suggest", hourly + once ~1 min after start,
@@ -107,6 +115,7 @@ Runs every 5s per approved live streamer whose chat we read (anonymous IRC with 
 - Every caption credits the creator (name + twitch.tv / youtube.com/@ link, always via `creatorUrl` in `src/lib/social.ts`);
   the credit is also burned into the video.
 - Secrets live in `.env` (gitignored). Never commit it.
+- Every push to claude/adoring-mendel-at7ood bumps the version and adds a CHANGELOG.md entry in plain words (Krew sees it after updating).
 
 ## Gotchas found while building
 - `.env.example` must never have `KEY=   # comment` lines: Docker Compose can read the comment as the value.

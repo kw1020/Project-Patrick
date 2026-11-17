@@ -23,6 +23,7 @@ if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
   Say "This copy was downloaded as a ZIP, so it can't update itself. Starting the version you have." Yellow
 } else {
   Say "Checking for updates..."
+  $versionBefore = Get-ClipFactoryVersion $root
   $before = (git -C $repoRoot rev-parse HEAD) 2>$null
   $out = (git -C $repoRoot pull --ff-only 2>&1) | Out-String
   $pullCode = $LASTEXITCODE
@@ -31,6 +32,15 @@ if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
     Say "Couldn't update (no internet, or files changed by hand). Starting the version you have." Yellow
     Say $out DarkGray
   } elseif ($before -ne $after) {
+    $versionAfter = Get-ClipFactoryVersion $root
+    if ($versionAfter -and ($versionAfter -ne $versionBefore)) {
+      Say ""
+      Say ("Updated to v" + $versionAfter) Green
+      foreach ($note in (Get-ClipFactoryNotes $root $versionAfter)) { Say ("  - " + $note) White }
+      Say "  (All patch notes: the version badge at the top of the dashboard.)" DarkGray
+      Say ""
+      Set-SeenVersion $root $versionAfter
+    }
     Say "Updated to the newest version. Rebuilding (a few minutes)..." Green
   } else {
     Say "Already up to date." Green
@@ -106,6 +116,7 @@ if (-not (Test-Path $stopLnk)) {
 }
 
 Say ""
-Say "Clip Factory is running: http://localhost:3000" Green
+$runningVersion = Get-ClipFactoryVersion $root
+if ($runningVersion) { Say ("Clip Factory v" + $runningVersion + " is running: http://localhost:3000") Green } else { Say "Clip Factory is running: http://localhost:3000" Green }
 Say "You can close this window. It keeps running in the background until you use Stop (tray icon) or 'Stop Clip Factory'." Gray
 Start-Sleep -Seconds 10

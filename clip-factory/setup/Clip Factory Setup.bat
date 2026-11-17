@@ -43,6 +43,10 @@ echo.
 echo Starting Clip Factory...
 start "" powershell -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "%CF%\scripts\windows\tray.ps1"
 echo.
+rem Version = the x.y.z of the first "## x.y.z" line of CHANGELOG.md. Skipped if it can't be read.
+set "CFVER="
+if exist "%CF%\CHANGELOG.md" for /f "tokens=2" %%v in ('findstr /b /c:"## " "%CF%\CHANGELOG.md"') do if not defined CFVER set "CFVER=%%v"
+if defined CFVER echo   Clip Factory v%CFVER% is installed.
 echo   Done. Look for the pink CF icon by the clock (bottom right).
 echo   If you can't see it, click the ^^ arrow there and drag CF out next to the clock.
 echo   The first start after an update takes a few minutes, then the app window opens.

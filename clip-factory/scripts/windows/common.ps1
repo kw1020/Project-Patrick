@@ -28,6 +28,58 @@ function Open-ClipFactoryWindow([string]$url) {
   }
 }
 
+# The installed version: the x.y.z of the first "## x.y.z" heading in CHANGELOG.md. "" when unreadable.
+function Get-ClipFactoryVersion([string]$root) {
+  try {
+    $f = Join-Path $root "CHANGELOG.md"
+    if (Test-Path -LiteralPath $f) {
+      foreach ($line in [System.IO.File]::ReadAllLines($f, [System.Text.Encoding]::UTF8)) {
+        if ($line.StartsWith("## ")) {
+          $m = [regex]::Match($line, '^##\s+(\d+\.\d+\.\d+)')
+          if ($m.Success) { return $m.Groups[1].Value }
+        }
+      }
+    }
+  } catch {}
+  return ""
+}
+
+# The bullet notes under one version's heading in CHANGELOG.md (an empty list when unreadable).
+function Get-ClipFactoryNotes([string]$root, [string]$version) {
+  $notes = @()
+  try {
+    $f = Join-Path $root "CHANGELOG.md"
+    $inside = $false
+    foreach ($line in [System.IO.File]::ReadAllLines($f, [System.Text.Encoding]::UTF8)) {
+      if ($line.StartsWith("## ")) {
+        if ($inside) { break }
+        $m = [regex]::Match($line, '^##\s+(\d+\.\d+\.\d+)')
+        $inside = ($m.Success -and ($m.Groups[1].Value -eq $version))
+        continue
+      }
+      if ($inside -and $line.StartsWith("- ")) { $notes += $line.Substring(2).Trim() }
+    }
+  } catch {}
+  return ,$notes
+}
+
+# The last version the owner was told about (storage\launcher-version.txt). "" when not saved yet.
+function Get-SeenVersion([string]$root) {
+  try {
+    $f = Join-Path $root "storage\launcher-version.txt"
+    if (Test-Path -LiteralPath $f) { return ([System.IO.File]::ReadAllText($f)).Trim() }
+  } catch {}
+  return ""
+}
+
+function Set-SeenVersion([string]$root, [string]$version) {
+  try {
+    $dir = Join-Path $root "storage"
+    if (-not (Test-Path -LiteralPath $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
+    [System.IO.File]::WriteAllText((Join-Path $dir "launcher-version.txt"), $version)
+  } catch {}
+}
+
 # Draws the Clip Factory logo (pink to amber rounded square with "CF") at any size.
 function New-ClipFactoryBitmap([int]$size) {
   Add-Type -AssemblyName System.Drawing

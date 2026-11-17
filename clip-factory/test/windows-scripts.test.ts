@@ -10,7 +10,11 @@ import path from "node:path";
 const root = path.join(__dirname, "..");
 const winDir = path.join(root, "scripts", "windows");
 const ps1Files = fs.readdirSync(winDir).filter((f) => f.endsWith(".ps1")).map((f) => path.join(winDir, f));
-const batFiles = fs.readdirSync(root).filter((f) => f.endsWith(".bat")).map((f) => path.join(root, f));
+const setupDir = path.join(root, "setup");
+const batFiles = [
+  ...fs.readdirSync(root).filter((f) => f.endsWith(".bat")).map((f) => path.join(root, f)),
+  ...fs.readdirSync(setupDir).filter((f) => f.endsWith(".bat")).map((f) => path.join(setupDir, f)),
+];
 
 const KNOWN_CMDLETS = new Set([
   "Add-Content", "Add-Type", "Copy-Item", "Get-ChildItem", "Get-Command", "Get-Content", "Get-Date",
