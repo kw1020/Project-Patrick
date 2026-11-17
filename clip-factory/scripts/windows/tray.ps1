@@ -577,6 +577,11 @@ try {
     $lnk = Join-Path ([Environment]::GetFolderPath("Desktop")) "Clip Factory.lnk"
     if (Set-ClipFactoryShortcut $lnk $script:trayPath $script:root $script:icoPath "") { Write-Log "Desktop shortcut 'Clip Factory' now opens the tray app." }
   }
+  # Start menu entry, so "Clip Factory" shows up in Windows search like any app.
+  Invoke-Safe {
+    $prog = Join-Path ([Environment]::GetFolderPath("Programs")) "Clip Factory.lnk"
+    [void](Set-ClipFactoryShortcut $prog $script:trayPath $script:root $script:icoPath "")
+  }
   # Keep the Startup shortcut pointing at this folder if it's turned on.
   Invoke-Safe {
     if (Test-Path -LiteralPath (Get-StartupLnk)) { [void](Set-ClipFactoryShortcut (Get-StartupLnk) $script:trayPath $script:root $script:icoPath "-NoOpen") }
