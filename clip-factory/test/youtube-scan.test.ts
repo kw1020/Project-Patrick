@@ -113,9 +113,12 @@ test("channelPageUrl understands @handles and channel links", async () => {
 test("approving a channel by @handle stores an approved youtube Streamer; errors are plain", async () => {
   const { prisma } = await import("../src/lib/db");
   const { addYouTubeChannel } = await import("../app/actions");
-  assert.match((await addYouTubeChannel(null, form({ channel: "@GoodChan", note: "" }))).error!, /why/);
   const bad = await addYouTubeChannel(null, form({ channel: "@NoSuchChan", note: "x" }));
   assert.match(bad.error!, /couldn't find that channel \(\[youtube:tab\] This channel does not exist\.\)/);
+
+  // One click, no note: approved with the default note.
+  assert.match((await addYouTubeChannel(null, form({ channel: "@GoodChan", note: "" }))).ok!, /Good Channel/);
+  assert.equal((await prisma.streamer.findUniqueOrThrow({ where: { twitchId: `yt:${GOOD}` } })).approvalNote, "Approved by Krew");
 
   const r = await addYouTubeChannel(null, form({ channel: "@GoodChan", note: "Runs a clipping campaign" }));
   assert.match(r.ok!, /Good Channel \(youtube\.com\/@GoodChan\) approved/);
@@ -258,4 +261,25 @@ test("Twitch Scout and Clips poller never touch YouTube rows", async () => {
   assert.equal(yt.platform, "youtube");
   assert.equal(await prisma.streamer.count({ where: { twitchId: "tw1" } }), 0);
   assert.ok(!channels.flat().includes("GoodChan"));
+});
+
+test("bulk add without a YouTube key: names are resolved with yt-dlp (@NameWithoutSpaces); unknown ones are 'not found'", async () => {
+  delete process.env.YOUTUBE_API_KEY;
+  const saved = { id: process.env.TWITCH_CLIENT_ID, secret: process.env.TWITCH_CLIENT_SECRET };
+  delete process.env.TWITCH_CLIENT_ID; delete process.env.TWITCH_CLIENT_SECRET;
+  try {
+    const { resolveCreators } = await import("../src/lib/creator-lookup");
+    const r = await resolveCreators(["Good Chan", "No Such Chan", "  ", "good chan"]);
+    assert.deepEqual(r.rows.map((x) => x.name), ["Good Chan", "No Such Chan"], "blank + repeated names dropped");
+    const good = r.rows[0].youtube;
+    assert.equal(good.status, "found");
+    if (good.status === "found") assert.deepEqual({ id: good.match.channelId, handle: good.match.handle, approved: good.match.approved }, { id: GOOD, handle: "goodchan", approved: true });
+    assert.equal(r.rows[1].youtube.status, "none");
+    assert.deepEqual(r.rows.map((x) => x.twitch), [{ status: "error", reason: "no Twitch keys" }, { status: "error", reason: "no Twitch keys" }]);
+    assert.match(r.notes.join(" "), /Twitch keys are missing/);
+    assert.ok(readCalls().some((a) => a.at(-1) === "https://www.youtube.com/@GoodChan/videos"));
+  } finally {
+    if (saved.id) process.env.TWITCH_CLIENT_ID = saved.id;
+    if (saved.secret) process.env.TWITCH_CLIENT_SECRET = saved.secret;
+  }
 });

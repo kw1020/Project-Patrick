@@ -64,7 +64,7 @@ export async function runClipsPoll() {
         streamerId: s.id, timestamp: new Date(c.created_at), spikeScore: c.view_count, source: "twitch_clip",
         twitchClipId: c.id, sourceUrl: c.url, sourceTitle: c.title, sourceViews: c.view_count, gameName: game,
         vodId: c.video_id || null, vodOffset: c.vod_offset ?? null,
-        clips: { create: { title, caption: defaultCaption(title, s, game), status: "processing", stage: "grab" } },
+        clips: { create: { title, caption: defaultCaption(title, s, game), status: "processing", stage: "grab", stageAt: new Date() } },
       },
       include: { clips: true },
     });

@@ -43,7 +43,7 @@ function worker(name: keyof typeof QUEUES, concurrency: number, fn: (job: Job) =
     if (name === "post") {
       // A failed upload leaves the clip approved, with the reason shown on its card.
       await setStatus("post", false, err.message);
-      if (clipId) await prisma.clip.update({ where: { id: clipId }, data: { stage: null, postError: err.message.slice(0, 1000) } }).catch(() => {});
+      if (clipId) await prisma.clip.update({ where: { id: clipId }, data: { stage: null, stageAt: new Date(), postError: err.message.slice(0, 1000) } }).catch(() => {});
       return;
     }
     const finalAttempt = job && job.attemptsMade >= (job.opts.attempts ?? 1);

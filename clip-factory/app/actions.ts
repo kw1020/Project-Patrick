@@ -6,10 +6,12 @@ import { enqueueCut, enqueueGrab, enqueuePost, enqueueTranscribe, pokeScout, pok
 import { resolveChannel } from "@/lib/ytdlp";
 import { getUsers, twitchConfigured } from "@/lib/twitch";
 import { parseFacecam } from "@/lib/media";
+import { approvalReasonFromEvidence } from "@/lib/permission";
+import { approveResolved, DEFAULT_APPROVAL_NOTE, resolveCreators, type ApprovePick, type ApproveResult, type ResolveResult } from "@/lib/creator-lookup";
 
 function refreshAll() {
   try {
-    for (const p of ["/", "/queue", "/posted", "/analytics", "/streamers", "/settings"]) revalidatePath(p);
+    for (const p of ["/", "/queue", "/workroom", "/posted", "/analytics", "/streamers", "/settings"]) revalidatePath(p);
   } catch {
     /* called outside a Next.js request (tests, scripts): no pages to refresh */
   }
@@ -21,7 +23,6 @@ export async function addStreamer(_prev: { error?: string; ok?: string } | null,
   const login = raw.replace(/^https?:\/\/(www\.)?twitch\.tv\//i, "").replace(/[/?#].*$/, "").toLowerCase();
   const note = String(form.get("note") || "").trim();
   if (!/^[a-z0-9_]{3,25}$/.test(login)) return { error: "That doesn't look like a Twitch username." };
-  if (!note) return { error: "Add a note on why they're approved (opted in, paid campaign, allows clippers…)." };
   if (!twitchConfigured()) return { error: "Add TWITCH_CLIENT_ID and TWITCH_CLIENT_SECRET to .env first." };
   const [u] = await getUsers({ logins: [login] });
   if (!u) return { error: `No Twitch user called "${login}".` };
@@ -29,8 +30,8 @@ export async function addStreamer(_prev: { error?: string; ok?: string } | null,
     return { error: `"${u.login}" is already in the list as a YouTube channel.` };
   await prisma.streamer.upsert({
     where: { twitchId: u.id },
-    update: { approved: true, approvalNote: note, login: u.login, name: u.display_name, profileImage: u.profile_image_url },
-    create: { twitchId: u.id, login: u.login, name: u.display_name, profileImage: u.profile_image_url, approved: true, approvalNote: note },
+    update: { approved: true, approvalNote: note || DEFAULT_APPROVAL_NOTE, login: u.login, name: u.display_name, profileImage: u.profile_image_url },
+    create: { twitchId: u.id, login: u.login, name: u.display_name, profileImage: u.profile_image_url, approved: true, approvalNote: note || DEFAULT_APPROVAL_NOTE },
   });
   await pokeScout().catch(() => {});
   refreshAll();
@@ -42,7 +43,6 @@ export async function addYouTubeChannel(_prev: { error?: string; ok?: string } |
   const input = String(form.get("channel") || "").trim();
   const note = String(form.get("note") || "").trim();
   if (!input) return { error: "Paste the channel's @handle or link." };
-  if (!note) return { error: "Add a note on why they're approved (runs a clipping campaign, allows clippers…)." };
   let ch;
   try {
     ch = await resolveChannel(input);
@@ -54,20 +54,49 @@ export async function addYouTubeChannel(_prev: { error?: string; ok?: string } |
   if (clash) return { error: `A ${clash.platform === "youtube" ? "YouTube channel" : "Twitch streamer"} called "${ch.handle}" is already in the list.` };
   await prisma.streamer.upsert({
     where: { twitchId },
-    update: { approved: true, approvalNote: note, login: ch.handle, name: ch.title, profileImage: ch.avatar, platform: "youtube" },
-    create: { twitchId, platform: "youtube", login: ch.handle, name: ch.title, profileImage: ch.avatar, approved: true, approvalNote: note },
+    update: { approved: true, approvalNote: note || DEFAULT_APPROVAL_NOTE, login: ch.handle, name: ch.title, profileImage: ch.avatar, platform: "youtube" },
+    create: { twitchId, platform: "youtube", login: ch.handle, name: ch.title, profileImage: ch.avatar, approved: true, approvalNote: note || DEFAULT_APPROVAL_NOTE },
   });
   await pokeYouTube().catch(() => {});
   refreshAll();
   return { ok: `${ch.title} (youtube.com/@${ch.handle}) approved. Scanning their newest videos now.` };
 }
 
+/**
+ * The one approve/unapprove path. Approving needs no reason (Krew's call, 2026-11-17): the note stored is the typed one,
+ * else the permission quote from their suggestion card when there was one, else "Approved by Krew".
+ */
 export async function setApproved(id: string, approved: boolean, note?: string) {
   const data: { approved: boolean; approvalNote?: string } = { approved };
-  if (note !== undefined) data.approvalNote = note;
+  const typed = typeof note === "string" ? note.trim().slice(0, 500) : "";
+  if (typed) data.approvalNote = typed;
+  else if (approved) {
+    const sug = await prisma.suggestion.findUnique({ where: { streamerId: id }, select: { evidence: true, evidenceSource: true } });
+    data.approvalNote = (sug && approvalReasonFromEvidence(sug)) || DEFAULT_APPROVAL_NOTE;
+  }
   const s = await prisma.streamer.update({ where: { id }, data });
   if (approved) await (s.platform === "youtube" ? pokeYouTube() : pokeScout()).catch(() => {});
   refreshAll();
+}
+
+/** One-click Approve (Live page, "Found by the Scout" list). */
+export async function approveStreamer(id: string) {
+  await setApproved(id, true);
+}
+
+// ---------- Add a list of creators ----------
+/** Look up every name (one per line) on Twitch and YouTube. Never approves anything. */
+export async function findCreators(text: string): Promise<ResolveResult> {
+  return resolveCreators(String(text ?? "").split(/\r?\n/));
+}
+
+/** Approve the ticked matches from the "Add a list of creators" table (Krew's click). */
+export async function approveCreators(picks: ApprovePick[], note?: string): Promise<ApproveResult> {
+  const r = await approveResolved(Array.isArray(picks) ? picks : [], String(note ?? "").trim().slice(0, 500) || DEFAULT_APPROVAL_NOTE);
+  if (r.twitchApproved) await pokeScout().catch(() => {});
+  if (r.youtubeApproved) await pokeYouTube().catch(() => {});
+  refreshAll();
+  return r;
 }
 
 export async function saveStreamer(id: string, form: FormData) {
@@ -85,10 +114,10 @@ export async function removeStreamer(id: string) {
 }
 
 // ---------- Suggestions ----------
-// The scanner only suggests. Approving is Krew's click + his written reason, through setApproved like any other approval.
-export async function approveSuggestion(id: string, _prev: { error?: string; ok?: string } | null, form: FormData) {
-  const note = String(form.get("note") || "").trim();
-  if (!note) return { error: "Write why they're approved (their bio / panels / Discord says clips are OK, paid campaign…)." };
+// The scanner only suggests. Approving is Krew's click (a note is optional), through setApproved like any other approval.
+// No note → setApproved stores the card's permission quote when there is one, else "Approved by Krew".
+export async function approveSuggestion(id: string, _prev: { error?: string; ok?: string } | null, form?: FormData) {
+  const note = String(form?.get("note") || "").trim();
   const sug = await prisma.suggestion.findUnique({ where: { id }, include: { streamer: true } });
   if (!sug) return { error: "That suggestion is gone (the list refreshed). Reload the page." };
   const yt = sug.streamer.platform === "youtube";
@@ -128,7 +157,7 @@ export async function setClipStatus(id: string, status: "pending" | "approved" |
 }
 
 async function queueUpload(clipId: string, accountId: string) {
-  await prisma.clip.update({ where: { id: clipId }, data: { stage: "post", postError: null } });
+  await prisma.clip.update({ where: { id: clipId }, data: { stage: "post", stageAt: new Date(), postError: null } });
   await enqueuePost(clipId, accountId);
 }
 
@@ -143,7 +172,7 @@ export async function postToAccount(clipId: string, accountId: string) {
 export async function retryClip(id: string) {
   const clip = await prisma.clip.findUniqueOrThrow({ where: { id } });
   const stage = !clip.rawPath ? "grab" : clip.words == null ? "transcribe" : "cut";
-  await prisma.clip.update({ where: { id }, data: { status: "processing", error: null, stage } });
+  await prisma.clip.update({ where: { id }, data: { status: "processing", error: null, stage, stageAt: new Date() } });
   if (stage === "grab") await enqueueGrab(clip.momentId, id);
   else if (stage === "transcribe") await enqueueTranscribe(id);
   else await enqueueCut(id);

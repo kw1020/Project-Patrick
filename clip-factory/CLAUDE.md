@@ -42,6 +42,14 @@ original brief is below, and the status section says what's done. Read both befo
   (compares with `storage/launcher-version.txt`, so updates by start.ps1/the setup file/a self-restarted tray count; a fresh
   install, i.e. no launcher.log or .ico in storage, stays quiet). `start.ps1` prints the new version's notes; the setup file
   prints "Clip Factory vX is installed". PowerShell parts UNVERIFIED on Windows.
+- **v1.7.0 (2026-11-17):** one-click approve everywhere (no reason; Live page + Scout list have a direct Approve button,
+  `approveStreamer`); `/workroom` live board of the line (`src/lib/workroom.ts` `getWorkroom`, refresh 3s, Nav badge = clips
+  processing; new additive column `Clip.stageAt`, set on every `stage` write, falls back to updatedAt; clips/hour = clips created
+  in the last 3h that came out cut); "Add a list of creators" card (`src/lib/creator-lookup.ts`: Helix `/search/channels`,
+  YouTube `forHandle` → `search` with the key or yt-dlp without; 4 at a time, 60s total; only exact matches pre-ticked;
+  `KREW_TOP_21` in `src/lib/starter-creators.ts`). Name clash (YouTube @handle = an existing login, e.g. Twitch "kaicenat")
+  follows the existing rule: the YouTube channel is NOT added and the table says why (no login suffix, because `login` is the
+  credit link). Unverified against real Helix search / YouTube API.
 - Docker image never built in the sandbox (no daemon); it builds fine on Krew's PC; a clean-copy `npm ci` + `next build` without `.env`
   (what the Dockerfile does) passes.
 - **Suggestions (2026-11-17):** `src/workers/suggest.ts` (queue "suggest", hourly + once ~1 min after start,
@@ -50,8 +58,8 @@ original brief is below, and the status section says what's done. Read both befo
   dismissed until `dismissedUntil` ("Not now" = 30 days). Top 40 by viewers get `/users` + one `/clips` page (7 days).
   `score = 2·log10(viewers+1) + 1.5·log10(clipCount+1) + 1.5·log10(topClipViews+1) + 2 if permission evidence`.
   Evidence = `src/lib/permission.ts` regexes on bio then title; any "no clips"/"don't clip" in either cancels.
-  It NEVER approves: Approve on a card calls `approveSuggestion` → `setApproved` with Krew's typed reason (pre-filled
-  only with the real quote). Never touches `isLive`/`viewers` (the Scout owns them); `Suggestion.viewers/gameName`
+  It NEVER approves: Approve on a card calls `approveSuggestion` → `setApproved` (one click since v1.7.0; the stored
+  note is the real permission quote when there is one). Never touches `isLive`/`viewers` (the Scout owns them); `Suggestion.viewers/gameName`
   hold the snapshot. Unverified against real Helix (bio `description` field and all-Twitch `/streams` paging per docs).
 - **YouTube suggestions (2026-11-17):** `src/workers/suggest-youtube.ts`, run inside the same hourly suggest job after
   Twitch (each half try/caught; per-half status `suggest_twitch` / `suggest_youtube` in Redis). Needs `YOUTUBE_API_KEY`
@@ -113,7 +121,10 @@ Runs every 5s per approved live streamer whose chat we read (anonymous IRC with 
 - **Reaction lag:** the moment is placed 12s before detection; grab waits 150s for the live VOD to catch up.
 
 ## Rules that must not break
-- The Grabber only pulls from `Streamer.approved = true`. Approving needs a written reason.
+- The Grabber only pulls from `Streamer.approved = true`. Creators are approved only by Krew's own click (nothing
+  approves on its own schedule; Suggestions and the bulk lookup only suggest). Since 2026-11-17 (Krew: "I just want to hit
+  approve and it gets approved") a reason is OPTIONAL: `approvalNote` = typed note, else the suggestion's permission quote,
+  else "Approved by Krew" (`DEFAULT_APPROVAL_NOTE`, `src/lib/creator-lookup.ts`; logic in `setApproved`).
 - Nothing posts without Krew pressing Approve. The Poster refuses clips that aren't approved; "auto-upload"
   only means the Approve click also uploads. Uploads are single-attempt so a retry can't double-post.
 - Every caption credits the creator (name + twitch.tv / youtube.com/@ link, always via `creatorUrl` in `src/lib/social.ts`);

@@ -15,7 +15,7 @@ export async function runGrab(clipId: string) {
   if (!clip) return "clip deleted";
   const { moment } = clip;
   if (!moment.streamer.approved) {
-    await prisma.clip.update({ where: { id: clipId }, data: { status: "rejected", stage: null, error: "Streamer is not approved" } });
+    await prisma.clip.update({ where: { id: clipId }, data: { status: "rejected", stage: null, stageAt: new Date(), error: "Streamer is not approved" } });
     return "skipped: streamer not approved";
   }
 
@@ -25,7 +25,7 @@ export async function runGrab(clipId: string) {
     const msg = `${free.toFixed(1)} GB free — grabbing paused below ${min} GB`;
     await setStatus("disk", false, msg);
     await queue("grab").add("grab", { momentId: clip.momentId, clipId }, { jobId: `grab-${clipId}-disk-${Date.now()}`, delay: DISK_RETRY_MS });
-    await prisma.clip.update({ where: { id: clipId }, data: { stage: "grab" } });
+    await prisma.clip.update({ where: { id: clipId }, data: { stage: "grab", stageAt: new Date() } });
     return `low disk (${msg}), retrying in ${DISK_RETRY_MS / 60_000} min`;
   }
   const last = (await getStatuses().catch(() => ({} as Record<string, AgentStatus>))).disk;
@@ -54,7 +54,7 @@ export async function runGrab(clipId: string) {
   if (!file || !fs.existsSync(file)) throw new Error("yt-dlp finished but no file was written");
 
   const rel = "raw/" + file.split(/[\\/]/).pop();
-  await prisma.clip.update({ where: { id: clipId }, data: { rawPath: rel, stage: "transcribe", error: null } });
+  await prisma.clip.update({ where: { id: clipId }, data: { rawPath: rel, stage: "transcribe", stageAt: new Date(), error: null } });
   await enqueueTranscribe(clipId);
   return `downloaded ${rel}`;
 }

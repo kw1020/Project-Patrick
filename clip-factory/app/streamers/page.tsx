@@ -5,9 +5,9 @@ import { ago, compact, num } from "@/lib/format";
 import { AddStreamer, AddYouTubeChannel } from "@/components/AddStreamer";
 import { creatorUrl } from "@/lib/social";
 import { SuggestionActions } from "@/components/SuggestionActions";
-import { approvalReasonFromEvidence } from "@/lib/permission";
 import { getStatuses, soft, type AgentStatus } from "@/lib/queues";
-import { removeStreamer, saveStreamer, scanSuggestionsNow } from "../actions";
+import { approveStreamer, removeStreamer, saveStreamer, scanSuggestionsNow } from "../actions";
+import { BulkAddCreators } from "@/components/BulkAddCreators";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +29,7 @@ export default async function StreamersPage({ searchParams }: { searchParams: Pr
       </div>
       <Suggestions tab={tab} twitch={twitchSuggestions} youtube={ytSuggestions}
         twitchStatus={statuses.suggest_twitch ?? statuses.suggest} youtubeStatus={statuses.suggest_youtube} hasYouTubeKey={Boolean(process.env.YOUTUBE_API_KEY)} />
+      <BulkAddCreators />
       <AddStreamer key={add} prefill={add} />
       <AddYouTubeChannel />
 
@@ -46,7 +47,7 @@ export default async function StreamersPage({ searchParams }: { searchParams: Pr
                   </div>
                   <div className="text-xs text-zinc-400">{s.platform === "youtube" ? `@${s.login}` : s.isLive ? <span className="text-red-400">● live · {num(s.viewers)}</span> : `seen ${ago(s.lastSeenAt)}`} · {s._count.moments} clips</div>
                 </div>
-                <input name="note" defaultValue={s.approvalNote ?? ""} placeholder="Why approved" className="field min-w-48 flex-1" />
+                <input name="note" defaultValue={s.approvalNote ?? ""} placeholder="Note (optional)" className="field min-w-48 flex-1" />
                 <input name="facecam" defaultValue={s.facecam ?? ""} placeholder="Facecam x,y,w,h e.g. 0.72,0.04,0.26,0.3" title="Where their webcam sits, as fractions of the frame (0–1). Used when Settings → Layout is “Facecam on top”." className="field w-72" />
                 <button className="btn-ghost">Save</button>
                 <button formAction={removeStreamer.bind(null, s.id)} className="btn-bad">Remove</button>
@@ -65,7 +66,7 @@ export default async function StreamersPage({ searchParams }: { searchParams: Pr
             <div key={s.id} className="flex items-center gap-3 px-4 py-2.5">
               <a href={creatorUrl(s)} target="_blank" className="min-w-0 flex-1 truncate font-semibold hover:text-hot">{s.name}</a>
               <span className="text-xs text-zinc-400">{s.isLive ? <span className="text-red-400">● live · {num(s.viewers)}</span> : `peak ${num(s.peakViewers)}`}</span>
-              <Link href={`/streamers?add=${s.login}`} className="btn-ghost text-xs">Approve…</Link>
+              <form action={approveStreamer.bind(null, s.id)}><button className="btn-ghost text-xs">Approve</button></form>
             </div>
           ))}
         </div>
@@ -95,7 +96,7 @@ function Suggestions({ tab, twitch, youtube, twitchStatus, youtubeStatus, hasYou
         <div className="min-w-0">
           <h2 className="text-lg font-black">Suggested for you {twitch.length + youtube.length > 0 && <span className="text-zinc-500">({twitch.length + youtube.length})</span>}</h2>
           <p className="text-xs text-zinc-400">
-            {tab === "youtube" ? "Big YouTube channels trending right now." : "Big streamers whose viewers clip a lot."} Nobody is approved until you approve them with a reason.
+            {tab === "youtube" ? "Big YouTube channels trending right now." : "Big streamers whose viewers clip a lot."} Nobody is approved until you press Approve.
             {status && <> · last scan {ago(status.at)}</>}
             {note && <span className={status?.ok ? "text-amber-200" : "text-red-300"}> ({status?.ok ? note : `failed: ${note}`})</span>}
           </p>
@@ -165,7 +166,7 @@ function TwitchCard({ sg }: { sg: SuggestionRow }) {
       </div>
       <Chips reasons={sg.reasons} />
       <Permission sg={sg} aboutUrl={`https://www.twitch.tv/${s.login}/about`} aboutLabel="About panels" where="or Discord" />
-      <div className="mt-auto"><SuggestionActions id={sg.id} name={s.name} prefill={approvalReasonFromEvidence(sg)} /></div>
+      <div className="mt-auto"><SuggestionActions id={sg.id} name={s.name} /></div>
     </div>
   );
 }
@@ -196,7 +197,7 @@ function YouTubeCard({ sg }: { sg: SuggestionRow }) {
       )}
       <Chips reasons={sg.reasons} />
       <Permission sg={sg} aboutUrl={`https://www.youtube.com/@${s.login}/about`} aboutLabel="channel About page" where="(links, business email) or their clipping-campaign page" />
-      <div className="mt-auto"><SuggestionActions id={sg.id} name={s.name} prefill={approvalReasonFromEvidence(sg)} /></div>
+      <div className="mt-auto"><SuggestionActions id={sg.id} name={s.name} /></div>
     </div>
   );
 }

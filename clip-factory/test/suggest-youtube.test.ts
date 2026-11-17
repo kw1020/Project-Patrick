@@ -181,7 +181,7 @@ test("scan: ranked, exclusions, no-handle and clash skipped, evidence, reasons, 
   assert.equal(await prisma.suggestion.count({ where: { platform: "youtube", status: "pending" } }), 4);
 });
 
-test("approving a YouTube suggestion needs a reason, uses the normal approve path and pokes the YouTube scanner", async () => {
+test("approving a YouTube suggestion is one click (no reason), uses the normal approve path and pokes the YouTube scanner", async () => {
   await seed();
   process.env.YOUTUBE_API_KEY = "yt-key";
   const { prisma } = await import("../src/lib/db");
@@ -190,16 +190,11 @@ test("approving a YouTube suggestion needs a reason, uses the normal approve pat
   await (await import("../src/workers/suggest")).runSuggestScan();
   const actions = await import("../app/actions");
   const big = await prisma.suggestion.findFirstOrThrow({ where: { streamer: { twitchId: "yt:UCbig" } } });
-
-  const empty = new FormData();
-  empty.set("note", " ");
-  assert.match((await actions.approveSuggestion(big.id, null, empty)).error!, /why/i);
   assert.equal((await prisma.streamer.findUniqueOrThrow({ where: { twitchId: "yt:UCbig" } })).approved, false);
 
   await queue("youtube").drain();
-  const form = new FormData();
-  form.set("note", 'Channel description says: "Clips welcome! Tag me on Shorts"');
-  const r = await actions.approveSuggestion(big.id, null, form);
+  // No form at all (the card's Approve button): the description quote is stored as the note.
+  const r = await actions.approveSuggestion(big.id, null);
   assert.match(r.ok!, /Big Channel approved/);
   const s = await prisma.streamer.findUniqueOrThrow({ where: { twitchId: "yt:UCbig" } });
   assert.equal(s.approved, true);

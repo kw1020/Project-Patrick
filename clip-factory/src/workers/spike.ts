@@ -54,7 +54,7 @@ export async function runSpikeCheck(chat: ChatHeat, now = Date.now(), lookupVod 
         streamerId: s.id, timestamp: new Date(now - REACTION_LAG_SEC * 1000), spikeScore: sp.ratio, source: "chat", gameName: game,
         vodId, vodOffset, sourceUrl: `https://www.twitch.tv/videos/${vodId}?t=${Math.max(0, vodOffset - 30)}s`,
         stats: JSON.stringify({ ...sp, viewers: s.viewers, chat: chat.samples(s.login, 20, 40, now) }),
-        clips: { create: { title, caption: defaultCaption(title, s, game), status: "processing", stage: "grab" } },
+        clips: { create: { title, caption: defaultCaption(title, s, game), status: "processing", stage: "grab", stageAt: new Date() } },
       },
       include: { clips: true },
     });

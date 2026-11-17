@@ -209,28 +209,28 @@ age in days (14). It respects the same backlog cap as the Twitch side. The Live 
 ## Suggestions
 
 Streamers page → **Suggested for you**: people the agents think are worth approving, mainly big
-streamers whose viewers clip a lot. **Nobody is approved automatically** — you still approve each one,
-with a written reason.
+streamers whose viewers clip a lot. **Nobody is approved automatically** — you still approve each one
+yourself (one click).
 
 - Every hour (first scan ~1 min after Clip Factory starts; **Scan now** runs one right away) it looks at
   the top 300 live streams on all of Twitch plus everyone the GTA Scout has seen this week, checks the
   40 biggest (clips viewers made in the last 7 days, top clip views, their Twitch bio) and keeps the best 25.
 - Each card says why ("18.2K watching now (Just Chatting)", "viewers made 340 clips this week",
   "top clip 52K views") and whether their **bio or stream title** says clips are OK. Green = there's a
-  quote (e.g. "Clips welcome!"), and Approve pre-fills it as your reason. Amber = nothing public found:
-  check their About panels / Discord first and type the reason yourself.
-- **Approve…** → reason → Confirm (same as the Approve form). **Not now** hides them for 30 days.
+  quote (e.g. "Clips welcome!"), and Approve keeps it as the note. Amber = nothing public found:
+  check their About panels / Discord first.
+- **Approve** approves them right away (same as the Approve form). **Not now** hides them for 30 days.
 - The Streamers tab shows a badge with how many suggestions are waiting; the Live page has a
   *Suggestions* card. Paused Scout (Settings) pauses this too.
 
 ### YouTube suggestions
 
 The **YouTube** tab next to **Twitch** suggests big YouTube channels the same way (never approved
-automatically, approving needs your reason). Each hour, in the same scan, it reads YouTube's trending
+automatically, you still press Approve). Each hour, in the same scan, it reads YouTube's trending
 charts (overall + Gaming + Entertainment + Comedy, country from Settings → *Suggestions country*, default US),
 looks up those channels and keeps the best 25. Cards show subscribers, the trending video, why
 ("12.4M subscribers", "trending now: '…' (8.1M views)", "2 videos trending") and whether the
-**channel description** says clips are OK (green quote = pre-filled reason; amber = check their About page
+**channel description** says clips are OK (green quote = kept as the approval note; amber = check their About page
 first). Channels without an @handle are skipped. Approving adds the channel to the YouTube scanner right away.
 
 It needs a free **YouTube API key** (each scan uses ~6 of the 10,000 free daily units):
@@ -243,6 +243,33 @@ It needs a free **YouTube API key** (each scan uses ~6 of the 10,000 free daily 
 
 Without the key the YouTube tab shows these steps and the Twitch part runs as normal. `npm run doctor`
 checks the key. "Daily API quota used up" fixes itself at midnight Pacific.
+
+## One-click approve
+
+Approving a creator is one click everywhere: the Streamers forms, the suggestion cards, the **Approve**
+button next to unapproved streamers on the Live page and in "Found by the Scout". The note box is optional.
+Stored note: what you typed, else the permission quote from their suggestion card, else "Approved by Krew".
+Clips still need your Approve in the Queue before anything posts, and every caption + video keeps the credit.
+
+## Workroom
+
+The **Workroom** tab is a live board of the production line (refreshes every 3 seconds): Finding (new
+moments) → Downloading → Captions → Judge → Cutting → Ready for you → Posting → Posted. Each card shows
+the creator, where the moment came from, the title, how long it has been in that step and the Judge score.
+Clips that failed are listed under **Problems** with the error and a **Retry** button. The top strip shows
+how many clips are in the line, ready for you, posted today and clips per hour (last 3 hours); when the
+line is full (12 clips) it says so and new moments wait. The tab's badge = clips in the line right now.
+
+## Add a list of creators
+
+Streamers page → **Add a list of creators**: type names, one per line (or **Load Krew's top 21**), then
+**Find them**. Each name is looked up on Twitch (channel search) and YouTube (with `YOUTUBE_API_KEY`: the
+@handle, then a search, biggest matching channel wins; without a key: `youtube.com/@NameWithoutSpaces`).
+Exact matches come ticked; a "closest match" is left unticked for you to check. Press **Approve all
+ticked** or a row's **Approve**. Nothing is approved until you press one of those.
+If a YouTube @handle is the same as a Twitch streamer already in Clip Factory (e.g. both "kaicenat"), the
+Twitch one is approved and the YouTube one is skipped with a note (one name per creator for now).
+Kick isn't supported yet.
 
 ## Run without Docker (dev)
 

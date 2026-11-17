@@ -155,22 +155,19 @@ test("scan: ranked pending suggestions, exclusions, evidence bonus, reasons, no 
   assert.deepEqual((await prisma.suggestion.findMany({ where: { status: "pending" } })).map((s) => s.id).sort(), pending.map((p) => p.id).sort());
 });
 
-test("approving a suggestion needs a reason and goes through the normal approve flow; Not now hides it for 30 days", async () => {
+test("approving a suggestion is one click (no reason) and goes through the normal approve flow; Not now hides it for 30 days", async () => {
   await seed();
   const { prisma } = await import("../src/lib/db");
   stubTwitch();
   await (await import("../src/workers/suggest")).runSuggestScan();
   const actions = await import("../app/actions");
   const b1 = await prisma.suggestion.findFirstOrThrow({ where: { streamer: { twitchId: "big1" } } });
-
-  const empty = new FormData();
-  empty.set("note", "   ");
-  assert.match((await actions.approveSuggestion(b1.id, null, empty)).error!, /why/i);
   assert.equal((await prisma.streamer.findUniqueOrThrow({ where: { twitchId: "big1" } })).approved, false);
 
-  const form = new FormData();
-  form.set("note", 'Bio says: "Clips welcome! Tag me on TikTok"');
-  assert.ok((await actions.approveSuggestion(b1.id, null, form)).ok);
+  // The card's Approve button sends no note: the bio quote becomes the stored note.
+  const empty = new FormData();
+  empty.set("note", "   ");
+  assert.ok((await actions.approveSuggestion(b1.id, null, empty)).ok);
   const s = await prisma.streamer.findUniqueOrThrow({ where: { twitchId: "big1" } });
   assert.equal(s.approved, true);
   assert.equal(s.approvalNote, 'Bio says: "Clips welcome! Tag me on TikTok"');

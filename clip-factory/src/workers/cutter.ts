@@ -29,7 +29,7 @@ export async function runTranscribe(clipId: string) {
   }
   await prisma.clip.update({
     where: { id: clipId },
-    data: { winStart: win.start, duration: win.length, transcript, words: JSON.stringify(words), stage: "judge", error: null },
+    data: { winStart: win.start, duration: win.length, transcript, words: JSON.stringify(words), stage: "judge", stageAt: new Date(), error: null },
   });
   await enqueueJudge(clipId);
   return `transcribed ${win.length}s, ${words.length} words`;
@@ -65,7 +65,7 @@ export async function runCut(clipId: string) {
     const autoReject = settings.judgeEnabled && clip.score != null && clip.score < settings.minScore;
     await prisma.clip.update({
       where: { id: clipId },
-      data: { finalPath: finalRel, duration: length, stage: null, error: null, status: fresh ? (autoReject ? "rejected" : "pending") : clip.status },
+      data: { finalPath: finalRel, duration: length, stage: null, stageAt: new Date(), error: null, status: fresh ? (autoReject ? "rejected" : "pending") : clip.status },
     });
     return `cut ${length}s ${layout}${words.length ? " + captions" : ""}${clip.hookText ? " + hook" : ""}${fresh && autoReject ? " (auto-rejected)" : ""}`;
   } finally {

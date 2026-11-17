@@ -13,7 +13,7 @@ export async function runJudge(clipId: string) {
   const game = momentGame(moment);
 
   const skip = async (why: string) => {
-    await prisma.clip.update({ where: { id: clipId }, data: { stage: "cut", judgeReason: why } });
+    await prisma.clip.update({ where: { id: clipId }, data: { stage: "cut", stageAt: new Date(), judgeReason: why } });
     await enqueueCut(clipId);
     return `unscored (${why})`;
   };
@@ -41,7 +41,7 @@ export async function runJudge(clipId: string) {
   await prisma.clip.update({
     where: { id: clipId },
     data: {
-      score: verdict.score, hookText: verdict.hook_text || null, judgeReason: verdict.reason, hashtags: tags.join(" "), stage: "cut",
+      score: verdict.score, hookText: verdict.hook_text || null, judgeReason: verdict.reason, hashtags: tags.join(" "), stage: "cut", stageAt: new Date(),
       ...(fresh && verdict.title ? { title: verdict.title, caption: judgedCaption(verdict.title, tags, streamer) } : {}),
     },
   });

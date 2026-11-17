@@ -76,6 +76,7 @@ model Clip {
   // processing -> pending (waiting for review) -> approved | rejected -> posted ; failed on error
   status     String   @default("processing")
   stage      String?  // grab | transcribe | judge | cut (while processing), post (uploading)
+  stageAt    DateTime? // when `stage` last changed (Workroom "time in this step"); null on older rows -> use updatedAt
   error      String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
@@ -172,7 +173,7 @@ model YouTubeVideo {
 }
 
 // Streamers the Suggestions scanner thinks Krew could approve (big + clippable). Never approves anyone:
-// Krew approves from the Streamers page with a written reason. One row per streamer.
+// Krew approves from the Streamers page with one click (a note is optional). One row per streamer.
 // status: pending (shown) | dismissed ("Not now", hidden until dismissedUntil) | approved
 // platform: twitch | youtube (each keeps its own top 25). YouTube ones come from the trending charts (YouTube Data API key).
 model Suggestion {

@@ -24,7 +24,7 @@ export async function runPost(clipId: string, accountId: string) {
     if (waiting >= MAX_PENDING_DRAFTS) throw new Error(`${acct.channelTitle} already has ${waiting} drafts waiting today (TikTok allows ${MAX_PENDING_DRAFTS}). Post them in the TikTok app first.`);
     const publishId = await uploadDraft(acct, file);
     await prisma.post.create({ data: { clipId, platform: "tiktok", accountId: acct.id, status: "draft", publishId } });
-    await prisma.clip.update({ where: { id: clipId }, data: { status: "posted", stage: null, postError: null } });
+    await prisma.clip.update({ where: { id: clipId }, data: { status: "posted", stage: null, stageAt: new Date(), postError: null } });
     return `sent ${streamer.name} clip to ${acct.channelTitle}'s TikTok inbox`;
   }
 
@@ -38,7 +38,7 @@ export async function runPost(clipId: string, accountId: string) {
   const id = await uploadVideo(acct, { file, title: clip.title || defaultTitle(null, streamer.name, game), description, tags, privacy });
 
   await prisma.post.create({ data: { clipId, platform: "youtube", accountId: acct.id, externalId: id, url: `https://youtube.com/shorts/${id}` } });
-  await prisma.clip.update({ where: { id: clipId }, data: { status: "posted", stage: null, postError: null } });
+  await prisma.clip.update({ where: { id: clipId }, data: { status: "posted", stage: null, stageAt: new Date(), postError: null } });
   return `uploaded ${streamer.name} clip to ${acct.channelTitle} (${privacy}): ${id}`;
 }
 

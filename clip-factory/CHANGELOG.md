@@ -1,5 +1,12 @@
 # Clip Factory patch notes
 
+## 1.7.0 — 2026-11-17
+- Approving a creator is now one click. No reason needed; you can still add a note if you want.
+- New Workroom page: watch every clip move through the line live, from finding to posted.
+- The Workroom shows how long each clip has been in each step, and a Retry button for any that got stuck.
+- Add a whole list of creators at once: type their names and Clip Factory finds them on Twitch and YouTube.
+- Your top 21 creators are ready to load with one button. Tick the ones you want and press Approve.
+
 ## 1.6.0 — 2026-11-17
 - Clip Factory now has a version number. You can see it at the top of the dashboard and on the tray icon.
 - After an update, a little note by the clock tells you the new version. Click it to see what changed.

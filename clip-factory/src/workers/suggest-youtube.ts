@@ -4,7 +4,7 @@ import { compact } from "../lib/format";
 
 // YouTube suggestions: big YouTube channels Krew could approve, from YouTube's own "trending" charts.
 // Like the Twitch part, this NEVER approves anyone. It only writes Suggestion rows (platform "youtube");
-// Krew approves on the Streamers page with a written reason.
+// Krew approves on the Streamers page (one click; a note is optional).
 //
 // Data: YouTube Data API v3 with a plain API key (YOUTUBE_API_KEY). Each call costs 1 quota unit
 // (default quota 10,000/day): 4 chart calls + 1 per 50 channels ≈ 6 units per hourly scan ≈ 150/day.

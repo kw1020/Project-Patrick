@@ -6,7 +6,7 @@ import { twitchConfigured } from "@/lib/twitch";
 import { ago, liveFor, num } from "@/lib/format";
 import { creatorUrl, isGta6 } from "@/lib/social";
 import { AutoRefresh } from "@/components/AutoRefresh";
-import { runScoutNow } from "./actions";
+import { approveStreamer, runScoutNow } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -127,7 +127,7 @@ export default async function LivePage({ searchParams }: { searchParams: Promise
                 {s.approved ? (
                   <span className="w-28 text-center text-xs font-bold text-emerald-400">✓ Approved</span>
                 ) : (
-                  <Link href={`/streamers?add=${s.login}`} className="btn-ghost w-28 text-xs">Approve…</Link>
+                  <form action={approveStreamer.bind(null, s.id)} className="w-28"><button className="btn-ghost w-full text-xs">Approve</button></form>
                 )}
               </div>
             ))}

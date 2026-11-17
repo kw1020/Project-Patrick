@@ -9,9 +9,10 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Clip Factory", description: "GTA 6 clip pipeline" };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const [pending, suggestions] = await Promise.all([
+  const [pending, suggestions, inLine] = await Promise.all([
     prisma.clip.count({ where: { status: "pending" } }).catch(() => 0),
     prisma.suggestion.count({ where: { status: "pending", streamer: { approved: false } } }).catch(() => 0),
+    prisma.clip.count({ where: { status: "processing" } }).catch(() => 0),
   ]);
   return (
     <html lang="en">
@@ -24,7 +25,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] font-bold uppercase text-zinc-400">GTA 6</span>
               <VersionChip version={getVersion()} />
             </div>
-            <Nav pending={pending} suggestions={suggestions} />
+            <Nav pending={pending} suggestions={suggestions} inLine={inLine} />
           </div>
         </header>
         <main className="mx-auto max-w-7xl px-4 py-6">{children}</main>

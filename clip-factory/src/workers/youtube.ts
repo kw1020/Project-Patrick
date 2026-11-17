@@ -75,7 +75,7 @@ export async function runYouTubeScan() {
           data: {
             streamerId: ch.id, timestamp: info.uploadDate ?? new Date(), spikeScore: p.value, source: "youtube",
             sourceUrl: url, sourceTitle: info.title, sourceViews: info.views, vodId: v.id, vodOffset: p.center,
-            clips: { create: { title, caption: defaultCaption(title, ch, null), status: "processing", stage: "grab" } },
+            clips: { create: { title, caption: defaultCaption(title, ch, null), status: "processing", stage: "grab", stageAt: new Date() } },
           },
           include: { clips: true },
         });
