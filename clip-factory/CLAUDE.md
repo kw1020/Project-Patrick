@@ -66,6 +66,7 @@ Runs every 5s per approved live streamer whose chat we read (anonymous IRC with 
 - Secrets live in `.env` (gitignored). Never commit it.
 
 ## Gotchas found while building
+- `.env.example` must never have `KEY=   # comment` lines: Docker Compose can read the comment as the value.
 - Tailwind 4: custom classes in `app/globals.css` must be `@utility`, not plain classes.
 - ioredis must match BullMQ's bundled version (5.11.1) or TypeScript breaks.
 - faster-whisper's own audio loader breaks on newer PyAV; `scripts/transcribe.py` reads the WAV itself.
