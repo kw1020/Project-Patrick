@@ -21,6 +21,7 @@ model Streamer {
   viewers       Int       @default(0)
   peakViewers   Int       @default(0)
   streamTitle   String?
+  gameName      String?   // Twitch category while live (any-game mode tracks approved streamers in every game)
   streamId      String?
   liveSince     DateTime?
   lastSeenAt    DateTime?
@@ -43,6 +44,7 @@ model Moment {
   sourceUrl    String?
   sourceTitle  String?
   sourceViews  Int      @default(0)
+  gameName     String?  // game being played (Twitch category name); null = GTA 6 for older rows
   vodId        String?
   vodOffset    Int? // seconds into the VOD
   stats        String? // JSON: chat-spike numbers + sample chat lines (for the Judge)
@@ -114,6 +116,7 @@ model Settings {
   layout           String  @default("blur") // blur | facecam
   captions         Boolean @default(true)
   scoutPaused      Boolean @default(false)
+  gameMode         String  @default("gta6") // gta6 | any (approved streamers in any game)
 }
 
 // Connected posting accounts. Several per platform (e.g. two YouTube channels, a TikTok).

@@ -87,6 +87,9 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         </div>
 
         <div className="card space-y-4 p-5">
+          <Row label="Which games" hint="Any game: approved streamers are clipped whatever they play. The GTA 6 scan still runs either way.">
+            <select name="gameMode" defaultValue={s.gameMode} className="field w-72"><option value="gta6">GTA 6 only</option><option value="any">Any game (approved streamers)</option></select>
+          </Row>
           <Row label="Pause the Scout" hint="Stops new clips. The queue still works."><input name="scoutPaused" type="checkbox" defaultChecked={s.scoutPaused} className={check} /></Row>
         </div>
         <button className="btn-hot">Save settings</button>

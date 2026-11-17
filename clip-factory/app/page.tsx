@@ -4,6 +4,7 @@ import { Avatar } from "@/components/Avatar";
 import { getStatuses, soft, type AgentStatus } from "@/lib/queues";
 import { twitchConfigured } from "@/lib/twitch";
 import { ago, liveFor, num } from "@/lib/format";
+import { isGta6 } from "@/lib/social";
 import { AutoRefresh } from "@/components/AutoRefresh";
 import { runScoutNow } from "./actions";
 
@@ -103,6 +104,7 @@ export default async function LivePage({ searchParams }: { searchParams: Promise
                     <a href={`https://twitch.tv/${s.login}`} target="_blank" className="font-bold hover:text-hot">{s.name}</a>
                     <span className="rounded bg-red-600 px-1.5 text-[10px] font-black uppercase">Live</span>
                     <span className="text-xs text-zinc-500">{liveFor(s.liveSince)}</span>
+                    {s.gameName && !isGta6(s.gameName) && <span className="rounded bg-zinc-800 px-1.5 text-[11px] font-semibold text-zinc-300">{s.gameName}</span>}
                   </div>
                   <div className="truncate text-sm text-zinc-400">{s.streamTitle}</div>
                 </div>

@@ -2,7 +2,8 @@ import { prisma, getSettings } from "../lib/db";
 import { getGameId, getLiveStreams, getStreamsByUserIds, getUsers } from "../lib/twitch";
 import type { ChatHeat } from "../lib/chat";
 
-/** Scout: who's live in GTA 6 right now. Discovers everyone; chat is only joined for approved streamers. */
+/** Scout: who's live in GTA 6 right now. Discovers everyone; chat is only joined for approved streamers.
+ *  Settings → "Any game": approved streamers are tracked live whatever they play. */
 export async function runScout(chat: ChatHeat) {
   const settings = await getSettings();
   if (settings.scoutPaused) return "paused";
@@ -10,7 +11,8 @@ export async function runScout(chat: ChatHeat) {
   const streams = await getLiveStreams(gameId);
 
   // /streams?game_id only returns the top 500: look up approved streamers directly so a small one is never missed.
-  // Their streams in another game are ignored (they end up not live, same as before).
+  // "gta6" mode: their streams in another game are ignored (they end up not live). "any" mode: kept, any game.
+  const anyGame = settings.gameMode === "any";
   const approvedIds = (await prisma.streamer.findMany({ where: { approved: true }, select: { twitchId: true } })).map((s) => s.twitchId);
   if (approvedIds.length) {
     const seen = new Set(streams.map((s) => s.user_id));
@@ -20,7 +22,7 @@ export async function runScout(chat: ChatHeat) {
       return [];
     });
     for (const st of extra) {
-      if (st.game_id === gameId && !seen.has(st.user_id)) { streams.push(st); seen.add(st.user_id); }
+      if ((anyGame || st.game_id === gameId) && !seen.has(st.user_id)) { streams.push(st); seen.add(st.user_id); }
     }
   }
   const now = new Date();
@@ -35,7 +37,7 @@ export async function runScout(chat: ChatHeat) {
       const live = {
         login: st.user_login, name: st.user_name, isLive: true, viewers: st.viewer_count,
         peakViewers: Math.max(prev?.peakViewers ?? 0, st.viewer_count), streamTitle: st.title,
-        streamId: st.id, liveSince: new Date(st.started_at), lastSeenAt: now,
+        gameName: st.game_name || null, streamId: st.id, liveSince: new Date(st.started_at), lastSeenAt: now,
       };
       return prisma.streamer.upsert({ where: { twitchId: st.user_id }, update: live, create: { twitchId: st.user_id, ...live } });
     }),
@@ -54,7 +56,8 @@ export async function runScout(chat: ChatHeat) {
 
   const approvedLive = await prisma.streamer.findMany({ where: { approved: true, isLive: true }, select: { login: true } });
   chat.setChannels(approvedLive.map((s) => s.login));
-  return `${streams.length} live in GTA 6, ${approvedLive.length} approved live`;
+  const otherGames = streams.filter((st) => st.game_id !== gameId).length;
+  return `${streams.length - otherGames} live in GTA 6, ${approvedLive.length} approved live${otherGames ? ` (${otherGames} in other games)` : ""}`;
 }
 
 /** Write chat heat for approved live streamers (every 10s). */

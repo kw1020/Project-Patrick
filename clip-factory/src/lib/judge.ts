@@ -18,6 +18,7 @@ export type Verdict = z.infer<typeof Verdict>;
 
 export type JudgeInput = {
   streamer: string;
+  game?: string | null;
   durationSec: number;
   source: "chat" | "twitch_clip";
   sourceTitle?: string | null;
@@ -69,6 +70,7 @@ export const JUDGE_SYSTEM = loadJudgePrompt();
 function render(i: JudgeInput) {
   const lines = [
     `Streamer: ${i.streamer}`,
+    ...(i.game ? [`Game: ${i.game}`] : []),
     `Clip length: ${Math.round(i.durationSec)}s`,
     `Auto-reject cut-off: below ${i.minScore}`,
   ];

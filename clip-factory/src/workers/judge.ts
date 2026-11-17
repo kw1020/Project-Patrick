@@ -2,7 +2,7 @@ import { prisma, getSettings } from "../lib/db";
 import { judgeClip, judgeConfigured } from "../lib/judge";
 import { buildLessons } from "../lib/learning";
 import { enqueueCut } from "../lib/queues";
-import { cleanHashtags, judgedCaption } from "../lib/social";
+import { cleanHashtags, judgedCaption, momentGame } from "../lib/social";
 
 /** Step 2 — Judge: Claude scores the clip and writes the hook, title and hashtags. Never blocks the line. */
 export async function runJudge(clipId: string) {
@@ -10,6 +10,7 @@ export async function runJudge(clipId: string) {
   if (!clip) return "clip deleted";
   const settings = await getSettings();
   const { moment } = clip, streamer = moment.streamer;
+  const game = momentGame(moment);
 
   const skip = async (why: string) => {
     await prisma.clip.update({ where: { id: clipId }, data: { stage: "cut", judgeReason: why } });
@@ -26,7 +27,7 @@ export async function runJudge(clipId: string) {
   let verdict;
   try {
     verdict = await judgeClip({
-      streamer: streamer.name, durationSec: clip.duration ?? 0, source: moment.source === "chat" ? "chat" : "twitch_clip",
+      streamer: streamer.name, game, durationSec: clip.duration ?? 0, source: moment.source === "chat" ? "chat" : "twitch_clip",
       sourceTitle: moment.sourceTitle, sourceViews: moment.sourceViews, transcript: clip.transcript, stats, minScore: settings.minScore,
     }, lessons?.text ?? null);
   } catch (e) {
@@ -34,7 +35,7 @@ export async function runJudge(clipId: string) {
   }
   if (!verdict) return skip("The Judge declined to score this clip");
 
-  const tags = cleanHashtags(verdict.hashtags, streamer.login);
+  const tags = cleanHashtags(verdict.hashtags, streamer.login, game);
   const fresh = clip.status === "processing"; // don't overwrite text Krew already edited
   await prisma.clip.update({
     where: { id: clipId },

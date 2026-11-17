@@ -86,7 +86,7 @@ export async function helixAll<T = any>(endpoint: string, params: Params, maxPag
 }
 
 export type TwitchStream = {
-  id: string; user_id: string; user_login: string; user_name: string; game_id: string;
+  id: string; user_id: string; user_login: string; user_name: string; game_id: string; game_name: string;
   title: string; viewer_count: number; started_at: string; thumbnail_url: string;
 };
 export type TwitchClip = {
@@ -107,6 +107,18 @@ export async function getGameId(): Promise<string> {
   const hit = search.data.find((g) => /grand theft auto (vi|6)\b/i.test(g.name));
   if (!hit) throw new Error("Couldn't find the GTA 6 category on Twitch. Set TWITCH_GAME_ID in .env.");
   return (gameIdCache = hit.id);
+}
+
+const gameNames = new Map<string, string>();
+/** Category names for game ids (Twitch clips only carry game_id). Cached in memory; unknown ids are left out. */
+export async function getGameNames(ids: string[]): Promise<Map<string, string>> {
+  const want = [...new Set(ids.filter(Boolean))];
+  const missing = want.filter((id) => !gameNames.has(id));
+  for (let i = 0; i < missing.length; i += 100) {
+    const r = await helix<{ id: string; name: string }>("/games", { id: missing.slice(i, i + 100) });
+    for (const g of r.data) gameNames.set(g.id, g.name);
+  }
+  return new Map(want.filter((id) => gameNames.has(id)).map((id) => [id, gameNames.get(id)!]));
 }
 
 export function getLiveStreams(gameId: string) {

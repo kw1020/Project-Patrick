@@ -1,7 +1,7 @@
 import { prisma, getSettings } from "../lib/db";
-import { getClips, getGameId, type TwitchClip } from "../lib/twitch";
+import { getClips, getGameId, getGameNames, type TwitchClip } from "../lib/twitch";
 import { enqueueGrab } from "../lib/queues";
-import { defaultCaption, defaultTitle } from "../lib/social";
+import { defaultCaption, defaultTitle, GTA6_NAME } from "../lib/social";
 import { backlogRoom } from "../lib/guards";
 
 const MAX_NEW_PER_RUN = 15;
@@ -24,9 +24,11 @@ export async function runClipsPoll() {
     for (const c of await getClips({ broadcaster_id: s.twitchId, started_at: startedAt }, 1)) found.set(c.id, c);
   }
 
+  // "any" mode: an approved streamer's clips count whatever game they're from.
+  const anyGame = settings.gameMode === "any";
   const candidates = [...found.values()]
     .filter((c) => byTwitchId.has(c.broadcaster_id)) // ground rule: approved streamers only
-    .filter((c) => c.game_id === gameId)
+    .filter((c) => anyGame || c.game_id === gameId)
     .filter((c) => c.view_count >= settings.minClipViews)
     .sort((a, b) => b.view_count - a.view_count);
 
@@ -37,6 +39,11 @@ export async function runClipsPoll() {
   // Launch-day cap: only take as many as the line has room for (candidates are highest views first).
   const room = await backlogRoom();
   const limit = Math.min(MAX_NEW_PER_RUN, room);
+  // Twitch clips carry only game_id: look up names for the other games (cached; a failed lookup just leaves it blank).
+  const otherIds = candidates.filter((c) => c.game_id && c.game_id !== gameId).map((c) => c.game_id);
+  const names = otherIds.length ? await getGameNames(otherIds).catch(() => new Map<string, string>()) : new Map<string, string>();
+  const gameOf = (c: TwitchClip) => (c.game_id === gameId ? GTA6_NAME : names.get(c.game_id) ?? null);
+
   let added = 0;
   for (const c of candidates) {
     if (known.has(c.id) || added >= limit) continue;
@@ -49,13 +56,15 @@ export async function runClipsPoll() {
       });
       if (dupe) continue;
     }
-    const title = defaultTitle(c.title, s.name);
+    const game = gameOf(c);
+    if (!game) continue; // game name lookup failed: try again next poll rather than mislabel it
+    const title = defaultTitle(c.title, s.name, game);
     const moment = await prisma.moment.create({
       data: {
         streamerId: s.id, timestamp: new Date(c.created_at), spikeScore: c.view_count, source: "twitch_clip",
-        twitchClipId: c.id, sourceUrl: c.url, sourceTitle: c.title, sourceViews: c.view_count,
+        twitchClipId: c.id, sourceUrl: c.url, sourceTitle: c.title, sourceViews: c.view_count, gameName: game,
         vodId: c.video_id || null, vodOffset: c.vod_offset ?? null,
-        clips: { create: { title, caption: defaultCaption(title, s.name, s.login), status: "processing", stage: "grab" } },
+        clips: { create: { title, caption: defaultCaption(title, s.name, s.login, game), status: "processing", stage: "grab" } },
       },
       include: { clips: true },
     });

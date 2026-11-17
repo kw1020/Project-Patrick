@@ -126,6 +126,7 @@ export async function saveSettings(form: FormData) {
       layout: form.get("layout") === "facecam" ? "facecam" : "blur",
       captions: form.get("captions") === "on",
       scoutPaused: form.get("scoutPaused") === "on",
+      gameMode: form.get("gameMode") === "any" ? "any" : "gta6",
       spikeEnabled: form.get("spikeEnabled") === "on",
       judgeEnabled: form.get("judgeEnabled") === "on",
       judgeLearns: form.get("judgeLearns") === "on",

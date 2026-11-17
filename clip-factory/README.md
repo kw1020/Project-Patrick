@@ -156,6 +156,14 @@ counts show up on the Posted page every 15 minutes. TikTok and Reels are still D
   fractions of the frame. Example: webcam in the top-right corner taking a quarter of the width
   and a third of the height = `0.74,0.02,0.25,0.33`. Streamers without a box use the blurred layout.
 
+## Any game
+
+Settings → **Which games** → *Any game (approved streamers)*. The Scout still lists everyone live in
+GTA 6, but your **approved** streamers are now tracked (live, chat, spikes, Twitch clips) whatever they
+play. The Live page shows the game next to anyone not in GTA 6. Titles and hashtags follow the game
+(`#Fortnite` instead of `#GTA6`), and the Judge is told the game. Back to *GTA 6 only* any time.
+Same rule as always: only approve streamers who allow clipping or run a clipping campaign.
+
 ## Run without Docker (dev)
 
 Needs Node 20+, Redis, ffmpeg, `pip install yt-dlp faster-whisper`.

@@ -3,6 +3,7 @@ import { prisma } from "../lib/db";
 import { resolveStored } from "../lib/paths";
 import { draftStatus, fetchTikTokStats, MAX_PENDING_DRAFTS, tiktokVideoUrl, uploadDraft } from "../lib/tiktok";
 import { fetchStats, uploadVideo } from "../lib/youtube";
+import { defaultTitle, gameHashtags, momentGame } from "../lib/social";
 
 /** Poster: sends an APPROVED clip to one connected account. Refuses anything Krew hasn't approved. */
 export async function runPost(clipId: string, accountId: string) {
@@ -31,9 +32,10 @@ export async function runPost(clipId: string, accountId: string) {
   let description = clip.caption || clip.title || "";
   if (!description.includes(`twitch.tv/${streamer.login}`)) description += `\n\n🎥 Credit: ${streamer.name} — https://twitch.tv/${streamer.login}`;
   if (!/#shorts\b/i.test(description)) description += "\n#Shorts";
-  const tags = (clip.hashtags || "#GTA6 #GTAVI").split(/\s+/).map((t) => t.replace(/^#/, "")).filter(Boolean);
+  const game = momentGame(clip.moment);
+  const tags = (clip.hashtags || gameHashtags(game).join(" ")).split(/\s+/).map((t) => t.replace(/^#/, "")).filter(Boolean);
   const privacy = (["public", "unlisted", "private"] as const).find((p) => p === acct.privacy) ?? "public";
-  const id = await uploadVideo(acct, { file, title: clip.title || `${streamer.name} in GTA 6`, description, tags, privacy });
+  const id = await uploadVideo(acct, { file, title: clip.title || defaultTitle(null, streamer.name, game), description, tags, privacy });
 
   await prisma.post.create({ data: { clipId, platform: "youtube", accountId: acct.id, externalId: id, url: `https://youtube.com/shorts/${id}` } });
   await prisma.clip.update({ where: { id: clipId }, data: { status: "posted", stage: null, postError: null } });

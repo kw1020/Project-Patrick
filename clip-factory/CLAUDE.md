@@ -9,6 +9,9 @@ original brief is below, and the status section says what's done. Read both befo
 - **Launch hardening done (2026-11-16):** all 6 `PLAN.md` steps (spike detector v2, Judge prompt file,
   Twitch 429/approved lookup, backlog + disk + retention, SQLite WAL, `npm run doctor`) plus launch-check
   fixes: stuck-clip sweeper (`sweepStuck` in `src/workers/retention.ts`, every 5 min) and a worker crash guard.
+- **Any-game mode (2026-11-17):** Settings `gameMode` gta6|any. In "any", approved Twitch streamers are tracked
+  live (Streamer.gameName) and their clips taken in every game (Moment.gameName, names via Helix `/games?id=`, cached);
+  GTA-wide discovery unchanged. Text helpers in `src/lib/social.ts` (`momentGame`, `gameHashtags`) are game-aware.
 - Docker image never built (no daemon in the sandbox); a clean-copy `npm ci` + `next build` without `.env`
   (what the Dockerfile does) passes.
 - Tests: `npm test` (unit, real ffmpeg renders, workers against Redis, Judge/YouTube/TikTok against the
