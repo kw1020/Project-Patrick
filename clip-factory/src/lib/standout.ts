@@ -44,18 +44,34 @@ export function overlaps(a: VodSpan | null, b: VodSpan | null, slack = 20) {
   return !!a && !!b && a.vodId === b.vodId && a.from <= b.to + slack && b.from <= a.to + slack;
 }
 
+/** Clips of one channel made within this many seconds of each other are the same moment (viewers press "clip" together). */
+export const SAME_MOMENT_SEC = 30;
+/** Wall-clock stretch (ms) in which a new clip's created_at means "we already have this moment". */
+export type TimeSpan = { from: number; to: number };
+/** Existing moment -> the created_at range of viewer clips of the same moment. */
+export function momentTimeSpan(m: { source: string; timestamp: Date }): TimeSpan {
+  const t = m.timestamp.getTime();
+  // chat: timestamp = the moment itself, viewers clip it 0-60s later; twitch_clip: timestamp = that clip's created_at.
+  return m.source === "chat" ? { from: t - 10_000, to: t + 60_000 } : { from: t - SAME_MOMENT_SEC * 1000, to: t + SAME_MOMENT_SEC * 1000 };
+}
+
 /**
  * Drop near-duplicates: a clip overlapping one already taken (`existing` = moments we already have) or a
- * higher-viewed clip in this list. Keeps the order of `scored` for the survivors.
+ * higher-viewed clip in this list. Same moment = same VOD and overlapping (+-`slack`s), or, because Twitch leaves
+ * vod_offset empty while the stream is live, created within SAME_MOMENT_SEC of a taken clip / inside an existing moment's
+ * TimeSpan. Keeps the order of `scored` for the survivors.
  */
-export function dedupe(scored: Scored[], existing: VodSpan[] = [], slack = 20): Scored[] {
+export function dedupe(scored: Scored[], existing: VodSpan[] = [], slack = 20, existingTimes: TimeSpan[] = []): Scored[] {
   const byViews = [...scored].sort((a, b) => b.clip.view_count - a.clip.view_count);
   const taken: VodSpan[] = [...existing];
+  const times: TimeSpan[] = [...existingTimes];
   const keep = new Set<Scored>();
   for (const s of byViews) {
-    const span = clipSpan(s.clip);
+    const span = clipSpan(s.clip), at = Date.parse(s.clip.created_at);
     if (span && taken.some((t) => overlaps(span, t, slack))) continue;
+    if (Number.isFinite(at) && times.some((t) => at >= t.from && at <= t.to)) continue;
     if (span) taken.push(span);
+    if (Number.isFinite(at)) times.push({ from: at - SAME_MOMENT_SEC * 1000, to: at + SAME_MOMENT_SEC * 1000 });
     keep.add(s);
   }
   return scored.filter((s) => keep.has(s));

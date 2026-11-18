@@ -317,7 +317,9 @@ export function audioCues(levels: number[], frame = FRAME, max = 4): { jumps: { 
   for (const x of order) {
     if (jumps.length >= max) break;
     if (jumps.some((j) => Math.abs(j.i - x.i) * frame < 3)) continue;
-    jumps.push({ at: onsetOf(m, levels, x.i, 99), db: Math.round(x.db), i: x.i });
+    let i = x.i; // back to where this jump's plateau starts
+    while (i > 0 && x.i - i < Math.round(1.5 / frame) && m.smooth[i - 1] - m.usual[i - 1] >= x.db - 1) i--;
+    jumps.push({ at: onsetOf(m, levels, i, 99), db: Math.round(x.db), i: x.i });
   }
   const silences: { from: number; to: number }[] = [];
   const half = smoothLevels(levels, 0.3, frame);

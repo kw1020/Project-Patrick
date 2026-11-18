@@ -4,7 +4,7 @@ import { enqueueGrab } from "../lib/queues";
 import { defaultCaption, defaultTitle, GTA6_NAME } from "../lib/social";
 import { backlogRoom } from "../lib/guards";
 import { categoryOff, skippedNote, twitchClipCategory, type Category } from "../lib/category";
-import { dedupe, roundRobin, scoreCreatorClips, type Scored, type VodSpan } from "../lib/standout";
+import { dedupe, momentTimeSpan, roundRobin, scoreCreatorClips, type Scored, type VodSpan } from "../lib/standout";
 
 const MAX_NEW_PER_RUN = 15;
 
@@ -73,7 +73,11 @@ export async function runClipsPoll() {
       ? (await prisma.moment.findMany({ where: { streamerId: s.id, vodId: { in: vodIds }, vodOffset: { not: null } }, select: { vodId: true, vodOffset: true, source: true } }))
         .map((m) => ({ vodId: m.vodId!, from: m.vodOffset! - (m.source === "chat" ? 30 : 0), to: m.vodOffset! + (m.source === "chat" ? 15 : 30) }))
       : [];
-    lists[i] = dedupe(lists[i], existing);
+    // Recent clips (stream still live) have no vod_offset: compare creation times with this creator's recent moments too.
+    const since = new Date(Math.min(...lists[i].map((k) => Date.parse(k.clip.created_at))) - 120_000);
+    const recent = (await prisma.moment.findMany({ where: { streamerId: s.id, source: { in: ["chat", "twitch_clip"] }, timestamp: { gte: since } }, select: { source: true, timestamp: true } }))
+      .map(momentTimeSpan);
+    lists[i] = dedupe(lists[i], existing, 20, recent);
   }
 
   // Fair mix: round-robin across creators, capped per creator and by the room in the line.

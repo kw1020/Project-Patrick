@@ -212,12 +212,13 @@ test("jump cuts: light caps (1.2s gaps, 0.35s pads, <= 15%, <= 4 cuts, not near 
 
 // ---------- Standout scoring, dedupe, fair mix (pure) ----------
 const NOW = Date.UTC(2026, 10, 18, 12);
-let n = 0;
+let n = 0, made = 0; // made: every clip gets its own creation time (clips made within 30s = the same moment)
 function tc(broadcaster_id: string, views: number, o: Partial<TwitchClip> & { ageH?: number } = {}): TwitchClip {
   const id = o.id ?? `c${++n}`;
+  made++;
   return {
     id, url: `https://clips.twitch.tv/${id}`, broadcaster_id, broadcaster_name: "B", creator_name: "x", video_id: o.video_id ?? "", game_id: o.game_id ?? "jc",
-    title: o.title ?? `clip ${id}`, view_count: views, created_at: new Date((o.created_at ? Date.parse(o.created_at) : NOW) - (o.ageH ?? 1) * HOUR).toISOString(),
+    title: o.title ?? `clip ${id}`, view_count: views, created_at: new Date((o.created_at ? Date.parse(o.created_at) : NOW) - (o.ageH ?? 1) * HOUR - (o.created_at ? 0 : made * 120_000)).toISOString(),
     thumbnail_url: "", duration: o.duration ?? 30, vod_offset: o.vod_offset ?? null,
   };
 }
@@ -445,6 +446,11 @@ test("line: window lands on the late payoff; the Judge's best_start/best_end is 
   assert.doesNotMatch(await runJudge(c.id), /Judge picked/);
   clip = await prisma.clip.findUniqueOrThrow({ where: { id: c.id } });
   assert.deepEqual([clip.winStart, clip.winLength], [25.3, 28]);
+  // Review fix: a Judge window that leaves the payoff out gets a payoff (punch-in) inside it, not a stale one outside.
+  mock.verdict = { ...mock.verdict, best_start: 10, best_end: 35 };
+  assert.match(await runJudge(c.id), /Judge picked 10-35s/);
+  clip = await prisma.clip.findUniqueOrThrow({ where: { id: c.id } });
+  assert.ok(clip.payoffAt! > 10.5 && clip.payoffAt! < 35, `payoff moved inside the Judge's window: ${clip.payoffAt}`);
   mock.verdict = { ...mock.verdict, best_start: null, best_end: null };
 });
 
