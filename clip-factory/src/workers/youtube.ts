@@ -1,6 +1,6 @@
 import { prisma, getSettings } from "../lib/db";
 import { enqueueGrab } from "../lib/queues";
-import { defaultCaption, defaultTitle } from "../lib/social";
+import { brandedCaption, defaultTitle } from "../lib/social";
 import { backlogRoom } from "../lib/guards";
 import { categoryOff, offReason, skippedNote, youtubeCategory, type Category } from "../lib/category";
 import { listChannelVideos, pickPeaks, videoInfo, videoUrl, ytError } from "../lib/ytdlp";
@@ -18,7 +18,7 @@ export async function runYouTubeScan() {
   if (settings.scoutPaused) return "paused";
   if (!settings.ytScanEnabled) return "off (Settings → YouTube scanner)";
   // Paused creators (Creators page) stay approved but are skipped.
-  const channels = await prisma.streamer.findMany({ where: { approved: true, paused: false, platform: "youtube" } });
+  const channels = await prisma.streamer.findMany({ where: { approved: true, paused: false, platform: "youtube" }, include: { campaign: true } });
   if (!channels.length) return "no approved YouTube channels yet (or all paused) — add one on the Streamers page";
   const skipped: Record<Category, number> = { funny: 0, gaming: 0 };
 
@@ -87,7 +87,7 @@ export async function runYouTubeScan() {
           data: {
             streamerId: ch.id, timestamp: info.uploadDate ?? new Date(), spikeScore: p.value, source: "youtube",
             sourceUrl: url, sourceTitle: info.title, sourceViews: info.views, vodId: v.id, vodOffset: p.center, category,
-            clips: { create: { title, caption: defaultCaption(title, ch, null), status: "processing", stage: "grab", stageAt: new Date(), category } },
+            clips: { create: { title, caption: brandedCaption({ hook: title, streamer: ch, category, game: null, campaign: ch.campaign }), status: "processing", stage: "grab", stageAt: new Date(), category } },
           },
           include: { clips: true },
         });

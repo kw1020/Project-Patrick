@@ -275,3 +275,25 @@ export function legacyPlan(facecam: Facecam | null, src?: { w: number; h: number
   if (!facecam) return { kind: "blur", place: overlayPlace("blur", null) };
   return { kind: "split", cam: facecam, zoomOn: "game", gameShift: src ? splitGameShift(src, facecam) : 0, place: overlayPlace("split", null) };
 }
+
+// ---------- v1.9.1 watermark ----------
+/**
+ * The channel watermark ("@ViceCityClips", Settings channelName + watermark): small, semi-transparent, bottom right just above
+ * the 8px progress bar. Moved up one line when the credit sits at the bottom so it never covers the credit; captions are
+ * centred at y <= 1660, so they stay clear. Used by the styled AND the plain ASS builders.
+ */
+export const WATERMARK_SIZE = 34;
+export function watermarkText(name: string | null | undefined) {
+  const t = (name || "").replace(/[\\{}\r\n]/g, "").replace(/^@+/, "").trim().slice(0, 30);
+  return t ? "@" + t : "";
+}
+export function watermarkStyle(font: string) {
+  // ~50% transparent white (&H80), thin outline, no shadow, alignment 3 (bottom right).
+  return `Style: Mark,${font},${WATERMARK_SIZE},&H80FFFFFF,&H00FFFFFF,&H90000000,&H00000000,-1,0,0,0,100,100,0,0,1,2,0,3,36,36,30,1`;
+}
+/** Where it goes (bottom-right anchor) and when it starts (after the hook when a low hook could reach it). */
+export function watermarkPlace(place: OverlayPlace | null) {
+  const y = place && place.creditAlign === 2 ? place.creditY - 58 : H - 30;
+  const hookBottom = place ? (place.hookAlign === 8 ? place.hookY + HOOK_H : place.hookY) : 0;
+  return { tag: `{\\an3\\pos(${W - 36},${y})}`, y, start: hookBottom > y - WATERMARK_SIZE - 80 ? 4.5 : 0 };
+}

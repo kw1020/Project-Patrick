@@ -62,6 +62,11 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
       </div>
 
       <form action={saveSettings} className="space-y-6">
+        <div className="card space-y-4 p-5" data-testid="branding">
+          <Head>Your channel</Head>
+          <Row label="Channel name" hint="Shown in the header and used for the watermark."><input name="channelName" defaultValue={s.channelName} maxLength={30} className="field" /></Row>
+          <Row label="Watermark on new clips" hint={`A small, see-through "@${s.channelName}" in the bottom-right corner. Re-cuts get it too.`}><input name="watermark" type="checkbox" defaultChecked={s.watermark} className={check} /></Row>
+        </div>
         <div className="card space-y-4 p-5" data-testid="what-to-clip">
           <Head>What to clip</Head>
           <Row label="Funny moments (doesn't have to be gaming)" hint="Laughing chat, banter, reactions, funny fails. Just Chatting, IRL and podcasts count."><input name="clipFunny" type="checkbox" defaultChecked={s.clipFunny} className={check} /></Row>

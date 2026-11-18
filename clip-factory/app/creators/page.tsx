@@ -4,6 +4,8 @@ import { CreatorActions } from "@/components/CreatorActions";
 import { ago, compact } from "@/lib/format";
 import { creatorUrl } from "@/lib/social";
 import { resetFacecamAuto } from "../actions";
+import { prisma } from "@/lib/db";
+import { CampaignSelect } from "@/components/Campaigns";
 import { CREATOR_FILTERS, getCreators, parseCreatorFilter, summaryLine, type CreatorFilter, type CreatorRow } from "@/lib/creators";
 
 export const dynamic = "force-dynamic";
@@ -25,7 +27,7 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
-function Card({ c }: { c: CreatorRow }) {
+function Card({ c, campaigns }: { c: CreatorRow; campaigns: { id: string; name: string; active: boolean }[] }) {
   const yt = c.platform === "youtube";
   const url = creatorUrl(c);
   return (
@@ -60,6 +62,10 @@ function Card({ c }: { c: CreatorRow }) {
         <Stat label="Last clip" value={c.lastClipAt ? ago(c.lastClipAt) : "none yet"} />
       </div>
 
+      <label className="flex min-w-0 items-center gap-2 text-xs text-zinc-400">
+        Campaign <CampaignSelect streamerId={c.id} value={c.campaignId ?? null} campaigns={campaigns} className="min-w-0 flex-1" />
+      </label>
+
       {c.webcam === "auto" && (
         <form action={resetFacecamAuto.bind(null, c.id)} className="flex items-center gap-2 text-xs text-emerald-300" data-testid="facecam-auto">
           <span>Webcam spot found automatically</span>
@@ -80,7 +86,10 @@ export default async function CreatorsPage({ searchParams }: { searchParams: Pro
   const sp = await searchParams;
   const q = (sp.q ?? "").trim().slice(0, 60);
   const f = parseCreatorFilter(sp.f);
-  const { summary, creators } = await getCreators({ q, filter: f });
+  const [{ summary, creators }, campaigns] = await Promise.all([
+    getCreators({ q, filter: f }),
+    prisma.campaign.findMany({ orderBy: [{ active: "desc" }, { createdAt: "asc" }], select: { id: true, name: true, active: true } }),
+  ]);
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -120,7 +129,7 @@ export default async function CreatorsPage({ searchParams }: { searchParams: Pro
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {creators.map((c) => <Card key={c.id} c={c} />)}
+          {creators.map((c) => <Card key={c.id} c={c} campaigns={campaigns} />)}
         </div>
       )}
       <p className="text-xs text-zinc-500">Pause stops new clips from a creator but keeps them approved. Remove takes them off the approved list (clips already made stay).</p>

@@ -3,7 +3,7 @@ import { prisma } from "../lib/db";
 import { resolveStored } from "../lib/paths";
 import { draftStatus, fetchTikTokStats, MAX_PENDING_DRAFTS, tiktokVideoUrl, uploadDraft } from "../lib/tiktok";
 import { fetchStats, uploadVideo } from "../lib/youtube";
-import { creatorCreditText, creditLine, defaultTitle, gameHashtags, momentGame } from "../lib/social";
+import { captionCredits, creatorCreditText, creatorUrl, creditLine, defaultTitle, gameHashtags, momentGame } from "../lib/social";
 
 /** Poster: sends an APPROVED clip to one connected account. Refuses anything Krew hasn't approved. */
 export async function runPost(clipId: string, accountId: string) {
@@ -23,21 +23,23 @@ export async function runPost(clipId: string, accountId: string) {
     const waiting = await prisma.post.count({ where: { accountId: acct.id, status: "draft", postedAt: { gt: new Date(Date.now() - 24 * 3600_000) } } });
     if (waiting >= MAX_PENDING_DRAFTS) throw new Error(`${acct.channelTitle} already has ${waiting} drafts waiting today (TikTok allows ${MAX_PENDING_DRAFTS}). Post them in the TikTok app first.`);
     const publishId = await uploadDraft(acct, file);
-    await prisma.post.create({ data: { clipId, platform: "tiktok", accountId: acct.id, status: "draft", publishId } });
+    await prisma.post.create({ data: { clipId, platform: "tiktok", accountId: acct.id, status: "draft", publishId, campaignId: streamer.campaignId ?? null } });
     await prisma.clip.update({ where: { id: clipId }, data: { status: "posted", stage: null, stageAt: new Date(), postError: null } });
     return `sent ${streamer.name} clip to ${acct.channelTitle}'s TikTok inbox`;
   }
 
-  // YouTube. The credit must be in what gets posted, even if the caption was edited.
+  // YouTube. The credit must be in what gets posted, even if the caption was edited: the "🎥 @login" line (v1.9.1) or the
+  // channel link both count. The link line is still added to the YouTube description only (clickable there).
   let description = clip.caption || clip.title || "";
-  if (!description.includes(creatorCreditText(streamer))) description += `\n\n${creditLine(streamer)}`;
+  if (!captionCredits(description, streamer)) description += `\n\n${creditLine(streamer)}`;
+  else if (!description.includes(creatorCreditText(streamer))) description += `\n\n${creatorUrl(streamer)}`;
   if (!/#shorts\b/i.test(description)) description += "\n#Shorts";
   const game = momentGame(clip.moment);
   const tags = (clip.hashtags || gameHashtags(game).join(" ")).split(/\s+/).map((t) => t.replace(/^#/, "")).filter(Boolean);
   const privacy = (["public", "unlisted", "private"] as const).find((p) => p === acct.privacy) ?? "public";
   const id = await uploadVideo(acct, { file, title: clip.title || defaultTitle(null, streamer.name, game), description, tags, privacy });
 
-  await prisma.post.create({ data: { clipId, platform: "youtube", accountId: acct.id, externalId: id, url: `https://youtube.com/shorts/${id}` } });
+  await prisma.post.create({ data: { clipId, platform: "youtube", accountId: acct.id, externalId: id, url: `https://youtube.com/shorts/${id}`, campaignId: streamer.campaignId ?? null } });
   await prisma.clip.update({ where: { id: clipId }, data: { status: "posted", stage: null, stageAt: new Date(), postError: null } });
   return `uploaded ${streamer.name} clip to ${acct.channelTitle} (${privacy}): ${id}`;
 }

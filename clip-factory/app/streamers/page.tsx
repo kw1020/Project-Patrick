@@ -8,18 +8,21 @@ import { SuggestionActions } from "@/components/SuggestionActions";
 import { getStatuses, soft, type AgentStatus } from "@/lib/queues";
 import { approveStreamer, removeStreamer, resetFacecamAuto, saveStreamer, scanSuggestionsNow } from "../actions";
 import { BulkAddCreators } from "@/components/BulkAddCreators";
+import { CampaignSelect, CampaignsCard } from "@/components/Campaigns";
 
 export const dynamic = "force-dynamic";
 
 export default async function StreamersPage({ searchParams }: { searchParams: Promise<{ add?: string; sg?: string }> }) {
   const { add, sg } = await searchParams;
-  const [approved, discovered, twitchSuggestions, ytSuggestions, statuses] = await Promise.all([
+  const [approved, discovered, twitchSuggestions, ytSuggestions, statuses, campaigns] = await Promise.all([
     prisma.streamer.findMany({ where: { approved: true }, orderBy: [{ isLive: "desc" }, { viewers: "desc" }, { name: "asc" }], include: { _count: { select: { moments: true } } } }),
     prisma.streamer.findMany({ where: { approved: false, platform: "twitch" }, orderBy: [{ isLive: "desc" }, { peakViewers: "desc" }], take: 40 }),
     prisma.suggestion.findMany({ where: { status: "pending", platform: "twitch", streamer: { approved: false, platform: "twitch" } }, orderBy: { score: "desc" }, include: { streamer: true } }),
     prisma.suggestion.findMany({ where: { status: "pending", platform: "youtube", streamer: { approved: false, platform: "youtube" } }, orderBy: { score: "desc" }, include: { streamer: true } }),
     soft(getStatuses(), {} as Record<string, AgentStatus>),
+    prisma.campaign.findMany({ orderBy: [{ active: "desc" }, { createdAt: "asc" }], include: { _count: { select: { streamers: true } } } }),
   ]);
+  const campaignViews = campaigns.map(({ _count, createdAt: _c, updatedAt: _u, source: _s, ...c }) => ({ ...c, creators: _count.streamers }));
   const tab: "twitch" | "youtube" = sg === "youtube" ? "youtube" : "twitch";
   return (
     <div className="space-y-6">
@@ -56,6 +59,7 @@ export default async function StreamersPage({ searchParams }: { searchParams: Pr
                     <button formAction={resetFacecamAuto.bind(null, s.id)} className="btn-ghost px-2 py-0.5 text-xs" title="Forget it; the next clip looks for the webcam again">reset</button>
                   </span>
                 )}
+                <CampaignSelect streamerId={s.id} value={s.campaignId} campaigns={campaignViews} />
                 <button className="btn-ghost">Save</button>
                 <button formAction={removeStreamer.bind(null, s.id)} className="btn-bad">Remove</button>
               </form>
@@ -63,6 +67,8 @@ export default async function StreamersPage({ searchParams }: { searchParams: Pr
           </div>
         )}
       </section>
+
+      <CampaignsCard campaigns={campaignViews} />
 
       <section className="space-y-2">
         <h2 className="font-bold">Found by the Scout, not approved</h2>

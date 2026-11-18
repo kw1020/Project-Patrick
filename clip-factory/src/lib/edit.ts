@@ -7,7 +7,7 @@ import { run, type Facecam, type Word } from "./media";
 import { storagePath } from "./paths";
 import { type EditStyle, type JumpCutMode } from "./edit-styles";
 import { FRAME, findPayoff, meanDb } from "./window";
-import { SEAM, cropXExpr, legacyPlan, overlayPlace, type LayoutPlan, type OverlayPlace } from "./layout";
+import { SEAM, cropXExpr, legacyPlan, overlayPlace, watermarkPlace, watermarkStyle, watermarkText, type LayoutPlan, type OverlayPlace } from "./layout";
 
 export { type EditStyle, type JumpCutMode, EDIT_STYLES, JUMP_CUT_MODES, parseEditStyle, parseJumpCuts, DEFAULT_EDIT_STYLE } from "./edit-styles";
 
@@ -292,7 +292,7 @@ export function splitHook(text: string, maxLine = 24) {
 /** Caption block centre: 62% of the frame height, clear of the hook (top) and the progress bar (bottom). */
 export const CAPTION_Y = Math.round(H * 0.62);
 
-export function buildStyledAss(opts: { words: Word[]; credit: string; duration: number; layout: "blur" | "facecam" | "split" | "fullcam"; hook?: string | null; style: EditStyle; font?: string; place?: OverlayPlace | null }) {
+export function buildStyledAss(opts: { words: Word[]; credit: string; duration: number; layout: "blur" | "facecam" | "split" | "fullcam"; hook?: string | null; style: EditStyle; font?: string; place?: OverlayPlace | null; watermark?: string | null }) {
   const S = STYLES[opts.style], font = opts.font || process.env.CAPTION_FONT || "DejaVu Sans";
   const D = opts.duration;
   // v1.9.0: where text goes depends on the layout and where the face is (src/lib/layout.ts overlayPlace).
@@ -307,9 +307,13 @@ export function buildStyledAss(opts: { words: Word[]; credit: string; duration: 
     // Credit: always on, top centre, drawn last (above zooms, never scaled).
     `Style: Credit,${font},42,&H10FFFFFF,&H00FFFFFF,&H00000000,&H78000000,-1,0,0,0,100,100,0,0,1,4,2,8,40,40,110,1`,
     `Style: Hook,${font},${S.hook.size},${S.hook.text},&H00FFFFFF,${S.hook.box},${S.hook.box},-1,0,0,0,100,100,0,0,3,16,0,8,90,90,${hookY},1`,
+    watermarkStyle(font),
     "", "[Events]", "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
     `Dialogue: 3,${assTime(0)},${assTime(D)},Credit,,0,0,0,,${creditTag}${esc(opts.credit)}`,
   ];
+  // v1.9.1: "@ViceCityClips" bottom right (Settings watermark), clear of the credit and captions; drawn after the zoom.
+  const mark = watermarkText(opts.watermark), wm = watermarkPlace(P);
+  if (mark && wm.start < D) lines.push(`Dialogue: 3,${assTime(wm.start)},${assTime(D)},Mark,,0,0,0,,${wm.tag}${mark}`);
   let hook = esc(opts.hook || "").slice(0, 70);
   if (hook) {
     if (opts.style === "meme") hook = hook.toUpperCase();
@@ -519,6 +523,8 @@ export async function renderStyled(opts: {
   /** v1.9.0: the layout (src/lib/layout.ts planLayout); wins over `facecam`. */
   plan?: LayoutPlan | null;
   words: Word[]; credit: string; hook: string | null; minSec: number; hasAudio: boolean;
+  /** v1.9.1: channel watermark text ("ViceCityClips"), null/empty = none. */
+  watermark?: string | null;
   peakHint?: { source: string; vodOffset: number | null; vodId?: string | null } | null; workDir: string; id: string;
   /** v1.8.0: the payoff in WINDOW seconds (from Clip.payoffAt); used as the peak instead of recomputing. */
   peakAt?: number | null;
@@ -534,7 +540,7 @@ export async function renderStyled(opts: {
   const lp = opts.plan ?? legacyPlan(opts.facecam, src);
   fs.mkdirSync(opts.workDir, { recursive: true });
   const assName = `${opts.id}.styled.ass`, assPath = path.join(opts.workDir, assName);
-  fs.writeFileSync(assPath, buildStyledAss({ words: plan.words, credit: opts.credit, duration: plan.duration, layout: lp.kind, hook: opts.hook, style: opts.style, place: lp.place }));
+  fs.writeFileSync(assPath, buildStyledAss({ words: plan.words, credit: opts.credit, duration: plan.duration, layout: lp.kind, hook: opts.hook, style: opts.style, place: lp.place, watermark: opts.watermark }));
   const sfx = S.sfx && opts.hasAudio ? await ensureSfx() : null;
   const whooshAt = sfx && opts.hook ? 0 : null;
   const boomAt = sfx && plan.punchStart != null ? plan.punchStart : null;

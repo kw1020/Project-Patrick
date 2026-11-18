@@ -35,6 +35,8 @@ model Streamer {
   chatRate      Float     @default(0) // messages/sec, last minute (approved + live only)
   chatAvg       Float     @default(0) // messages/sec, 5-min rolling average
   paused        Boolean   @default(false) // still approved, but the clips poller / spike detector / YouTube scanner skip them (Creators page)
+  campaignId    String?   // v1.9.1: the Whop Content Rewards campaign this creator's clips are for (captions follow its rules)
+  campaign      Campaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   moments       Moment[]
@@ -117,6 +119,8 @@ model Post {
   comments   Int?
   syncedAt   DateTime?
   error      String?
+  campaignLink String? // v1.9.1: where Krew submitted this post on Whop (Content Rewards)
+  campaignId   String? // v1.9.1: the campaign it was submitted to (plain id, no relation: deleting a campaign keeps the post)
   stats      PostStat[]
 }
 
@@ -152,6 +156,25 @@ model Settings {
   jumpCuts            String  @default("light") // v1.8.0: off | light | normal (only real silence is cut)
   migratedAnyGame     Boolean @default(false) // v1.8.0 one-time move: gta6 -> any, lookback 24h -> 7d, max 45s -> 35s
   migratedAutoLayout  Boolean @default(false) // v1.9.0 one-time move: layout blur -> auto
+  channelName         String  @default("ViceCityClips") // v1.9.1: Krew's channel, shown in the header + the watermark
+  watermark           Boolean @default(true) // v1.9.1: burn a small "@<channelName>" into new clips (bottom right)
+}
+
+// v1.9.1 Campaign mode: a Whop Content Rewards campaign. Creators are tagged with one (Streamer.campaignId) and their
+// captions follow its rules (src/lib/social.ts brandedCaption / checkCampaignCaption). Nothing is blocked: Krew decides.
+model Campaign {
+  id              String     @id @default(cuid())
+  name            String
+  source          String     @default("whop")
+  link            String?    // the campaign's page on Whop
+  rules           String?    // free text: the campaign's caption rules (the Judge reads them)
+  requiredText    String?    // lines that must appear in the caption, one per line (e.g. "@kaicenat", "#ad")
+  bannedWords     String?    // comma or line separated
+  maxCaptionChars Int?
+  active          Boolean    @default(true)
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  streamers       Streamer[]
 }
 
 // Connected posting accounts. Several per platform (e.g. two YouTube channels, a TikTok).

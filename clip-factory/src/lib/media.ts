@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { cropXExpr, legacyPlan, overlayPlace, type LayoutPlan, type OverlayPlace } from "./layout";
+import { cropXExpr, legacyPlan, overlayPlace, watermarkPlace, watermarkStyle, watermarkText, type LayoutPlan, type OverlayPlace } from "./layout";
 
 export function run(cmd: string, args: string[], opts: { cwd?: string; timeoutMs?: number } = {}): Promise<{ stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
@@ -114,7 +114,7 @@ export function chunkWords(words: Word[], maxWords = 3, maxChars = 18) {
 }
 
 /** ASS subtitle file: big bold word-chunk captions + a permanent streamer credit. */
-export function buildAss(opts: { words: Word[]; credit: string; duration: number; font?: string; layout: "blur" | "facecam" | "split" | "fullcam"; hook?: string | null; place?: OverlayPlace | null }) {
+export function buildAss(opts: { words: Word[]; credit: string; duration: number; font?: string; layout: "blur" | "facecam" | "split" | "fullcam"; hook?: string | null; place?: OverlayPlace | null; watermark?: string | null }) {
   const font = opts.font || process.env.CAPTION_FONT || "DejaVu Sans";
   const capMarginV = 470;
   // v1.9.0: split / fullcam place the text off the face (src/lib/layout.ts overlayPlace); blur keeps the v1.7.1 styles.
@@ -134,11 +134,15 @@ export function buildAss(opts: { words: Word[]; credit: string; duration: number
     `Style: Credit,${font},40,&H30FFFFFF,&H00FFFFFF,&H00000000,&H64000000,-1,0,0,0,100,100,0,0,1,3,1,8,40,40,110,1`,
     // Hook: white text on a pink box near the top, first few seconds only.
     `Style: Hook,${font},62,&H00FFFFFF,&H00FFFFFF,&H00813DFF,&H00813DFF,-1,0,0,0,100,100,0,0,3,14,0,8,90,90,250,1`,
+    watermarkStyle(font),
     "",
     "[Events]",
     "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
     `Dialogue: 1,${assTime(0)},${assTime(opts.duration)},Credit,,0,0,0,,${place ? at(place.creditAlign, place.creditY) : ""}${assEscape(opts.credit)}`,
   ];
+  // v1.9.1: "@ViceCityClips" bottom right (Settings watermark), clear of the credit and captions.
+  const mark = watermarkText(opts.watermark), wm = watermarkPlace(place);
+  if (mark && wm.start < opts.duration) lines.push(`Dialogue: 1,${assTime(wm.start)},${assTime(opts.duration)},Mark,,0,0,0,,${wm.tag}${mark}`);
   const hook = assEscape(opts.hook || "").slice(0, 70);
   if (hook) lines.push(`Dialogue: 2,${assTime(0)},${assTime(Math.min(4.5, opts.duration))},Hook,,0,0,0,,${place ? at(place.hookAlign, place.hookY) : ""}{\\fad(0,250)}${hook}`);
   for (const c of chunkWords(opts.words)) {

@@ -1,5 +1,12 @@
 # Clip Factory patch notes
 
+## 1.9.1 — 2026-11-18
+- ViceCityClips captions: every caption is now a short hook, then the streamer's @name, then #GTA6 #GTAVI #ViceCity plus 1 or 2 extra hashtags the Judge picks.
+- A small see-through @ViceCityClips watermark in the bottom-right corner of new clips. Turn it off or change the name in Settings.
+- Campaign mode for Whop Content Rewards: tag a creator with a campaign on the Streamers or Creators page.
+- Campaign caption rules are followed automatically (required lines and hashtags, banned words, max length), and each clip card shows a quick check.
+- Add the Whop campaign link to posted clips on the Posted page, and filter the Posted page by campaign.
+
 ## 1.9.0 — 2026-11-18
 - New layout: the streamer's camera on top and the game below. Clip Factory finds the webcam by itself, no box to type in.
 - New layout: full streamer cam, where the whole screen is the streamer's face. Used for funny moments and Just Chatting.

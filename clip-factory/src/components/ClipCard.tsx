@@ -1,8 +1,8 @@
 "use client";
 import { useState, useTransition } from "react";
-import { markPosted, postToAccount, recutClip, retryClip, setClipStatus, updateClipText } from "../../app/actions";
+import { markPosted, postToAccount, rebuildCaption, recutClip, retryClip, setClipStatus, updateClipText } from "../../app/actions";
 import { EDIT_STYLES, LAYOUTS, editStyleLabel, layoutChip, parseEditStyle } from "../lib/edit-styles";
-import { creatorCreditText, creatorUrl } from "../lib/social";
+import { captionCredits, checkCampaignCaption, creatorHandle, creatorUrl } from "../lib/social";
 import { CategoryChip } from "./CategoryChip";
 
 export type ClipView = {
@@ -14,6 +14,7 @@ export type ClipView = {
   layout?: string | null; // v1.9.0: split | fullcam | blur, the layout it was last cut with // version busts the browser's video cache after a re-cut
   streamer: { name: string; login: string; platform: string }; source: string; vodOffset?: number | null; spikeScore: number; sourceUrl: string | null; sourceViews: number;
   category?: string | null; // funny | gaming (null on older clips)
+  campaign?: { name: string; requiredText: string | null; bannedWords: string | null; maxCaptionChars: number | null } | null; // v1.9.1: the creator's active campaign
   posts: { platform: string; accountId: string | null; status: string; url: string | null; error: string | null }[]; postError: string | null;
 };
 export type AccountView = { id: string; platform: string; label: string; autoPost: boolean; privacy: string };
@@ -86,8 +87,16 @@ export function ClipCard({ clip, accounts }: { clip: ClipView; accounts: Account
         )}
         <input className="field font-semibold" value={title} onChange={(e) => { setTitle(e.target.value); setSaved(false); }} onBlur={save} maxLength={100} />
         <textarea className="field min-h-28 text-xs leading-relaxed" value={caption} onChange={(e) => { setCaption(e.target.value); setSaved(false); }} onBlur={save} />
-        {!caption.includes(creatorCreditText(clip.streamer)) && (
-          <div className="text-xs text-sun">⚠ Caption must credit {creatorCreditText(clip.streamer)}</div>
+        {!captionCredits(caption, clip.streamer) && (
+          <div className="text-xs text-sun">⚠ Caption must credit {creatorHandle(clip.streamer)}</div>
+        )}
+        {clip.campaign && (
+          <div className="space-y-0.5 rounded-lg border border-line px-2.5 py-2 text-xs" data-testid="campaign-checks">
+            <div className="font-bold text-zinc-300">Campaign: {clip.campaign.name}</div>
+            {checkCampaignCaption(caption, clip.campaign).map((r, i) => (
+              <div key={i} className={`[overflow-wrap:anywhere] ${r.ok ? "text-emerald-300" : "text-sun"}`}>{r.ok ? "✅" : "⚠️"} {r.rule}</div>
+            ))}
+          </div>
         )}
 
         <div className="mt-auto flex flex-wrap gap-2 pt-1">
@@ -101,6 +110,10 @@ export function ClipCard({ clip, accounts }: { clip: ClipView; accounts: Account
           {clip.status === "failed" && <button className="btn-hot flex-1" disabled={busy} onClick={() => act(() => retryClip(clip.id))}>Retry</button>}
           {clip.hasVideo && !clip.expired && <a className="btn-ghost flex-1" href={`/api/media/${clip.id}?download=1`}>Download</a>}
           <button className="btn-ghost flex-1" onClick={copy}>{copied ? "Copied ✓" : "Copy caption"}</button>
+          {clip.status !== "processing" && (
+            <button className="btn-ghost flex-1" disabled={busy} title="Write the caption again in the ViceCityClips format, with the creator's campaign rules"
+              onClick={() => start(async () => { const c = await rebuildCaption(clip.id); setCaption(c); setSaved(true); })}>Rebuild caption</button>
+          )}
         </div>
         {recutting && <div className="animate-pulse text-xs text-sun">Re-cutting… the new version replaces this video in about a minute.</div>}
         {clip.editNote && !recutting && <div className="text-xs text-zinc-500" title={clip.editNote}>Plain edit used (the styled edit hit a problem).</div>}
@@ -151,13 +164,14 @@ export function ClipCard({ clip, accounts }: { clip: ClipView; accounts: Account
                 ))}
               </div>
             )}
-            <form action={(fd) => act(() => markPosted(clip.id, fd))} className="flex gap-2">
+            <form id={`posted-${clip.id}`} action={(fd) => act(() => markPosted(clip.id, fd))} className="flex gap-2">
               <select name="platform" className="field w-24 shrink-0">
                 <option value="tiktok">TikTok</option><option value="instagram">Reels</option><option value="youtube">Shorts</option>
               </select>
-              <input name="url" placeholder="Post link (optional)" className="field" />
+              <input name="url" placeholder="Post link (optional)" className="field min-w-0" />
               <button className="btn-ghost shrink-0">Posted</button>
             </form>
+            <input form={`posted-${clip.id}`} name="campaignLink" placeholder="Whop campaign link (optional)" className="field text-xs" data-testid="posted-campaign-link" />
           </div>
         )}
       </div>

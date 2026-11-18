@@ -4,20 +4,22 @@ import { fileURLToPath } from "node:url";
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
+import { EXTRA_TAGS, cleanExtras, type ExtraTag } from "./social";
 
 export const JUDGE_MODEL = process.env.JUDGE_MODEL || "claude-sonnet-5-5";
 
 const Verdict = z.object({
   score: z.number().describe("1-10: how likely a stranger scrolling short-form video stops and watches to the end"),
-  hook_text: z.string().describe("On-screen text for the first seconds, max 45 characters, no hashtags or emoji"),
+  hook_text: z.string().describe("Short scroll-stopping hook, max 45 characters, no hashtags or emoji: on screen for the first seconds AND the first line of the post caption"),
   title: z.string().describe("Post title, max 80 characters"),
   hashtags: z.array(z.string()).describe("4-6 hashtags without the # sign"),
+  extra_hashtags: z.array(z.enum(EXTRA_TAGS)).describe("1-2 extra hashtags for the caption, without #: GTA6Funny for funny moments, GTA6Clips for GTA gameplay, StreamerMoments for reactions/IRL, Gaming for other games"),
   reason: z.string().describe("One or two plain sentences on why this score"),
   category: z.enum(["funny", "gaming"]).describe("funny: comedy, banter, reactions, funny fails (any stream, not only games). gaming: plays, clutches, chases, game moments"),
   best_start: z.number().nullable().describe("Seconds into the SOURCE where the best stretch starts, or null to keep the proposed window"),
   best_end: z.number().nullable().describe("Seconds into the SOURCE where the best stretch ends (after the payoff lands), or null"),
 });
-export type Verdict = z.infer<typeof Verdict>;
+export type Verdict = Omit<z.infer<typeof Verdict>, "extra_hashtags"> & { extra_hashtags: ExtraTag[] };
 /** The structured-output schema (exported for tests). */
 export const VerdictSchema = Verdict;
 
@@ -38,6 +40,9 @@ export type JudgeInput = {
   timedTranscript?: string | null; // "[12.4s] text…" one line per sentence, times in the source
   window?: { start: number; end: number } | null; // the proposed window (seconds in the source)
   lengthRange?: { min: number; max: number } | null; // allowed clip length
+  // v1.9.1 Campaign mode: the creator's campaign caption rules (free text) + banned words; the hook must follow them.
+  campaignRules?: string | null;
+  bannedWords?: string | null;
 };
 
 export function judgeConfigured() {
@@ -97,6 +102,8 @@ function render(i: JudgeInput) {
     lines.push(`Found as: a chat spike (${s.kind ?? "volume"}). Chat hit ${s.rate?.toFixed(1) ?? "?"} messages/sec against a normal ${s.baseline?.toFixed(2) ?? "?"} (${s.ratio ?? "?"}x), ${Math.round((s.hypeShare ?? 0) * 100)}% of messages were hype words or emotes, ${s.viewers ?? "?"} viewers.`);
     if (s.laughShare != null) lines.push(`Laughs (LMAO, KEKW, 😂, "I can't"…) were ${Math.round(s.laughShare * 100)}% of chat's reactions; the rest were gameplay hype (W, Pog, "no way").`);
   }
+  if (i.campaignRules?.trim()) lines.push(`Campaign caption rules: ${i.campaignRules.trim().replace(/\s*\n\s*/g, " / ").slice(0, 1500)}`);
+  if (i.bannedWords?.trim()) lines.push(`Campaign banned words (never in the hook): ${i.bannedWords.trim().replace(/\s*\n\s*/g, ", ").slice(0, 500)}`);
   if (i.category === "funny" || i.category === "gaming") lines.push(`First guess at the type: ${i.category} (from chat, the Twitch category or the title)`);
   if (i.sourceLength && i.window) {
     const range = i.lengthRange ? ` Clips must be ${i.lengthRange.min}-${i.lengthRange.max}s long.` : "";
@@ -132,6 +139,8 @@ export async function judgeClip(input: JudgeInput, lessons: string | null = null
     hook_text: v.hook_text.replace(/[#\n]/g, " ").trim().slice(0, 60),
     title: v.title.replace(/[<>\n]/g, " ").trim().slice(0, 90),
     hashtags: v.hashtags,
+    // Validated in code: known tags only, deduped, max 2; none → the worker's fallback (defaultExtras).
+    extra_hashtags: cleanExtras(v.extra_hashtags, []),
     reason: v.reason.trim().slice(0, 500),
     category: v.category === "funny" ? "funny" : "gaming",
     best_start: typeof v.best_start === "number" && Number.isFinite(v.best_start) ? Math.round(v.best_start * 100) / 100 : null,

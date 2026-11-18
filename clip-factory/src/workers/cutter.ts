@@ -121,6 +121,8 @@ export async function runCut(clipId: string, styleOverride?: string, jumpOverrid
   const peakAt = clip.payoffAt != null ? clip.payoffAt - start : null;
 
   const assPath = storagePath("work", `${clipId}.ass`);
+  // v1.9.1: Settings watermark on = "@<channelName>" burned in (styled and plain edits; re-cuts too).
+  const watermark = settings.watermark ? settings.channelName : null;
   let usedLayout: string = layout;
   try {
     const finalRel = `final/${clipId}.mp4`;
@@ -129,19 +131,19 @@ export async function runCut(clipId: string, styleOverride?: string, jumpOverrid
     // Never lose a clip to a fancy effect: if the styled render fails, the plain v1.7.1 edit is made instead.
     const audio = await hasAudio(raw);
     const r = await renderOrFallback(style, () => renderStyled({
-      input: raw, output: storagePath(finalRel), start, length, facecam, plan, style, words, credit: creatorCreditText(streamer), hook: clip.hookText || clip.title,
+      input: raw, output: storagePath(finalRel), start, length, facecam, plan, style, words, credit: creatorCreditText(streamer), hook: clip.hookText || clip.title, watermark,
       minSec: settings.clipMinSec, hasAudio: audio, workDir: storagePath("work"), id: clipId,
       peakHint: { source: clip.moment.source, vodOffset: clip.moment.vodOffset, vodId: clip.moment.vodId }, peakAt, jumpCuts,
     }), async () => {
       // The plain edit supports every layout; if even that fails in a cam layout, the plain blur edit is the last resort.
       const credit = creatorCreditText(streamer);
       try {
-        fs.writeFileSync(assPath, buildAss({ words, credit, duration: length, layout, hook: clip.hookText, place: plan.place }));
+        fs.writeFileSync(assPath, buildAss({ words, credit, duration: length, layout, hook: clip.hookText, place: plan.place, watermark }));
         await renderVertical({ input: raw, output: storagePath(finalRel), start, length, facecam, plan, assPath });
       } catch (e) {
         if (layout === "blur") throw e;
         console.warn(`[cut] ${clipId}: plain ${layout} edit failed, using blur:`, (e as Error).message);
-        fs.writeFileSync(assPath, buildAss({ words, credit, duration: length, layout: "blur", hook: clip.hookText }));
+        fs.writeFileSync(assPath, buildAss({ words, credit, duration: length, layout: "blur", hook: clip.hookText, watermark }));
         await renderVertical({ input: raw, output: storagePath(finalRel), start, length, facecam: null, plan: null, assPath });
         usedLayout = "blur";
       }

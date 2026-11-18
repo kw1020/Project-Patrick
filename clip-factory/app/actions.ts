@@ -9,6 +9,8 @@ import { parseFacecam } from "@/lib/media";
 import { parseEditStyle, parseJumpCuts, parseLayoutSetting } from "@/lib/edit-styles";
 import { approvalReasonFromEvidence } from "@/lib/permission";
 import { loginTakenBy } from "@/lib/streamers";
+import { parseCampaignForm, parseChannelName, parseLink } from "@/lib/campaigns";
+import { brandedCaption, captionHashtags, cleanExtras, defaultExtras, defaultTitle, momentGame } from "@/lib/social";
 import { approveResolved, DEFAULT_APPROVAL_NOTE, resolveCreators, type ApprovePick, type ApproveResult, type ResolveResult } from "@/lib/creator-lookup";
 
 function refreshAll() {
@@ -213,7 +215,10 @@ export async function resetFacecamAuto(id: string) {
 export async function markPosted(id: string, form: FormData) {
   const platform = String(form.get("platform") || "tiktok");
   const url = String(form.get("url") || "").trim() || null;
-  await prisma.post.create({ data: { clipId: id, platform, url } });
+  // v1.9.1: optional Whop campaign link; the post is tagged with the creator's campaign.
+  const campaignLink = parseLink(form.get("campaignLink"));
+  const clip = await prisma.clip.findUnique({ where: { id }, select: { moment: { select: { streamer: { select: { campaignId: true } } } } } });
+  await prisma.post.create({ data: { clipId: id, platform, url, campaignLink, campaignId: clip?.moment.streamer.campaignId ?? null } });
   await prisma.clip.update({ where: { id }, data: { status: "posted" } });
   refreshAll();
 }
@@ -221,8 +226,59 @@ export async function markPosted(id: string, form: FormData) {
 export async function updatePost(id: string, form: FormData) {
   const v = String(form.get("views") || "").replace(/[^0-9]/g, "");
   const url = String(form.get("url") || "").trim();
-  await prisma.post.update({ where: { id }, data: { views: v ? parseInt(v) : null, url: url || null } });
+  const extra: { campaignLink?: string | null; campaignId?: string | null } = {};
+  if (form.get("campaignLink") != null) extra.campaignLink = parseLink(form.get("campaignLink"));
+  if (form.get("campaignId") != null) {
+    const cid = String(form.get("campaignId") || "");
+    extra.campaignId = cid && (await prisma.campaign.findUnique({ where: { id: cid } })) ? cid : null;
+  }
+  await prisma.post.update({ where: { id }, data: { views: v ? parseInt(v) : null, url: url || null, ...extra } });
   revalidatePath("/posted");
+}
+
+// ---------- Campaigns (v1.9.1, Whop Content Rewards) ----------
+export async function createCampaign(form: FormData) {
+  const c = await prisma.campaign.create({ data: parseCampaignForm(form) });
+  refreshAll();
+  return c.id;
+}
+
+export async function saveCampaign(id: string, form: FormData) {
+  await prisma.campaign.update({ where: { id }, data: parseCampaignForm(form) });
+  refreshAll();
+}
+
+/** Creators on it go back to "None" (onDelete SetNull); posts keep their campaign link. */
+export async function deleteCampaign(id: string) {
+  await prisma.campaign.delete({ where: { id } });
+  refreshAll();
+}
+
+/** Streamers / Creators "Campaign" select: an id, "" = none, "new" = a new campaign named after the creator. */
+export async function setStreamerCampaign(streamerId: string, value: string) {
+  let campaignId: string | null = value || null;
+  if (value === "new") {
+    const s = await prisma.streamer.findUniqueOrThrow({ where: { id: streamerId } });
+    campaignId = (await prisma.campaign.create({ data: { name: `${s.name} campaign`, requiredText: `@${s.login}` } })).id;
+  } else if (campaignId && !(await prisma.campaign.findUnique({ where: { id: campaignId } }))) {
+    throw new Error("That campaign was deleted");
+  }
+  await prisma.streamer.update({ where: { id: streamerId }, data: { campaignId } });
+  refreshAll();
+  return campaignId;
+}
+
+/** Queue card "Rebuild caption": the ViceCityClips format again from the hook, with the creator's campaign rules now. */
+export async function rebuildCaption(clipId: string) {
+  const clip = await prisma.clip.findUniqueOrThrow({ where: { id: clipId }, include: { moment: { include: { streamer: { include: { campaign: true } } } } } });
+  const s = clip.moment.streamer, game = momentGame(clip.moment), category = clip.category ?? clip.moment.category;
+  const caption = brandedCaption({
+    hook: clip.hookText || clip.title, fallbackHook: defaultTitle(clip.moment.sourceTitle, s.name, game), streamer: s, campaign: s.campaign,
+    extras: cleanExtras((clip.hashtags || "").split(/\s+/), defaultExtras(category, game)), category, game,
+  });
+  await prisma.clip.update({ where: { id: clipId }, data: { caption, hashtags: captionHashtags(caption) } });
+  refreshAll();
+  return caption;
 }
 
 // ---------- Settings / control ----------
@@ -261,6 +317,9 @@ export async function saveSettings(form: FormData) {
       judgeEnabled: form.get("judgeEnabled") === "on",
       judgeLearns: form.get("judgeLearns") === "on",
       editStyle: parseEditStyle(form.get("editStyle")),
+      // v1.9.1 branding. An old form without the field keeps the name.
+      ...(form.get("channelName") != null ? { channelName: parseChannelName(form.get("channelName")) } : {}),
+      watermark: form.get("watermark") === "on",
     },
   });
   refreshAll();

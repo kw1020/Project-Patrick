@@ -15,7 +15,7 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
   const [clips, counts, catCounts, creator] = await Promise.all([
     prisma.clip.findMany({
       where: queueWhere(f),
-      include: { posts: true, moment: { include: { streamer: true } } },
+      include: { posts: true, moment: { include: { streamer: { include: { campaign: true } } } } },
       // Best first: Judge score, then how big the moment was.
       orderBy: tab === "pending" ? [{ score: { sort: "desc", nulls: "last" } }, { moment: { spikeScore: "desc" } }] : [{ updatedAt: "desc" }],
       take: 60,
@@ -37,6 +37,7 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
     streamer: { name: k.moment.streamer.name, login: k.moment.streamer.login, platform: k.moment.streamer.platform },
     source: k.moment.source, vodOffset: k.moment.vodOffset, spikeScore: k.moment.spikeScore, sourceUrl: k.moment.sourceUrl, sourceViews: k.moment.sourceViews,
     category: k.category ?? k.moment.category,
+    campaign: k.moment.streamer.campaign?.active ? (({ name, requiredText, bannedWords, maxCaptionChars }) => ({ name, requiredText, bannedWords, maxCaptionChars }))(k.moment.streamer.campaign) : null,
     posts: k.posts.map((p) => ({ platform: p.platform, accountId: p.accountId, status: p.status, url: p.url, error: p.error })), postError: k.postError,
   }));
 

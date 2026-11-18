@@ -1,7 +1,7 @@
 import { prisma, getSettings } from "../lib/db";
 import { getClips, getGameId, getGameNames, type TwitchClip } from "../lib/twitch";
 import { enqueueGrab } from "../lib/queues";
-import { defaultCaption, defaultTitle, GTA6_NAME } from "../lib/social";
+import { brandedCaption, defaultTitle, GTA6_NAME } from "../lib/social";
 import { backlogRoom } from "../lib/guards";
 import { categoryOff, skippedNote, twitchClipCategory, type Category } from "../lib/category";
 import { dedupe, momentTimeSpan, roundRobin, scoreCreatorClips, type Scored, type VodSpan } from "../lib/standout";
@@ -17,7 +17,7 @@ export async function runClipsPoll() {
   const settings = await getSettings();
   if (settings.scoutPaused) return "paused";
   // Paused creators (Creators page) stay approved but are skipped.
-  const approved = await prisma.streamer.findMany({ where: { approved: true, paused: false, platform: "twitch" } });
+  const approved = await prisma.streamer.findMany({ where: { approved: true, paused: false, platform: "twitch" }, include: { campaign: true } });
   if (!approved.length) return "no approved streamers yet (or all paused) — add some on the Streamers page";
 
   // "any" mode (default since v1.8.0): every game, only approved creators. "gta6": GTA clips only, plus the GTA-wide list.
@@ -96,7 +96,7 @@ export async function runClipsPoll() {
         streamerId: s.id, timestamp: new Date(c.created_at), spikeScore: pick.standout, source: "twitch_clip",
         twitchClipId: c.id, sourceUrl: c.url, sourceTitle: c.title, sourceViews: c.view_count, gameName: game,
         vodId: c.video_id || null, vodOffset: c.vod_offset ?? null, category,
-        clips: { create: { title, caption: defaultCaption(title, s, game), status: "processing", stage: "grab", stageAt: new Date(), category } },
+        clips: { create: { title, caption: brandedCaption({ hook: title, streamer: s, category, game, campaign: s.campaign }), status: "processing", stage: "grab", stageAt: new Date(), category } },
       },
       include: { clips: true },
     });
