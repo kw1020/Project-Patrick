@@ -269,14 +269,20 @@ function finishListing(result, tagPrice) {
   return out;
 }
 
-export async function analyze({ mode = "item", imageB64, mediaType, tagPrice, note }) {
+/** Local-market hint for the prompt. Only furniture and listings sell locally. */
+export function areaLine(mode, area) {
+  if (!area || mode === "item") return "";
+  return `Krew's local market: ${area}. Price and judge demand for that area, and say if it is a weak market for this style.`;
+}
+
+export async function analyze({ mode = "item", imageB64, mediaType, tagPrice, note, area }) {
   const config = MODE_CONFIG[mode];
   if (!config) throw new ScanError("Unknown mode.", 400);
 
   const priceLine = Number.isFinite(tagPrice)
     ? `${mode === "listing" ? "Asking price" : "Price"} Krew gave: $${tagPrice.toFixed(2)}.`
     : "No price given.";
-  const userText = [config.ask, priceLine, note ? `Note from Krew: ${note}` : ""].filter(Boolean).join("\n");
+  const userText = [config.ask, priceLine, areaLine(mode, area), note ? `Note from Krew: ${note}` : ""].filter(Boolean).join("\n");
 
   // Beta endpoint so we can opt in to the server-side refusal fallback.
   const response = await getClient().beta.messages.create({

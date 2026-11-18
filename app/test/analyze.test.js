@@ -100,3 +100,12 @@ test("listing mode never shows an opening offer above the walk-away price", () =
   const r = mockAnalyze({ mode: "listing", tagPrice: NaN });
   assert.ok(r.opening_offer <= r.max_buy_price);
 });
+
+import { areaLine } from "../analyze.js";
+
+test("area hint is added for furniture and listings only", () => {
+  assert.match(areaLine("furniture", "Denver, CO"), /Denver, CO/);
+  assert.match(areaLine("listing", "Denver, CO"), /local market/);
+  assert.equal(areaLine("item", "Denver, CO"), "");
+  assert.equal(areaLine("furniture", ""), "");
+});

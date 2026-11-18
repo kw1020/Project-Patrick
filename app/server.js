@@ -79,7 +79,8 @@ async function handleScan(req, res) {
   const note = typeof body.note === "string" ? body.note.slice(0, 300) : "";
   const mode = body.mode ?? "item";
   if (!MODES.includes(mode)) throw new ScanError("Unknown mode.", 400);
-  const input = { mode, mediaType: match[1], imageB64: match[2], tagPrice, note };
+  const area = typeof body.area === "string" ? body.area.replace(/[^\p{L}\p{N} ,.'-]/gu, "").slice(0, 80).trim() : "";
+  const input = { mode, mediaType: match[1], imageB64: match[2], tagPrice, note, area };
 
   scansToday++;
   try {

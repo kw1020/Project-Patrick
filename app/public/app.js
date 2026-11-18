@@ -68,7 +68,7 @@ function setPasscode(v) {
   try { localStorage.setItem(PASS_KEY, v); } catch { /* private mode */ }
 }
 function loadSettings() {
-  const defaults = { mode: "item", maxPrice: 100, clCity: "" };
+  const defaults = { mode: "item", maxPrice: 100, clCity: "", city: "", state: "", zip: "", radius: 25 };
   try {
     return { ...defaults, ...JSON.parse(localStorage.getItem(SETTINGS_KEY)) };
   } catch {
@@ -133,9 +133,20 @@ function facebookUrl(query, { maxPrice, newest } = {}) {
   if (newest) url += "&sortBy=creation_time_descend";
   return url;
 }
-function craigslistUrl(query) {
-  const city = settings.clCity.trim().toLowerCase().replace(/[^a-z0-9-]/g, "");
-  return city ? `https://${city}.craigslist.org/search/fua?query=${q(query)}&sort=date` : null;
+const slug = (s) => s.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+/** Craigslist subdomain: the one the user set, else a guess from their city. */
+function clSubdomain() {
+  return slug(settings.clCity || settings.city || "");
+}
+function areaString() {
+  return [settings.city.trim(), settings.state.trim().toUpperCase()].filter(Boolean).join(", ");
+}
+function craigslistUrl(query, section = "fua") {
+  const sub = clSubdomain();
+  if (!sub) return null;
+  let url = `https://${sub}.craigslist.org/search/${section}?query=${q(query)}&sort=date`;
+  if (/^\d{5}$/.test(settings.zip)) url += `&postal=${settings.zip}&search_distance=${settings.radius || 25}`;
+  return url;
 }
 function offerupUrl(query) {
   return `https://offerup.com/search?q=${q(query)}`;
@@ -176,7 +187,7 @@ $("photo").addEventListener("change", async (e) => {
     const res = await fetch("/api/scan", {
       method: "POST",
       headers: { "content-type": "application/json", "x-patrick-key": getPasscode() },
-      body: JSON.stringify({ mode, image, tagPrice, note: $("note").value.trim() }),
+      body: JSON.stringify({ mode, image, tagPrice, note: $("note").value.trim(), area: areaString() }),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || `Scan failed (${res.status}).`);
@@ -390,9 +401,58 @@ const PRESET_GROUPS = [
   },
 ];
 
+function mapsUrl(term) {
+  const place = areaString() || settings.zip;
+  return `https://www.google.com/maps/search/${q(place ? `${term} near ${place}` : term)}`;
+}
+
+function renderSources() {
+  const place = areaString() || settings.zip;
+  if (!place) {
+    $("sources").replaceChildren();
+    return;
+  }
+  const link = (href, label) => el("a", { class: "btn small", target: "_blank", rel: "noopener", href }, label);
+  const row = (label, ...links) => el("div", { class: "preset" }, el("span", {}, label), el("div", { class: "links tight" }, links));
+
+  const stores = [
+    ["Goodwill", "Goodwill"],
+    ["Habitat ReStore (furniture)", "Habitat for Humanity ReStore"],
+    ["Salvation Army", "Salvation Army thrift store"],
+    ["Thrift stores", "thrift store"],
+    ["Consignment and antique", "antique mall"],
+    ["Flea markets", "flea market"],
+  ].map(([label, term]) => row(label, link(mapsUrl(term), "Map")));
+
+  const sales = [];
+  const st = settings.state.trim().toUpperCase();
+  const city = settings.city.trim();
+  if (st && city) {
+    const path = city.replace(/[^A-Za-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    sales.push(row("Estate sales", link(`https://www.estatesales.net/${st}/${path}`, "estatesales.net"), link(mapsUrl("estate sale"), "Map")));
+  }
+  const gs = craigslistUrl("", "gms");
+  sales.push(row("Garage and moving sales",
+    link(facebookUrl("garage sale", { newest: true }), "FB"),
+    gs ? link(gs, "CL") : null));
+
+  $("sources").replaceChildren(
+    el("section", { class: "card" }, el("h2", {}, `Stores near ${place}`), stores),
+    el("section", { class: "card" }, el("h2", {}, "Sales near you"), sales));
+}
+
 function renderFind() {
   $("maxprice").value = settings.maxPrice;
   $("clcity").value = settings.clCity;
+  $("clcity").placeholder = settings.city ? slug(settings.city) : "e.g. denver";
+  $("city").value = settings.city;
+  $("state").value = settings.state;
+  $("zip").value = settings.zip;
+  $("radius").value = settings.radius;
+  $("area-hint").textContent = areaString()
+    ? "Patrick prices furniture and listings for your market. Add a ZIP to limit Craigslist to your radius."
+    : "Set this once. Patrick prices for your market and builds local links.";
+  renderSources();
   renderCustomLinks();
 
   const maxPrice = settings.maxPrice;
@@ -439,6 +499,19 @@ $("clcity").addEventListener("change", (e) => {
   renderFind();
 });
 $("custom").addEventListener("input", renderCustomLinks);
+for (const [id, key] of [["city", "city"], ["state", "state"], ["zip", "zip"]]) {
+  $(id).addEventListener("change", (e) => {
+    settings[key] = key === "zip" ? e.target.value.replace(/\D/g, "").slice(0, 5) : key === "state" ? e.target.value.trim().toUpperCase() : e.target.value.trim();
+    saveSettings();
+    renderFind();
+  });
+}
+$("radius").addEventListener("change", (e) => {
+  const n = Number(e.target.value);
+  settings.radius = Number.isFinite(n) && n > 0 ? Math.min(Math.round(n), 500) : 25;
+  saveSettings();
+  renderFind();
+});
 
 // ---------- log ----------
 function netFor(e) {

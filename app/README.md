@@ -8,6 +8,13 @@ Point your phone at something, tap scan, and get a verdict: BUY / MAYBE / PASS /
 - **Furniture:** local-pickup math (no selling fees). Adds material and maker clues, size and hauling, refurb hours and profit per hour, a flip plan, and a shopping list for supplies. Pieces that need a truck get their hauling cost counted.
 - **Listing:** screenshot someone's Facebook Marketplace / Craigslist / OfferUp ad. Patrick reads the price and photos, judges the deal, gives an opening offer and a walk-away price, writes the message to send the seller, and lists questions to ask before you drive out.
 
+## Your area
+
+On the **Find** tab, enter your city, state, and optionally ZIP and radius once (saved on the phone). Then:
+- Furniture and Listing scans tell Patrick your local market, so prices and demand are judged for where you live.
+- Craigslist links use your ZIP and radius. The Craigslist city is guessed from your city; override it in the Craigslist city box if the guess is wrong (suburbs often are).
+- You get one-tap maps for Goodwill, Habitat ReStore, Salvation Army, thrift stores, antique malls and flea markets near you, plus estate sale and garage sale links.
+
 ## Find tab
 
 Deal-hunting links for Facebook Marketplace, Craigslist and OfferUp: brands that flip (Broyhill, Lane, Ethan Allen...), styles that sell (mid-century, rattan, butcher block...), sellers in a hurry, and free furniture. Set your max price and Craigslist city once (saved on the phone). Links open the real sites sorted by newest.

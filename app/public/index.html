@@ -52,6 +52,32 @@
   </main>
 
   <main id="view-find" hidden>
+    <section class="card" id="area-card">
+      <h2>Your area</h2>
+      <div class="row">
+        <div class="field grow">
+          <label for="city">City</label>
+          <input id="city" type="text" autocomplete="address-level2" placeholder="e.g. Denver">
+        </div>
+        <div class="field" style="width:80px">
+          <label for="state">State</label>
+          <input id="state" type="text" maxlength="2" autocapitalize="characters" autocomplete="address-level1" placeholder="CO">
+        </div>
+      </div>
+      <div class="row" style="margin-bottom:0">
+        <div class="field">
+          <label for="zip">ZIP</label>
+          <input id="zip" type="text" inputmode="numeric" maxlength="5" autocomplete="postal-code" placeholder="80202">
+        </div>
+        <div class="field">
+          <label for="radius">Radius (mi)</label>
+          <input id="radius" type="number" inputmode="numeric" min="1" max="500" step="5">
+        </div>
+      </div>
+      <p class="hint" id="area-hint">Set this once. Patrick prices for your market and builds local links.</p>
+    </section>
+    <div id="sources"></div>
+
     <section class="card">
       <div class="row">
         <div class="field">
