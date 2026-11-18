@@ -132,7 +132,10 @@ export type FullcamCrop = { w: number; h: number; y: number; keys: { t: number; 
  * frame (median of 3 neighbours, so one bad frame can't jerk it) that cropXExpr eases between.
  */
 export function fullcamCrop(src: { w: number; h: number }, det: CamInfo | null, cam: Facecam | null): FullcamCrop {
-  const area: Rect = cam ? { x: cam.x * src.w, y: cam.y * src.h, w: cam.w * src.w, h: cam.h * src.h } : { x: 0, y: 0, w: src.w, h: src.h };
+  // Inside a webcam box keep 2% off each side: upscaled, even a 1px border line would show as a thick bar.
+  const area: Rect = cam
+    ? { x: (cam.x + cam.w * 0.02) * src.w, y: (cam.y + cam.h * 0.02) * src.h, w: cam.w * 0.96 * src.w, h: cam.h * 0.96 * src.h }
+    : { x: 0, y: 0, w: src.w, h: src.h };
   const face = det?.faceBox ? { x: det.faceBox[0] * src.w, y: det.faceBox[1] * src.h, w: det.faceBox[2] * src.w, h: det.faceBox[3] * src.h } : null;
   const fcx = face ? face.x + face.w / 2 : area.x + area.w / 2;
   const fcy = face ? face.y + face.h / 2 : area.y + area.h * 0.45;

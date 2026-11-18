@@ -150,7 +150,9 @@ test("chunkWordsDetailed + buildStyledAss: active word highlight, pop-in, credit
   assert.match(meme, /\\frz-?[123]/, "tilted");
   assert.match(meme, /\\1c&H0014FF39&/, "green");
   assert.match(meme, /\}LOL$/m);
-  assert.match(meme, /pos\(540,190\)/, "hook higher in facecam layout");
+  // v1.9.0: "facecam" = the split layout: hook just above the seam (an2 at 626), captions just under it, credit on top.
+  assert.match(meme, /\\an2\\pos\(540,626\)/, "hook sits on the cam/game seam in the split layout");
+  assert.match(meme, /\\an5\\pos\(540,760\)/, "captions just under the seam");
   assert.match(meme, /Style: Cap,DejaVu Sans,100,/);
 
   const none = buildStyledAss({ words: [], credit: "twitch.tv/x", duration: 10, layout: "blur", style: "hype" });
@@ -181,7 +183,8 @@ test("buildStyledFilter: trim+concat in sync, zoom on the foreground only, credi
 
   const one = buildStyledFilter({ style: "clean", facecam: { x: 0.7, y: 0.05, w: 0.28, h: 0.3 }, src: { w: 1920, h: 1080 }, segs: [{ start: 0, end: 20 }], hasAudio: false, zoom: null, duration: 20 });
   assert.doesNotMatch(one, /concat|trim|\[0:a\]|loudnorm/);
-  assert.match(one, /\[cb1\]scale=2276:1280,crop=1080:1280\[bot\]/);
+  // v1.9.0: the game crop moves left so the corner cam (x 0.70-0.98) doesn't show a slice in the game part.
+  assert.match(one, /\[cb1\]scale=2276:1280,crop=1080:1280:x=513:y=0\[bot\]/);
   assert.match(one, /color=c=white@0\.6/);
   assert.deepEqual(fitSize(1920, 1080, 1080, 1920, "contain"), { w: 1080, h: 608 });
   assert.deepEqual(fitSize(1080, 1920, 1080, 1280, "cover"), { w: 1080, h: 1920 });
