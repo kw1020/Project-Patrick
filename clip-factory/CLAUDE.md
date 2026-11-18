@@ -165,6 +165,22 @@ original brief is below, and the status section says what's done. Read both befo
   layout chip + Re-cut ▾ = style select + layout select + jump-cuts checkbox + Re-cut (`recutClip(id, style, jumps, layout)`, job
   data `layout`). Proof (session scratchpad only, scikit-image's public-domain astronaut.png as the face): renders 15-18s for all
   layouts (same as v1.8.0), corner cam found to within ~2px of its real border. Unverified on real Twitch webcams / Krew's PC.
+- **v1.9.1 (2026-11-18): ViceCityClips captions + watermark, Campaign mode (Whop Content Rewards).** Captions: `brandedCaption`
+  (see the credit rule below) used at moment creation (clips/spike/youtube workers, hook = `defaultTitle` cut to 60, extras =
+  `defaultExtras`: funny → GTA6Funny, GTA 6 → GTA6Clips, else StreamerMoments), by the Judge (hook = `hook_text`, new structured
+  field `extra_hashtags` = zod enum of the 4 extras, `cleanExtras` dedupes/max 2, empty → `defaultExtras`; Clip.title = hook;
+  Clip.hashtags = the caption's hashtags) and by the Queue card's "Rebuild caption" (`rebuildCaption`). The old `defaultCaption`/
+  `judgedCaption`/`cleanHashtags` stay only for old tests. Settings `channelName` ("ViceCityClips", header) + `watermark` (true):
+  `watermarkStyle`/`watermarkPlace` in `src/lib/layout.ts`, one `Mark` style + dialogue in BOTH `buildAss` (plain) and
+  `buildStyledAss`, 34px &H80 white, `\an3\pos(1044, 1890)` or 58px above a bottom credit, starts at 4.5s if a low hook could
+  reach it. Campaign model (`name, source "whop", link, rules, requiredText (lines), bannedWords, maxCaptionChars, active`),
+  `Streamer.campaignId` (SetNull), `Post.campaignLink`/`Post.campaignId` (plain id) — all additive, `test/v191.test.ts` pushes
+  from 028c1be with rows (`toV190Schema`). Campaign rules in captions: required tag-only lines → hashtag line (may exceed 5),
+  text lines appended if missing, banned words removed from the hook (fallback hook), hook trimmed to `maxCaptionChars`;
+  the Judge's user message gets "Campaign caption rules: …" + banned words. `checkCampaignCaption` → ✅/⚠️ lines on ClipCard
+  (blocks nothing). UI: `src/components/Campaigns.tsx` (Campaign select on Streamers rows + Creators cards, "+ New campaign…";
+  Campaigns card with two-step delete), Posted page campaign select + link + `?campaign=<id>|none` filter, manual "Posted" form
+  campaign link. Unverified against the real Claude API (enum arrays in structured outputs) and on Krew's PC.
 - Docker image never built in the sandbox (no daemon); it builds fine on Krew's PC; a clean-copy `npm ci` + `next build` without `.env`
   (what the Dockerfile does) passes.
 - **Suggestions (2026-11-17):** `src/workers/suggest.ts` (queue "suggest", hourly + once ~1 min after start,
@@ -252,8 +268,10 @@ and in `Moment.stats` (the Judge sees the laugh share). A spike of a kind switch
   else "Approved by Krew" (`DEFAULT_APPROVAL_NOTE`, `src/lib/creator-lookup.ts`; logic in `setApproved`).
 - Nothing posts without Krew pressing Approve. The Poster refuses clips that aren't approved; "auto-upload"
   only means the Approve click also uploads. Uploads are single-attempt so a retry can't double-post.
-- Every caption credits the creator (name + twitch.tv / youtube.com/@ link, always via `creatorUrl` in `src/lib/social.ts`);
-  the credit is also burned into the video.
+- Every caption credits the creator. Since v1.9.1 (Krew's exact format) every caption is built by `brandedCaption` in
+  `src/lib/social.ts`: `<hook>\n\n🎥 @<login>\n\n#GTA6 #GTAVI #ViceCity <1-2 of #GTA6Clips #GTA6Funny #Gaming #StreamerMoments>`
+  (+ campaign-required lines). The channel-link credit (`creatorUrl`/`creatorCreditText`) is still burned into the video and
+  appended to YouTube descriptions; the ClipCard warning and the YouTube poster accept the `@login` line or the link.
 - Secrets live in `.env` (gitignored). Never commit it.
 - Every push to claude/adoring-mendel-at7ood bumps the version and adds a CHANGELOG.md entry in plain words (Krew sees it after updating).
 

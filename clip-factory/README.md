@@ -206,6 +206,40 @@ under 60s) with the streamer credit and `#Shorts` in the description. Start with
 **Unlisted** for your first clip to check it looks right, then switch to Public. YouTube view
 counts show up on the Posted page every 15 minutes. TikTok and Reels are still Download + Copy caption.
 
+## Captions + branding (v1.9.1)
+
+Every caption is built the same way (`brandedCaption` in `src/lib/social.ts`):
+
+```
+<short hook>
+
+🎥 @<streamer>
+
+#GTA6 #GTAVI #ViceCity #GTA6Clips
+```
+
+- The hook is the Judge's hook (60 characters max, no hashtags or emoji). The clip's title is set to it too.
+- `#GTA6 #GTAVI #ViceCity` are always first. The Judge picks 1 or 2 more from `#GTA6Clips #GTA6Funny #Gaming #StreamerMoments`.
+  Without the Judge: funny clips get `#GTA6Funny`, GTA 6 clips `#GTA6Clips`, anything else `#StreamerMoments`.
+- YouTube creators are credited with their @handle. The burned-in credit on the video (`twitch.tv/name` / `youtube.com/@name`)
+  is unchanged, and YouTube uploads still get the channel link added to the description.
+- **Rebuild caption** on a Queue card writes the caption again in this format (after you change a creator's campaign, say).
+- Settings → **Your channel**: the channel name (shown in the header, default `ViceCityClips`) and the **watermark**: a small
+  see-through `@ViceCityClips` burned into the bottom-right corner of new clips (and re-cuts). Untick it to turn it off.
+
+## Campaign mode (v1.9.1, Whop Content Rewards)
+
+1. Streamers page → **Campaigns** → **+ New campaign**: name, Whop link, the campaign's caption rules (paste them in the box),
+   lines that must be in every caption (one per line, e.g. `@kaicenat`, `#ad`, `#KaiCenatClips`), banned words, max length.
+2. Pick the campaign in the **Campaign** select next to the creator (Streamers page or their card on the Creators page).
+   "+ New campaign…" there makes one named after the creator with their @name already required.
+3. New clips from that creator follow the rules by themselves: required lines are added (hashtags go on the hashtag line,
+   after `#GTA6 #GTAVI #ViceCity`), banned words are taken out of the hook, the hook is shortened to fit the max length,
+   and the Judge reads the rules box when it writes the hook.
+4. Each Queue card shows the campaign's checks (✅ / ⚠️). Nothing is blocked: you decide.
+5. When you've submitted a post on Whop, paste the link in **Campaign link** on the Posted page (or in the "Posted" form on the
+   card). The Posted page can be filtered by campaign.
+
 ## Settings worth knowing
 
 - **Min Twitch clip views** (default 25): raise it on launch day when there are thousands of clips.

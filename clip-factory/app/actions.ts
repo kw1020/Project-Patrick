@@ -233,7 +233,7 @@ export async function updatePost(id: string, form: FormData) {
     extra.campaignId = cid && (await prisma.campaign.findUnique({ where: { id: cid } })) ? cid : null;
   }
   await prisma.post.update({ where: { id }, data: { views: v ? parseInt(v) : null, url: url || null, ...extra } });
-  revalidatePath("/posted");
+  try { revalidatePath("/posted"); } catch { /* outside a Next.js request (tests) */ }
 }
 
 // ---------- Campaigns (v1.9.1, Whop Content Rewards) ----------

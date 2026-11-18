@@ -111,9 +111,8 @@ test("any mode: approved streamer playing Fortnite is live (with game) and their
   const fnm = moments[0];
   assert.equal(fnm.gameName, "Fortnite");
   assert.equal(fnm.clips[0].title, "FNGUY in Fortnite"); // name as Twitch reported it to the Scout
-  assert.match(fnm.clips[0].caption!, /#Fortnite #fnguy #twitch/);
-  assert.doesNotMatch(fnm.clips[0].caption!, /GTA/);
-  assert.match(fnm.clips[0].caption!, /https:\/\/twitch\.tv\/fnguy/);
+  // v1.9.1 ViceCityClips format: the brand tags are always there; a non-GTA game gets #StreamerMoments, not #GTA6Clips.
+  assert.equal(fnm.clips[0].caption, "FNGUY in Fortnite\n\n🎥 @fnguy\n\n#GTA6 #GTAVI #ViceCity #StreamerMoments");
   assert.deepEqual(gameLookups, [[FORTNITE]]); // GTA's name isn't looked up
 });
 

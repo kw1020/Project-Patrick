@@ -149,8 +149,8 @@ test("scan: peaks from the heatmap video, backlog respected, rest next scan with
   assert.equal(m0.spikeScore, 0.9);
   assert.equal(m0.clips[0].status, "processing");
   assert.equal(m0.clips[0].title, "Heat video");
-  assert.match(m0.clips[0].caption!, /Credit: Good Channel — https:\/\/youtube\.com\/@GoodChan/);
-  assert.doesNotMatch(m0.clips[0].caption!, /twitch|GTA/i);
+  assert.match(m0.clips[0].caption!, /\n\n🎥 @GoodChan\n\n#GTA6 #GTAVI #ViceCity #/); // v1.9.1: YouTube creators are credited by @handle
+  assert.doesNotMatch(m0.clips[0].caption!, /twitch/i);
   assert.equal((await prisma.youTubeVideo.findUniqueOrThrow({ where: { id: "vidHEAT" } })).status, "partial");
 
   // The line frees up: only the missing peak is added; the no-heatmap video gets its turn and is skipped with a note.
