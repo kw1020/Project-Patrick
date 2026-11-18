@@ -134,6 +134,37 @@ original brief is below, and the status section says what's done. Read both befo
   when it was left out. Prompt rewritten (editor rules for best_start/best_end, hook without spoiling the payoff). Dedupe
   (`src/lib/standout.ts`): clips created within 30s (`SAME_MOMENT_SEC`) are one moment; existing chat moments block clips created
   -10..+60s around them, existing viewer clips +-30s. No schema change in the review.
+- **v1.9.0 (2026-11-18): layouts** (Krew: "streamer's camera up and game down. Or just a full streamer cam if it's like a funny
+  moment"). Settings `layout` auto (new default) | split | fullcam | blur ("facecam" = old name of split, still read);
+  `migrateV190Settings` moves blur -> auto ONCE (`migratedAutoLayout`). New additive columns: `Clip.layout`, `Clip.camInfo` (JSON
+  detection + the window it was measured on), `Streamer.facecamAuto`; `test/v190.test.ts` pushes from the 9bf0915 schema with rows
+  (`toV180Schema` in `test/schema-v173.ts`). **Detection** `scripts/detect_cam.py` (same Python as transcribe.py; Dockerfile pins
+  `opencv-python-headless==4.10.0.84`, UNVERIFIED in the Docker image): 10 frames evenly over the window (parallel ffmpeg input
+  seeks, scaled to 640 wide), Haar frontal cascade (equalized gray, minNeighbors 5) + profile cascade both ways as fallback,
+  boxes clustered by position across frames (biggest steady cluster; stray game "faces" drop out), hitRate = frames in it / 10.
+  region: large (face area >= 4% of the frame) / corner (centre x < .3 or > .7 AND y < .35 or > .65, or within .2 of an edge) /
+  center. camBox: median face expanded to 3.6x face width at 16:9 (face centred across, 45% down), shifted inside the frame, then
+  each side snapped (`snap_edges`) to the OUTERMOST line in a +-50% band that is a Canny edge (any colour channel, dilated 1px)
+  over >= 55% of the side in >= 60% of the frames, then stepped in 0.6%/1% of the frame so no game shows at the rim. 1.5-2.7s
+  per clip here (4 cores); `--summarize` mode takes injected boxes (tests). Pure rules in `src/lib/layout.ts`: `autoLayout` no
+  face / hitRate < 0.4 -> blur; large or center -> fullcam; funny + hitRate >= 0.6 + cam box >= half the frame tall -> fullcam;
+  corner -> split (a small corner cam is NOT blown up to full screen for funny clips: it stays split with the punch-in on the cam
+  — deliberate deviation from the brief's "funny -> fullcam", the 5x upscale looked bad). `needsDetect`/`chooseLayout`: typed
+  `Streamer.facecam` always wins; a remembered `facecamAuto` skips detection for auto/split (not in non-game categories like Just
+  Chatting, `isNonGame`); cached `Clip.camInfo` is reused while the window is unchanged (failed checks aren't cached).
+  `boxToRemember`: Twitch only, no typed box, split from this clip's detection, hitRate >= 0.6, corner, >= 2 sides snapped.
+  Reset on Streamers rows + Creators cards (`resetFacecamAuto`). Render (`planLayout` -> `LayoutPlan`, used by `buildStyledFilter`
+  AND the plain `buildFilter`): split = cam box cover-scaled into the top 640px, game cover-cropped below and moved up to 12% away
+  from the cam (`splitGameShift`), 6px dark seam; zoom/punch on the cam for funny clips, on the game otherwise; fullcam = 9:16
+  crop of the frame (or inside the cam box minus 2% per side), height down to 75% to put the face near 40% from the top, x static
+  unless the face moves > 8% of the crop width, else keys per sampled frame (median of 3) cosine-eased (`cropXExpr`, key times
+  remapped through jump cuts); zoom on the whole frame. Text (`overlayPlace`, face rect grown 25%): split captions centred at
+  y=760 (just under the seam), hook above the seam if the face is high enough else under the captions, credit top unless the face
+  reaches y<175 then bottom (y=1886); fullcam captions at 72% (lower if the chin is there), hook top or under the captions, credit
+  top/bottom likewise. Cutter: plain fallback renders the layout too, and if that fails falls back to plain blur. Queue card:
+  layout chip + Re-cut ▾ = style select + layout select + jump-cuts checkbox + Re-cut (`recutClip(id, style, jumps, layout)`, job
+  data `layout`). Proof (session scratchpad only, scikit-image's public-domain astronaut.png as the face): renders 15-18s for all
+  layouts (same as v1.8.0), corner cam found to within ~2px of its real border. Unverified on real Twitch webcams / Krew's PC.
 - Docker image never built in the sandbox (no daemon); it builds fine on Krew's PC; a clean-copy `npm ci` + `next build` without `.env`
   (what the Dockerfile does) passes.
 - **Suggestions (2026-11-17):** `src/workers/suggest.ts` (queue "suggest", hourly + once ~1 min after start,

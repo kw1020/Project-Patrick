@@ -209,9 +209,30 @@ counts show up on the Posted page every 15 minutes. TikTok and Reels are still D
 ## Settings worth knowing
 
 - **Min Twitch clip views** (default 25): raise it on launch day when there are thousands of clips.
-- **Layout → Facecam on top**: set each streamer's webcam box on the Streamers page as `x,y,w,h`
-  fractions of the frame. Example: webcam in the top-right corner taking a quarter of the width
-  and a third of the height = `0.74,0.02,0.25,0.33`. Streamers without a box use the blurred layout.
+- **Layout**: see "Layouts" below. Auto is the default.
+
+## Layouts
+
+Settings → Clips → **Layout** decides how the wide stream fits the tall video:
+
+- **Auto (recommended)**: looks for the streamer's face in each clip (about 2-3 seconds) and picks one of the three below.
+  No face → Blurred background. A big face or a face in the middle (Just Chatting, IRL, face-cam-only streams) → Full
+  streamer cam. A small face in a corner (a webcam over the game) → Cam on top + game below. A funny clip with a big
+  webcam also gets Full streamer cam; a small corner webcam stays Cam + game (blown up to full screen it would be blurry),
+  with the zoom on the streamer's reaction instead.
+- **Cam on top + game below**: the webcam fills the top third, the game the rest. The webcam box is found automatically;
+  the game part moves a little sideways so no slice of the webcam shows in it. Captions sit just under the line between
+  the two, the hook and the credit stay off the face. Zoom: on the cam for funny clips, on the game otherwise.
+- **Full streamer cam**: the whole screen is the streamer, face about 40% from the top, following the face slowly if they
+  move. Captions sit lower (about 72% down) so they never cover the face.
+- **Blurred background**: the whole frame in the middle with a blurred copy behind it (the old default).
+
+Each creator's webcam spot is remembered after a confident find (Streamers and Creators pages show "webcam spot found
+automatically" with a **reset** button). To set it yourself, type the box on the Streamers page as `x,y,w,h` fractions of
+the frame (webcam in the top-right corner taking a quarter of the width and a third of the height = `0.74,0.02,0.25,0.33`);
+a typed box always wins. Any clip can be re-cut in another layout from its Queue card (**Re-cut ▾**: style, layout,
+jump cuts on/off). The face check uses OpenCV (installed in the Docker image); if it is missing, clips use the blurred
+layout. `CAM_DETECT=off` in `.env` turns the check off.
 
 ## Any game
 
@@ -354,7 +375,7 @@ npm run build && npm start
 | Clips poller | `src/workers/clips.ts` | Every 2 min: Helix `/clips` game-wide + per approved streamer; new clips over the view threshold → Grabber |
 | Grabber | `src/workers/grabber.ts` | `yt-dlp` the Twitch clip (or a VOD section) into `storage/raw` |
 | Spike detector | `src/workers/spike.ts` | Every 5s: last 10s of chat vs the 5-min baseline → chat Moment with a VOD offset |
-| Transcribe + Cutter | `src/workers/cutter.ts` | Whisper transcript, then ffmpeg: 15–45s, 9:16 (blur fill or facecam stack), captions + hook + credit burned in |
+| Transcribe + Cutter | `src/workers/cutter.ts` | Whisper transcript, then ffmpeg: 15–45s, 9:16 (Auto / cam + game / full cam / blur, face check in `scripts/detect_cam.py`), captions + hook + credit burned in |
 | Judge | `src/workers/judge.ts`, `src/lib/judge.ts` | Claude (`claude-sonnet-5-5`) → `{score, hook_text, title, hashtags, reason}`; below min score = auto-reject |
 | Poster | `src/workers/poster.ts`, `src/lib/youtube.ts` | Uploads approved clips to YouTube; syncs view counts |
 

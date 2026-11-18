@@ -1,5 +1,12 @@
 # Clip Factory patch notes
 
+## 1.9.0 — 2026-11-18
+- New layout: the streamer's camera on top and the game below. Clip Factory finds the webcam by itself, no box to type in.
+- New layout: full streamer cam, where the whole screen is the streamer's face. Used for funny moments and Just Chatting.
+- Auto (the new default) looks for the streamer's face in every clip and picks the best layout for it.
+- Change the layout in Settings, or re-cut any clip in another layout from its card in the Queue.
+- Remembers where each creator's webcam sits, so the next clips are faster. Reset it on the Creators page if they move it.
+
 ## 1.8.0 — 2026-11-18
 - Any game for everyone by default: your approved creators are clipped whatever they play (you can switch back to GTA 6 only in Settings).
 - A fair mix across all your creators: each scan takes at most 2 new clips per creator, one from each in turn, so one or two big channels can't fill the line.

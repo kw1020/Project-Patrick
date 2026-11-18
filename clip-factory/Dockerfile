@@ -8,7 +8,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 # deno: the JavaScript runtime yt-dlp needs for YouTube; yt-dlp[default] adds its YouTube helper scripts
 COPY --from=deno /deno /usr/local/bin/deno
-RUN python3 -m venv /opt/py && /opt/py/bin/pip install --no-cache-dir -U "yt-dlp[default]" faster-whisper
+# opencv-python-headless: face/webcam detection for the layouts (scripts/detect_cam.py, bundled Haar cascades, no downloads)
+RUN python3 -m venv /opt/py && /opt/py/bin/pip install --no-cache-dir -U "yt-dlp[default]" faster-whisper "opencv-python-headless==4.10.0.84"
 ENV PATH="/opt/py/bin:$PATH" PYTHON=/opt/py/bin/python NEXT_TELEMETRY_DISABLED=1
 
 WORKDIR /app
