@@ -202,6 +202,9 @@ original brief is below, and the status section says what's done. Read both befo
   `subscribers/videoId/videoTitle/videoViews`. Approve → `setApproved` (pokes the YouTube scanner). Unverified against the real API.
 - Tests: `npm test` (unit, real ffmpeg renders, workers against Redis, Judge/YouTube/TikTok against the
   stand-in servers in `test/mocks.ts`). `npx tsx test/mocks.ts 4010` prints env vars to run the app on stand-ins.
+- **Judge verified for real on Krew's PC (2026-11-18, v1.9.0):** `npm run doctor` → claude-sonnet-5-5 scored the test clip 6/10
+  (structured output with nullable best_start/best_end + category enum accepted). 493 live GTA 6 streams, 45 approved.
+  Worker rebuilt with fresh yt-dlp (`docker compose build --pull --no-cache worker`, ~7 min).
 - **First real run on Krew's Windows PC (2026-11-17), `npm run doctor` in Docker: 0 broken.** Verified for real:
   Docker build, Redis, DB, Twitch token, GTA 6 category (id `1867279146`, 179 live streams pre-launch),
   yt-dlp download of a real Twitch clip, ffmpeg 9:16 render. Still unverified: Judge (no key yet), chat/spike
