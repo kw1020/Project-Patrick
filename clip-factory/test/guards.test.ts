@@ -93,18 +93,20 @@ test("clips poller: line full (12 processing) → adds 0; room for 2 → adds th
   const { prisma } = await import("../src/lib/db");
   const { runClipsPoll } = await import("../src/workers/clips");
   const s = await streamer("polly");
+  // Near-equal views: relax the v1.8.0 standout + per-creator rules, this test is about the backlog cap.
+  await prisma.settings.upsert({ where: { id: "main" }, update: { standoutMin: 0.5, maxPerCreatorPerRun: 15 }, create: { id: "main", standoutMin: 0.5, maxPerCreatorPerRun: 15 } });
   for (let i = 0; i < 12; i++) await clip("polly", { status: "processing", stage: "grab" });
   stubTwitch(s.twitchId, 5);
 
   const msg = await runClipsPoll();
-  assert.match(msg, /0 new/);
+  assert.match(msg, /picked 0 standout clips/);
   assert.match(msg, /full/);
   assert.equal(await prisma.moment.count({ where: { source: "twitch_clip", twitchClipId: { not: null } } }), 0);
 
   // Two clips finish → room for two.
   const two = await prisma.clip.findMany({ where: { status: "processing" }, take: 2 });
   await prisma.clip.updateMany({ where: { id: { in: two.map((c) => c.id) } }, data: { status: "pending", stage: null } });
-  assert.match(await runClipsPoll(), /2 new/);
+  assert.match(await runClipsPoll(), /picked 2 standout clips from 1 creator · .*line has room for 2, rest next scan/);
   const added = await prisma.moment.findMany({ where: { twitchClipId: { not: null } }, orderBy: { sourceViews: "desc" } });
   assert.deepEqual(added.map((m) => m.twitchClipId), ["clip-0", "clip-1"]);
 });

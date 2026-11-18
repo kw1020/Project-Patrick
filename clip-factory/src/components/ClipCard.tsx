@@ -107,6 +107,8 @@ export function ClipCard({ clip, accounts }: { clip: ClipView; accounts: Account
                   onClick={() => act(() => recutClip(clip.id, x.key))}>{x.label}</button>
               ))}
             </div>
+            <button title="Same style, but no cuts inside the clip" className="btn-ghost mt-2 w-full" disabled={busy || recutting}
+              onClick={() => act(() => recutClip(clip.id, clip.editStyle ?? "hype", "off"))}>{styleName ?? "Hype"} without jump cuts</button>
           </details>
         )}
 

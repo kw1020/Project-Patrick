@@ -7,7 +7,7 @@ export async function startMocks(port = 0): Promise<Mock> {
   const mock: Mock = {
     url: "", requests: [], close: async () => {}, refreshCount: 0,
     tiktokStatus: { status: "SEND_TO_USER_INBOX", publicaly_available_post_id: [] },
-    verdict: { score: 8.4, hook_text: "He jumped the bridge?!", title: "Impossible bridge jump in GTA 6", hashtags: ["GTA6", "#gaming", "vice city", "GTA6"], reason: "Clear payoff and chat exploded.", category: "gaming" },
+    verdict: { score: 8.4, hook_text: "He jumped the bridge?!", title: "Impossible bridge jump in GTA 6", hashtags: ["GTA6", "#gaming", "vice city", "GTA6"], reason: "Clear payoff and chat exploded.", category: "gaming", best_start: null, best_end: null },
   };
   const server = http.createServer((req, res) => {
     const chunks: Buffer[] = [];

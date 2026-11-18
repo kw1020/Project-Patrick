@@ -6,7 +6,7 @@ import { enqueueCut, enqueueGrab, enqueuePost, enqueueTranscribe, pokeScout, pok
 import { resolveChannel } from "@/lib/ytdlp";
 import { getUsers, twitchConfigured } from "@/lib/twitch";
 import { parseFacecam } from "@/lib/media";
-import { parseEditStyle } from "@/lib/edit-styles";
+import { parseEditStyle, parseJumpCuts } from "@/lib/edit-styles";
 import { approvalReasonFromEvidence } from "@/lib/permission";
 import { loginTakenBy } from "@/lib/streamers";
 import { approveResolved, DEFAULT_APPROVAL_NOTE, resolveCreators, type ApprovePick, type ApproveResult, type ResolveResult } from "@/lib/creator-lookup";
@@ -193,13 +193,13 @@ export async function retryClip(id: string) {
  * Re-cut a clip in another editing style (Queue card "Re-cut"). Needs the raw video (deleted 12h after the cut).
  * The review status stays as it is (the cutter only decides review/auto-reject on a clip's first cut).
  */
-export async function recutClip(id: string, style: string) {
+export async function recutClip(id: string, style: string, jumpCuts?: string) {
   const clip = await prisma.clip.findUniqueOrThrow({ where: { id } });
   if (!clip.rawPath) throw new Error("The original video is gone (deleted to save space), so this clip can't be re-cut.");
   if (clip.words == null) return retryClip(id); // never transcribed: run the whole line again
   const s = parseEditStyle(style);
   await prisma.clip.update({ where: { id }, data: { stage: "cut", stageAt: new Date(), error: null, ...(clip.status === "failed" ? { status: "processing" } : {}) } });
-  await enqueueCut(id, 1, s);
+  await enqueueCut(id, 1, s, jumpCuts ? parseJumpCuts(jumpCuts) : undefined);
   refreshAll();
 }
 
@@ -225,7 +225,7 @@ export async function saveSettings(form: FormData) {
     return Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : def;
   };
   const clipMinSec = Math.round(n("clipMinSec", 5, 59, 15));
-  const clipMaxSec = Math.max(clipMinSec, Math.round(n("clipMaxSec", 10, 59, 45)));
+  const clipMaxSec = Math.max(clipMinSec, Math.round(n("clipMaxSec", 10, 59, 35)));
   await prisma.settings.upsert({
     where: { id: "main" },
     create: { id: "main" },
@@ -234,11 +234,15 @@ export async function saveSettings(form: FormData) {
       minScore: n("minScore", 1, 10, 6),
       clipMinSec, clipMaxSec,
       minClipViews: Math.round(n("minClipViews", 0, 100000, 25)),
-      clipLookbackHrs: Math.round(n("clipLookbackHrs", 1, 168, 24)),
+      // Shown in days since v1.8.0 (1-30); an old form posting hours still works.
+      clipLookbackHrs: form.get("clipLookbackDays") != null ? Math.round(n("clipLookbackDays", 1, 30, 7) * 24) : Math.round(n("clipLookbackHrs", 1, 720, 168)),
+      standoutMin: Math.round(n("standoutMin", 1, 20, 2) * 10) / 10,
+      maxPerCreatorPerRun: Math.round(n("maxPerCreatorPerRun", 1, 15, 2)),
+      jumpCuts: parseJumpCuts(form.get("jumpCuts")),
       layout: form.get("layout") === "facecam" ? "facecam" : "blur",
       captions: form.get("captions") === "on",
       scoutPaused: form.get("scoutPaused") === "on",
-      gameMode: form.get("gameMode") === "any" ? "any" : "gta6",
+      gameMode: form.get("gameMode") === "gta6" ? "gta6" : "any",
       clipFunny: form.get("clipFunny") === "on",
       clipGaming: form.get("clipGaming") === "on",
       ytScanEnabled: form.get("ytScanEnabled") === "on",

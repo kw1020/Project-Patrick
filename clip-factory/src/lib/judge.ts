@@ -14,6 +14,8 @@ const Verdict = z.object({
   hashtags: z.array(z.string()).describe("4-6 hashtags without the # sign"),
   reason: z.string().describe("One or two plain sentences on why this score"),
   category: z.enum(["funny", "gaming"]).describe("funny: comedy, banter, reactions, funny fails (any stream, not only games). gaming: plays, clutches, chases, game moments"),
+  best_start: z.number().nullable().describe("Seconds into the SOURCE where the best stretch starts, or null to keep the proposed window"),
+  best_end: z.number().nullable().describe("Seconds into the SOURCE where the best stretch ends (after the payoff lands), or null"),
 });
 export type Verdict = z.infer<typeof Verdict>;
 /** The structured-output schema (exported for tests). */
@@ -31,6 +33,11 @@ export type JudgeInput = {
   stats?: { kind?: string; ratio?: number; rate?: number; baseline?: number; hypeShare?: number; laughShare?: number; viewers?: number; chat?: string[] } | null;
   minScore: number;
   category?: string | null; // the pipeline's first guess (chat laughs / Twitch category / title), evidence only
+  // v1.8.0: the whole source, so the Judge can pick the best stretch itself (best_start/best_end).
+  sourceLength?: number | null; // seconds
+  timedTranscript?: string | null; // "[12.4s] text…" one line per sentence, times in the source
+  window?: { start: number; end: number } | null; // the proposed window (seconds in the source)
+  lengthRange?: { min: number; max: number } | null; // allowed clip length
 };
 
 export function judgeConfigured() {
@@ -91,7 +98,12 @@ function render(i: JudgeInput) {
     if (s.laughShare != null) lines.push(`Laughs (LMAO, KEKW, 😂, "I can't"…) were ${Math.round(s.laughShare * 100)}% of chat's reactions; the rest were gameplay hype (W, Pog, "no way").`);
   }
   if (i.category === "funny" || i.category === "gaming") lines.push(`First guess at the type: ${i.category} (from chat, the Twitch category or the title)`);
+  if (i.sourceLength && i.window) {
+    const range = i.lengthRange ? ` Clips must be ${i.lengthRange.min}-${i.lengthRange.max}s long.` : "";
+    lines.push(`Source video: ${Math.round(i.sourceLength * 10) / 10}s. Proposed window: ${i.window.start.toFixed(1)}s to ${i.window.end.toFixed(1)}s (around the loudest / most reacted-to moment).${range}`);
+  }
   lines.push("", "<transcript>", i.transcript?.trim() || "(no speech detected)", "</transcript>");
+  if (i.timedTranscript != null && i.sourceLength) lines.push("", "<source_transcript>", i.timedTranscript.trim() || "(no speech detected in the whole source)", "</source_transcript>");
   if (i.stats?.chat?.length) lines.push("", "<chat_sample>", ...i.stats.chat.slice(0, 40), "</chat_sample>");
   return lines.join("\n");
 }
@@ -120,5 +132,7 @@ export async function judgeClip(input: JudgeInput, lessons: string | null = null
     hashtags: v.hashtags,
     reason: v.reason.trim().slice(0, 500),
     category: v.category === "funny" ? "funny" : "gaming",
+    best_start: typeof v.best_start === "number" && Number.isFinite(v.best_start) ? Math.round(v.best_start * 100) / 100 : null,
+    best_end: typeof v.best_end === "number" && Number.isFinite(v.best_end) ? Math.round(v.best_end * 100) / 100 : null,
   };
 }

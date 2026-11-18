@@ -10,6 +10,7 @@ import {
 } from "../src/lib/edit";
 import { EDIT_STYLES, parseEditStyle } from "../src/lib/edit-styles";
 import { probeDuration, run, type Word } from "../src/lib/media";
+import { toV173Schema } from "./schema-v173";
 
 // v1.7.3 editing styles: jump cuts, word-by-word captions, zooms, hook, SFX, progress bar.
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "cf-edit-"));
@@ -105,12 +106,18 @@ test("zoomExpr: alternating 108% on cuts and a smooth punch-in; none for clean",
   assert.equal(at(12), 1);
 });
 
+/** 100ms loudness for `length` seconds: -20 dB while a word is spoken, -70 dB (silence) elsewhere. */
+export function speechLevels(words: Word[], length: number, quiet = -70): number[] {
+  return Array.from({ length: Math.round(length * 10) }, (_, i) => (words.some((w) => i / 10 + 0.05 >= w.start && i / 10 + 0.05 <= w.end) ? -20 : quiet));
+}
+
 test("planEdit: clean has jump cuts but no zoom; hype zooms on the remapped peak", () => {
   const words = talk([1, 6], [6, 6], [12, 6]);
-  const clean = planEdit({ style: "clean", words, length: 20, minSec: 8, peak: 9 });
+  const levels = speechLevels(words, 20);
+  const clean = planEdit({ style: "clean", words, length: 20, minSec: 8, peak: 9, levels });
   assert.equal(clean.zoom, null);
   assert.equal(clean.punchStart, null);
-  const hype = planEdit({ style: "hype", words, length: 20, minSec: 8, peak: 15 });
+  const hype = planEdit({ style: "hype", words, length: 20, minSec: 8, peak: 15, levels });
   assert.ok(hype.segs.length > 1);
   assert.ok(hype.duration < 20 && hype.duration >= 8);
   assert.equal(hype.peak, remapTime(15, hype.segs));
@@ -247,7 +254,7 @@ test("renderStyled with no audio and no words still renders (no captions, no cut
 test("db push upgrade from the v1.7.2 schema (0684afb) with rows: no prompt, rows kept, editStyle defaults to hype", () => {
   const SCHEMA = path.join(__dirname, "..", "prisma", "schema.prisma");
   const now = fs.readFileSync(SCHEMA, "utf8");
-  const derived = now.replace(/^ {2}(winLength|editStyle|editNote)\s.*\n/gm, "");
+  const derived = toV173Schema(now).replace(/^ {2}(winLength|editStyle|editNote)\s.*\n/gm, "");
   const git = spawnSync("git", ["show", "0684afb:clip-factory/prisma/schema.prisma"], { encoding: "utf8", cwd: path.join(__dirname, "..") });
   if (git.status === 0) assert.equal(derived, git.stdout, "only the three v1.7.3 columns were added");
   const uniques = (s: string) => (s.match(/@unique|@@unique|@@id/g) ?? []).length;

@@ -5,9 +5,10 @@ import fs from "node:fs";
 import path from "node:path";
 import { run, type Facecam, type Word } from "./media";
 import { storagePath } from "./paths";
-import { type EditStyle } from "./edit-styles";
+import { type EditStyle, type JumpCutMode } from "./edit-styles";
+import { FRAME, meanDb } from "./window";
 
-export { type EditStyle, EDIT_STYLES, parseEditStyle, DEFAULT_EDIT_STYLE } from "./edit-styles";
+export { type EditStyle, type JumpCutMode, EDIT_STYLES, JUMP_CUT_MODES, parseEditStyle, parseJumpCuts, DEFAULT_EDIT_STYLE } from "./edit-styles";
 
 const W = 1080, H = 1920, FPS = 30;
 
@@ -47,13 +48,48 @@ const r3 = (t: number) => Math.round(t * 1000) / 1000;
 
 // ---------- Jump cuts ----------
 /**
- * Which parts of the window to keep. Removes silences between words longer than `maxGap` (keeping `pad` either side),
- * biggest first, never below `minSec`, never across `protect` (the punch-in moment). Fewer than `minWords` words = no cuts.
- * Times are seconds inside the window [0, length].
+ * v1.8.0 (Krew: "it's randomly cutting when he's talking"): Whisper misses words under game audio, music and crosstalk,
+ * so a "gap" between words is often real sound. Jump cuts now only remove gaps whose AUDIO is quiet, and far fewer.
+ * light (default): gaps >= 1.2s, 0.35s kept each side, <= 15% of the window, <= 4 cuts, none within 1s of the payoff.
+ * normal: gaps >= 0.8s, 0.25s each side, <= 25%, <= 6 cuts. off: none.
  */
-export function planJumpCuts(opts: { words: Word[]; length: number; minSec: number; protect?: Seg | null; maxGap?: number; pad?: number; minWords?: number; maxCuts?: number }): Seg[] {
+export const JUMP_PRESETS: Record<Exclude<JumpCutMode, "off">, { maxGap: number; pad: number; maxShare: number; maxCuts: number }> = {
+  light: { maxGap: 1.2, pad: 0.35, maxShare: 0.15, maxCuts: 4 },
+  normal: { maxGap: 0.8, pad: 0.25, maxShare: 0.25, maxCuts: 6 },
+};
+
+/**
+ * The level (dB) below which a 100ms frame counts as silence: 15 dB under the speech level (frames inside words),
+ * and never above -35 dB. Null when there's nothing to measure.
+ */
+export function silenceThreshold(levels: number[], words: Word[], frame = FRAME): number | null {
+  if (!levels.length) return null;
+  const speech = words.flatMap((w) => levels.slice(Math.max(0, Math.floor(w.start / frame)), Math.ceil(w.end / frame))).filter((v) => Number.isFinite(v));
+  const pool = (speech.length >= 3 ? speech : levels.filter((v) => Number.isFinite(v))).sort((a, b) => a - b);
+  if (!pool.length) return -35; // nothing but pure silence
+  const level = pool[Math.floor(pool.length * (speech.length >= 3 ? 0.5 : 0.75))];
+  return Math.min(-35, level - 15);
+}
+
+/** True when every 100ms frame of [start, end] is under the threshold (frames we don't have = not quiet). */
+export function isQuiet(levels: number[], start: number, end: number, threshold: number, frame = FRAME) {
+  const a = Math.max(0, Math.floor(start / frame + 1e-6)), b = Math.ceil(end / frame - 1e-6);
+  if (b <= a || b > levels.length) return false;
+  for (let i = a; i < b; i++) if (!(levels[i] < threshold)) return false;
+  return true;
+}
+
+/**
+ * Which parts of the window to keep. Removes gaps between words longer than `maxGap` (keeping `pad` either side),
+ * biggest first, never below `minSec`, never across `protect` (the payoff / punch-in), at most `maxCuts` and `maxShare`
+ * of the window. With `levels` (100ms loudness of the window) a gap is only cut when its audio is really quiet.
+ * Fewer than `minWords` words = no cuts. Times are seconds inside the window [0, length].
+ */
+export function planJumpCuts(opts: { words: Word[]; length: number; minSec: number; protect?: Seg | null; maxGap?: number; pad?: number; minWords?: number; maxCuts?: number; maxShare?: number; levels?: number[]; quietDb?: number | null }): Seg[] {
   const { length, minSec } = opts;
   const maxGap = opts.maxGap ?? 0.6, pad = opts.pad ?? 0.15, minWords = opts.minWords ?? 6, maxCuts = opts.maxCuts ?? 16;
+  const maxRemove = (opts.maxShare ?? 1) * length;
+  const threshold = opts.levels ? (opts.quietDb ?? silenceThreshold(opts.levels, opts.words)) : null;
   const whole = [{ start: 0, end: snap(length) }];
   const words = opts.words.filter((w) => w.word.trim() && w.start < length && w.end > 0).sort((a, b) => a.start - b.start);
   if (words.length < minWords || length <= minSec) return whole;
@@ -64,17 +100,21 @@ export function planJumpCuts(opts: { words: Word[]; length: number; minSec: numb
     const g = { start: snap(a + pad), end: snap(Math.min(b, length) - pad) };
     if (g.end - g.start < 0.1) continue;
     if (opts.protect && g.start < opts.protect.end && g.end > opts.protect.start) continue;
+    // Loudness known: keep any gap with game sound, music or untranscribed talk in it.
+    if (opts.levels && (threshold == null || !isQuiet(opts.levels, g.start, g.end, threshold))) continue;
     gaps.push(g);
   }
   gaps.sort((x, y) => (y.end - y.start) - (x.end - x.start));
-  let total = snap(length);
+  let total = snap(length), removed = 0;
   const cut: Seg[] = [];
   for (const g of gaps) {
     if (cut.length >= maxCuts) break;
     const len = g.end - g.start;
     if (total - len < minSec) continue; // would go under the minimum: keep this one
+    if (removed + len > maxRemove + 1e-6) continue; // over the share cap: keep this one
     cut.push(g);
     total -= len;
+    removed += len;
   }
   if (!cut.length) return whole;
   cut.sort((x, y) => x.start - y.start);
@@ -367,22 +407,42 @@ export async function probeSize(file: string): Promise<{ w: number; h: number }>
   return Math.abs(rot || 0) === 90 ? { w: h, h: w } : { w, h };
 }
 
-/** RMS level (dB) of each second of the window. Audio only, ~0.2s. */
-export async function measureLoudness(file: string, start: number, length: number): Promise<number[]> {
-  const { stdout } = await run("ffmpeg", ["-hide_banner", "-loglevel", "error", "-ss", String(start), "-t", String(length), "-i", file, "-vn",
-    "-af", "aresample=8000,asetnsamples=n=8000:p=0,astats=metadata=1:reset=1:measure_overall=RMS_level:measure_perchannel=none,ametadata=mode=print:key=lavfi.astats.Overall.RMS_level:file=-",
+/** RMS level (dB) of each `step` seconds of [start, start+length] (default 0.1s; length 0 = to the end). Audio only, one cheap pass. */
+export async function measureLevels(file: string, start: number, length: number, step = FRAME): Promise<number[]> {
+  const n = Math.max(1, Math.round(8000 * step));
+  const { stdout } = await run("ffmpeg", ["-hide_banner", "-loglevel", "error", ...(start > 0 ? ["-ss", String(start)] : []), ...(length > 0 ? ["-t", String(length)] : []), "-i", file, "-vn",
+    "-af", `aresample=8000,asetnsamples=n=${n}:p=0,astats=metadata=1:reset=1:measure_overall=RMS_level:measure_perchannel=none,ametadata=mode=print:key=lavfi.astats.Overall.RMS_level:file=-`,
     "-f", "null", "-"], { timeoutMs: 120_000 });
   return parseLoudness(stdout);
+}
+
+/** RMS level (dB) of each second of the window. */
+export async function measureLoudness(file: string, start: number, length: number): Promise<number[]> {
+  return measureLevels(file, start, length, 1);
+}
+
+/** 100ms levels -> 1-second levels (mean power). */
+export function perSecond(levels: number[], frame = FRAME): number[] {
+  const k = Math.max(1, Math.round(1 / frame)), out: number[] = [];
+  for (let i = 0; i < levels.length; i += k) out.push(meanDb(levels.slice(i, i + k)));
+  return out;
 }
 
 // ---------- Plan + render ----------
 export type EditPlan = { segs: Seg[]; duration: number; words: Word[]; peak: number | null; punchStart: number | null; zoom: string | null };
 
-/** Everything the render needs, from the window's words + loudness. Pure. */
-export function planEdit(opts: { style: EditStyle; words: Word[]; length: number; minSec: number; peak: number | null }): EditPlan {
+/**
+ * Everything the render needs, from the window's words + loudness. Pure. `levels` = 100ms loudness of the window:
+ * jump cuts only happen where it's quiet, so with no levels (no audio / measuring failed) nothing is cut.
+ */
+export function planEdit(opts: { style: EditStyle; words: Word[]; length: number; minSec: number; peak: number | null; levels?: number[]; jumpCuts?: JumpCutMode }): EditPlan {
   const S = STYLES[opts.style];
-  const protect = opts.peak != null ? { start: opts.peak - 0.6, end: opts.peak + PUNCH_LEN } : null;
-  const segs = S.jumpCuts ? planJumpCuts({ words: opts.words, length: opts.length, minSec: opts.minSec, protect }) : [{ start: 0, end: snap(opts.length) }];
+  const mode = opts.jumpCuts ?? "light";
+  // Never cut within 1s before the payoff or during the punch-in that follows it.
+  const protect = opts.peak != null ? { start: opts.peak - 1, end: opts.peak + Math.max(1, PUNCH_LEN) } : null;
+  const segs = S.jumpCuts && mode !== "off"
+    ? planJumpCuts({ words: opts.words, length: opts.length, minSec: opts.minSec, protect, ...JUMP_PRESETS[mode], levels: opts.levels ?? [] })
+    : [{ start: 0, end: snap(opts.length) }];
   const duration = segsDuration(segs);
   const words = remapWords(opts.words, segs);
   const peak = opts.peak != null ? remapTime(opts.peak, segs) : null;
@@ -395,12 +455,17 @@ export async function renderStyled(opts: {
   input: string; output: string; start: number; length: number; facecam: Facecam | null; style: EditStyle;
   words: Word[]; credit: string; hook: string | null; minSec: number; hasAudio: boolean;
   peakHint?: { source: string; vodOffset: number | null; vodId?: string | null } | null; workDir: string; id: string;
+  /** v1.8.0: the payoff in WINDOW seconds (from Clip.payoffAt); used as the peak instead of recomputing. */
+  peakAt?: number | null;
+  jumpCuts?: JumpCutMode;
 }) {
   const S = STYLES[opts.style];
   const src = await probeSize(opts.input);
-  const levels = opts.hasAudio ? await measureLoudness(opts.input, opts.start, opts.length).catch(() => []) : [];
-  const peak = pickPeak({ source: opts.peakHint?.source ?? "", vodOffset: opts.peakHint?.vodOffset ?? null, vodId: opts.peakHint?.vodId, winStart: opts.start, length: opts.length, levels });
-  const plan = planEdit({ style: opts.style, words: opts.words, length: opts.length, minSec: opts.minSec, peak });
+  const fine = opts.hasAudio ? await measureLevels(opts.input, opts.start, opts.length).catch(() => [] as number[]) : [];
+  const levels = perSecond(fine);
+  const known = opts.peakAt != null && opts.peakAt > 0 && opts.peakAt < opts.length ? r3(opts.peakAt) : null;
+  const peak = known ?? pickPeak({ source: opts.peakHint?.source ?? "", vodOffset: opts.peakHint?.vodOffset ?? null, vodId: opts.peakHint?.vodId, winStart: opts.start, length: opts.length, levels });
+  const plan = planEdit({ style: opts.style, words: opts.words, length: opts.length, minSec: opts.minSec, peak, levels: fine, jumpCuts: opts.jumpCuts ?? "light" });
   const layout = opts.facecam ? "facecam" : "blur";
   fs.mkdirSync(opts.workDir, { recursive: true });
   const assName = `${opts.id}.styled.ass`, assPath = path.join(opts.workDir, assName);

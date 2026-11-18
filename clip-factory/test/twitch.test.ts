@@ -148,9 +148,11 @@ test("scout: approved streamer outside the top 500 but playing GTA 6 is marked l
   assert.deepEqual(lookup.searchParams.getAll("user_id"), ["small1"]);
 });
 
-test("scout: approved streamer live in another game is ignored (not live)", async () => {
+test("scout: approved streamer live in another game is ignored (not live) in GTA 6 mode", async () => {
   const { prisma } = await import("../src/lib/db");
   const { runScout } = await import("../src/workers/scout");
+  // "any" is the default since v1.8.0; this is the GTA-only behaviour.
+  await prisma.settings.upsert({ where: { id: "main" }, update: { gameMode: "gta6" }, create: { id: "main", gameMode: "gta6" } });
   await prisma.streamer.create({ data: { twitchId: "other1", login: "otherguy", name: "OtherGuy", approved: true, isLive: true } });
   scoutFetch(stream("other1", "otherguy", "just-chatting", 900));
   const { chat, channels } = stubChat();
@@ -160,4 +162,5 @@ test("scout: approved streamer live in another game is ignored (not live)", asyn
   assert.equal(other.isLive, false);
   assert.equal(other.viewers, 0);
   assert.ok(!channels.at(-1)!.includes("otherguy"));
+  await prisma.settings.update({ where: { id: "main" }, data: { gameMode: "any" } });
 });

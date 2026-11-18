@@ -50,10 +50,30 @@ Settings -> Clips -> **Editing style** picks how new clips are edited (default *
 - **Clean**: white word-by-word captions and jump cuts, a simple fade-in hook, no zooms or sound effects.
 - **Meme**: bigger tilted captions with the spoken word in green, harder zoom punch, yellow hook, sound effects.
 
-Every style keeps the `twitch.tv/name` / `youtube.com/@name` credit burned in at the top. Jump cuts never make a clip
-shorter than the minimum clip length and are skipped when there is little talking. To try another style on one clip,
+Every style keeps the `twitch.tv/name` / `youtube.com/@name` credit burned in at the top. Jump cuts (Settings -> Clips ->
+**Jump cuts**: Light by default, Normal or Off) only remove pauses where the audio is really silent, never game sound,
+music or talking the captions missed; Light cuts pauses of 1.2s+ only, at most 4 per clip and 15% of it, never right
+before the payoff. They never make a clip shorter than the minimum clip length and are skipped when there is little talking.
+**Re-cut -> ... without jump cuts** re-makes one clip with none. To try another style on one clip,
 open **Re-cut** on its Queue card (works while the original video is still kept, about 12 hours). If a styled edit ever
 fails, the clip is made with the plain edit instead and the card says so.
+
+### How clips are picked (v1.8.0)
+
+- **Which creators:** every approved, not-paused creator, in any game (Settings -> Which games can go back to GTA 6 only).
+- **Which Twitch clips:** each creator's viewer-made clips from the last 7 days (Settings -> Look back). A clip counts as
+  *standout* when its views are at least 2x that creator's usual (median) clip views, and at least *Min Twitch clip views*.
+  A creator's single best clip is also allowed if it has 5x the minimum. Newer clips rank higher.
+- **No repeats:** viewers often clip the same moment several times; only the most-viewed one is taken, and moments the
+  chat spike detector already caught are skipped.
+- **Fair mix:** each scan takes one clip from each creator in turn (best first), at most 2 per creator (Settings), until
+  the line is full. The Live page says e.g. "picked 9 standout clips from 6 creators · 4 had nothing standout".
+- **Which part:** the whole source is transcribed, then the cut is placed on the payoff: the loudest moment in the last
+  70% of a viewer clip (people clip right after something happens), a burst of reactions ("oh no", "bro", "what"), the
+  chat spike's moment or the YouTube most-replayed point. The payoff sits about two-thirds in, the clip starts on a word
+  (not dead air) and ends after the reaction, 15-35 seconds.
+- **The Judge** (needs `ANTHROPIC_API_KEY`) reads the whole timed transcript, scores strictly ("would a stranger keep
+  watching past 3 seconds?") and may choose a better start and end itself. Without a key every clip arrives unscored.
 
 ## Install with automatic updates (Windows, once)
 
@@ -195,8 +215,8 @@ counts show up on the Posted page every 15 minutes. TikTok and Reels are still D
 
 ## Any game
 
-Settings → **Which games** → *Any game (approved streamers)*. The Scout still lists everyone live in
-GTA 6, but your **approved** streamers are now tracked (live, chat, spikes, Twitch clips) whatever they
+Settings → **Which games** → *Any game (approved streamers)* (the default since v1.8.0; older installs were moved
+over once on update). The Scout still lists everyone live in GTA 6, but your **approved** streamers are now tracked (live, chat, spikes, Twitch clips) whatever they
 play. The Live page shows the game next to anyone not in GTA 6. Titles and hashtags follow the game
 (`#Fortnite` instead of `#GTA6`), and the Judge is told the game. Back to *GTA 6 only* any time.
 Same rule as always: only approve streamers who allow clipping or run a clipping campaign.

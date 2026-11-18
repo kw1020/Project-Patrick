@@ -9,7 +9,7 @@ original brief is below, and the status section says what's done. Read both befo
 - **Launch hardening done (2026-11-16):** all 6 `PLAN.md` steps (spike detector v2, Judge prompt file,
   Twitch 429/approved lookup, backlog + disk + retention, SQLite WAL, `npm run doctor`) plus launch-check
   fixes: stuck-clip sweeper (`sweepStuck` in `src/workers/retention.ts`, every 5 min) and a worker crash guard.
-- **Any-game mode (2026-11-17):** Settings `gameMode` gta6|any. In "any", approved Twitch streamers are tracked
+- **Any-game mode (2026-11-17):** Settings `gameMode` gta6|any (default "any" since v1.8.0). In "any", approved Twitch streamers are tracked
   live (Streamer.gameName) and their clips taken in every game (Moment.gameName, names via Helix `/games?id=`, cached);
   GTA-wide discovery unchanged. Text helpers in `src/lib/social.ts` (`momentGame`, `gameHashtags`) are game-aware.
 - **YouTube scanner (2026-11-17):** approved YouTube channels are `Streamer` rows with `platform: "youtube"`,
@@ -82,7 +82,7 @@ original brief is below, and the status section says what's done. Read both befo
   expression (crop's in_w is the FIRST frame's size, so default centring breaks), blurred bg never zooms, `eq`+`unsharp`, ASS
   (credit top y=110, hook y=250 / 190 facecam, captions centred at y=1190 = 62%) drawn after the zoom, progress bar = an 8px `color`
   source overlaid with x='-W+W*t/D' (drawbox can't animate its width in ffmpeg 6.1), `loudnorm` I=-14 + SFX via `adelay`+`amix`.
-  Jump cuts (`planJumpCuts`): gaps > 0.6s between words, 0.15s pad, biggest first, never under `clipMinSec`, never across the peak,
+  Jump cuts (`planJumpCuts`, v1.7.3 rules, made conservative + silence-checked in v1.8.0 below): gaps > 0.6s between words, 0.15s pad, biggest first, never under `clipMinSec`, never across the peak,
   none with < 6 words; leading/trailing silence is kept (may be gameplay). Peak (`pickPeak`): chat spike from a VOD = the moment
   (raw time min(30, vodOffset)); else the loudest second from one `astats` pass (~0.2s). Punch = 0.25s smoothstep in, 1.2s hold, 0.25s out.
   SFX (whoosh = filtered noise with `asendcmd` opening a low-pass, boom = 130->55 Hz sine drop) are made by ffmpeg once into
@@ -91,6 +91,32 @@ original brief is below, and the status section says what's done. Read both befo
   to processing); only while `rawPath` exists. **Measured (this sandbox, 4 cores, 45s 1080p60 source, -preset veryfast):** plain v1.7.1
   render 19.2-20.2s; hype 17.8-18.5s, clean 15.9-16.2s, meme 18.7-19.6s, hype facecam 19.8s (outputs 32.7s after jump cuts; doing fps=30
   before scaling pays for the effects). Proof contact sheets in the session scratchpad only. Unverified on Krew's PC and on real Twitch audio.
+- **v1.8.0 (2026-11-18): better moments** (Krew: "bland, only Kai and Hasan, wrong times, too GTA 6"; then "the editing is
+  chopping"). All schema changes additive with defaults (`test/v180.test.ts` pushes from the bf79233 schema with rows; older
+  upgrade tests derive their old schema via `test/schema-v173.ts`). Settings defaults: `gameMode` "any", `clipLookbackHrs` 168,
+  `clipMaxSec` 35; new `standoutMin` 2, `maxPerCreatorPerRun` 2, `jumpCuts` "light" (off|light|normal), `migratedAnyGame`. One-time
+  worker migration `migrateV180Settings` (`src/workers/migrate.ts`): gta6->any, 24->168, 45->35 only if still the old value, then
+  sets the flag so later manual changes stick. Clips poller (`src/workers/clips.ts` + pure `src/lib/standout.ts`): per approved,
+  not-paused Twitch creator one `/clips` page (own broadcaster_id only); `standout = views / max(creator median, minClipViews)`,
+  `rank = standout / (1 + ageH/48)`; keep views >= minClipViews AND standout >= standoutMin, or the creator's single best if >= 5x
+  minClipViews; dedupe same `video_id` overlapping ±20s (keep most-viewed; also vs existing moments of that streamer, chat ones
+  as vodOffset-30..+15); round-robin by best rank, cap per creator, total min(15, backlogRoom()). "any" mode never runs the
+  game-wide GTA `/clips` query (gta6 mode only). Moment.spikeScore = standout for twitch_clip. Status "picked N standout clips
+  from M creators · K had nothing standout". Window (`src/lib/window.ts`, pure): `runTranscribe` now transcribes + measures
+  100ms loudness of the WHOLE source (<= 180s) → `Clip.words` timed in the source with `Clip.wordsFull = true` (older rows:
+  window-relative, false) → `findPayoff` (chat: min(30, vodOffset), YouTube: min(25, vodOffset), sharpened to a loud 1.5s within
+  -3..+5s; Twitch clip: loudest 1.5s in the last 70% + reaction-word bursts) → `pickSmartWindow` (payoff at 65%, start on a
+  word / skip >1s dead air, end on a sentence end within 6s of nominal or not mid-word, >= payoff+1.5) → `Clip.payoffAt`
+  (source seconds; the cutter passes `payoffAt - winStart` as `renderStyled({ peakAt })`, falling back to `pickPeak` when it's
+  outside the window). Judge gets "Source video / Proposed window" + `<source_transcript>` ("[12.4s] …" lines) and returns
+  nullable `best_start`/`best_end`; `validJudgeWindow` (length within [min, max], inside the source) → winStart/winLength/
+  duration/transcript replaced. Order unchanged: grab → transcribe → judge → cut; re-cuts use the stored window.
+  Jump cuts (`planJumpCuts`): a gap is cut only if every 100ms frame (one `astats` pass, `measureLevels`) is under
+  `silenceThreshold` = min(-35, speech median - 15 dB); no levels = no cuts. Presets `JUMP_PRESETS` light (gap >= 1.2s, pad 0.35,
+  <= 15%, <= 4 cuts) / normal (0.8, 0.25, 25%, 6); never within 1s before the payoff through the punch. Queue Re-cut has
+  "<style> without jump cuts" (`recutClip(id, style, "off")`, job data `jumpCuts`). Settings page: standout + per-creator knobs,
+  lookback in days (`clipLookbackDays` form field, 1-30), jump cuts select, amber no-key note. Live heading "Live now" in any mode
+  (game chip on everyone). Prompt: stricter scale (routine 3-5, real moment 7-10). Unverified on real Twitch audio/Whisper/Claude.
 - Docker image never built in the sandbox (no daemon); it builds fine on Krew's PC; a clean-copy `npm ci` + `next build` without `.env`
   (what the Dockerfile does) passes.
 - **Suggestions (2026-11-17):** `src/workers/suggest.ts` (queue "suggest", hourly + once ~1 min after start,

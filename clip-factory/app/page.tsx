@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { prisma } from "@/lib/db";
+import { getSettings, prisma } from "@/lib/db";
 import { Avatar } from "@/components/Avatar";
 import { getStatuses, soft, type AgentStatus } from "@/lib/queues";
 import { twitchConfigured } from "@/lib/twitch";
@@ -36,12 +36,14 @@ function AgentCard({ name, s, idle }: { name: string; s?: AgentStatus; idle?: st
 
 export default async function LivePage({ searchParams }: { searchParams: Promise<{ all?: string }> }) {
   const { all } = await searchParams;
-  const [streams, statuses, counts, suggestionCount] = await Promise.all([
+  const [streams, statuses, counts, suggestionCount, settings] = await Promise.all([
     prisma.streamer.findMany({ where: { platform: "twitch", isLive: true, ...(all ? {} : { approved: true }) }, orderBy: [{ viewers: "desc" }], take: 200 }),
     soft(getStatuses(), {} as Record<string, AgentStatus>),
     prisma.clip.groupBy({ by: ["status"], _count: true }),
     prisma.suggestion.count({ where: { status: "pending", streamer: { approved: false } } }),
+    getSettings(),
   ]);
+  const anyGame = settings.gameMode !== "gta6";
   const totalLive = await prisma.streamer.count({ where: { platform: "twitch", isLive: true } });
   const c = Object.fromEntries(counts.map((x) => [x.status, x._count])) as Record<string, number>;
 
@@ -89,7 +91,7 @@ export default async function LivePage({ searchParams }: { searchParams: Promise
       <section>
         <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
           <div>
-            <h1 className="text-2xl font-black">Live in GTA 6</h1>
+            <h1 className="text-2xl font-black">{anyGame ? "Live now" : "Live in GTA 6"}</h1>
             <p className="text-sm text-zinc-400">{totalLive} streamers live right now. Only approved streamers get clipped.</p>
           </div>
           <div className="flex items-center gap-2">
@@ -115,7 +117,7 @@ export default async function LivePage({ searchParams }: { searchParams: Promise
                     <a href={creatorUrl(s)} target="_blank" className="font-bold hover:text-hot">{s.name}</a>
                     <span className="rounded bg-red-600 px-1.5 text-[10px] font-black uppercase">Live</span>
                     <span className="text-xs text-zinc-500">{liveFor(s.liveSince)}</span>
-                    {s.gameName && !isGta6(s.gameName) && <span className="rounded bg-zinc-800 px-1.5 text-[11px] font-semibold text-zinc-300">{s.gameName}</span>}
+                    {s.gameName && (anyGame || !isGta6(s.gameName)) && <span className="rounded bg-zinc-800 px-1.5 text-[11px] font-semibold text-zinc-300">{s.gameName}</span>}
                   </div>
                   <div className="truncate text-sm text-zinc-400">{s.streamTitle}</div>
                 </div>

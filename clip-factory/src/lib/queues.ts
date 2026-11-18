@@ -37,9 +37,9 @@ export async function enqueueJudge(clipId: string) {
   await queue("judge").add("judge", { clipId }, { jobId: `judge-${clipId}-${Date.now()}`, attempts: 1 });
 }
 /** priority 1 = render first (clips headed for review); 10 = when idle (auto-rejected clips). */
-/** `style` = re-cut in this editing style (else Settings.editStyle). */
-export async function enqueueCut(clipId: string, priority = 1, style?: string) {
-  await queue("cut").add("cut", style ? { clipId, style } : { clipId }, { jobId: `cut-${clipId}-${Date.now()}`, priority });
+/** `style` = re-cut in this editing style (else Settings.editStyle); `jumpCuts` = off|light|normal for this cut only. */
+export async function enqueueCut(clipId: string, priority = 1, style?: string, jumpCuts?: string) {
+  await queue("cut").add("cut", { clipId, ...(style ? { style } : {}), ...(jumpCuts ? { jumpCuts } : {}) }, { jobId: `cut-${clipId}-${Date.now()}`, priority });
 }
 /** One attempt only: a retried upload could post the same video twice. */
 export async function enqueuePost(clipId: string, accountId: string) {

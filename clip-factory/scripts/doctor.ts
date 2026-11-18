@@ -166,7 +166,7 @@ async function main() {
 
   await check("Database", 30_000, async () => {
     const s = await getSettings();
-    return { status: "ok", detail: `settings row OK (Judge cut-off ${s.minScore}, clips ${s.clipMinSec}-${s.clipMaxSec}s)` };
+    return { status: "ok", detail: `settings row OK (Judge cut-off ${s.minScore}, clips ${s.clipMinSec}-${s.clipMaxSec}s, ${s.gameMode === "gta6" ? "GTA 6 only" : "any game"}, standout clips ${s.standoutMin}x the creator's usual, max ${s.maxPerCreatorPerRun} per creator per scan, jump cuts ${s.jumpCuts})` };
   }, "Run `npm run db:push` in the clip-factory folder to create the database, and check DATABASE_URL in .env.");
 
   // ---------- 4. Twitch ----------
@@ -259,7 +259,7 @@ async function main() {
   // ---------- 6. Judge ----------
   section("Judge (Claude)");
   if (!judgeConfigured()) {
-    print("Judge", { status: "warn", detail: "skipped — no ANTHROPIC_API_KEY, clips go to review unscored", fix: "Add ANTHROPIC_API_KEY to .env to have Claude score clips." });
+    print("Judge", { status: "warn", detail: "skipped — no ANTHROPIC_API_KEY, clips go to review unscored (boring ones aren't filtered out)", fix: "Add ANTHROPIC_API_KEY to .env to have Claude score clips and pick the best part of each." });
   } else {
     await check("Judge", 60_000, async () => {
       const v = await judgeClip({

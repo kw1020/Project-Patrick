@@ -9,6 +9,7 @@ import { categoryOff, skippedNote, twitchClipCategory, youtubeCategory } from ".
 import { parseQueueParams, queueHref, queueWhere } from "../src/lib/queue-filter";
 import { filterCreators, sortCreators, summarize, summaryLine, type CreatorRow } from "../src/lib/creators";
 import { startMocks, mockEnv, type Mock } from "./mocks";
+import { toV173Schema } from "./schema-v173";
 
 // v1.7.2: funny | gaming moments (chat laughs, Twitch category, YouTube category/title, Judge label, Settings switches),
 // Queue type tabs + creator filter, Creators page (stats, pause, remove).
@@ -291,7 +292,9 @@ function stubTwitch(clips: Record<string, ReturnType<typeof twClip>[]>, streams:
 }
 
 test("clips poller: Just Chatting / laugh-title clips are funny, game clips gaming; funny off skips them; paused creators aren't asked", async () => {
-  const prisma = await reset();
+  // Equal views here, so the v1.8.0 standout rule is relaxed: this test is about categories.
+  const relaxed = { standoutMin: 0.5, maxPerCreatorPerRun: 5 };
+  const prisma = await reset(relaxed);
   await prisma.streamer.create({ data: { twitchId: "b1", login: "kai", name: "Kai", approved: true } });
   await prisma.streamer.create({ data: { twitchId: "b2", login: "zzz", name: "Zzz", approved: true, paused: true } });
   const clips = {
@@ -306,11 +309,11 @@ test("clips poller: Just Chatting / laugh-title clips are funny, game clips gami
   assert.deepEqual(Object.fromEntries(got.map((m) => [m.twitchClipId, [m.category, m.clips[0].category]])),
     { "c-jc": ["funny", "funny"], "c-fn": ["gaming", "gaming"], "c-fn-lol": ["funny", "funny"] });
 
-  await reset({ clipFunny: false });
+  await reset({ clipFunny: false, ...relaxed });
   await prisma.streamer.create({ data: { twitchId: "b1", login: "kai", name: "Kai", approved: true } });
   asked = stubTwitch(clips);
   const msg = await runClipsPoll();
-  assert.match(msg, /1 new sent to the Grabber · skipped 2 funny \(off in Settings\)/);
+  assert.match(msg, /picked 1 standout clip from 1 creator · skipped 2 funny \(off in Settings\)/);
   assert.deepEqual((await prisma.moment.findMany()).map((m) => m.twitchClipId), ["c-fn"]);
 });
 
@@ -476,7 +479,7 @@ test("creators: stats from the database (moments, cut clips, approved, posted, v
 test("db push upgrade from the v1.7.1 schema (5486a81) with rows: no prompt, rows kept, new columns defaulted", () => {
   const now = fs.readFileSync(SCHEMA, "utf8");
   // v1.7.1 = today's schema without the v1.7.2 lines.
-  const old = now
+  const old = toV173Schema(now)
     .replace(/^ {2}(paused|approvedAt|category|clipFunny|clipGaming|winLength|editStyle|editNote)\s.*\n/gm, "") // + v1.7.3 columns
     .replace(/^\/\/ \| off_funny.*\n/m, "");
   for (const f of ["paused", "approvedAt", "category", "clipFunny", "clipGaming"]) assert.doesNotMatch(old, new RegExp(`^\\s+${f}\\s`, "m"), f);

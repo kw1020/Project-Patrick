@@ -105,7 +105,9 @@ test("any mode: approved streamer playing Fortnite is live (with game) and their
 
   await (await import("../src/workers/clips")).runClipsPoll();
   const moments = await prisma.moment.findMany({ include: { clips: true }, orderBy: { twitchClipId: "asc" } });
-  assert.deepEqual(moments.map((m) => m.twitchClipId), ["fn-clip", "gta-clip"]);
+  // v1.8.0: in "any" mode only approved creators' own clips are asked for (no game-wide GTA query), so the
+  // GTA-wide "gta-clip" is not taken (it's GTA discovery for gta6 mode only).
+  assert.deepEqual(moments.map((m) => m.twitchClipId), ["fn-clip"]);
   const fnm = moments[0];
   assert.equal(fnm.gameName, "Fortnite");
   assert.equal(fnm.clips[0].title, "FNGUY in Fortnite"); // name as Twitch reported it to the Scout

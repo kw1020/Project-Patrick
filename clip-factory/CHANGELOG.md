@@ -1,5 +1,13 @@
 # Clip Factory patch notes
 
+## 1.8.0 — 2026-11-18
+- Any game for everyone by default: your approved creators are clipped whatever they play (you can switch back to GTA 6 only in Settings).
+- A fair mix across all your creators: each scan takes at most 2 new clips per creator, one from each in turn, so one or two big channels can't fill the line.
+- Only standout clips: a Twitch clip needs way more views than that creator's usual clips (2x by default), from the last 7 days.
+- Smarter cut that lands on the payoff (the loud or funny bit) with a little build-up first, 15 to 35 seconds long.
+- Stricter Judge that can pick the best part of the video itself. Without an Anthropic key, clips still come to you unscored.
+- Jump cuts only cut real silence now, and much less often; you can turn them off in Settings or re-cut one clip without them.
+
 ## 1.7.3 — 2026-11-17
 - New editing styles: Hype, Clean and Meme. Pick one in Settings, under Clips. Hype is the new default.
 - Captions now pop in word by word and light up the word being said.

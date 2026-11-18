@@ -77,6 +77,8 @@ model Clip {
   winLength   Float?  // length of that window (duration = the edited clip, shorter after jump cuts); null on older rows -> duration
   editStyle   String? // hype | clean | meme: the style it was last cut with (v1.7.3)
   editNote    String? // set when the styled edit failed and the plain edit was used instead
+  payoffAt    Float?  // v1.8.0: the payoff moment, seconds into the raw file (punch-in + where the window was placed)
+  wordsFull   Boolean @default(false) // v1.8.0: words are timed in the whole raw file (older rows: inside the window)
   score       Float?  // Judge score 1-10
   hookText    String? // Judge's on-screen hook
   hashtags    String? // space-separated
@@ -127,13 +129,13 @@ model Settings {
   ytAutoUpload     Boolean @default(false)
   ytPrivacy        String  @default("public")
   clipMinSec       Int     @default(15)
-  clipMaxSec       Int     @default(45)
+  clipMaxSec       Int     @default(35) // v1.8.0: 45 -> 35 (existing installs moved once, see migratedAnyGame)
   minClipViews     Int     @default(25) // Twitch clips need at least this many views
-  clipLookbackHrs  Int     @default(24)
+  clipLookbackHrs  Int     @default(168) // v1.8.0: 7 days (was 24h); existing 24 moved to 168 once
   layout           String  @default("blur") // blur | facecam
   captions         Boolean @default(true)
   scoutPaused      Boolean @default(false)
-  gameMode         String  @default("gta6") // gta6 | any (approved streamers in any game)
+  gameMode         String  @default("any") // any (approved streamers in any game, default since v1.8.0) | gta6
   clipFunny        Boolean @default(true) // "What to clip": funny moments (don't have to be gaming)
   clipGaming       Boolean @default(true) // "What to clip": gaming moments
   ytScanEnabled      Boolean @default(true) // YouTube scanner: most-replayed parts of approved channels' new videos
@@ -142,6 +144,10 @@ model Settings {
   ytMaxVideoAgeDays  Int     @default(14)
   ytSuggestRegion    String  @default("US") // YouTube suggestions: country of the "trending" charts (ISO 3166-1 alpha-2)
   editStyle          String  @default("hype") // hype | clean | meme (v1.7.3 editing styles)
+  standoutMin         Float   @default(2) // v1.8.0: a Twitch clip needs >= N x that creator's usual (median) clip views
+  maxPerCreatorPerRun Int     @default(2) // v1.8.0: fair mix, at most this many new clips per creator per scan
+  jumpCuts            String  @default("light") // v1.8.0: off | light | normal (only real silence is cut)
+  migratedAnyGame     Boolean @default(false) // v1.8.0 one-time move: gta6 -> any, lookback 24h -> 7d, max 45s -> 35s
 }
 
 // Connected posting accounts. Several per platform (e.g. two YouTube channels, a TikTok).

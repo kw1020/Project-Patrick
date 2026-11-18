@@ -4,75 +4,92 @@ import { enqueueGrab } from "../lib/queues";
 import { defaultCaption, defaultTitle, GTA6_NAME } from "../lib/social";
 import { backlogRoom } from "../lib/guards";
 import { categoryOff, skippedNote, twitchClipCategory, type Category } from "../lib/category";
+import { dedupe, roundRobin, scoreCreatorClips, type Scored, type VodSpan } from "../lib/standout";
 
 const MAX_NEW_PER_RUN = 15;
 
-/** Twitch Clips poller: viewer-made clips of approved streamers are free, pre-picked hype moments. */
+/**
+ * Twitch Clips poller (v1.8.0 "Better moments"): for each approved, not-paused Twitch creator, their viewer-made clips
+ * from the lookback window; only clips that stand out against THAT creator's usual clip (Settings.standoutMin), no
+ * near-duplicates, shared out round-robin (at most Settings.maxPerCreatorPerRun each) so no channel hogs the line.
+ */
 export async function runClipsPoll() {
   const settings = await getSettings();
   if (settings.scoutPaused) return "paused";
   // Paused creators (Creators page) stay approved but are skipped.
   const approved = await prisma.streamer.findMany({ where: { approved: true, paused: false, platform: "twitch" } });
   if (!approved.length) return "no approved streamers yet (or all paused) — add some on the Streamers page";
-  const byTwitchId = new Map(approved.map((s) => [s.twitchId, s]));
 
-  const gameId = await getGameId();
+  // "any" mode (default since v1.8.0): every game, only approved creators. "gta6": GTA clips only, plus the GTA-wide list.
+  const anyGame = settings.gameMode !== "gta6";
+  const gameId = anyGame ? await getGameId().catch(() => null) : await getGameId();
   const startedAt = new Date(Date.now() - settings.clipLookbackHrs * 3600_000).toISOString();
 
-  const found = new Map<string, TwitchClip>();
-  // 1) Game-wide top clips, 2) each approved streamer's own clips (catches smaller channels).
-  for (const c of await getClips({ game_id: gameId, started_at: startedAt }, 2)) found.set(c.id, c);
+  const perCreator = new Map<string, Map<string, TwitchClip>>(approved.map((s) => [s.twitchId, new Map()]));
   for (const s of approved) {
-    for (const c of await getClips({ broadcaster_id: s.twitchId, started_at: startedAt }, 1)) found.set(c.id, c);
+    for (const c of await getClips({ broadcaster_id: s.twitchId, started_at: startedAt }, 1)) {
+      if (c.broadcaster_id === s.twitchId) perCreator.get(s.twitchId)!.set(c.id, c); // ground rule: only their own channel's clips
+    }
+  }
+  if (!anyGame && gameId) {
+    // GTA discovery (gta6 mode only): the game-wide top clips, kept for approved creators (ground rule).
+    for (const c of await getClips({ game_id: gameId, started_at: startedAt }, 2)) perCreator.get(c.broadcaster_id)?.set(c.id, c);
   }
 
-  // "any" mode: an approved streamer's clips count whatever game they're from.
-  const anyGame = settings.gameMode === "any";
-  const candidates = [...found.values()]
-    .filter((c) => byTwitchId.has(c.broadcaster_id)) // ground rule: approved streamers only
-    .filter((c) => anyGame || c.game_id === gameId)
-    .filter((c) => c.view_count >= settings.minClipViews)
-    .sort((a, b) => b.view_count - a.view_count);
-
   const known = new Set(
-    (await prisma.moment.findMany({ where: { twitchClipId: { in: candidates.map((c) => c.id) } }, select: { twitchClipId: true } })).map((m) => m.twitchClipId),
+    (await prisma.moment.findMany({ where: { twitchClipId: { in: [...perCreator.values()].flatMap((m) => [...m.keys()]) } }, select: { twitchClipId: true } })).map((m) => m.twitchClipId),
   );
 
-  // Launch-day cap: only take as many as the line has room for (candidates are highest views first).
+  // Score each creator's clips against their own usual; then drop clips we already have and near-duplicates.
+  let nothing = 0;
+  const lists: Scored[][] = [];
+  for (const s of approved) {
+    const clips = [...perCreator.get(s.twitchId)!.values()].filter((c) => anyGame || c.game_id === gameId);
+    const { kept } = scoreCreatorClips(clips, { minClipViews: settings.minClipViews, standoutMin: settings.standoutMin });
+    if (!kept.length) nothing++;
+    lists.push(kept.filter((k) => !known.has(k.clip.id)));
+  }
+
+  // Twitch clips carry only game_id: look up names for the other games (cached; a failed lookup just leaves it blank).
+  const otherIds = lists.flat().map((k) => k.clip.game_id).filter((g) => g && g !== gameId);
+  const names = otherIds.length ? await getGameNames(otherIds).catch(() => new Map<string, string>()) : new Map<string, string>();
+  const gameOf = (c: TwitchClip) => (gameId && c.game_id === gameId ? GTA6_NAME : names.get(c.game_id) ?? null);
+
+  // Settings → "What to clip": a switched-off kind never becomes a moment. Unknown game name: try again next poll.
+  const skipped: Record<Category, number> = { funny: 0, gaming: 0 };
+  for (let i = 0; i < lists.length; i++) {
+    lists[i] = lists[i].filter((k) => {
+      const game = gameOf(k.clip);
+      if (!game) return false;
+      const cat = twitchClipCategory(game, k.clip.title);
+      if (categoryOff(settings, cat)) { skipped[cat]++; return false; }
+      return true;
+    });
+    if (!lists[i].length) continue;
+    // Viewers often clip the same moment several times: keep the most-viewed, and skip moments we already have.
+    const s = approved[i];
+    const vodIds = [...new Set(lists[i].map((k) => k.clip.video_id).filter(Boolean))];
+    const existing: VodSpan[] = vodIds.length
+      ? (await prisma.moment.findMany({ where: { streamerId: s.id, vodId: { in: vodIds }, vodOffset: { not: null } }, select: { vodId: true, vodOffset: true, source: true } }))
+        .map((m) => ({ vodId: m.vodId!, from: m.vodOffset! - (m.source === "chat" ? 30 : 0), to: m.vodOffset! + (m.source === "chat" ? 15 : 30) }))
+      : [];
+    lists[i] = dedupe(lists[i], existing);
+  }
+
+  // Fair mix: round-robin across creators, capped per creator and by the room in the line.
   const room = await backlogRoom();
   const limit = Math.min(MAX_NEW_PER_RUN, room);
-  // Twitch clips carry only game_id: look up names for the other games (cached; a failed lookup just leaves it blank).
-  const otherIds = candidates.filter((c) => c.game_id && c.game_id !== gameId).map((c) => c.game_id);
-  const names = otherIds.length ? await getGameNames(otherIds).catch(() => new Map<string, string>()) : new Map<string, string>();
-  const gameOf = (c: TwitchClip) => (c.game_id === gameId ? GTA6_NAME : names.get(c.game_id) ?? null);
+  const picks = roundRobin(lists, Math.max(1, settings.maxPerCreatorPerRun), limit);
+  const waiting = lists.reduce((n, l) => n + l.length, 0); // standout clips not taken this time come next scan
 
-  let added = 0;
-  const skipped: Record<Category, number> = { funny: 0, gaming: 0 };
-  for (const c of candidates) {
-    if (known.has(c.id)) continue;
-    // Settings → "What to clip": a switched-off kind never becomes a moment (needs the game name, so after the lookup).
-    const knownGame = gameOf(c);
-    if (knownGame) {
-      const cat = twitchClipCategory(knownGame, c.title);
-      if (categoryOff(settings, cat)) { skipped[cat]++; continue; }
-    }
-    if (added >= limit) continue;
-    const s = byTwitchId.get(c.broadcaster_id)!;
-    // Skip if the spike detector already caught this same moment from chat.
-    if (c.video_id && c.vod_offset != null) {
-      const dupe = await prisma.moment.findFirst({
-        where: { streamerId: s.id, source: "chat", vodId: c.video_id, vodOffset: { gte: c.vod_offset - 10, lte: c.vod_offset + Math.ceil(c.duration) + 10 } },
-        select: { id: true },
-      });
-      if (dupe) continue;
-    }
-    const game = gameOf(c);
-    if (!game) continue; // game name lookup failed: try again next poll rather than mislabel it
+  const from = new Set<number>();
+  for (const { creator, pick } of picks) {
+    const s = approved[creator], c = pick.clip, game = gameOf(c)!;
     const title = defaultTitle(c.title, s.name, game);
     const category = twitchClipCategory(game, c.title);
     const moment = await prisma.moment.create({
       data: {
-        streamerId: s.id, timestamp: new Date(c.created_at), spikeScore: c.view_count, source: "twitch_clip",
+        streamerId: s.id, timestamp: new Date(c.created_at), spikeScore: pick.standout, source: "twitch_clip",
         twitchClipId: c.id, sourceUrl: c.url, sourceTitle: c.title, sourceViews: c.view_count, gameName: game,
         vodId: c.video_id || null, vodOffset: c.vod_offset ?? null, category,
         clips: { create: { title, caption: defaultCaption(title, s, game), status: "processing", stage: "grab", stageAt: new Date(), category } },
@@ -80,8 +97,13 @@ export async function runClipsPoll() {
       include: { clips: true },
     });
     await enqueueGrab(moment.id, moment.clips[0].id);
-    added++;
+    from.add(creator);
   }
+
+  const n = picks.length, parts = [`picked ${n} standout clip${n === 1 ? "" : "s"} from ${from.size} creator${from.size === 1 ? "" : "s"}`];
+  if (nothing) parts.push(`${nothing} had nothing standout`);
+  if (waiting > n) parts.push(room <= n ? (room ? `line has room for ${room}, rest next scan` : "line full, skipped new ones") : "rest next scan");
   const skip = skippedNote(skipped);
-  return `${candidates.length} eligible clips, ${added} new sent to the Grabber${room < MAX_NEW_PER_RUN ? ` (line ${room ? `has room for ${room}` : "full, skipped new ones"})` : ""}${skip ? ` · ${skip}` : ""}`;
+  if (skip) parts.push(skip);
+  return parts.join(" · ");
 }
