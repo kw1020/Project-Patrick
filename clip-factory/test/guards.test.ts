@@ -65,7 +65,7 @@ const json = (body: unknown) => new Response(JSON.stringify(body), { status: 200
 function stubTwitch(broadcaster: string, n: number) {
   const clips = Array.from({ length: n }, (_, i) => ({
     id: `clip-${i}`, url: `https://clips.twitch.tv/c${i}`, broadcaster_id: broadcaster, broadcaster_name: "B", creator_name: "x",
-    video_id: "", game_id: GTA, title: `clip ${i}`, view_count: 1000 - i, created_at: new Date().toISOString(),
+    video_id: "", game_id: GTA, title: `clip ${i}`, view_count: 1000 - i, created_at: new Date(Date.now() - (i + 1) * 120_000).toISOString(), // 2 min apart: separate moments
     thumbnail_url: "", duration: 30, vod_offset: null,
   }));
   globalThis.fetch = (async (input: string | URL | Request) => {

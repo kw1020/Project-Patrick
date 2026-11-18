@@ -104,19 +104,36 @@ original brief is below, and the status section says what's done. Read both befo
   game-wide GTA `/clips` query (gta6 mode only). Moment.spikeScore = standout for twitch_clip. Status "picked N standout clips
   from M creators · K had nothing standout". Window (`src/lib/window.ts`, pure): `runTranscribe` now transcribes + measures
   100ms loudness of the WHOLE source (<= 180s) → `Clip.words` timed in the source with `Clip.wordsFull = true` (older rows:
-  window-relative, false) → `findPayoff` (chat: min(30, vodOffset), YouTube: min(25, vodOffset), sharpened to a loud 1.5s within
-  -3..+5s; Twitch clip: loudest 1.5s in the last 70% + reaction-word bursts) → `pickSmartWindow` (payoff at 65%, start on a
-  word / skip >1s dead air, end on a sentence end within 6s of nominal or not mid-word, >= payoff+1.5) → `Clip.payoffAt`
-  (source seconds; the cutter passes `payoffAt - winStart` as `renderStyled({ peakAt })`, falling back to `pickPeak` when it's
-  outside the window). Judge gets "Source video / Proposed window" + `<source_transcript>` ("[12.4s] …" lines) and returns
+  window-relative, false) → `findPayoff` → `pickSmartWindow` → `Clip.payoffAt` (source seconds; the cutter passes `payoffAt - winStart` as `renderStyled({ peakAt })`; outside the window → `windowPeak`: chat moment, else the same jump search on the window, else loudest second). Payoff/window rules: see "v1.8.0 review" below. Judge gets "Source video / Proposed window" + `<source_transcript>` ("[12.4s] …" lines) and returns
   nullable `best_start`/`best_end`; `validJudgeWindow` (length within [min, max], inside the source) → winStart/winLength/
   duration/transcript replaced. Order unchanged: grab → transcribe → judge → cut; re-cuts use the stored window.
-  Jump cuts (`planJumpCuts`): a gap is cut only if every 100ms frame (one `astats` pass, `measureLevels`) is under
-  `silenceThreshold` = min(-35, speech median - 15 dB); no levels = no cuts. Presets `JUMP_PRESETS` light (gap >= 1.2s, pad 0.35,
+  Jump cuts (`planJumpCuts`): only a run of 100ms frames (one `astats` pass, `measureLevels`) inside a word gap that are all under
+  `silenceThreshold` = min(-45, speech median - 20 dB) (review: was -35/-15); no levels = no cuts. Presets `JUMP_PRESETS` light (gap >= 1.2s, pad 0.35,
   <= 15%, <= 4 cuts) / normal (0.8, 0.25, 25%, 6); never within 1s before the payoff through the punch. Queue Re-cut has
   "<style> without jump cuts" (`recutClip(id, style, "off")`, job data `jumpCuts`). Settings page: standout + per-creator knobs,
   lookback in days (`clipLookbackDays` form field, 1-30), jump cuts select, amber no-key note. Live heading "Live now" in any mode
   (game chip on everyone). Prompt: stricter scale (routine 3-5, real moment 7-10). Unverified on real Twitch audio/Whisper/Claude.
+- **v1.8.0 review (2026-11-18, on top of 9489388; `test/v180-review.test.ts` + updated `test/v180.test.ts`, proof renders in the session
+  scratchpad only).** Problems found: "loudest 1.5s" picks game noise (game audio is loud all the time); payoff landed ~2s late and the
+  window ran 11s past it; jump cuts never cut a silence that shared a word gap with game audio, and the -35 dB cap let quiet game/music
+  beds be cut; Judge windows could open/end mid-word and drop the payoff (stale punch-in); live Twitch clips (no `vod_offset` yet)
+  were never deduped; Whisper writes laughter as single "Ha" tokens the reaction regex missed. Now (`src/lib/window.ts`):
+  `scoreMoments` per 100ms frame: audio = (1s level - usual) clamped 0..15 + 0.25 x (1s level - median) clamped 0..20, where
+  usual = max(p80 of the 1-8s before, p75 of the whole source) and median likewise (so a talker coming back after a pause scores ~0);
+  react = 2.5 per reaction word starting in the next 3s once there are >= 2 (max 6). `findPayoff`: chat/YouTube hint sharpened within
+  -3..+5s if score >= 6, else the hint; Twitch clip: best frame in the last 70% (+2 late bonus, then back to the start of that
+  moment's plateau), needs score >= 5 (`CLUE_MIN`), else 70%; payoff = the onset. `reactionEnd`: while the 0.5s level stays >=
+  max(usual - 3, bed + 6) (bed = p20 of the 8s before; dips <= 0.8s) and/or reaction words chain (gaps <= 1.2s), max payoff + 8s.
+  `pickSmartWindow`: end = reaction end + 0.8, or the end of a "capper" sentence under way / starting within 2s that ends by
+  payoff + 10s; never mid-word; >= payoff + 2. Start = the sentence start (0.25s early) closest to end - 80% of maxSec (28s at 35),
+  >= 3s before the payoff; no words = that spot moved past real silence (< -50 dBFS, `SILENT_DB`). Result on the proof source:
+  payoff at 64-65% of a 24s clip, ending right after the capper line. Jump cuts (`planJumpCuts` + `quietRuns`): only the truly quiet
+  run INSIDE a word gap (>= maxGap long) is cut, pads kept next to words. Judge: the worker re-measures levels (`judgeMarks`:
+  window edges, likely payoff, loudness jumps >= 6 dB, silences >= 1.5s as "[t] (sound: ...)" lines in `<source_transcript>`; the
+  window's plain `<transcript>` is only sent for older clips), snaps its window (`snapWindowToWords`) and re-finds the payoff inside it
+  when it was left out. Prompt rewritten (editor rules for best_start/best_end, hook without spoiling the payoff). Dedupe
+  (`src/lib/standout.ts`): clips created within 30s (`SAME_MOMENT_SEC`) are one moment; existing chat moments block clips created
+  -10..+60s around them, existing viewer clips +-30s. No schema change in the review.
 - Docker image never built in the sandbox (no daemon); it builds fine on Krew's PC; a clean-copy `npm ci` + `next build` without `.env`
   (what the Dockerfile does) passes.
 - **Suggestions (2026-11-17):** `src/workers/suggest.ts` (queue "suggest", hourly + once ~1 min after start,

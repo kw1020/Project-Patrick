@@ -268,9 +268,10 @@ test("spike worker: funny spike → funny moment + clip; funny off → skipped a
 });
 
 const json = (body: unknown) => new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } });
+let twMade = 0; // each clip 2 min apart (clips made within 30s are one moment since the v1.8.0 review)
 const twClip = (id: string, broadcaster_id: string, game_id: string, title: string) => ({
   id, url: `https://clips.twitch.tv/${id}`, broadcaster_id, broadcaster_name: "B", creator_name: "x", video_id: "", game_id,
-  title, view_count: 500, created_at: new Date().toISOString(), thumbnail_url: "", duration: 30, vod_offset: null,
+  title, view_count: 500, created_at: new Date(Date.now() - ++twMade * 120_000).toISOString(), thumbnail_url: "", duration: 30, vod_offset: null,
 });
 function stubTwitch(clips: Record<string, ReturnType<typeof twClip>[]>, streams: unknown[] = []) {
   const asked: string[] = [];

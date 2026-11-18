@@ -4,9 +4,9 @@
 - Any game for everyone by default: your approved creators are clipped whatever they play (you can switch back to GTA 6 only in Settings).
 - A fair mix across all your creators: each scan takes at most 2 new clips per creator, one from each in turn, so one or two big channels can't fill the line.
 - Only standout clips: a Twitch clip needs way more views than that creator's usual clips (2x by default), from the last 7 days.
-- Smarter cut that lands on the payoff (the loud or funny bit) with a little build-up first, 15 to 35 seconds long.
+- Smarter cut: it finds the reaction (a sudden jump in loudness, a scream, laughing, "no way") instead of just the loudest second, starts at the start of a sentence and ends right after the reaction, 15 to 35 seconds long.
 - Stricter Judge that can pick the best part of the video itself. Without an Anthropic key, clips still come to you unscored.
-- Jump cuts only cut real silence now, and much less often; you can turn them off in Settings or re-cut one clip without them.
+- Jump cuts only cut real silence now (never game sound or music), and much less often; you can turn them off in Settings or re-cut one clip without them.
 
 ## 1.7.3 — 2026-11-17
 - New editing styles: Hype, Clean and Meme. Pick one in Settings, under Clips. Hype is the new default.
