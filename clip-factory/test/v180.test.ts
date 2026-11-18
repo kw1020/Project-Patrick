@@ -445,7 +445,7 @@ test("line: window lands on the late payoff; the Judge's best_start/best_end is 
   mock.verdict = { ...mock.verdict, best_start: 50, best_end: 54 };
   assert.doesNotMatch(await runJudge(c.id), /Judge picked/);
   clip = await prisma.clip.findUniqueOrThrow({ where: { id: c.id } });
-  assert.deepEqual([clip.winStart, clip.winLength], [25.3, 28]);
+  assert.deepEqual([clip.winStart! + clip.winLength!, clip.winLength], [winEnd, 28], "back to the heuristic window");
   // Review fix: a Judge window that leaves the payoff out gets a payoff (punch-in) inside it, not a stale one outside.
   mock.verdict = { ...mock.verdict, best_start: 10, best_end: 35 };
   assert.match(await runJudge(c.id), /Judge picked 10-35s/);

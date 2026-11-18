@@ -200,9 +200,14 @@ export function reactionEnd(o: { payoff: number; levels: number[]; words: Word[]
   if (o.levels.length) {
     const m = scoreMoments(o.levels, [], f), i0 = Math.max(0, Math.min(m.smooth.length - 1, Math.round(p / f)));
     const usual = m.usual[i0] ?? FLOOR, half = smoothLevels(o.levels, 0.5, f);
+    // The bed = the quiet floor of the 8s before (game audio / room with nobody talking). The reaction goes on while
+    // there's talking/laughing at about the usual level AND clearly over the bed (6 dB), so a loud game bed alone never counts.
+    const prior = m.smooth.slice(Math.max(0, i0 - Math.round(8 / f)), Math.max(0, i0 - Math.round(1 / f))).filter((v) => v > FLOOR);
+    const bed = prior.length >= 15 ? quantile(prior, 0.2) : quantile(m.smooth.filter((v) => v > FLOOR), 0.2);
+    const loud = Math.max(usual - 3, bed + 6);
     let lastLoud = p;
     for (let i = i0; i < half.length && i * f <= cap; i++) {
-      if (half[i] >= usual + 2 && half[i] > SILENT_DB) lastLoud = i * f + 0.5;
+      if (half[i] >= loud && half[i] > SILENT_DB) lastLoud = i * f + 0.5;
       else if (i * f - lastLoud > 0.8) break;
     }
     end = Math.max(end, Math.min(cap, lastLoud));

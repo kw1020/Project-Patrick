@@ -69,6 +69,18 @@ test("payoff: the steady loudest second of game audio is not a payoff; a reactio
   assert.ok(end < 53, "not on the next topic");
 });
 
+test("reaction end: wordless laughter at talking level after a scream is part of the reaction; a game bed alone is not", () => {
+  // Game bed -33, talking -18 (28-40s), scream -10 (43.5-45.3), laughing -18 (45.8-48.3), then only the bed.
+  const levels = levelsWith(60, -33, [28.5, 40, -18], [43.5, 45.3, -10], [45.8, 48.3, -18]);
+  assert.equal(findPayoff({ source: "twitch_clip", duration: 60, levels, words: [] }).at, 43.5);
+  const end = reactionEnd({ payoff: 43.5, levels, words: [], duration: 60 });
+  assert.ok(end >= 48 && end <= 49, `laughter kept: ${end}`);
+  // Loud game all the time (bed = talking level): only the scream counts, the reaction doesn't run on for 8s.
+  const loudGame = levelsWith(60, -18, [43.5, 45.3, -8]);
+  const e2 = reactionEnd({ payoff: 43.5, levels: loudGame, words: [], duration: 60 });
+  assert.ok(e2 >= 45 && e2 <= 46.5, `stops with the scream: ${e2}`);
+});
+
 test("chat hint: sharpened to the reaction, else kept; range limits the search", () => {
   const levels = levelsWith(45, -20, [33, 35, -8]);
   assert.equal(findPayoff({ source: "chat", duration: 45, levels, words: [], hint: 30 }).at, 33);
