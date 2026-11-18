@@ -6,7 +6,7 @@ import path from "node:path";
 import { run, type Facecam, type Word } from "./media";
 import { storagePath } from "./paths";
 import { type EditStyle, type JumpCutMode } from "./edit-styles";
-import { FRAME, meanDb } from "./window";
+import { FRAME, findPayoff, meanDb } from "./window";
 
 export { type EditStyle, type JumpCutMode, EDIT_STYLES, JUMP_CUT_MODES, parseEditStyle, parseJumpCuts, DEFAULT_EDIT_STYLE } from "./edit-styles";
 
@@ -58,17 +58,35 @@ export const JUMP_PRESETS: Record<Exclude<JumpCutMode, "off">, { maxGap: number;
   normal: { maxGap: 0.8, pad: 0.25, maxShare: 0.25, maxCuts: 6 },
 };
 
+/** Real silence is at least this far under the speech level, and never louder than SILENCE_MAX_DB. */
+export const SILENCE_BELOW_SPEECH_DB = 20;
+export const SILENCE_MAX_DB = -45;
+
 /**
- * The level (dB) below which a 100ms frame counts as silence: 15 dB under the speech level (frames inside words),
- * and never above -35 dB. Null when there's nothing to measure.
+ * The level (dB) below which a 100ms frame counts as silence: 20 dB under the speech level (frames inside words), and never
+ * above -45 dBFS. Game audio / music beds on Twitch sit around -40..-20 dBFS, so they never count as silence (v1.8.0 review:
+ * the earlier -35 cap let quiet game beds be cut). Null when there's nothing to measure.
  */
 export function silenceThreshold(levels: number[], words: Word[], frame = FRAME): number | null {
   if (!levels.length) return null;
   const speech = words.flatMap((w) => levels.slice(Math.max(0, Math.floor(w.start / frame)), Math.ceil(w.end / frame))).filter((v) => Number.isFinite(v));
   const pool = (speech.length >= 3 ? speech : levels.filter((v) => Number.isFinite(v))).sort((a, b) => a - b);
-  if (!pool.length) return -35; // nothing but pure silence
+  if (!pool.length) return SILENCE_MAX_DB; // nothing but pure silence
   const level = pool[Math.floor(pool.length * (speech.length >= 3 ? 0.5 : 0.75))];
-  return Math.min(-35, level - 15);
+  return Math.min(SILENCE_MAX_DB, level - SILENCE_BELOW_SPEECH_DB);
+}
+
+/** Runs of quiet frames (every frame under `threshold`) inside [start, end], in seconds. Frames we don't have = not quiet. */
+export function quietRuns(levels: number[], start: number, end: number, threshold: number, frame = FRAME): Seg[] {
+  const a = Math.max(0, Math.floor(start / frame + 1e-6)), b = Math.min(levels.length, Math.ceil(end / frame - 1e-6));
+  const out: Seg[] = [];
+  let rs = -1;
+  for (let i = a; i <= b; i++) {
+    const q = i < b && levels[i] < threshold;
+    if (q && rs < 0) rs = i;
+    if (!q && rs >= 0) { out.push({ start: Math.max(start, rs * frame), end: Math.min(end, i * frame) }); rs = -1; }
+  }
+  return out;
 }
 
 /** True when every 100ms frame of [start, end] is under the threshold (frames we don't have = not quiet). */
@@ -97,12 +115,21 @@ export function planJumpCuts(opts: { words: Word[]; length: number; minSec: numb
   for (let i = 0; i + 1 < words.length; i++) {
     const a = words[i].end, b = words[i + 1].start;
     if (b - a <= maxGap) continue;
-    const g = { start: snap(a + pad), end: snap(Math.min(b, length) - pad) };
-    if (g.end - g.start < 0.1) continue;
-    if (opts.protect && g.start < opts.protect.end && g.end > opts.protect.start) continue;
-    // Loudness known: keep any gap with game sound, music or untranscribed talk in it.
-    if (opts.levels && (threshold == null || !isQuiet(opts.levels, g.start, g.end, threshold))) continue;
-    gaps.push(g);
+    const cands: Seg[] = [];
+    if (opts.levels) {
+      // Loudness known: only the truly silent part of the gap (>= maxGap of it) is cut; game sound, music or
+      // untranscribed talk in the rest of the gap stays. 0.35s/0.25s (pad) is kept next to the words either way.
+      if (threshold == null) continue;
+      for (const q of quietRuns(opts.levels, a, Math.min(b, length), threshold)) {
+        if (q.end - q.start < maxGap - 1e-6) continue;
+        cands.push({ start: snap(Math.max(q.start + 0.05, a + pad)), end: snap(Math.min(q.end - 0.05, Math.min(b, length) - pad)) });
+      }
+    } else cands.push({ start: snap(a + pad), end: snap(Math.min(b, length) - pad) });
+    for (const g of cands) {
+      if (g.end - g.start < 0.1) continue;
+      if (opts.protect && g.start < opts.protect.end && g.end > opts.protect.start) continue;
+      gaps.push(g);
+    }
   }
   gaps.sort((x, y) => (y.end - y.start) - (x.end - x.start));
   let total = snap(length), removed = 0;
@@ -181,6 +208,24 @@ export function pickPeak(opts: { source: string; vodOffset: number | null; vodId
   const i = loudestSecond(opts.levels);
   if (i == null) return null;
   return r3(Math.min(opts.length - 1, i + 0.2));
+}
+
+/**
+ * The punch-in moment when Clip.payoffAt doesn't fall inside the window (older clips, or the Judge moved the window off it):
+ * a chat spike's known moment, else the same loudness-jump + reaction-word search the window uses (findPayoff), else the
+ * loudest second.
+ */
+export function windowPeak(o: { peakHint?: { source: string; vodOffset: number | null; vodId?: string | null } | null; start: number; length: number; fine: number[]; levels: number[]; words: Word[] }): number | null {
+  const source = o.peakHint?.source ?? "";
+  if (source === "chat") {
+    const p = pickPeak({ source, vodOffset: o.peakHint?.vodOffset ?? null, vodId: o.peakHint?.vodId, winStart: o.start, length: o.length, levels: o.levels });
+    if (p != null) return p;
+  }
+  if (o.fine.length || o.words.length) {
+    const p = findPayoff({ source: "window", duration: o.length, levels: o.fine, words: o.words, range: { from: 0.5, to: o.length } });
+    if (!p.why.startsWith("no clear")) return r3(p.at);
+  }
+  return pickPeak({ source: "", vodOffset: null, winStart: o.start, length: o.length, levels: o.levels });
 }
 
 /** Punch-in timing on the edited timeline: 0.25s in (fully in at the peak), 1.2s hold, 0.25s out. */
@@ -464,7 +509,7 @@ export async function renderStyled(opts: {
   const fine = opts.hasAudio ? await measureLevels(opts.input, opts.start, opts.length).catch(() => [] as number[]) : [];
   const levels = perSecond(fine);
   const known = opts.peakAt != null && opts.peakAt > 0 && opts.peakAt < opts.length ? r3(opts.peakAt) : null;
-  const peak = known ?? pickPeak({ source: opts.peakHint?.source ?? "", vodOffset: opts.peakHint?.vodOffset ?? null, vodId: opts.peakHint?.vodId, winStart: opts.start, length: opts.length, levels });
+  const peak = known ?? windowPeak({ ...opts, fine, levels });
   const plan = planEdit({ style: opts.style, words: opts.words, length: opts.length, minSec: opts.minSec, peak, levels: fine, jumpCuts: opts.jumpCuts ?? "light" });
   const layout = opts.facecam ? "facecam" : "blur";
   fs.mkdirSync(opts.workDir, { recursive: true });

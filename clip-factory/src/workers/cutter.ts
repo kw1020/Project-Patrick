@@ -47,7 +47,7 @@ export async function runTranscribe(clipId: string) {
     fs.rmSync(wav, { force: true });
   }
   const payoff = findPayoff({ source: clip.moment.source, duration: span, levels, words, hint: payoffHint(clip.moment) });
-  const win = pickSmartWindow({ duration: span, payoff: payoff.at, words, minSec: settings.clipMinSec, maxSec: settings.clipMaxSec });
+  const win = pickSmartWindow({ duration: span, payoff: payoff.at, words, levels, minSec: settings.clipMinSec, maxSec: settings.clipMaxSec });
   const inWin = windowWords(words, win.start, win.length);
   await prisma.clip.update({
     where: { id: clipId },

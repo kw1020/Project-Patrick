@@ -4,7 +4,8 @@ import { buildLessons } from "../lib/learning";
 import { enqueueCut } from "../lib/queues";
 import { cleanHashtags, judgedCaption, momentGame } from "../lib/social";
 import { categoryOff, offReason } from "../lib/category";
-import { timedTranscript, validJudgeWindow, windowWords } from "../lib/window";
+import { audioCues, findPayoff, snapWindowToWords, timedTranscript, validJudgeWindow, windowWords } from "../lib/window";
+import { measureLevels } from "../lib/edit";
 import { probeDuration, type Word } from "../lib/media";
 import { resolveStored } from "../lib/paths";
 import { MAX_SOURCE_SEC } from "./cutter";
@@ -33,6 +34,9 @@ export async function runJudge(clipId: string) {
   if (clip.wordsFull && clip.words) { try { words = JSON.parse(clip.words); } catch { /* no words */ } }
   const sourceLength = clip.wordsFull && clip.winStart != null && clip.winLength != null ? await sourceSeconds(clip) : null;
   const win = clip.winStart != null && clip.winLength != null ? { start: clip.winStart, end: clip.winStart + clip.winLength } : null;
+  // The Judge can't hear: loudness jumps and real silences go into its timeline (one cheap astats pass; none if it fails).
+  const levels = sourceLength && clip.rawPath ? await measureLevels(resolveStored(clip.rawPath), 0, sourceLength).catch(() => [] as number[]) : [];
+  const marks = sourceLength && win ? judgeMarks(levels, win, clip.payoffAt) : [];
 
   const lessons = settings.judgeLearns ? await buildLessons().catch(() => null) : null;
   let verdict;
@@ -42,7 +46,7 @@ export async function runJudge(clipId: string) {
       replayScore: moment.source === "youtube" ? moment.spikeScore : undefined,
       sourceTitle: moment.sourceTitle, sourceViews: moment.sourceViews, transcript: clip.transcript, stats, minScore: settings.minScore,
       category: clip.category ?? moment.category,
-      ...(sourceLength && win ? { sourceLength, window: win, timedTranscript: timedTranscript(words), lengthRange: { min: settings.clipMinSec, max: settings.clipMaxSec } } : {}),
+      ...(sourceLength && win ? { sourceLength, window: win, timedTranscript: timedTranscript(words, 80, marks), lengthRange: { min: settings.clipMinSec, max: settings.clipMaxSec } } : {}),
     }, lessons?.text ?? null);
   } catch (e) {
     return skip(`Judge error: ${(e as Error).message}`.slice(0, 300));
@@ -55,11 +59,16 @@ export async function runJudge(clipId: string) {
   const category = verdict.category;
   const off = categoryOff(settings, category);
   // The Judge's own window, only when it's a sane length inside the source (else the heuristic window stays).
-  const picked = sourceLength ? validJudgeWindow({ start: verdict.best_start, end: verdict.best_end }, { duration: sourceLength, minSec: settings.clipMinSec, maxSec: settings.clipMaxSec }) : null;
+  const valid = sourceLength ? validJudgeWindow({ start: verdict.best_start, end: verdict.best_end }, { duration: sourceLength, minSec: settings.clipMinSec, maxSec: settings.clipMaxSec }) : null;
+  // Its times come from a transcript: don't open or end mid-word.
+  const picked = valid && sourceLength ? snapWindowToWords(valid, words, { duration: sourceLength, maxSec: settings.clipMaxSec }) : null;
   const moved = picked && win && (Math.abs(picked.start - win.start) > 0.05 || Math.abs(picked.start + picked.length - win.end) > 0.05) ? picked : null;
   const winData = moved ? (() => {
     const inWin = windowWords(words, moved.start, moved.length);
-    return { winStart: moved.start, winLength: moved.length, duration: moved.length, transcript: inWin.length ? inWin.map((w) => w.word.trim()).join(" ") : null };
+    // The punch-in must be inside the clip: if the Judge's stretch leaves the payoff out, find the payoff inside it.
+    const inside = clip.payoffAt != null && clip.payoffAt > moved.start + 0.5 && clip.payoffAt < moved.start + moved.length - 0.5;
+    const payoffAt = inside ? clip.payoffAt : findPayoff({ source: "window", duration: sourceLength!, levels, words, range: { from: moved.start + 0.5, to: moved.start + moved.length } }).at;
+    return { winStart: moved.start, winLength: moved.length, duration: moved.length, payoffAt, transcript: inWin.length ? inWin.map((w) => w.word.trim()).join(" ") : null };
   })() : {};
   await prisma.clip.update({
     where: { id: clipId },
@@ -84,4 +93,16 @@ async function sourceSeconds(clip: { rawPath: string | null; winStart: number | 
   } catch {
     return end || null;
   }
+}
+
+/** Lines put into the Judge's timed transcript: the proposed window's edges, the payoff, loudness jumps, real silences. */
+export function judgeMarks(levels: number[], win: { start: number; end: number }, payoffAt: number | null): { at: number; text: string }[] {
+  const cues = audioCues(levels);
+  return [
+    { at: win.start, text: "proposed window starts" },
+    { at: win.end, text: "proposed window ends" },
+    ...(payoffAt != null ? [{ at: payoffAt, text: "likely payoff / reaction" }] : []),
+    ...cues.jumps.map((j) => ({ at: j.at, text: `sound: sudden loud burst, ${j.db} dB over the usual level` })),
+    ...cues.silences.map((x) => ({ at: x.from, text: `sound: silence until ${x.to.toFixed(1)}s` })),
+  ];
 }

@@ -77,49 +77,70 @@ test("window: payoff near the end of a 60s clip -> the window ends ~3s after it,
   assert.ok((57 - w.start) / w.length >= 0.6);
 });
 
-test("window: payoff in the middle sits at ~65% and the end lands just after a sentence", () => {
-  const words = talk([0, 140]).map((w) => (Math.abs(w.end - 39.88) < 0.01 ? { ...w, word: "it." } : w)); // a sentence ends at ~39.9s
-  const w = pickSmartWindow({ duration: 60, payoff: 30, words, minSec: 15, maxSec: 35 });
+test("window: ends just after the reaction (+ a capper line), starts on a sentence ~80% of max earlier: payoff ~2/3 in", () => {
+  // Steady talk, sentences every 4.2s; a reaction at 30s ("no no what bro"), then a capper line, then more rambling.
+  const words = talk([0, 14], [4.5, 14], [9, 14], [13.5, 14], [18, 14], [22.5, 14]).map((w, i) => (i % 14 === 13 ? { ...w, word: "it." } : w));
+  const react: Word[] = [{ word: "no", start: 30, end: 30.2 }, { word: "no", start: 30.4, end: 30.6 }, { word: "what!", start: 31, end: 31.4 }, { word: "bro", start: 31.8, end: 32.1 }];
+  const capper = talk([33, 8]).map((w, i) => (i === 7 ? { ...w, word: "happened." } : w)); // 33 -> 35.38
+  const after = talk([37, 30]); // he moves on
+  const all = [...words, ...react, ...capper, ...after];
+  const w = pickSmartWindow({ duration: 60, payoff: 30, words: all, minSec: 15, maxSec: 35 });
   const end = w.start + w.length;
-  assert.ok(Math.abs(end - 40.28) < 0.05, `ends after the sentence: ${end}`);
-  assert.ok(w.start <= 30 - 0.6 * 35 + 0.5 && w.start >= 30 - 0.7 * 35, `start ${w.start}`);
+  assert.ok(Math.abs(end - 35.78) < 0.05, `ends after the capper line: ${end}`);
+  assert.equal(w.start, 9 - 0.25, "starts on a sentence start, 0.25s early");
+  const at = (30 - w.start) / w.length;
+  assert.ok(at > 0.6 && at < 0.85, `payoff at ${at}`);
+  // No words: the end is 2s after the payoff at least, the length 80% of max.
   const plain = pickSmartWindow({ duration: 60, payoff: 30, words: [], minSec: 15, maxSec: 35 });
-  assert.ok(Math.abs((30 - plain.start) / plain.length - 0.65) < 0.01, "no words: payoff at 65%");
+  assert.deepEqual(plain, { start: 4, length: 28 });
+  // The reaction chain on its own (no capper): ends 0.8s after the last reaction word.
+  const noCap = pickSmartWindow({ duration: 60, payoff: 30, words: [...words, ...react], minSec: 15, maxSec: 35 });
+  assert.ok(Math.abs(noCap.start + noCap.length - 32.9) < 0.05, String(noCap.start + noCap.length));
 });
 
-test("window: no words -> loudness only; Twitch clips look for the payoff in the last 70%", () => {
-  // Loud early (5s) and a bit less loud late (30s): a viewer clip's payoff is the late one.
+test("window: no words -> loudness JUMPS (not the loudest second); Twitch clips look in the last 70%", () => {
+  // Loud early (5s) and a bit less loud late (30s) over a quiet bed: a viewer clip's payoff is the late one, at its onset.
   const levels = levelsWith(40, -45, [5, 6.5, -8], [30, 31.5, -12]);
   const p = findPayoff({ source: "twitch_clip", duration: 40, levels, words: [] });
-  assert.ok(Math.abs(p.at - 30.75) < 0.3, `payoff ${p.at}`);
-  assert.equal(p.why, "loudest moment");
-  const w = pickSmartWindow({ duration: 40, payoff: p.at, words: [], minSec: 15, maxSec: 35 });
-  assert.equal(w.start + w.length, 40);
-  assert.equal(w.length, 35);
-  // Not a viewer clip: anywhere counts.
-  assert.ok(Math.abs(findPayoff({ source: "youtube", duration: 40, levels, words: [] }).at - 5.75) < 0.3);
+  assert.equal(p.at, 30);
+  assert.equal(p.why, "loudness jump");
+  const w = pickSmartWindow({ duration: 40, payoff: p.at, words: [], minSec: 15, maxSec: 35, levels });
+  assert.ok(w.start + w.length >= 32 && w.start + w.length <= 33, `ends ~1s after the loud stretch: ${w.start + w.length}`);
+  // Not a viewer clip: anywhere counts (the first big jump).
+  assert.equal(findPayoff({ source: "youtube", duration: 40, levels, words: [] }).at, 5);
   // Silent and wordless: a late default spot for viewer clips, the middle otherwise.
   assert.equal(findPayoff({ source: "twitch_clip", duration: 40, levels: [], words: [] }).at, 28);
   assert.equal(findPayoff({ source: "chat", duration: 40, levels: [], words: [] }).at, 20);
+  // Game audio loud all the time with louder gunfire bursts everywhere: the steady loudest second means nothing;
+  // a scream 10 dB over the usual level does.
+  const game = levelsWith(60, -18, [12, 12.4, -9], [20, 20.3, -9], [27, 27.4, -9], [44, 46, -6]);
+  assert.ok(Math.abs(findPayoff({ source: "twitch_clip", duration: 60, levels: game, words: [] }).at - 44) <= 0.2);
+  // Talking that starts again after a pause is NOT a payoff (it is only back at the usual level).
+  const pauses = levelsWith(60, -40, [5, 15, -18], [20, 30, -18], [35, 45, -18], [50, 58, -18]);
+  assert.match(findPayoff({ source: "twitch_clip", duration: 60, levels: pauses, words: [] }).why, /no clear/);
 });
 
 test("window: short source -> whole source; dead-air openings are skipped; reaction words and hints count", () => {
   assert.deepEqual(pickSmartWindow({ duration: 12, payoff: 10, words: talk([1, 10]), minSec: 15, maxSec: 35 }), { start: 0, length: 12 });
   // 30s source (fits): the first 4s are silence before anyone talks -> start just before the first word.
   const w = pickSmartWindow({ duration: 30, payoff: 22, words: talk([4, 60]), minSec: 15, maxSec: 35 });
-  assert.equal(w.start, 3.7);
-  assert.equal(w.start + w.length, 30);
+  assert.equal(w.start, 3.75);
+  assert.ok(w.start + w.length >= 24 && w.start + w.length <= 24.5, `ends ~2s after the payoff: ${w.start + w.length}`);
   // Reaction words: "oh no bro what" in 3s.
   const words: Word[] = [...talk([2, 10]), { word: "oh", start: 40, end: 40.2 }, { word: "no", start: 40.4, end: 40.6 }, { word: "bro!", start: 41, end: 41.3 }, { word: "WHAT", start: 42, end: 42.4 }];
   assert.deepEqual(reactionBurst(words), { at: 41, count: 4 });
-  assert.equal(findPayoff({ source: "twitch_clip", duration: 50, levels: [], words }).at, 41);
-  // Loudness and reactions agree -> between them.
-  const both = findPayoff({ source: "twitch_clip", duration: 50, levels: levelsWith(50, -40, [42, 43.5, -10]), words });
-  assert.equal(both.why, "loudest moment + reactions");
+  assert.equal(findPayoff({ source: "twitch_clip", duration: 50, levels: [], words }).at, 40);
+  // Whisper writes laughter as separate "Ha" tokens: they count.
+  assert.equal(reactionBurst([{ word: "Ha", start: 10, end: 10.2 }, { word: "ha", start: 10.3, end: 10.5 }, { word: "ha.", start: 10.6, end: 10.8 }])?.count, 3);
+  // Loudness and reactions agree.
+  const both = findPayoff({ source: "twitch_clip", duration: 50, levels: levelsWith(50, -40, [40, 43.5, -10]), words });
+  assert.equal(both.why, "loudness jump + reactions");
+  assert.equal(both.at, 40);
   // Chat spike: the known reaction point, sharpened to a loud moment close by.
   assert.equal(findPayoff({ source: "chat", duration: 45, levels: levelsWith(45, -40), words: [], hint: 30 }).at, 30);
   const sharp = findPayoff({ source: "chat", duration: 45, levels: levelsWith(45, -40, [32, 33.5, -10]), words: [], hint: 30 });
-  assert.ok(Math.abs(sharp.at - 32.75) < 0.2, String(sharp.at));
+  assert.equal(sharp.at, 32);
+  assert.match(sharp.why, /chat reaction \+ loudness jump near it/);
   assert.equal(loudestStretch(levelsWith(10, -80)), null, "silence = no peak");
 });
 
@@ -151,9 +172,9 @@ test("jump cuts: a loud gap (music / untranscribed talk) is NOT cut; a truly sil
   // No loudness at all (no audio / measuring failed): nothing is cut.
   assert.equal(planEdit({ style: "hype", words, length: 20, minSec: 8, peak: null }).segs.length, 1);
   assert.equal(planEdit({ style: "hype", words, length: 20, minSec: 8, peak: null, levels: [] }).segs.length, 1);
-  // Threshold: 15 dB under speech, never above -35.
-  assert.equal(silenceThreshold(silent, words), -35);
-  assert.equal(silenceThreshold(speech(words, 20, -70).map((v) => (v === -20 ? -30 : v)), words), -45);
+  // Threshold: 20 dB under speech, never above -45 (quiet game/music beds are not silence).
+  assert.equal(silenceThreshold(silent, words), -45);
+  assert.equal(silenceThreshold(speech(words, 20, -70).map((v) => (v === -20 ? -30 : v)), words), -50);
   assert.equal(isQuiet(silent, 3.2, 5.6, -35), true);
   assert.equal(isQuiet(loud, 3.2, 5.6, -35), false);
   assert.equal(isQuiet(silent, 19, 25, -35), false, "past the measured audio = not quiet");
@@ -384,11 +405,11 @@ test("line: window lands on the late payoff; the Judge's best_start/best_end is 
 
   await runTranscribe(c.id);
   let clip = await prisma.clip.findUniqueOrThrow({ where: { id: c.id } });
-  assert.ok(clip.payoffAt! > 49.5 && clip.payoffAt! < 52.5, `payoff ${clip.payoffAt}`);
+  assert.ok(clip.payoffAt! > 49.5 && clip.payoffAt! < 50.5, `payoff at the burst's onset: ${clip.payoffAt}`);
   assert.equal(clip.wordsFull, true);
-  assert.equal(clip.winLength, 35);
-  assert.equal(clip.winStart! + clip.winLength!, 60, "ends at the source end (payoff late)");
-  assert.ok(clip.winStart! + clip.winLength! >= clip.payoffAt! + 1.5);
+  assert.equal(clip.winLength, 28, "80% of the max length");
+  const winEnd = clip.winStart! + clip.winLength!;
+  assert.ok(winEnd >= 52.5 && winEnd <= 54, `ends ~1s after the 2s burst, not at the source end: ${winEnd}`);
 
   // Judge picks 34-56s (22s): valid, so the window moves. The prompt carried the source length + proposed window.
   mock.verdict = { ...mock.verdict, best_start: 34, best_end: 56 };
@@ -396,8 +417,14 @@ test("line: window lands on the late payoff; the Judge's best_start/best_end is 
   assert.match(await runJudge(c.id), /Judge picked 34-56s/);
   const sent = JSON.parse(mock.requests.slice(before).find((r) => r.path.includes("/messages"))!.body.toString());
   const userMsg = sent.messages[0].content as string;
-  assert.match(userMsg, /Source video: 60s\. Proposed window: 25\.0s to 60\.0s/);
+  assert.match(userMsg, new RegExp(`Source video: 60s\\. Proposed window: ${clip.winStart!.toFixed(1)}s to ${winEnd.toFixed(1)}s`));
   assert.match(userMsg, /<source_transcript>/);
+  // The Judge can't hear: the burst, the silence and the window edges are in its timeline; no duplicate window transcript.
+  assert.match(userMsg, /\[50\.0s\] \(sound: sudden loud burst, \d+ dB over the usual level\)/);
+  assert.match(userMsg, /\[0\.0s\] \(sound: silence until (49|50)\.\ds\)/);
+  assert.match(userMsg, /\(proposed window starts\)/);
+  assert.match(userMsg, /\(likely payoff \/ reaction\)/);
+  assert.doesNotMatch(userMsg, /<transcript>/);
   assert.match(JSON.stringify(sent.output_config.format), /best_start/);
   clip = await prisma.clip.findUniqueOrThrow({ where: { id: c.id } });
   assert.deepEqual([clip.winStart, clip.winLength, clip.duration], [34, 22, 22]);
@@ -417,7 +444,7 @@ test("line: window lands on the late payoff; the Judge's best_start/best_end is 
   mock.verdict = { ...mock.verdict, best_start: 50, best_end: 54 };
   assert.doesNotMatch(await runJudge(c.id), /Judge picked/);
   clip = await prisma.clip.findUniqueOrThrow({ where: { id: c.id } });
-  assert.deepEqual([clip.winStart, clip.winLength], [25, 35]);
+  assert.deepEqual([clip.winStart, clip.winLength], [25.3, 28]);
   mock.verdict = { ...mock.verdict, best_start: null, best_end: null };
 });
 

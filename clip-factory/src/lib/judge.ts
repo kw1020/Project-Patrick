@@ -100,10 +100,12 @@ function render(i: JudgeInput) {
   if (i.category === "funny" || i.category === "gaming") lines.push(`First guess at the type: ${i.category} (from chat, the Twitch category or the title)`);
   if (i.sourceLength && i.window) {
     const range = i.lengthRange ? ` Clips must be ${i.lengthRange.min}-${i.lengthRange.max}s long.` : "";
-    lines.push(`Source video: ${Math.round(i.sourceLength * 10) / 10}s. Proposed window: ${i.window.start.toFixed(1)}s to ${i.window.end.toFixed(1)}s (around the loudest / most reacted-to moment).${range}`);
+    lines.push(`Source video: ${Math.round(i.sourceLength * 10) / 10}s. Proposed window: ${i.window.start.toFixed(1)}s to ${i.window.end.toFixed(1)}s (picked automatically around the biggest loudness jump / reaction).${range}`);
   }
-  lines.push("", "<transcript>", i.transcript?.trim() || "(no speech detected)", "</transcript>");
+  // v1.8.0: with the whole source's timed transcript (window edges + sound cues marked in it), the window's plain transcript
+  // would only repeat it. Older clips get the plain transcript.
   if (i.timedTranscript != null && i.sourceLength) lines.push("", "<source_transcript>", i.timedTranscript.trim() || "(no speech detected in the whole source)", "</source_transcript>");
+  else lines.push("", "<transcript>", i.transcript?.trim() || "(no speech detected)", "</transcript>");
   if (i.stats?.chat?.length) lines.push("", "<chat_sample>", ...i.stats.chat.slice(0, 40), "</chat_sample>");
   return lines.join("\n");
 }
