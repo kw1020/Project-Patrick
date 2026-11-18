@@ -3,7 +3,7 @@ import { judgeConfigured, JUDGE_MODEL } from "@/lib/judge";
 import { MIN_POSTS_TO_LEARN } from "@/lib/learning";
 import { tiktokConfigured, tiktokRedirectUri } from "@/lib/tiktok";
 import { redirectUri, youtubeConfigured } from "@/lib/youtube";
-import { EDIT_STYLES, JUMP_CUT_MODES, parseEditStyle, parseJumpCuts } from "@/lib/edit-styles";
+import { EDIT_STYLES, JUMP_CUT_MODES, LAYOUTS, parseEditStyle, parseJumpCuts, parseLayoutSetting } from "@/lib/edit-styles";
 import { disconnectAccount, saveAccount, saveSettings } from "../actions";
 
 export const dynamic = "force-dynamic";
@@ -98,8 +98,15 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           <Row label="Max new clips per creator per scan" hint="Shares the line out fairly, so one big channel can't fill it."><input name="maxPerCreatorPerRun" type="number" min="1" defaultValue={s.maxPerCreatorPerRun} className="field w-32" /></Row>
           <Row label="Min Twitch clip views" hint="Only grab viewer clips with at least this many views."><input name="minClipViews" type="number" defaultValue={s.minClipViews} className="field w-32" /></Row>
           <Row label="Look back (days)" hint="How old a Twitch clip can be (1-30 days)."><input name="clipLookbackDays" type="number" min="1" max="30" defaultValue={Math.max(1, Math.round(s.clipLookbackHrs / 24))} className="field w-32" /></Row>
-          <Row label="Vertical layout" hint="Facecam needs the box set per streamer; falls back to blur.">
-            <select name="layout" defaultValue={s.layout} className="field w-56"><option value="blur">Blurred background</option><option value="facecam">Facecam on top</option></select>
+          <Row label="Layout" hint="How the wide stream is fitted into the tall video. You can re-cut any clip in another layout from its card in the Queue.">
+            <div className="space-y-1.5" data-testid="layout-choice">
+              {LAYOUTS.map((x) => (
+                <label key={x.key} className="flex items-start gap-2 text-sm">
+                  <input type="radio" name="layout" value={x.key} defaultChecked={parseLayoutSetting(s.layout) === x.key} className="mt-0.5 h-4 w-4 accent-[#ff3d81]" />
+                  <span><span className="font-semibold">{x.label}</span> <span className="text-xs text-zinc-500">{x.hint}</span></span>
+                </label>
+              ))}
+            </div>
           </Row>
           <Row label="Editing style" hint="How new clips are edited. You can re-cut any clip in another style from its card in the Queue.">
             <div className="space-y-1.5">

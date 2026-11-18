@@ -3,6 +3,7 @@ import { Avatar } from "@/components/Avatar";
 import { CreatorActions } from "@/components/CreatorActions";
 import { ago, compact } from "@/lib/format";
 import { creatorUrl } from "@/lib/social";
+import { resetFacecamAuto } from "../actions";
 import { CREATOR_FILTERS, getCreators, parseCreatorFilter, summaryLine, type CreatorFilter, type CreatorRow } from "@/lib/creators";
 
 export const dynamic = "force-dynamic";
@@ -58,6 +59,13 @@ function Card({ c }: { c: CreatorRow }) {
         <Stat label="Views" value={compact(c.views)} />
         <Stat label="Last clip" value={c.lastClipAt ? ago(c.lastClipAt) : "none yet"} />
       </div>
+
+      {c.webcam === "auto" && (
+        <form action={resetFacecamAuto.bind(null, c.id)} className="flex items-center gap-2 text-xs text-emerald-300" data-testid="facecam-auto">
+          <span>Webcam spot found automatically</span>
+          <button className="btn-ghost px-2 py-0.5 text-xs" title="Forget it; the next clip looks for the webcam again">reset</button>
+        </form>
+      )}
 
       <div className="mt-auto flex flex-wrap gap-2">
         <a href={url} target="_blank" className="btn-ghost px-2.5 py-1 text-xs">Open channel ↗</a>

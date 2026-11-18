@@ -6,7 +6,10 @@ import { enqueueJudge } from "../lib/queues";
 import { transcribe } from "../lib/transcribe";
 import { creatorCreditText } from "../lib/social";
 import { categoryOff, isCategory, offReason } from "../lib/category";
-import { measureLevels, parseEditStyle, parseJumpCuts, renderOrFallback, renderStyled } from "../lib/edit";
+import { measureLevels, parseEditStyle, parseJumpCuts, probeSize, renderOrFallback, renderStyled } from "../lib/edit";
+import { isNonGame } from "../lib/category";
+import { detectCam } from "../lib/camdetect";
+import { boxToRemember, camInfoFits, chooseLayout, needsDetect, parseCamInfo, parseLayoutSetting, planLayout, type CamInfo, type LayoutPlan } from "../lib/layout";
 import { findPayoff, pickSmartWindow, windowWords } from "../lib/window";
 
 /** Longest stretch of source we transcribe (Twitch clips are <= 60s, VOD/YouTube sections 45s). */
@@ -62,7 +65,31 @@ export async function runTranscribe(clipId: string) {
 }
 
 /** Step 3 — Cutter: make it 9:16, burn captions + hook + streamer credit, in an editing style (v1.7.3). */
-export async function runCut(clipId: string, styleOverride?: string, jumpOverride?: string) {
+/**
+ * v1.9.0: which layout this clip gets (Settings.layout or the Re-cut choice), running the face/webcam check when needed
+ * (cached on Clip.camInfo per window, skipped when the creator has a webcam box) and remembering a confidently found webcam
+ * spot on the Twitch creator (Streamer.facecamAuto; a typed-in Streamer.facecam always wins).
+ */
+export async function resolveLayout(o: {
+  raw: string; start: number; length: number; mode: string | null | undefined; category: string | null; gameName: string | null; camInfo: string | null;
+  streamer: { id: string; platform: string; facecam: string | null; facecamAuto: string | null };
+}): Promise<{ plan: LayoutPlan; det: CamInfo | null; why: string; remembered: string | null }> {
+  const mode = parseLayoutSetting(o.mode);
+  const manual = parseFacecam(o.streamer.facecam), remembered = parseFacecam(o.streamer.facecamAuto);
+  const cached = parseCamInfo(o.camInfo);
+  let det: CamInfo | null = camInfoFits(cached, o.start, o.length) ? cached : null;
+  if (!det && needsDetect({ mode, cached, winStart: o.start, winLength: o.length, manual, remembered, nonGame: isNonGame(o.gameName) })) {
+    det = await detectCam(o.raw, o.start, o.length);
+  }
+  const choice = chooseLayout({ mode, det, category: o.category, manual, remembered });
+  const src = choice.layout === "blur" ? { w: 1920, h: 1080 } : await probeSize(o.raw);
+  const plan = planLayout({ choice, det, src, category: o.category });
+  const keep = boxToRemember({ choice, det, platform: o.streamer.platform, manual: o.streamer.facecam, remembered: o.streamer.facecamAuto });
+  if (keep) await prisma.streamer.update({ where: { id: o.streamer.id }, data: { facecamAuto: keep } });
+  return { plan, det, why: choice.why, remembered: keep };
+}
+
+export async function runCut(clipId: string, styleOverride?: string, jumpOverride?: string, layoutOverride?: string) {
   const clip = await prisma.clip.findUnique({ where: { id: clipId }, include: { moment: { include: { streamer: true } } } });
   if (!clip) return "clip deleted";
   if (!clip.rawPath) throw new Error("No raw video to cut (grab step didn't finish)");
@@ -77,8 +104,11 @@ export async function runCut(clipId: string, styleOverride?: string, jumpOverrid
     const win = pickWindow(await probeDuration(raw), settings.clipMinSec, settings.clipMaxSec);
     start = win.start; length = win.length;
   }
-  const facecam = settings.layout === "facecam" ? parseFacecam(streamer.facecam) : null;
-  const layout = facecam ? "facecam" : "blur";
+  const lay = await resolveLayout({
+    raw, start, length, mode: layoutOverride ?? settings.layout, category: clip.category, gameName: clip.moment.gameName, camInfo: clip.camInfo, streamer,
+  });
+  const plan = lay.plan, layout = plan.kind;
+  const facecam = plan.kind === "split" ? plan.cam : null;
   let words: Word[] = [];
   if (settings.captions && clip.words) {
     try {
@@ -91,6 +121,7 @@ export async function runCut(clipId: string, styleOverride?: string, jumpOverrid
   const peakAt = clip.payoffAt != null ? clip.payoffAt - start : null;
 
   const assPath = storagePath("work", `${clipId}.ass`);
+  let usedLayout: string = layout;
   try {
     const finalRel = `final/${clipId}.mp4`;
     const style = parseEditStyle(styleOverride ?? settings.editStyle);
@@ -98,12 +129,22 @@ export async function runCut(clipId: string, styleOverride?: string, jumpOverrid
     // Never lose a clip to a fancy effect: if the styled render fails, the plain v1.7.1 edit is made instead.
     const audio = await hasAudio(raw);
     const r = await renderOrFallback(style, () => renderStyled({
-      input: raw, output: storagePath(finalRel), start, length, facecam, style, words, credit: creatorCreditText(streamer), hook: clip.hookText || clip.title,
+      input: raw, output: storagePath(finalRel), start, length, facecam, plan, style, words, credit: creatorCreditText(streamer), hook: clip.hookText || clip.title,
       minSec: settings.clipMinSec, hasAudio: audio, workDir: storagePath("work"), id: clipId,
       peakHint: { source: clip.moment.source, vodOffset: clip.moment.vodOffset, vodId: clip.moment.vodId }, peakAt, jumpCuts,
     }), async () => {
-      fs.writeFileSync(assPath, buildAss({ words, credit: creatorCreditText(streamer), duration: length, layout, hook: clip.hookText }));
-      await renderVertical({ input: raw, output: storagePath(finalRel), start, length, facecam, assPath });
+      // The plain edit supports every layout; if even that fails in a cam layout, the plain blur edit is the last resort.
+      const credit = creatorCreditText(streamer);
+      try {
+        fs.writeFileSync(assPath, buildAss({ words, credit, duration: length, layout, hook: clip.hookText, place: plan.place }));
+        await renderVertical({ input: raw, output: storagePath(finalRel), start, length, facecam, plan, assPath });
+      } catch (e) {
+        if (layout === "blur") throw e;
+        console.warn(`[cut] ${clipId}: plain ${layout} edit failed, using blur:`, (e as Error).message);
+        fs.writeFileSync(assPath, buildAss({ words, credit, duration: length, layout: "blur", hook: clip.hookText }));
+        await renderVertical({ input: raw, output: storagePath(finalRel), start, length, facecam: null, plan: null, assPath });
+        usedLayout = "blur";
+      }
     });
     if (r.note) console.warn(`[cut] ${clipId}: ${r.note}`);
     const outLen = r.result?.duration ?? length, editNote = r.note, cutWith = r.result ? style : null;
@@ -119,11 +160,12 @@ export async function runCut(clipId: string, styleOverride?: string, jumpOverrid
     await prisma.clip.update({
       where: { id: clipId },
       data: {
-        finalPath: finalRel, duration: outLen, winLength: length, editStyle: cutWith, editNote, stage: null, stageAt: new Date(), error: null, status: fresh ? (autoReject ? "rejected" : "pending") : clip.status,
+        finalPath: finalRel, duration: outLen, winLength: length, editStyle: cutWith, editNote, layout: usedLayout,
+        ...(lay.det && !lay.det.error ? { camInfo: JSON.stringify(lay.det) } : {}), stage: null, stageAt: new Date(), error: null, status: fresh ? (autoReject ? "rejected" : "pending") : clip.status,
         ...(fresh ? kindReason : {}),
       },
     });
-    return `cut ${outLen}s ${cutWith ?? "plain"} ${layout}${cuts ? ` (${cuts} jump cut${cuts === 1 ? "" : "s"})` : ""}${words.length ? " + captions" : ""}${clip.hookText ? " + hook" : ""}${fresh && autoReject ? " (auto-rejected)" : ""}`;
+    return `cut ${outLen}s ${cutWith ?? "plain"} ${usedLayout} (${lay.why}${lay.det?.ms != null ? `, face check ${(lay.det.ms / 1000).toFixed(1)}s` : ""}${lay.remembered ? ", webcam spot remembered" : ""})${cuts ? ` (${cuts} jump cut${cuts === 1 ? "" : "s"})` : ""}${words.length ? " + captions" : ""}${clip.hookText ? " + hook" : ""}${fresh && autoReject ? " (auto-rejected)" : ""}`;
   } finally {
     fs.rmSync(assPath, { force: true });
   }

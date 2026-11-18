@@ -28,3 +28,22 @@ export const JUMP_CUT_MODES: { key: JumpCutMode; label: string; hint: string }[]
 export function parseJumpCuts(s: unknown): JumpCutMode {
   return s === "off" || s === "normal" || s === "light" ? s : "light";
 }
+
+// v1.9.0 layouts. "facecam" is the pre-1.9 name of "split" (old Settings rows keep working).
+export type LayoutKind = "split" | "fullcam" | "blur";
+export type LayoutSetting = "auto" | LayoutKind;
+export const LAYOUTS: { key: LayoutSetting; label: string; short: string; hint: string }[] = [
+  { key: "auto", label: "Auto (recommended)", short: "Auto", hint: "Finds the streamer's face in each clip and picks the best layout below." },
+  { key: "split", label: "Cam on top + game below", short: "Cam + game", hint: "The webcam fills the top third, the game sits underneath. The webcam spot is found automatically." },
+  { key: "fullcam", label: "Full streamer cam", short: "Full cam", hint: "The whole screen is the streamer's face. Best for funny moments and Just Chatting." },
+  { key: "blur", label: "Blurred background", short: "Blur", hint: "The whole frame in the middle with a blurred copy behind it. Works for everything." },
+];
+export const DEFAULT_LAYOUT: LayoutSetting = "auto";
+export function parseLayoutSetting(s: unknown): LayoutSetting {
+  if (s === "facecam") return "split";
+  return s === "split" || s === "fullcam" || s === "blur" || s === "auto" ? s : DEFAULT_LAYOUT;
+}
+/** Short chip text for a clip's layout (null = unknown / older clip). */
+export function layoutChip(s: string | null | undefined): string | null {
+  return s === "split" || s === "facecam" ? "Cam + game" : s === "fullcam" ? "Full cam" : s === "blur" ? "Blur" : null;
+}

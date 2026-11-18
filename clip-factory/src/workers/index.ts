@@ -14,7 +14,7 @@ import { migrateLegacySettings, runPost, runStatsSync } from "./poster";
 import { runSpikeCheck } from "./spike";
 import { runYouTubeScan } from "./youtube";
 import { runSuggestScan } from "./suggest";
-import { migrateV180Settings } from "./migrate";
+import { migrateV180Settings, migrateV190Settings } from "./migrate";
 import { startRetention } from "./retention";
 import { judgeConfigured } from "../lib/judge";
 
@@ -65,6 +65,7 @@ async function main() {
   await checkTools();
   await migrateLegacySettings().catch((e) => console.error("[migrate]", e.message));
   await migrateV180Settings().then((m) => m && console.log(`[migrate] ${m}`)).catch((e) => console.error("[migrate]", e.message));
+  await migrateV190Settings().then((m) => m && console.log(`[migrate] ${m}`)).catch((e) => console.error("[migrate]", e.message));
 
   const workers = [
     worker("scout", 1, () => runScout(chat)),
@@ -72,7 +73,7 @@ async function main() {
     worker("grab", 2, (job) => runGrab(job.data.clipId)),
     worker("transcribe", 1, (job) => runTranscribe(job.data.clipId)),
     worker("judge", 3, (job) => runJudge(job.data.clipId)),
-    worker("cut", Number(process.env.CUT_CONCURRENCY || 1), (job) => runCut(job.data.clipId, job.data.style, job.data.jumpCuts)), // ffmpeg is CPU-heavy: one at a time
+    worker("cut", Number(process.env.CUT_CONCURRENCY || 1), (job) => runCut(job.data.clipId, job.data.style, job.data.jumpCuts, job.data.layout)), // ffmpeg is CPU-heavy: one at a time
     worker("youtube", 1, () => runYouTubeScan()),
     worker("suggest", 1, () => runSuggestScan()),
     worker("post", 1, (job) => (job.name === "views" ? runStatsSync() : runPost(job.data.clipId, job.data.accountId))),

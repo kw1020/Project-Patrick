@@ -22,6 +22,7 @@ model Streamer {
   approvalNote  String?
   approvedAt    DateTime? // when Krew last approved them (Creators page); null on rows approved before v1.7.2 -> createdAt
   facecam       String?   // "x,y,w,h" fractions of the frame, for the facecam-on-top layout
+  facecamAuto   String?   // v1.9.0: webcam spot found automatically ("x,y,w,h"); a typed-in facecam always wins
   profileImage  String?
   isLive        Boolean   @default(false)
   viewers       Int       @default(0)
@@ -79,6 +80,8 @@ model Clip {
   editNote    String? // set when the styled edit failed and the plain edit was used instead
   payoffAt    Float?  // v1.8.0: the payoff moment, seconds into the raw file (punch-in + where the window was placed)
   wordsFull   Boolean @default(false) // v1.8.0: words are timed in the whole raw file (older rows: inside the window)
+  layout      String? // v1.9.0: split | fullcam | blur, the layout it was last cut with (null on older clips)
+  camInfo     String? // v1.9.0: JSON face/webcam detection for the window it was measured on (src/lib/layout.ts CamInfo)
   score       Float?  // Judge score 1-10
   hookText    String? // Judge's on-screen hook
   hashtags    String? // space-separated
@@ -132,7 +135,7 @@ model Settings {
   clipMaxSec       Int     @default(35) // v1.8.0: 45 -> 35 (existing installs moved once, see migratedAnyGame)
   minClipViews     Int     @default(25) // Twitch clips need at least this many views
   clipLookbackHrs  Int     @default(168) // v1.8.0: 7 days (was 24h); existing 24 moved to 168 once
-  layout           String  @default("blur") // blur | facecam
+  layout           String  @default("auto") // v1.9.0: auto | split | fullcam | blur ("facecam" = old name of split)
   captions         Boolean @default(true)
   scoutPaused      Boolean @default(false)
   gameMode         String  @default("any") // any (approved streamers in any game, default since v1.8.0) | gta6
@@ -148,6 +151,7 @@ model Settings {
   maxPerCreatorPerRun Int     @default(2) // v1.8.0: fair mix, at most this many new clips per creator per scan
   jumpCuts            String  @default("light") // v1.8.0: off | light | normal (only real silence is cut)
   migratedAnyGame     Boolean @default(false) // v1.8.0 one-time move: gta6 -> any, lookback 24h -> 7d, max 45s -> 35s
+  migratedAutoLayout  Boolean @default(false) // v1.9.0 one-time move: layout blur -> auto
 }
 
 // Connected posting accounts. Several per platform (e.g. two YouTube channels, a TikTok).

@@ -19,6 +19,7 @@ export type CreatorRow = {
   posted: number;      // clips posted
   views: number;       // total views of their live posts
   lastClipAt: Date | null;
+  webcam?: "manual" | "auto" | null; // v1.9.0: typed-in webcam box, one found automatically (Streamer.facecamAuto), or none
 };
 export type CreatorSummary = { total: number; twitch: number; youtube: number; live: number; paused: number };
 
@@ -58,6 +59,7 @@ export async function creatorStats(): Promise<CreatorRow[]> {
       approvalNote: s.approvalNote, approvedAt: s.approvedAt ?? s.createdAt,
       moments: momentCount.get(s.id) ?? 0, clips: a?.clips ?? 0, approved: a?.approved ?? 0, posted: a?.posted ?? 0,
       views: a?.views ?? 0, lastClipAt: a?.last ?? null,
+      webcam: s.facecam ? "manual" : s.facecamAuto ? "auto" : null,
     };
   }));
 }

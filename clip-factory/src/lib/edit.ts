@@ -7,6 +7,7 @@ import { run, type Facecam, type Word } from "./media";
 import { storagePath } from "./paths";
 import { type EditStyle, type JumpCutMode } from "./edit-styles";
 import { FRAME, findPayoff, meanDb } from "./window";
+import { SEAM, cropXExpr, legacyPlan, overlayPlace, type LayoutPlan, type OverlayPlace } from "./layout";
 
 export { type EditStyle, type JumpCutMode, EDIT_STYLES, JUMP_CUT_MODES, parseEditStyle, parseJumpCuts, DEFAULT_EDIT_STYLE } from "./edit-styles";
 
@@ -291,10 +292,13 @@ export function splitHook(text: string, maxLine = 24) {
 /** Caption block centre: 62% of the frame height, clear of the hook (top) and the progress bar (bottom). */
 export const CAPTION_Y = Math.round(H * 0.62);
 
-export function buildStyledAss(opts: { words: Word[]; credit: string; duration: number; layout: "blur" | "facecam"; hook?: string | null; style: EditStyle; font?: string }) {
+export function buildStyledAss(opts: { words: Word[]; credit: string; duration: number; layout: "blur" | "facecam" | "split" | "fullcam"; hook?: string | null; style: EditStyle; font?: string; place?: OverlayPlace | null }) {
   const S = STYLES[opts.style], font = opts.font || process.env.CAPTION_FONT || "DejaVu Sans";
   const D = opts.duration;
-  const hookY = opts.layout === "facecam" ? 190 : 250; // just under the credit line
+  // v1.9.0: where text goes depends on the layout and where the face is (src/lib/layout.ts overlayPlace).
+  const P = opts.place ?? overlayPlace(opts.layout, null);
+  const hookY = P.hookY, capY = P.capY;
+  const creditTag = opts.layout === "blur" && !opts.place ? "" : `{\\an${P.creditAlign}\\pos(540,${P.creditY})}`;
   const lines = [
     "[Script Info]", "ScriptType: v4.00+", "PlayResX: 1080", "PlayResY: 1920", "WrapStyle: 0", "ScaledBorderAndShadow: yes", "",
     "[V4+ Styles]",
@@ -304,17 +308,18 @@ export function buildStyledAss(opts: { words: Word[]; credit: string; duration: 
     `Style: Credit,${font},42,&H10FFFFFF,&H00FFFFFF,&H00000000,&H78000000,-1,0,0,0,100,100,0,0,1,4,2,8,40,40,110,1`,
     `Style: Hook,${font},${S.hook.size},${S.hook.text},&H00FFFFFF,${S.hook.box},${S.hook.box},-1,0,0,0,100,100,0,0,3,16,0,8,90,90,${hookY},1`,
     "", "[Events]", "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
-    `Dialogue: 3,${assTime(0)},${assTime(D)},Credit,,0,0,0,,${esc(opts.credit)}`,
+    `Dialogue: 3,${assTime(0)},${assTime(D)},Credit,,0,0,0,,${creditTag}${esc(opts.credit)}`,
   ];
   let hook = esc(opts.hook || "").slice(0, 70);
   if (hook) {
     if (opts.style === "meme") hook = hook.toUpperCase();
     hook = splitHook(hook);
     const end = Math.min(3.3, D);
+    const an = P.hookAlign, orgY = an === 2 ? hookY - 40 : hookY + 40;
     const tags = S.hook.anim === "pop"
       // 0 → 110% → 100% in 200ms, one small wiggle, fade out.
-      ? `\\an8\\pos(540,${hookY})\\org(540,${hookY + 40})\\fscx0\\fscy0\\t(0,130,\\fscx110\\fscy110)\\t(130,200,\\fscx100\\fscy100)\\t(200,300,\\frz2)\\t(300,420,\\frz-2)\\t(420,500,\\frz0)\\fad(0,300)`
-      : `\\an8\\pos(540,${hookY})\\fad(300,300)`;
+      ? `\\an${an}\\pos(540,${hookY})\\org(540,${orgY})\\fscx0\\fscy0\\t(0,130,\\fscx110\\fscy110)\\t(130,200,\\fscx100\\fscy100)\\t(200,300,\\frz2)\\t(300,420,\\frz-2)\\t(420,500,\\frz0)\\fad(0,300)`
+      : `\\an${an}\\pos(540,${hookY})\\fad(300,300)`;
     lines.push(`Dialogue: 2,${assTime(0)},${assTime(end)},Hook,,0,0,0,,{${tags}}${hook}`);
   }
   const chunks = chunkWordsDetailed(opts.words, 3, S.cap.maxChars);
@@ -322,7 +327,7 @@ export function buildStyledAss(opts: { words: Word[]; credit: string; duration: 
     if (c.start >= D) return;
     const tokens = c.words.map((w) => (S.cap.upper ? esc(w.word).toUpperCase() : esc(w.word)));
     const tilt = S.cap.tilt ? ((ci * 7 + 3) % 7) - 3 || 2 : 0; // -3..3°, never flat, same every render
-    const base = `\\an5\\pos(540,${CAPTION_Y})${tilt ? `\\frz${tilt}` : ""}`;
+    const base = `\\an5\\pos(540,${capY})${tilt ? `\\frz${tilt}` : ""}`;
     c.words.forEach((w, wi) => {
       const s = wi === 0 ? c.start : w.start;
       const e = wi + 1 < c.words.length ? c.words[wi + 1].start : c.end;
@@ -349,15 +354,19 @@ export function fitSize(sw: number, sh: number, bw: number, bh: number, mode: "c
 }
 
 /** Scale to (w,h)×zoom and crop the centre back to (cw,ch). With no zoom: plain scale + crop. */
-function zoomChain(w: number, h: number, cw: number, ch: number, z: string | null) {
-  if (!z) return `scale=${w}:${h},crop=${cw}:${ch}`;
+function zoomChain(w: number, h: number, cw: number, ch: number, z: string | null, shift = 0) {
+  // shift = move the crop centre sideways by this share of the scaled width (split: keep the webcam out of the game part).
+  if (!z) return shift ? `scale=${w}:${h},crop=${cw}:${ch}:x=${Math.round(Math.max(0, Math.min(w - cw, (w - cw) / 2 + w * shift)))}:y=${Math.round((h - ch) / 2)}` : `scale=${w}:${h},crop=${cw}:${ch}`;
   const zw = `2*trunc(${w}*(${z})/2)`, zh = `2*trunc(${h}*(${z})/2)`;
   // scale eval=frame changes the frame size per frame; crop's x/y must use the same numbers (its in_w is the first frame's).
-  return `scale=w='${zw}':h='${zh}':eval=frame,crop=${cw}:${ch}:x='(${zw}-${cw})/2':y='(${zh}-${ch})/2'`;
+  const x = shift ? `max(0,min(${zw}-${cw},(${zw}-${cw})/2+${zw}*${shift}))` : `(${zw}-${cw})/2`;
+  return `scale=w='${zw}':h='${zh}':eval=frame,crop=${cw}:${ch}:x='${x}':y='(${zh}-${ch})/2'`;
 }
 
 export type StyledFilterOpts = {
   style: EditStyle; facecam: Facecam | null; src: { w: number; h: number }; segs: Seg[]; hasAudio: boolean;
+  /** v1.9.0 layout (wins over `facecam`, which is the pre-1.9 way to ask for the split layout). */
+  plan?: LayoutPlan | null;
   assFile?: string | null; zoom: string | null; duration: number; sfx?: { whooshAt?: number | null; boomAt?: number | null } | null;
 };
 
@@ -380,15 +389,24 @@ export function buildStyledFilter(o: StyledFilterOpts) {
     g.push(`[0:v]fps=${FPS}[cv]`);
     if (o.hasAudio) g.push(`[0:a]anull[ca]`);
   }
-  // 2) 9:16 layout. Zoom only on the gameplay (foreground) layer; the blurred background stays still.
+  // 2) 9:16 layout. The zoom goes on one layer (layout.ts planLayout): blur = the gameplay (the blurred fill stays still),
+  // split = the cam for funny clips / the game otherwise, fullcam = the whole frame.
   const color = `eq=saturation=${S.eq.saturation}:contrast=${S.eq.contrast},unsharp=5:5:0.5:5:5:0`;
-  if (o.facecam) {
-    const f = o.facecam, topH = 640, botH = H - topH;
+  const plan = o.plan ?? legacyPlan(o.facecam, o.src);
+  if (plan.kind === "split") {
+    const f = plan.cam, topH = SEAM, botH = H - topH;
     const bot = fitSize(o.src.w, o.src.h, W, botH, "cover");
+    const camPx = { w: Math.max(2, Math.round(f.w * o.src.w)), h: Math.max(2, Math.round(f.h * o.src.h)) };
+    const top = fitSize(camPx.w, camPx.h, W, topH, "cover");
     g.push(`[cv]split=2[ca1][cb1]`);
-    g.push(`[ca1]crop=w=iw*${f.w}:h=ih*${f.h}:x=iw*${f.x}:y=ih*${f.y},scale=${W}:${topH}:force_original_aspect_ratio=increase,crop=${W}:${topH}[top]`);
-    g.push(`[cb1]${zoomChain(bot.w, bot.h, W, botH, o.zoom)}[bot]`);
-    g.push(`[top][bot]vstack=inputs=2,setsar=1,${color}[v0]`);
+    g.push(`[ca1]crop=${camPx.w}:${camPx.h}:${Math.round(f.x * o.src.w)}:${Math.round(f.y * o.src.h)},${zoomChain(top.w, top.h, W, topH, plan.zoomOn === "cam" ? o.zoom : null)}[top]`);
+    g.push(`[cb1]${zoomChain(bot.w, bot.h, W, botH, plan.zoomOn === "game" ? o.zoom : null, plan.gameShift)}[bot]`);
+    // A thin dark seam line between cam and game.
+    g.push(`[top][bot]vstack=inputs=2,setsar=1,${color},drawbox=x=0:y=${topH - 3}:w=${W}:h=6:color=black@0.55:t=fill[v0]`);
+  } else if (plan.kind === "fullcam") {
+    const c = plan.crop;
+    const x = cropXExpr(c.keys, (t) => remapTime(t, o.segs));
+    g.push(`[cv]crop=${c.w}:${c.h}:x='${x}':y=${c.y},${zoomChain(W, H, W, H, o.zoom)},setsar=1,${color}[v0]`);
   } else {
     const fg = fitSize(o.src.w, o.src.h, W, H, "contain");
     g.push(`[cv]split=2[ca1][cb1]`);
@@ -498,6 +516,8 @@ export function planEdit(opts: { style: EditStyle; words: Word[]; length: number
 
 export async function renderStyled(opts: {
   input: string; output: string; start: number; length: number; facecam: Facecam | null; style: EditStyle;
+  /** v1.9.0: the layout (src/lib/layout.ts planLayout); wins over `facecam`. */
+  plan?: LayoutPlan | null;
   words: Word[]; credit: string; hook: string | null; minSec: number; hasAudio: boolean;
   peakHint?: { source: string; vodOffset: number | null; vodId?: string | null } | null; workDir: string; id: string;
   /** v1.8.0: the payoff in WINDOW seconds (from Clip.payoffAt); used as the peak instead of recomputing. */
@@ -511,17 +531,17 @@ export async function renderStyled(opts: {
   const known = opts.peakAt != null && opts.peakAt > 0 && opts.peakAt < opts.length ? r3(opts.peakAt) : null;
   const peak = known ?? windowPeak({ ...opts, fine, levels });
   const plan = planEdit({ style: opts.style, words: opts.words, length: opts.length, minSec: opts.minSec, peak, levels: fine, jumpCuts: opts.jumpCuts ?? "light" });
-  const layout = opts.facecam ? "facecam" : "blur";
+  const lp = opts.plan ?? legacyPlan(opts.facecam, src);
   fs.mkdirSync(opts.workDir, { recursive: true });
   const assName = `${opts.id}.styled.ass`, assPath = path.join(opts.workDir, assName);
-  fs.writeFileSync(assPath, buildStyledAss({ words: plan.words, credit: opts.credit, duration: plan.duration, layout, hook: opts.hook, style: opts.style }));
+  fs.writeFileSync(assPath, buildStyledAss({ words: plan.words, credit: opts.credit, duration: plan.duration, layout: lp.kind, hook: opts.hook, style: opts.style, place: lp.place }));
   const sfx = S.sfx && opts.hasAudio ? await ensureSfx() : null;
   const whooshAt = sfx && opts.hook ? 0 : null;
   const boomAt = sfx && plan.punchStart != null ? plan.punchStart : null;
   const extra: string[] = [];
   if (whooshAt != null) extra.push("-i", sfx!.whoosh);
   if (boomAt != null) extra.push("-i", sfx!.boom);
-  const filter = buildStyledFilter({ style: opts.style, facecam: opts.facecam, src, segs: plan.segs, hasAudio: opts.hasAudio, assFile: assName, zoom: plan.zoom, duration: plan.duration, sfx: { whooshAt, boomAt } });
+  const filter = buildStyledFilter({ style: opts.style, facecam: opts.facecam, plan: lp, src, segs: plan.segs, hasAudio: opts.hasAudio, assFile: assName, zoom: plan.zoom, duration: plan.duration, sfx: { whooshAt, boomAt } });
   fs.mkdirSync(path.dirname(opts.output), { recursive: true });
   const tmp = opts.output + ".part.mp4";
   try {

@@ -15,3 +15,16 @@ export async function migrateV180Settings(): Promise<string | null> {
   await prisma.settings.update({ where: { id: "main" }, data: { ...changes, migratedAnyGame: true } });
   return Object.keys(changes).length ? `settings moved to v1.8.0 defaults: ${Object.entries(changes).map(([k, v]) => `${k}=${v}`).join(", ")}` : "settings already on v1.8.0 defaults";
 }
+
+/**
+ * v1.9.0 one-time move to the new Auto layout (Krew: "streamer's camera up and game down, or full streamer cam if it's funny").
+ * Only an install still on the old default "blur" moves to "auto"; "facecam" (= split) etc. are left alone. `migratedAutoLayout`
+ * makes it run once, so choosing Blur again in Settings afterwards sticks.
+ */
+export async function migrateV190Settings(): Promise<string | null> {
+  const s = await prisma.settings.upsert({ where: { id: "main" }, update: {}, create: { id: "main" } });
+  if (s.migratedAutoLayout) return null;
+  const moved = s.layout === "blur";
+  await prisma.settings.update({ where: { id: "main" }, data: { ...(moved ? { layout: "auto" } : {}), migratedAutoLayout: true } });
+  return moved ? "layout moved to auto (v1.9.0)" : `layout kept (${s.layout})`;
+}

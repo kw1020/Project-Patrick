@@ -31,6 +31,9 @@ export const TITLE_GAMING = new RegExp(
   "i",
 );
 
+/** True for Twitch categories that aren't a game (Just Chatting, IRL, podcasts...). */
+export const isNonGame = (gameName: string | null | undefined) => Boolean(gameName && NON_GAME_CATEGORIES.has(norm(gameName)));
+
 /** Twitch viewer clip: funny when its Twitch category isn't a game or the title laughs, else gaming. */
 export function twitchClipCategory(gameName: string | null | undefined, title: string | null | undefined): Category {
   if (gameName && NON_GAME_CATEGORIES.has(norm(gameName))) return "funny";

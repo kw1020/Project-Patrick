@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { cropXExpr, legacyPlan, overlayPlace, type LayoutPlan, type OverlayPlace } from "./layout";
 
 export function run(cmd: string, args: string[], opts: { cwd?: string; timeoutMs?: number } = {}): Promise<{ stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
@@ -43,18 +44,26 @@ export function parseFacecam(s: string | null | undefined): Facecam | null {
   return { x, y, w, h };
 }
 
-/** 9:16 (1080x1920) filtergraph. "blur" = blurred fill behind the full frame; facecam = cam on top, gameplay below. */
-export function buildFilter(opts: { facecam: Facecam | null; assFile?: string | null }) {
+/**
+ * 9:16 (1080x1920) filtergraph for the plain edit. blur = blurred fill behind the full frame; split = cam on top, game below
+ * (moved away from the cam, see splitGameShift); fullcam = a 9:16 crop around the face (v1.9.0). `plan` wins over `facecam`.
+ */
+export function buildFilter(opts: { facecam: Facecam | null; assFile?: string | null; plan?: LayoutPlan | null }) {
   const W = 1080, H = 1920;
+  const plan = opts.plan ?? legacyPlan(opts.facecam);
   let g: string;
-  if (opts.facecam) {
-    const f = opts.facecam, topH = 640, botH = H - topH;
+  if (plan.kind === "split") {
+    const f = plan.cam, topH = 640, botH = H - topH;
+    const botCrop = plan.gameShift ? `crop=${W}:${botH}:x='max(0,min(iw-${W},(iw-${W})/2+iw*${plan.gameShift}))':y=0` : `crop=${W}:${botH}`;
     g = [
       `[0:v]split=2[a][b]`,
       `[a]crop=w=iw*${f.w}:h=ih*${f.h}:x=iw*${f.x}:y=ih*${f.y},scale=${W}:${topH}:force_original_aspect_ratio=increase,crop=${W}:${topH}[top]`,
-      `[b]scale=-2:${botH},crop=${W}:${botH}[bot]`,
+      `[b]scale=-2:${botH},${botCrop}[bot]`,
       `[top][bot]vstack=inputs=2,setsar=1,fps=30[v0]`,
     ].join(";");
+  } else if (plan.kind === "fullcam") {
+    const c = plan.crop;
+    g = `[0:v]crop=${c.w}:${c.h}:x='${cropXExpr(c.keys)}':y=${c.y},scale=${W}:${H},setsar=1,fps=30[v0]`;
   } else {
     g = [
       `[0:v]split=2[a][b]`,
@@ -105,9 +114,12 @@ export function chunkWords(words: Word[], maxWords = 3, maxChars = 18) {
 }
 
 /** ASS subtitle file: big bold word-chunk captions + a permanent streamer credit. */
-export function buildAss(opts: { words: Word[]; credit: string; duration: number; font?: string; layout: "blur" | "facecam"; hook?: string | null }) {
+export function buildAss(opts: { words: Word[]; credit: string; duration: number; font?: string; layout: "blur" | "facecam" | "split" | "fullcam"; hook?: string | null; place?: OverlayPlace | null }) {
   const font = opts.font || process.env.CAPTION_FONT || "DejaVu Sans";
-  const capMarginV = opts.layout === "facecam" ? 360 : 470;
+  const capMarginV = 470;
+  // v1.9.0: split / fullcam place the text off the face (src/lib/layout.ts overlayPlace); blur keeps the v1.7.1 styles.
+  const place = opts.place ?? (opts.layout === "blur" ? null : overlayPlace(opts.layout, null));
+  const at = (an: number, y: number) => (place ? `{\\an${an}\\pos(540,${y})}` : "");
   const lines = [
     "[Script Info]",
     "ScriptType: v4.00+",
@@ -121,29 +133,29 @@ export function buildAss(opts: { words: Word[]; credit: string; duration: number
     `Style: Cap,${font},86,&H00FFFFFF,&H00FFFFFF,&H00000000,&H64000000,-1,0,0,0,100,100,1,0,1,7,3,2,60,60,${capMarginV},1`,
     `Style: Credit,${font},40,&H30FFFFFF,&H00FFFFFF,&H00000000,&H64000000,-1,0,0,0,100,100,0,0,1,3,1,8,40,40,110,1`,
     // Hook: white text on a pink box near the top, first few seconds only.
-    `Style: Hook,${font},62,&H00FFFFFF,&H00FFFFFF,&H00813DFF,&H00813DFF,-1,0,0,0,100,100,0,0,3,14,0,8,90,90,${opts.layout === "facecam" ? 175 : 250},1`,
+    `Style: Hook,${font},62,&H00FFFFFF,&H00FFFFFF,&H00813DFF,&H00813DFF,-1,0,0,0,100,100,0,0,3,14,0,8,90,90,250,1`,
     "",
     "[Events]",
     "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
-    `Dialogue: 1,${assTime(0)},${assTime(opts.duration)},Credit,,0,0,0,,${assEscape(opts.credit)}`,
+    `Dialogue: 1,${assTime(0)},${assTime(opts.duration)},Credit,,0,0,0,,${place ? at(place.creditAlign, place.creditY) : ""}${assEscape(opts.credit)}`,
   ];
   const hook = assEscape(opts.hook || "").slice(0, 70);
-  if (hook) lines.push(`Dialogue: 2,${assTime(0)},${assTime(Math.min(4.5, opts.duration))},Hook,,0,0,0,,{\\fad(0,250)}${hook}`);
+  if (hook) lines.push(`Dialogue: 2,${assTime(0)},${assTime(Math.min(4.5, opts.duration))},Hook,,0,0,0,,${place ? at(place.hookAlign, place.hookY) : ""}{\\fad(0,250)}${hook}`);
   for (const c of chunkWords(opts.words)) {
     if (c.start >= opts.duration) continue;
     const text = assEscape(c.text).toUpperCase();
     if (!text) continue;
-    lines.push(`Dialogue: 0,${assTime(c.start)},${assTime(Math.min(c.end, opts.duration))},Cap,,0,0,0,,{\\fad(60,0)}${text}`);
+    lines.push(`Dialogue: 0,${assTime(c.start)},${assTime(Math.min(c.end, opts.duration))},Cap,,0,0,0,,${place ? at(5, place.capY) : ""}{\\fad(60,0)}${text}`);
   }
   return lines.join("\n") + "\n";
 }
 
 /** Render the final vertical clip. */
 export async function renderVertical(opts: {
-  input: string; output: string; start: number; length: number; facecam: Facecam | null; assPath?: string | null;
+  input: string; output: string; start: number; length: number; facecam: Facecam | null; assPath?: string | null; plan?: LayoutPlan | null;
 }) {
   const cwd = opts.assPath ? path.dirname(opts.assPath) : undefined;
-  const filter = buildFilter({ facecam: opts.facecam, assFile: opts.assPath ? path.basename(opts.assPath) : null });
+  const filter = buildFilter({ facecam: opts.facecam, plan: opts.plan, assFile: opts.assPath ? path.basename(opts.assPath) : null });
   fs.mkdirSync(path.dirname(opts.output), { recursive: true });
   const tmp = opts.output + ".part.mp4";
   await run("ffmpeg", [

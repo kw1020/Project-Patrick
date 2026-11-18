@@ -6,7 +6,7 @@ import { enqueueCut, enqueueGrab, enqueuePost, enqueueTranscribe, pokeScout, pok
 import { resolveChannel } from "@/lib/ytdlp";
 import { getUsers, twitchConfigured } from "@/lib/twitch";
 import { parseFacecam } from "@/lib/media";
-import { parseEditStyle, parseJumpCuts } from "@/lib/edit-styles";
+import { parseEditStyle, parseJumpCuts, parseLayoutSetting } from "@/lib/edit-styles";
 import { approvalReasonFromEvidence } from "@/lib/permission";
 import { loginTakenBy } from "@/lib/streamers";
 import { approveResolved, DEFAULT_APPROVAL_NOTE, resolveCreators, type ApprovePick, type ApproveResult, type ResolveResult } from "@/lib/creator-lookup";
@@ -193,13 +193,20 @@ export async function retryClip(id: string) {
  * Re-cut a clip in another editing style (Queue card "Re-cut"). Needs the raw video (deleted 12h after the cut).
  * The review status stays as it is (the cutter only decides review/auto-reject on a clip's first cut).
  */
-export async function recutClip(id: string, style: string, jumpCuts?: string) {
+/** Queue card "Re-cut": another editing style, optionally without jump cuts and/or in another layout (v1.9.0; "auto" = decide again). */
+export async function recutClip(id: string, style: string, jumpCuts?: string, layout?: string) {
   const clip = await prisma.clip.findUniqueOrThrow({ where: { id } });
   if (!clip.rawPath) throw new Error("The original video is gone (deleted to save space), so this clip can't be re-cut.");
   if (clip.words == null) return retryClip(id); // never transcribed: run the whole line again
   const s = parseEditStyle(style);
   await prisma.clip.update({ where: { id }, data: { stage: "cut", stageAt: new Date(), error: null, ...(clip.status === "failed" ? { status: "processing" } : {}) } });
-  await enqueueCut(id, 1, s, jumpCuts ? parseJumpCuts(jumpCuts) : undefined);
+  await enqueueCut(id, 1, s, jumpCuts ? parseJumpCuts(jumpCuts) : undefined, layout ? parseLayoutSetting(layout) : undefined);
+  refreshAll();
+}
+
+/** Streamers / Creators: forget the webcam spot found automatically (the next clip looks for it again). */
+export async function resetFacecamAuto(id: string) {
+  await prisma.streamer.update({ where: { id }, data: { facecamAuto: null } });
   refreshAll();
 }
 
@@ -239,7 +246,7 @@ export async function saveSettings(form: FormData) {
       standoutMin: Math.round(n("standoutMin", 1, 20, 2) * 10) / 10,
       maxPerCreatorPerRun: Math.round(n("maxPerCreatorPerRun", 1, 15, 2)),
       jumpCuts: parseJumpCuts(form.get("jumpCuts")),
-      layout: form.get("layout") === "facecam" ? "facecam" : "blur",
+      layout: parseLayoutSetting(form.get("layout")),
       captions: form.get("captions") === "on",
       scoutPaused: form.get("scoutPaused") === "on",
       gameMode: form.get("gameMode") === "gta6" ? "gta6" : "any",

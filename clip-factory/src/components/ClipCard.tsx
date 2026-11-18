@@ -1,7 +1,7 @@
 "use client";
 import { useState, useTransition } from "react";
 import { markPosted, postToAccount, recutClip, retryClip, setClipStatus, updateClipText } from "../../app/actions";
-import { EDIT_STYLES, editStyleLabel } from "../lib/edit-styles";
+import { EDIT_STYLES, LAYOUTS, editStyleLabel, layoutChip, parseEditStyle } from "../lib/edit-styles";
 import { creatorCreditText, creatorUrl } from "../lib/social";
 import { CategoryChip } from "./CategoryChip";
 
@@ -10,7 +10,8 @@ export type ClipView = {
   duration: number | null; score: number | null; hook: string | null; judgeReason: string | null; hasVideo: boolean;
   expired?: boolean; // the video was deleted by retention to save disk
   canRecut?: boolean; // the raw video is still there, so it can be re-cut in another editing style
-  editStyle?: string | null; editNote?: string | null; version?: number; // version busts the browser's video cache after a re-cut
+  editStyle?: string | null; editNote?: string | null; version?: number;
+  layout?: string | null; // v1.9.0: split | fullcam | blur, the layout it was last cut with // version busts the browser's video cache after a re-cut
   streamer: { name: string; login: string; platform: string }; source: string; vodOffset?: number | null; spikeScore: number; sourceUrl: string | null; sourceViews: number;
   category?: string | null; // funny | gaming (null on older clips)
   posts: { platform: string; accountId: string | null; status: string; url: string | null; error: string | null }[]; postError: string | null;
@@ -26,6 +27,9 @@ export function ClipCard({ clip, accounts }: { clip: ClipView; accounts: Account
   const [saved, setSaved] = useState(true);
   const [copied, setCopied] = useState(false);
   const [busy, start] = useTransition();
+  const [recutStyle, setRecutStyle] = useState<string>(parseEditStyle(clip.editStyle));
+  const [recutLayout, setRecutLayout] = useState<string>(clip.layout === "facecam" ? "split" : clip.layout ?? "auto");
+  const [recutJumps, setRecutJumps] = useState(true);
   const dirty = title !== clip.title || caption !== clip.caption;
 
   const save = () => { if (dirty || !saved) start(async () => { await updateClipText(clip.id, title, caption); setSaved(true); }); };
@@ -41,6 +45,7 @@ export function ClipCard({ clip, accounts }: { clip: ClipView; accounts: Account
   const reviewed = clip.status === "approved" || clip.status === "posted";
   const recutting = clip.stage === "cut" && clip.status !== "processing";
   const styleName = editStyleLabel(clip.editStyle);
+  const layoutName = layoutChip(clip.layout);
   const scoreColor = clip.score == null ? "" : clip.score >= 8 ? "text-emerald-300" : clip.score >= 6 ? "text-sun" : "text-red-300";
 
   return (
@@ -58,6 +63,7 @@ export function ClipCard({ clip, accounts }: { clip: ClipView; accounts: Account
           {clip.score != null && <span className={`rounded-md bg-black/75 px-2 py-1 text-xs font-black ${scoreColor}`}>{clip.score}/10</span>}
           {clip.duration != null && <span className="rounded-md bg-black/75 px-2 py-1 text-xs font-bold">{Math.round(clip.duration)}s</span>}
           {styleName && <span className="rounded-md bg-black/75 px-2 py-1 text-xs font-bold text-zinc-300">{styleName}</span>}
+          {layoutName && <span className="rounded-md bg-black/75 px-2 py-1 text-xs font-bold text-zinc-300" data-testid="layout-chip">{layoutName}</span>}
           <span className="rounded-md bg-black/75 px-2 py-1 text-xs font-bold text-zinc-300">{clip.source === "chat" ? `Chat spike ${clip.spikeScore}x` : clip.source === "youtube" ? "YouTube peak" : "Twitch clip"}</span>
           {clip.category && <span className="rounded-md bg-black/75"><CategoryChip category={clip.category} className="inline-block px-2 py-1 text-xs" /></span>}
         </div>
@@ -101,14 +107,22 @@ export function ClipCard({ clip, accounts }: { clip: ClipView; accounts: Account
         {clip.canRecut && clip.status !== "processing" && (
           <details className="text-xs">
             <summary className="cursor-pointer select-none text-zinc-400 hover:text-white">Re-cut ▾</summary>
-            <div className="mt-2 flex gap-2">
-              {EDIT_STYLES.map((x) => (
-                <button key={x.key} title={x.hint} className={`btn-ghost flex-1 ${clip.editStyle === x.key ? "ring-1 ring-hot" : ""}`} disabled={busy || recutting}
-                  onClick={() => act(() => recutClip(clip.id, x.key))}>{x.label}</button>
-              ))}
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <select aria-label="Editing style" className="field py-1 text-xs" value={recutStyle} onChange={(e) => setRecutStyle(e.target.value)} disabled={busy || recutting}>
+                {EDIT_STYLES.map((x) => <option key={x.key} value={x.key} title={x.hint}>{x.label}</option>)}
+              </select>
+              <select aria-label="Layout" className="field py-1 text-xs" value={recutLayout} onChange={(e) => setRecutLayout(e.target.value)} disabled={busy || recutting}>
+                {LAYOUTS.map((x) => <option key={x.key} value={x.key} title={x.hint}>{x.short}</option>)}
+              </select>
             </div>
-            <button title="Same style, but no cuts inside the clip" className="btn-ghost mt-2 w-full" disabled={busy || recutting}
-              onClick={() => act(() => recutClip(clip.id, clip.editStyle ?? "hype", "off"))}>{styleName ?? "Hype"} without jump cuts</button>
+            <div className="mt-2 flex items-center gap-2">
+              <label className="flex flex-1 items-center gap-1.5 text-zinc-400" title="Off = no cuts inside the clip">
+                <input type="checkbox" className="h-3.5 w-3.5 accent-[#ff3d81]" checked={recutJumps} onChange={(e) => setRecutJumps(e.target.checked)} disabled={busy || recutting} />
+                Jump cuts
+              </label>
+              <button className="btn-hot px-3 py-1 text-xs" disabled={busy || recutting}
+                onClick={() => act(() => recutClip(clip.id, recutStyle, recutJumps ? undefined : "off", recutLayout))}>Re-cut</button>
+            </div>
           </details>
         )}
 

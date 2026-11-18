@@ -6,7 +6,7 @@ import { AddStreamer, AddYouTubeChannel } from "@/components/AddStreamer";
 import { creatorUrl } from "@/lib/social";
 import { SuggestionActions } from "@/components/SuggestionActions";
 import { getStatuses, soft, type AgentStatus } from "@/lib/queues";
-import { approveStreamer, removeStreamer, saveStreamer, scanSuggestionsNow } from "../actions";
+import { approveStreamer, removeStreamer, resetFacecamAuto, saveStreamer, scanSuggestionsNow } from "../actions";
 import { BulkAddCreators } from "@/components/BulkAddCreators";
 
 export const dynamic = "force-dynamic";
@@ -49,7 +49,13 @@ export default async function StreamersPage({ searchParams }: { searchParams: Pr
                   <div className="text-xs text-zinc-400">{s.platform === "youtube" ? `@${s.login}` : s.isLive ? <span className="text-red-400">● live · {num(s.viewers)}</span> : `seen ${ago(s.lastSeenAt)}`} · {s._count.moments} clips</div>
                 </div>
                 <input name="note" defaultValue={s.approvalNote ?? ""} placeholder="Note (optional)" className="field min-w-48 flex-1" />
-                <input name="facecam" defaultValue={s.facecam ?? ""} placeholder="Facecam x,y,w,h e.g. 0.72,0.04,0.26,0.3" title="Where their webcam sits, as fractions of the frame (0–1). Used when Settings → Layout is “Facecam on top”." className="field w-72" />
+                <input name="facecam" defaultValue={s.facecam ?? ""} placeholder={s.facecamAuto ? `Webcam (found: ${s.facecamAuto})` : "Webcam x,y,w,h (optional, found automatically)"} title="Where their webcam sits, as fractions of the frame (0–1): x,y,width,height. Leave empty and Clip Factory finds it by itself. A box typed here always wins." className="field w-72" />
+                {s.facecamAuto && !s.facecam && (
+                  <span className="flex items-center gap-1.5 text-xs text-emerald-300" data-testid="facecam-auto">
+                    webcam spot found automatically
+                    <button formAction={resetFacecamAuto.bind(null, s.id)} className="btn-ghost px-2 py-0.5 text-xs" title="Forget it; the next clip looks for the webcam again">reset</button>
+                  </span>
+                )}
                 <button className="btn-ghost">Save</button>
                 <button formAction={removeStreamer.bind(null, s.id)} className="btn-bad">Remove</button>
               </form>
