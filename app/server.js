@@ -4,7 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { timingSafeEqual } from "node:crypto";
 import Anthropic from "@anthropic-ai/sdk";
-import { analyze, mockAnalyze, ScanError, MODEL } from "./analyze.js";
+import { analyze, mockAnalyze, ScanError, MODEL, MODES } from "./analyze.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC = path.join(here, "public");
@@ -77,7 +77,9 @@ async function handleScan(req, res) {
 
   const tagPrice = body.tagPrice === "" || body.tagPrice == null ? NaN : Number(body.tagPrice);
   const note = typeof body.note === "string" ? body.note.slice(0, 300) : "";
-  const input = { mediaType: match[1], imageB64: match[2], tagPrice, note };
+  const mode = body.mode ?? "item";
+  if (!MODES.includes(mode)) throw new ScanError("Unknown mode.", 400);
+  const input = { mode, mediaType: match[1], imageB64: match[2], tagPrice, note };
 
   scansToday++;
   try {

@@ -87,3 +87,16 @@ li { margin: 3px 0; }
 .pill.bought { color: var(--maybe); border-color: var(--maybe); }
 .pill.sold { color: var(--buy); border-color: var(--buy); }
 .empty { text-align: center; color: var(--muted); padding: 24px 0; }
+
+.modes { display: flex; gap: 6px; margin-bottom: 8px; }
+.mode { flex: 1; padding: 9px 4px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--muted); font: inherit; font-size: 14px; }
+.mode.active { color: #fff; background: var(--accent); border-color: var(--accent); }
+.preset { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 0; border-top: 1px solid var(--line); }
+.preset:first-of-type { border-top: 0; }
+.preset span { flex: 1; min-width: 0; }
+.links.tight { gap: 6px; flex-wrap: nowrap; }
+.btn.small { padding: 6px 10px; font-size: 14px; }
+.btn.off { opacity: .45; pointer-events: none; }
+.pill.mode-pill { color: var(--accent); border-color: var(--accent); }
+.big-offer { font-size: 22px; font-weight: 800; }
+#presets, #log { display: grid; gap: 14px; }

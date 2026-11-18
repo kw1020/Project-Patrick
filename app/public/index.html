@@ -14,6 +14,7 @@
     <h1>Patrick</h1>
     <nav>
       <button id="tab-scan" class="tab active" type="button">Scan</button>
+      <button id="tab-find" class="tab" type="button">Find</button>
       <button id="tab-log" class="tab" type="button">Log</button>
     </nav>
   </header>
@@ -26,9 +27,15 @@
     </section>
 
     <section class="card">
+      <div class="modes" id="modes" role="tablist" aria-label="What are you scanning">
+        <button type="button" class="mode" data-mode="item">Thrift item</button>
+        <button type="button" class="mode" data-mode="furniture">Furniture</button>
+        <button type="button" class="mode" data-mode="listing">Listing</button>
+      </div>
+      <p class="hint" id="mode-hint"></p>
       <div class="row">
         <div class="field">
-          <label for="tag">Tag price ($)</label>
+          <label for="tag" id="tag-label">Tag price ($)</label>
           <input id="tag" type="number" inputmode="decimal" min="0" step="0.01" placeholder="optional">
         </div>
         <div class="field grow">
@@ -42,6 +49,27 @@
     </section>
 
     <section id="result" hidden></section>
+  </main>
+
+  <main id="view-find" hidden>
+    <section class="card">
+      <div class="row">
+        <div class="field">
+          <label for="maxprice">Max price ($)</label>
+          <input id="maxprice" type="number" inputmode="numeric" min="0" step="5">
+        </div>
+        <div class="field grow">
+          <label for="clcity">Craigslist city</label>
+          <input id="clcity" type="text" autocapitalize="none" autocomplete="off" placeholder="e.g. denver">
+        </div>
+      </div>
+      <p class="hint">City is the part before .craigslist.org. Facebook and OfferUp use your account location.</p>
+      <label for="custom">Search for anything</label>
+      <input id="custom" type="text" placeholder="e.g. solid oak desk">
+      <div class="links" id="custom-links" style="margin-top:8px"></div>
+    </section>
+    <div id="presets"></div>
+    <section class="card" id="tips"></section>
   </main>
 
   <main id="view-log" hidden>
