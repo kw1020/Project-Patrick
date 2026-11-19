@@ -266,6 +266,12 @@ test("To post actions: Post to all queues the API accounts (single attempt), lis
   await assert.rejects(actions.markPostedToAccount(pending.id, w.ig.id, fd({})), /Approve the clip first/);
   await assert.rejects(actions.postToAccount(pending.id, w.yt.id), /Approve the clip first/);
 
+  // v1.9.8: a hard fail in the Platform check blocks Post to all, in plain English, and queues nothing.
+  const leak = await w.mk(w.gtaM.id, "approved", { caption: "The GTA 6 leak\n\n🎥 @kaicenat" });
+  await assert.rejects(actions.postToAll(leak.id, "vcc"), /Not posted\. Caption\/title says "leak"/);
+  assert.equal((await queue("post").getJobs(["waiting", "prioritized", "delayed"])).length, 0);
+  await w.prisma.clip.delete({ where: { id: leak.id } });
+
   const c = await w.mk(w.gtaM.id, "approved");
   const r = await actions.postToAll(c.id, "vcc");
   assert.deepEqual(r.queued, ["YouTube ViceCityClips YT"]);

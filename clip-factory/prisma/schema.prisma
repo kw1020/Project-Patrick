@@ -94,6 +94,11 @@ model Clip {
   judgeFrames       Int?    // v1.9.4: how many stills it looked at (0 = text only; null = judged before v1.9.4)
   judgeTokensIn     Int?    // v1.9.4: tokens the Judge call used (all input incl. images) for the cost on Settings
   judgeTokensOut    Int?
+  judgeHookOk       Boolean? // v1.9.8: the Judge said the first ~1.5s hook (null = judged before v1.9.8)
+  judgePayoffIn     Boolean? // v1.9.8: the Judge said the payoff is inside the window it was shown
+  judgePayoff       String?  // v1.9.8: the payoff in one line, as the Judge named it ("" / null = it could not name one, score capped at 4)
+  judgeAudio        String?  // v1.9.8: the <audio_summary> block the Judge read (debugging / "what it heard")
+  platformInfo      String?  // v1.9.8: JSON {file: ffprobe facts, render: what was burned in} for the Platform check
   category    String? // funny | gaming: the moment's guess at first, replaced by the Judge's label; null on older rows
   postError   String? // last YouTube upload error
   channelId   String? // v1.9.5: the Channel this clip goes to when Krew picked one on To post (null = by category, src/lib/channels.ts)
@@ -147,7 +152,7 @@ model Settings {
   spikeEnabled     Boolean @default(true)
   spikeMultiplier  Float   @default(3) // chat msgs/sec >= N x 5-min average
   judgeEnabled     Boolean @default(true)
-  minScore         Float   @default(6) // Judge auto-reject below this
+  minScore         Float   @default(7) // Judge auto-reject below this (v1.9.8: 6 -> 7, about the top third reaches Krew)
   judgeLearns      Boolean @default(true) // feed results from Krew's accounts into the Judge
   // Phase 2 single-account settings; Phase 3 moved these onto each Account. Kept so old databases update cleanly.
   ytAutoUpload     Boolean @default(false)
@@ -185,6 +190,9 @@ model Settings {
   migratedChannels    Boolean @default(false) // v1.9.5 one-time: first Channel made from channelName, existing accounts put in it
   supremePerChannel   Int     @default(5) // v1.9.6: Supreme Judge picks per channel per run
   supremeDailyCents   Int     @default(25) // v1.9.6: daily cap for Supreme Judge + video checks, in US cents
+  // v1.9.8 quality over quantity (Krew: "lesser of the clips that are lower quality and more clips that are just more higher quality")
+  maxPerCreatorPerHour Int    @default(3)     // at most this many clips per creator per hour reach review; the best are kept
+  migratedMinScore7    Boolean @default(false) // v1.9.8 one-time move: minScore 6 -> 7
 }
 
 // v1.9.5: one of Krew's brands (e.g. "ViceCityClips") = up to one YouTube + one TikTok + one Instagram account that all get the same

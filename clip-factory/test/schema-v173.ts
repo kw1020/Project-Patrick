@@ -1,6 +1,14 @@
+// Today's schema turned back into the v1.9.6 (7fb3948) one: the v1.9.8 columns removed, the minScore default put back.
+export function toV196Schema(now: string): string {
+  return now
+    .replace(/^ {2}(judgeHookOk|judgePayoffIn|judgePayoff|judgeAudio|platformInfo|maxPerCreatorPerHour|migratedMinScore7)\s.*\n/gm, "")
+    .replace(/^ {2}\/\/ v1\.9\.8.*\n/gm, "")
+    .replace(/^ {2}minScore .*\n/m, "  minScore         Float   @default(6) // Judge auto-reject below this\n");
+}
+
 // Today's schema turned back into the v1.9.5 one: the v1.9.6 columns (Supreme Judge, video checks) and AiSpend removed.
 export function toV195Schema(now: string): string {
-  return now
+  return toV196Schema(now)
     .replace(/^ {2}\w+ +\w+\??(?: +@default\([^)]*\))? *\/\/ v1\.9\.6.*\n/gm, "")
     .replace(/\/\/ v1\.9\.6: what the Supreme Judge[\s\S]*?\nmodel AiSpend \{[\s\S]*?\n\}\n\n/, "");
 }

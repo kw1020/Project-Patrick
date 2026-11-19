@@ -266,6 +266,46 @@ original brief is below, and the status section says what's done. Read both befo
 - **v1.9.7 (2026-11-19): auto-post per channel.** `setClipStatus` approve → `autoPostTargets` (`src/lib/channels.ts`): with channels, only
   api accounts whose `homeChannelId` = `channelForClip(...)`, not disabled; clip with no channel → nothing; no channels at all → old
   behaviour. `test/v197.test.ts`. The quality build (better clips/platform rules) moves to 1.9.8.
+- **v1.9.8 (2026-11-19, built as "1.9.7" on v1.9.4, rebased onto v1.9.7): fewer + better clips, the Judge "watches", Platform check.** Krew: "the clip finder to be better… the
+  judge to actually be able to watch the videos… follow the guidelines of every social media", then "just random pieces taken out…
+  lesser of the clips that are lower quality". All schema changes additive (`test/v198.test.ts` pushes from 7fb3948 = v1.9.6 = v1.9.7 schema, with rows;
+  `toV196Schema` in `test/schema-v173.ts`): Clip `judgeHookOk/judgePayoffIn/judgePayoff/judgeAudio/platformInfo`, Settings
+  `maxPerCreatorPerHour` (3), `migratedMinScore7`; `minScore` default 6 -> 7 (`migrateV198Settings` moves 6 -> 7 once).
+  **Event gate** (`src/lib/rank.ts` `eventGate`/`gateInputs`, run in `runJudge` BEFORE the Claude call, `FINDER_GATE=off` skips):
+  dead air (>= 50% real silence + < 10% speech + < 6 words) / AFK (no talk, no spike, 0 scene changes) / no spike (loudness jump
+  < 6 dB over that stream's usual AND chat peak < 2.5x its own median) / no reaction (no reaction word 2s before-3s after the peak,
+  < 3 words within +-3s, jump < 9 dB) → score 2, judgeReason `FINDER_PREFIX` + reason, cut at priority 10 (auto-rejected).
+  **Judge input** (`src/lib/audio-summary.ts`): `<audio_summary>` = loudness digits 0-9 per 0.5s relative to the window,
+  labelled spikes (`audioPeaks`), speech/silence stretches, chat heat per 5s (`ChatHeat.heat`, stored on chat-spike
+  `Moment.stats.heat/heatStep/heatEnd`, mapped by `chatInSource`: detection = moment + 12s, moment at min(30, vodOffset) in the
+  raw) and whether chat and sound peak together. Frames (`pickFrameTimes` peaks/scenes): + 2 per peak (at it, +1s), + up to 3
+  ffmpeg scene changes (`detectScenes`, fps=10, 256px, `select=gt(scene,0.3)`), max 12; without them the v1.9.4 pick is unchanged.
+  Schema adds `payoff` (one line), `hook_lands`, `payoff_in_window`, `payoff_at` before `score`; `namedPayoff` false (empty,
+  vague, < 3 words, or no time) → score capped at 4 in code (`NO_PAYOFF_CAP`). No own window + flags → `windowFromJudgeFlags`
+  (payoff outside → fresh window round payoff_at; weak hook → next sentence >= 1s later); Judge's payoff_at becomes the punch-in
+  when inside. **Tighter cuts** (`tightenWindow`, after `pickSmartWindow` in runTranscribe and for flag windows): build-up
+  <= `LEAD_MAX` 12s (opens 1.2s before the setup sentence), real silence trimmed at both ends (never into the payoff), not
+  mid-word, >= minSec. **Ranking**: `twitchClipRank` = standout x (1 + 0.5 log2(1 + views-per-hour / (base/24))) x 1.2 if the
+  streamer clipped it / (1 + age/48) (used by `scoreCreatorClips`); `candidateScore` (+ gate, chat+sound coincidence x1.6) sets
+  the Judge queue priority (`judgePriority`, `enqueueJudge(id, priority)`). **Keep the best** (`src/lib/funnel.ts` `keepBest`,
+  in the Cutter for fresh clips that would go to review): a near-duplicate (same VOD stretch, or moments <= 45s apart) of an
+  equal/better clip is rejected, a worse PENDING duplicate is rejected instead; > maxPerCreatorPerHour in review in the last
+  hour → the worst pending one makes room or the new one is rejected. Queue header: `funnelLine` "Last 24h: X found, Y kept (...)".
+  **Platform check** (`src/lib/platform-rules.ts`, sources cited at the top): `checkFile` (1080x1920, H.264/AAC, 23-60 fps,
+  <= 25 Mbps, size limits, 3s-3:00, moov first), `checkOriginality` (credit, hook/styled edit/new layout = real editing; captions
+  alone or nothing = hard fail; no other app's watermark/source host), `checkCaption` (2,200 chars, <= 5 hashtags for IG,
+  YouTube title 100, `BANNED_PHRASES` incl. "leak", credit for TikTok/IG). Facts on `Clip.platformInfo` from the Cutter
+  (`probeFinal` + `renderFacts`); ClipCard "Platform check" (live with the edited caption); `runPost` refuses on a hard fail
+  for that platform (`postBlockReason`), so auto-post after Approve shows "Posting failed: Platform check failed: …". Upload cards
+  (`ToPostCard`, shared `PlatformCheckBox`) show it too; any hard fail disables Post to all and `postToAll` refuses ("Not posted. …").
+  The v1.9.6 video check (`Clip.qa`, ffmpeg black/freeze/silence) is reused as warnings in the box, not re-run.
+  **Safe zones**: `TEXT_SAFE` top 290 / bottom 480 / left 60 / right 190 (ad templates' tops, measured organic bottoms, widest
+  right rail); all text centred on `TEXT_X` 475 and shrunk (`fitScale`, DejaVu Bold width estimate) to 830px; credit top y=290
+  (or bottom y=1440 when a face is up there), hook under it at 360, watermark right-aligned at x=890 above y=1440 (or under the top
+  credit when fullcam captions are low). `test/v198.test.ts` renders every layout x style (+ plain) with long text and checks
+  the drawn pixels' bounding box. Measured cost estimate: ~6.5k input tokens (12 x ~308 per 640x360 still + text) + ~450
+  output ≈ 1.75¢/clip at $2/$10 (8 frames ≈ 1.5¢). Unverified: real Claude with the new fields, real Twitch audio through the
+  gate (thresholds from fixtures), scene detection speed on 1080p60 on Krew's PC, platform UI positions (from ad templates).
 - Docker image never built in the sandbox (no daemon); it builds fine on Krew's PC; a clean-copy `npm ci` + `next build` without `.env`
   (what the Dockerfile does) passes.
 - **Suggestions (2026-11-17):** `src/workers/suggest.ts` (queue "suggest", hourly + once ~1 min after start,
@@ -385,6 +425,8 @@ GTA 6 launches Thursday Nov 19, 2026 (PS5 / Xbox). Phase 1 MUST work by launch d
 **Ground rules:** approved streamers only (opted in, paid clipping campaign, or publicly allows clippers;
 the scout can discover anyone, the grabber only pulls approved) · human approval in the dashboard before
 anything posts · always credit the streamer (name + channel link) in the caption · secrets in `.env`.
+
+**Krew's standing requirements:** Clips must be genuinely entertaining with a clear payoff; fewer, higher-quality clips beat many random ones. (2026-11-19) Every clip must follow the rules of every platform it goes to (YouTube Shorts, TikTok, Instagram Reels).
 
 **Production line:**
 1. Scout — every 2 min, Helix `GET /streams?game_id=<GTA VI>`; track viewers; join chat (anonymous, read-only) for approved live streamers.

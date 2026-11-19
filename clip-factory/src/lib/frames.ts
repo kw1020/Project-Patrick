@@ -6,6 +6,27 @@ import { run } from "./media";
 // as image blocks (Krew: "The Judge is only giving every video a 6 out of 10"). Pure time picking + one ffmpeg call.
 
 export const JUDGE_FRAME_COUNT = 8;
+/** v1.9.8: never more than this many stills (cost: each 640x360 JPEG is ~300 input tokens). */
+export const JUDGE_FRAME_MAX = 12;
+/** ffmpeg scene score that counts as a cut / big change of shot. */
+export const SCENE_THRESHOLD = 0.3;
+
+/** Scene-change times (source seconds) in [start, start+length] from `showinfo` output lines (pts_time:12.34). */
+export function parseSceneTimes(stderr: string, start: number): number[] {
+  return [...stderr.matchAll(/pts_time:([0-9.]+)/g)].map((m) => Math.round((start + parseFloat(m[1])) * 10) / 10).filter((t) => Number.isFinite(t));
+}
+
+/**
+ * v1.9.8: where the picture changes a lot (ffmpeg select='gt(scene,0.3)') inside the window, biggest changes not ranked,
+ * at most `max`, >= 1.5s apart. Decodes the window at 10 fps and 256px wide to stay cheap. Throws on ffmpeg errors.
+ */
+export async function detectScenes(input: string, start: number, length: number, max = 3, timeoutMs = 45_000): Promise<number[]> {
+  const { stderr } = await run(process.env.FFMPEG || "ffmpeg", ["-hide_banner", "-loglevel", "info", "-ss", start.toFixed(2), "-t", length.toFixed(2), "-i", input,
+    "-an", "-vf", `fps=10,scale=256:-2,select=gt(scene\\,${SCENE_THRESHOLD}),showinfo`, "-f", "null", "-"], { timeoutMs });
+  const out: number[] = [];
+  for (const t of parseSceneTimes(stderr, start)) if (!out.some((x) => Math.abs(x - t) < 1.5) && out.length < max) out.push(t);
+  return out;
+}
 export const JUDGE_FRAME_WIDTH = 640;
 /** ffmpeg mjpeg quality scale (2 = best, 31 = worst); 6 is roughly "JPEG quality 70". */
 export const JUDGE_FRAME_Q = 6;
@@ -20,8 +41,13 @@ const r1 = (x: number) => Math.round(x * 10) / 10;
  * (each placed as far as possible from the frames already chosen). No payoff, or one outside the window → 60% of the way in.
  * Frames closer than 0.4s to one already picked are skipped and filled by the spread, so short windows still get distinct times.
  */
-export function pickFrameTimes(o: { start: number; end: number; payoffAt?: number | null; count?: number; sourceLength?: number | null }): number[] {
-  const count = Math.max(1, Math.round(o.count ?? JUDGE_FRAME_COUNT));
+export function pickFrameTimes(o: { start: number; end: number; payoffAt?: number | null; count?: number; sourceLength?: number | null; peaks?: number[]; scenes?: number[] }): number[] {
+  // v1.9.8: up to 2 frames per loudness/chat peak (at it, +1s for the reaction) and up to 3 scene changes (+0.2s, the new
+  // shot), on top of the 8, capped at JUDGE_FRAME_MAX. Without peaks/scenes it's the v1.9.4 pick.
+  const peaks = (o.peaks ?? []).filter((t) => Number.isFinite(t) && t >= o.start && t <= o.end).slice(0, 2);
+  const scenes = (o.scenes ?? []).filter((t) => Number.isFinite(t) && t > o.start + 0.5 && t < o.end - 0.5).slice(0, 3);
+  const extra = peaks.length * 2 + scenes.length;
+  const count = Math.max(1, Math.min(JUDGE_FRAME_MAX, Math.round(o.count ?? JUDGE_FRAME_COUNT + extra)));
   const start = Math.max(0, o.start);
   const hardEnd = o.sourceLength != null && o.sourceLength > 0 ? Math.min(o.end, o.sourceLength) : o.end;
   const end = Math.max(start, hardEnd - 0.1); // the last decodable instant
@@ -40,6 +66,9 @@ export function pickFrameTimes(o: { start: number; end: number; payoffAt?: numbe
   add(p);
   add(p - 2);
   add(p + 2);
+  // v1.9.8: the loud/chat peaks and the reaction right after, then the scene changes.
+  for (const t of peaks) { add(t); add(t + 1); }
+  for (const t of scenes) add(t + 0.2);
   // The rest: spread out, each as far as possible from what's already there (0.1s grid).
   const steps = Math.max(1, Math.round(len * 10));
   while (picked.length < count) {

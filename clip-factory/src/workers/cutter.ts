@@ -9,8 +9,12 @@ import { categoryOff, isCategory, offReason } from "../lib/category";
 import { measureLevels, parseEditStyle, parseJumpCuts, probeSize, renderOrFallback, renderStyled } from "../lib/edit";
 import { isNonGame } from "../lib/category";
 import { detectCam } from "../lib/camdetect";
-import { boxToRemember, camInfoFits, chooseLayout, needsDetect, parseCamInfo, parseLayoutSetting, planLayout, type CamInfo, type LayoutPlan } from "../lib/layout";
-import { findPayoff, pickSmartWindow, windowWords } from "../lib/window";
+import { boxToRemember, camInfoFits, chooseLayout, needsDetect, overlayPlace, parseCamInfo, parseLayoutSetting, planLayout, watermarkText, type CamInfo, type LayoutPlan } from "../lib/layout";
+import { audioCues, findPayoff, pickSmartWindow, tightenWindow, windowWords } from "../lib/window";
+import { audioSummary, chatInSource, chatPeak } from "../lib/audio-summary";
+import { candidateScore, gateInputs, judgePriority } from "../lib/rank";
+import { probeFinal, renderFacts } from "../lib/platform-file";
+import { keepBest, vodSpan, type KeepClip } from "../lib/funnel";
 
 /** Longest stretch of source we transcribe (Twitch clips are <= 60s, VOD/YouTube sections 45s). */
 export const MAX_SOURCE_SEC = 180;
@@ -50,7 +54,8 @@ export async function runTranscribe(clipId: string) {
     fs.rmSync(wav, { force: true });
   }
   const payoff = findPayoff({ source: clip.moment.source, duration: span, levels, words, hint: payoffHint(clip.moment) });
-  const win = pickSmartWindow({ duration: span, payoff: payoff.at, words, levels, minSec: settings.clipMinSec, maxSec: settings.clipMaxSec });
+  // v1.9.8: then tightened: open 1-3s before the setup, end right after the reaction, no dead air at either end.
+  const win = tightenWindow(pickSmartWindow({ duration: span, payoff: payoff.at, words, levels, minSec: settings.clipMinSec, maxSec: settings.clipMaxSec }), { payoff: payoff.at, words, levels, minSec: settings.clipMinSec, maxSec: settings.clipMaxSec, duration: span });
   const inWin = windowWords(words, win.start, win.length);
   await prisma.clip.update({
     where: { id: clipId },
@@ -60,8 +65,38 @@ export async function runTranscribe(clipId: string) {
       stage: "judge", stageAt: new Date(), error: null,
     },
   });
-  await enqueueJudge(clipId);
-  return `transcribed ${Math.round(span)}s (${words.length} words), payoff at ${payoff.at}s (${payoff.why}), keeping ${win.start}-${Math.round((win.start + win.length) * 10) / 10}s`;
+  // v1.9.8: judge the most promising clips first (chat + sound spiking together, little silence; src/lib/rank.ts).
+  const pr = judgeRank(clip.moment, levels, words, win, payoff.at);
+  await enqueueJudge(clipId, judgePriority(pr));
+  return `transcribed ${Math.round(span)}s (${words.length} words), payoff at ${payoff.at}s (${payoff.why}), keeping ${win.start}-${Math.round((win.start + win.length) * 10) / 10}s, finder score ${pr}`;
+}
+
+/** v1.9.8: keepBest (src/lib/funnel.ts) against this creator's clips from the last 3 hours that are in review. */
+async function keepBestFor(clip: { id: string; score: number | null; createdAt: Date; moment: { streamerId: string; source: string; vodId: string | null; vodOffset: number | null; timestamp: Date } }, start: number, length: number, cap: number) {
+  const rows = await prisma.clip.findMany({
+    where: { id: { not: clip.id }, status: { in: ["pending", "approved", "posted"] }, createdAt: { gte: new Date(Date.now() - 3 * 3600_000) }, moment: { streamerId: clip.moment.streamerId } },
+    select: { id: true, score: true, status: true, createdAt: true, winStart: true, winLength: true, duration: true, moment: { select: { streamerId: true, source: true, vodId: true, vodOffset: true, timestamp: true } } },
+  });
+  const toKeep = (c: { id: string; score: number | null; status: string; createdAt: Date; moment: { streamerId: string; source: string; vodId: string | null; vodOffset: number | null; timestamp: Date } }, s: number | null, l: number | null): KeepClip =>
+    ({ id: c.id, streamerId: c.moment.streamerId, score: c.score, status: c.status, createdAt: c.createdAt.getTime(), at: c.moment.timestamp.getTime(), ...vodSpan(c.moment, s, l) });
+  return keepBest(toKeep({ ...clip, status: "pending" }, start, length), rows.map((r) => toKeep(r, r.winStart, r.winLength ?? r.duration)), cap);
+}
+
+/** v1.9.8: the clip finder's score for a transcribed clip (src/lib/rank.ts candidateScore) from what was just measured. */
+export function judgeRank(m: { source: string; spikeScore: number; sourceViews: number; stats: string | null; vodOffset: number | null; vodId: string | null }, levels: number[], words: Word[], win: { start: number; length: number }, peak: number | null = null): number {
+  let stats: { heat?: number[]; heatStep?: number; heatEnd?: number } | null = null;
+  try { stats = m.stats ? JSON.parse(m.stats) : null; } catch { /* none */ }
+  const chat = stats?.heat ? chatInSource({ heat: stats.heat, step: stats.heatStep ?? 5, endAt: stats.heatEnd ?? 0 }, payoffHint(m)) : [];
+  const a = audioSummary({ levels, words, window: { start: win.start, end: win.start + win.length }, chat });
+  const w = { start: win.start, end: win.start + win.length };
+  const cp = chatPeak(chat.filter((c) => c.at >= w.start - 5 && c.at <= w.end + 5));
+  const g = levels.length ? gateInputs({ levels, words, win: w, peak, silenceShare: a.silenceShare, speechShare: a.speechShare, chatX: chat.length ? (cp?.x ?? 1) : null, sceneChanges: null, jumps: audioCues(levels, undefined, 8).jumps }) : null;
+  const source = m.source === "chat" ? "chat" : m.source === "youtube" ? "youtube" : "twitch_clip";
+  return candidateScore({
+    id: "", streamer: "", source, chatRatio: m.spikeScore, replay: m.spikeScore, views: m.sourceViews, base: Math.max(1, m.sourceViews / Math.max(1, m.spikeScore)), ageHours: 0,
+    audioJumpDb: g ? g.audioJumpDb : null, coincide: a.coincide, silenceShare: g ? a.silenceShare : null, speechShare: g ? a.speechShare : null,
+    wordCount: g?.wordCount ?? null, sceneChanges: null, chatX: g?.chatX ?? null, reactNear: g?.reactNear ?? null, wordsNear: g?.wordsNear ?? null,
+  });
 }
 
 /** Step 3 — Cutter: make it 9:16, burn captions + hook + streamer credit, in an editing style (v1.7.3). */
@@ -156,12 +191,28 @@ export async function runCut(clipId: string, styleOverride?: string, jumpOverrid
     const fresh = clip.status === "processing" || clip.status === "failed";
     // Settings → "What to clip": a clip whose kind (the Judge's label, else the first guess) is switched off is set aside too.
     const kindOff = isCategory(clip.category) && categoryOff(settings, clip.category);
-    const autoReject = kindOff || (settings.judgeEnabled && clip.score != null && clip.score < settings.minScore);
-    const kindReason = kindOff && isCategory(clip.category) && !(clip.judgeReason ?? "").startsWith(offReason(clip.category))
+    let autoReject = kindOff || (settings.judgeEnabled && clip.score != null && clip.score < settings.minScore);
+    let kindReason: { judgeReason?: string } = kindOff && isCategory(clip.category) && !(clip.judgeReason ?? "").startsWith(offReason(clip.category))
       ? { judgeReason: clip.judgeReason ? `${offReason(clip.category)} (${clip.judgeReason})` : offReason(clip.category) } : {};
+    // v1.9.8 quality over quantity: near-duplicates and more than Settings.maxPerCreatorPerHour clips of one creator in an hour
+    // don't reach review; the best ones are kept (a better new clip replaces a worse pending one).
+    if (fresh && !autoReject) {
+      const k = await keepBestFor(clip, start, length, settings.maxPerCreatorPerHour);
+      if (!k.keep) { autoReject = true; kindReason = { judgeReason: `${k.reason}${clip.judgeReason ? ` (Judge: ${clip.judgeReason})` : ""}` }; }
+      for (const d of k.demote) {
+        await prisma.clip.updateMany({ where: { id: d.id, status: "pending" }, data: { status: "rejected", judgeReason: d.reason } });
+      }
+    }
+    // v1.9.8 Platform check: what the file is (ffprobe) + what the render put in; the Queue card and the Poster read it.
+    const file = await probeFinal(storagePath(finalRel)).catch((e) => { console.warn(`[cut] ${clipId}: ffprobe failed:`, (e as Error).message); return null; });
+    const render = renderFacts({
+      captions: words.length > 0, hook: Boolean(r.result ? clip.hookText || clip.title : clip.hookText), watermark: watermarkText(watermark) || null, styled: Boolean(r.result),
+      layout: usedLayout, place: usedLayout === plan.kind ? plan.place : overlayPlace("blur", null), sourceUrl: clip.moment.sourceUrl,
+    });
     await prisma.clip.update({
       where: { id: clipId },
       data: {
+        platformInfo: JSON.stringify({ file, render, at: new Date().toISOString() }),
         finalPath: finalRel, duration: outLen, winLength: length, editStyle: cutWith, editNote, layout: usedLayout,
         // v1.9.6: the edit as rendered (for the video check's cut checks); a new video is unchecked until checked again.
         cutPlan: JSON.stringify(r.result ? { segs: r.result.segs, punchStart: r.result.punchStart, duration: r.result.duration } : { segs: [{ start: 0, end: length }], punchStart: null, duration: length }),

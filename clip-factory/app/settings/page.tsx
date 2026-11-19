@@ -165,9 +165,9 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           {!judgeConfigured() && <div className="rounded-lg bg-sun/10 px-3 py-2 text-sm text-sun">No <Code>ANTHROPIC_API_KEY</Code> in <Code>.env</Code>, so clips go to review unscored.</div>}
           <Row label="Score clips with Claude" hint={`Uses ${JUDGE_MODEL}. Writes the hook, title and hashtags too.`}><input name="judgeEnabled" type="checkbox" defaultChecked={s.judgeEnabled} className={check} /></Row>
           <Row label="Learn from my results" hint={`Shows the Judge which of your posts did best and worst. Starts once ${MIN_POSTS_TO_LEARN} posts are a day old. See Analytics.`}><input name="judgeLearns" type="checkbox" defaultChecked={s.judgeLearns} className={check} /></Row>
-          <Row label="Min score" hint="Clips the Judge scores below this go straight to Rejected (you can still rescue them)."><input name="minScore" type="number" step="0.5" defaultValue={s.minScore} className="field w-32" /></Row>
+          <Row label="Min score" hint="Clips the Judge scores below this go straight to Rejected (you can still rescue them). 7 lets about the top third through."><input name="minScore" type="number" step="0.5" defaultValue={s.minScore} className="field w-32" /></Row>
           <div className="text-xs text-zinc-400" data-testid="judge-cost">
-            The Judge looks at 8 frames of each clip plus its transcript.{" "}
+            The Judge looks at 8-12 frames of each clip plus its transcript and a summary of the sound.{" "}
             {cents != null ? <>Cost: <b className="text-zinc-200">~{cents < 1 ? cents.toFixed(1) : Math.round(cents * 10) / 10}¢ per clip</b> (last {costRows.length}).</> : "Cost per clip shows here once clips have been scored."}
           </div>
         </div>
@@ -185,6 +185,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           <Row label="Clip length (seconds)" hint="The cut lands on the payoff (the loud or funny bit) with a little build-up. Shorter sources are kept whole."><div className="flex items-center gap-2"><input name="clipMinSec" type="number" defaultValue={s.clipMinSec} className="field w-24" /> to <input name="clipMaxSec" type="number" defaultValue={s.clipMaxSec} className="field w-24" /></div></Row>
           <Row label="Only standout clips" hint="A Twitch clip needs at least this many times the views of that creator's usual clip. Higher = fewer, better clips."><div className="flex items-center gap-2 text-sm"><span>at least</span><input name="standoutMin" type="number" step="0.5" min="1" defaultValue={s.standoutMin} className="field w-24" /><span>&times; the creator&apos;s usual clip views</span></div></Row>
           <Row label="Max new clips per creator per scan" hint="Shares the line out fairly, so one big channel can't fill it."><input name="maxPerCreatorPerRun" type="number" min="1" defaultValue={s.maxPerCreatorPerRun} className="field w-32" /></Row>
+          <Row label="Max clips per creator per hour" hint="Only the best this many of one creator's clips in an hour reach review; near-duplicates of the same moment keep only the best."><input name="maxPerCreatorPerHour" type="number" min="1" max="30" defaultValue={s.maxPerCreatorPerHour} className="field w-32" /></Row>
           <Row label="Min Twitch clip views" hint="Only grab viewer clips with at least this many views."><input name="minClipViews" type="number" defaultValue={s.minClipViews} className="field w-32" /></Row>
           <Row label="Look back (days)" hint="How old a Twitch clip can be (1-30 days)."><input name="clipLookbackDays" type="number" min="1" max="30" defaultValue={Math.max(1, Math.round(s.clipLookbackHrs / 24))} className="field w-32" /></Row>
           <Row label="Layout" hint="How the wide stream is fitted into the tall video. You can re-cut any clip in another layout from its card in the Queue.">

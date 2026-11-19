@@ -33,8 +33,9 @@ export async function enqueueGrab(momentId: string, clipId: string, opts: { dela
 export async function enqueueTranscribe(clipId: string) {
   await queue("transcribe").add("transcribe", { clipId }, { jobId: `tr-${clipId}-${Date.now()}` });
 }
-export async function enqueueJudge(clipId: string) {
-  await queue("judge").add("judge", { clipId }, { jobId: `judge-${clipId}-${Date.now()}`, attempts: 1 });
+/** v1.9.8: `priority` (1 = first) from src/lib/rank.ts judgePriority, so the most promising clips are judged first. */
+export async function enqueueJudge(clipId: string, priority?: number) {
+  await queue("judge").add("judge", { clipId }, { jobId: `judge-${clipId}-${Date.now()}`, attempts: 1, ...(priority ? { priority } : {}) });
 }
 /** priority 1 = render first (clips headed for review); 10 = when idle (auto-rejected clips). */
 /** `style` = re-cut in this editing style (else Settings.editStyle); `jumpCuts` = off|light|normal for this cut only. */

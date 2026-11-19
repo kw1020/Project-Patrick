@@ -313,6 +313,22 @@ export class ChatHeat {
     return null;
   }
 
+  /**
+   * v1.9.8: counted messages per `step` seconds over the last `secs` seconds, oldest first, the last bucket ending now.
+   * Stored with a chat-spike moment so the Judge sees where chat heated up inside the clip (src/lib/audio-summary.ts).
+   */
+  heat(login: string, secs = 60, step = 5, now = this.clock.now()): number[] {
+    const b = this.buckets.get(login.toLowerCase());
+    const sec = Math.floor(now / 1000), n = Math.max(1, Math.round(secs / step));
+    const out: number[] = [];
+    for (let k = n - 1; k >= 0; k--) {
+      let c = 0;
+      for (let s = sec - (k + 1) * step + 1; s <= sec - k * step; s++) c += b?.get(s)?.n ?? 0;
+      out.push(c);
+    }
+    return out;
+  }
+
   /** Up to `max` chat lines from the last `secs` seconds (context for the Judge). */
   samples(login: string, secs = 20, max = 40, now = this.clock.now()) {
     const r = (this.recent.get(login.toLowerCase()) ?? []).filter((m) => m.t >= now - secs * 1000);

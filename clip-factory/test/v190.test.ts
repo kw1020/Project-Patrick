@@ -239,17 +239,17 @@ test("splitGameShift: the game crop moves away from a corner cam, at most 12%", 
 
 const overlaps = (a: { top: number; bottom: number }, b: { top: number; bottom: number }) => a.top < b.bottom && b.top < a.bottom;
 
-test("overlayPlace: captions/hook/credit never on the face; fullcam captions at ~72%, split captions just under the seam", () => {
+test("overlayPlace: captions/hook/credit never on the face; fullcam captions at ~68%, split captions just under the seam", () => {
   const blur = overlayPlace("blur", null);
-  assert.deepEqual([blur.capY, blur.hookY, blur.creditY], [1190, 250, 110]);
+  assert.deepEqual([blur.capY, blur.hookY, blur.creditY], [1190, 360, 290]);
   // fullcam, face in the upper middle
   const face = { x: 380, y: 600, w: 320, h: 330 };
   const fc = overlayPlace("fullcam", face);
-  assert.equal(fc.capY, Math.round(1920 * 0.72));
+  assert.equal(fc.capY, Math.round(1920 * 0.68));
   const head = { top: face.y - face.h * 0.25, bottom: face.y + face.h * 1.25 };
   assert.ok(!overlaps({ top: fc.capY - 60, bottom: fc.capY + 60 }, head), "captions under the chin");
   assert.ok(!overlaps({ top: fc.hookY, bottom: fc.hookY + 190 }, head), "hook off the face");
-  assert.deepEqual([fc.creditY, fc.creditAlign], [110, 8]);
+  assert.deepEqual([fc.creditY, fc.creditAlign], [290, 8]);
   // fullcam, head near the top: hook and credit move off it
   const high = overlayPlace("fullcam", { x: 380, y: 150, w: 320, h: 330 });
   assert.ok(high.hookY > 150 + 330 * 1.25, "hook below the head");
@@ -263,7 +263,7 @@ test("overlayPlace: captions/hook/credit never on the face; fullcam captions at 
   assert.ok(!overlaps({ top: sp.capY - 60, bottom: sp.capY + 60 }, hook), "hook and captions apart");
   assert.equal(sp.creditAlign, 2, "face reaches the top of the cam: credit at the bottom");
   const smallFace = overlayPlace("split", { x: 450, y: 220, w: 150, h: 150 });
-  assert.deepEqual([smallFace.hookAlign, smallFace.hookY, smallFace.creditY], [2, SEAM - 14, 110], "small face: hook just above the seam, credit on top");
+  assert.deepEqual([smallFace.hookAlign, smallFace.hookY, smallFace.creditY], [2, SEAM - 14, 1440], "small face: hook just above the seam; its forehead is where the safe top starts (v1.9.8), so the credit goes to the bottom");
 });
 
 test("faceInOutput + planLayout: zoom on the cam for funny split clips, on the game otherwise; fullcam = whole frame", () => {
@@ -284,7 +284,7 @@ test("faceInOutput + planLayout: zoom on the cam for funny split clips, on the g
   const plain = buildFilter({ facecam: null, plan: fc });
   assert.match(plain, /^\[0:v\]crop=\d+:\d+:x='\d+':y=\d+,scale=1080:1920/);
   const ass = buildAss({ words: [{ word: "hi", start: 0, end: 1 }], credit: "twitch.tv/x", duration: 5, layout: "fullcam", place: fc.place, hook: "hook" });
-  assert.match(ass, new RegExp(`\\\\an5\\\\pos\\(540,${fc.place.capY}\\)`));
+  assert.match(ass, new RegExp(`\\\\an5\\\\pos\\(475,${fc.place.capY}\\)`));
 });
 
 // ---------- Real renders ----------

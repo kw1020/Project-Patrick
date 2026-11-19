@@ -65,7 +65,8 @@ export async function runSpikeCheck(chat: ChatHeat, now = Date.now(), lookupVod 
       data: {
         streamerId: s.id, timestamp: new Date(now - REACTION_LAG_SEC * 1000), spikeScore: sp.ratio, source: "chat", gameName: game,
         vodId, vodOffset, sourceUrl: `https://www.twitch.tv/videos/${vodId}?t=${Math.max(0, vodOffset - 30)}s`, category: sp.category,
-        stats: JSON.stringify({ ...sp, viewers: s.viewers, chat: chat.samples(s.login, 20, 40, now) }),
+        // v1.9.8: + chat heat per 5s over the last 60s (heatEnd = now), so the Judge can line chat up with the sound.
+        stats: JSON.stringify({ ...sp, viewers: s.viewers, chat: chat.samples(s.login, 20, 40, now), heat: chat.heat?.(s.login, 60, 5, now), heatStep: 5, heatEnd: now }),
         clips: { create: { title, caption: brandedCaption({ hook: title, streamer: s, category: sp.category, game, campaign: s.campaign }), status: "processing", stage: "grab", stageAt: new Date(), category: sp.category } },
       },
       include: { clips: true },

@@ -4,6 +4,8 @@ import { markPostedToAccount, postToAccount, postToAll, setClipChannel } from ".
 import { PLATFORM_LABEL, downloadUrl } from "../lib/channels";
 import { checkCampaignCaption } from "../lib/social";
 import { CategoryChip } from "./CategoryChip";
+import { PlatformCheckBox } from "./PlatformCheckBox";
+import { parsePlatformInfo, platformCheck } from "../lib/platform-rules";
 
 export type ToPostRow = {
   accountId: string; platform: string; label: string; action: "post" | "tiktok" | "manual"; error: string | null; disabled?: boolean;
@@ -17,6 +19,8 @@ export type ToPostView = {
   channelId: string | null; chosenChannelId: string | null; channelName: string | null;
   rows: ToPostRow[];
   supreme?: { rank: number | null; reason: string | null } | null;
+  /** v1.9.8 Platform check facts (Clip.platformInfo JSON) + caption credit + the v1.9.6 video-check issues. */
+  platformInfo?: string | null; creditOk?: boolean; qaIssues?: { type: string; detail: string; source?: string }[] | null;
 };
 
 const chip: Record<string, string> = {
@@ -46,6 +50,8 @@ export function ToPostCard({ clip, channels, children }: { clip: ToPostView; cha
   const manualLeft = left.filter((r) => r.action === "manual" || r.error);
   const uploading = clip.stage === "post";
   const checks = clip.campaign ? checkCampaignCaption(clip.caption, clip.campaign) : [];
+  // v1.9.8: a hard fail in the Platform check blocks Post to all (the Poster refuses it too).
+  const pc = platformCheck({ caption: clip.caption, title: clip.title, creditOk: clip.creditOk ?? true, info: parsePlatformInfo(clip.platformInfo), qa: clip.qaIssues });
 
   return (
     <article className={`card flex min-w-0 flex-col overflow-hidden ${busy ? "opacity-70" : ""}`} data-testid="to-post-card">
@@ -84,6 +90,7 @@ export function ToPostCard({ clip, channels, children }: { clip: ToPostView; cha
             {copied === "caption" ? "Copied ✓" : "Copy"}
           </button>
         </div>
+        {clip.hasVideo && <PlatformCheckBox check={pc} />}
         {checks.length > 0 && (
           <div className="space-y-0.5 text-xs" data-testid="campaign-checks">
             <div className="font-bold text-zinc-300">Campaign: {clip.campaign!.name}{clip.campaign!.link && <a href={clip.campaign!.link} target="_blank" className="ml-1 font-normal text-hot">open ↗</a>}</div>
@@ -98,12 +105,13 @@ export function ToPostCard({ clip, channels, children }: { clip: ToPostView; cha
         ) : (
           <div className="space-y-2">
             {left.length > 0 && (
-              <button className="btn-hot w-full" disabled={busy || uploading || clip.stage === "cut"} data-testid="post-to-all"
+              <button className="btn-hot w-full" disabled={busy || uploading || clip.stage === "cut" || pc.fails > 0} data-testid="post-to-all"
+                title={pc.fails ? "Blocked: fix the Platform check problems first (re-cut or edit the caption in the Queue)" : undefined}
                 onClick={() => run(async () => {
                   const r = await postToAll(clip.id, clip.channelId!);
                   setMsg(r.queued.length ? `Sending to ${r.queued.join(", ")}…${r.byHand.length ? " Then do the by-hand ones below." : ""}` : "Nothing to upload: do the by-hand ones below.");
                 })}>
-                Post to all on {clip.channelName}{autoLeft.length ? ` (${autoLeft.map((r) => PLATFORM_LABEL[r.platform]).join(" + ")} now${manualLeft.length ? `, ${manualLeft.length} by hand` : ""})` : " (by hand)"}
+                {pc.fails ? "⛔ Blocked by the Platform check: " : ""}Post to all on {clip.channelName}{autoLeft.length ? ` (${autoLeft.map((r) => PLATFORM_LABEL[r.platform]).join(" + ")} now${manualLeft.length ? `, ${manualLeft.length} by hand` : ""})` : " (by hand)"}
               </button>
             )}
             {msg && <div className="text-xs text-emerald-300">{msg}</div>}

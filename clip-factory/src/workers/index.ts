@@ -15,7 +15,7 @@ import { runSpikeCheck } from "./spike";
 import { runYouTubeScan } from "./youtube";
 import { runSuggestScan } from "./suggest";
 import { runQa, runSupreme } from "./supreme";
-import { migrateV180Settings, migrateV190Settings } from "./migrate";
+import { migrateV180Settings, migrateV190Settings, migrateV198Settings } from "./migrate";
 import { startRetention } from "./retention";
 import { judgeConfigured } from "../lib/judge";
 import { ensureChannels } from "../lib/to-post";
@@ -70,6 +70,7 @@ async function main() {
   await migrateV180Settings().then((m) => m && console.log(`[migrate] ${m}`)).catch((e) => console.error("[migrate]", e.message));
   await migrateV190Settings().then((m) => m && console.log(`[migrate] ${m}`)).catch((e) => console.error("[migrate]", e.message));
   await ensureChannels().then((m) => m && console.log(`[migrate] ${m}`)).catch((e) => console.error("[migrate]", e.message));
+  await migrateV198Settings().then((m) => m && console.log(`[migrate] ${m}`)).catch((e) => console.error("[migrate]", e.message));
 
   const workers = [
     worker("scout", 1, () => runScout(chat)),

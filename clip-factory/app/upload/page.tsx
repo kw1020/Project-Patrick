@@ -5,6 +5,7 @@ import { PLATFORM_LABEL, POST_PLATFORMS, accountAction, isGtaFocus, parseKinds }
 import { toPostItems } from "@/lib/to-post";
 import { QaBox } from "@/components/QaBox";
 import { parseQa } from "@/lib/qa";
+import { captionCredits } from "@/lib/social";
 import { budgetLine } from "@/lib/ai-spend";
 import { getStatuses, soft, type AgentStatus } from "@/lib/queues";
 import { ago } from "@/lib/format";
@@ -29,6 +30,7 @@ function view(x: Item): ToPostView {
       done: post ? { status: post.status, url: post.url } : null,
     })),
     supreme: k.supremePick ? { rank: k.supremeRank, reason: k.supremeReason } : null, // v1.9.6
+    platformInfo: k.platformInfo, creditOk: captionCredits(k.caption ?? "", s), qaIssues: parseQa(k.qa)?.issues ?? null, // v1.9.8
   };
 }
 

@@ -11,7 +11,13 @@ export const JUDGE_MODEL = process.env.JUDGE_MODEL || "claude-sonnet-5-5";
 
 // v1.9.4: `observations` comes BEFORE `score` so the model writes down what it saw and heard first, then scores it.
 const Verdict = z.object({
-  observations: z.string().describe("At most 2 plain sentences: what visibly and audibly happens in this clip (from the frames and the transcript), before any judgement"),
+  observations: z.string().describe("At most 2 plain sentences: what visibly and audibly happens in this clip (from the frames, the audio summary and the transcript), before any judgement"),
+  // v1.9.8 (Krew: "we need the clips to be actually entertaining"): name the payoff or the score is capped at 4.
+  payoff: z.string().describe("ONE line naming the specific funny or impressive thing that happens and its result, e.g. \"he jumps the car off the pier and lands on a moving train\". Empty string if you can't name one: random gameplay, chatter, nothing resolves"),
+  // v1.9.8: two yes/no checks an editor makes, written before the score and used to fix the window.
+  hook_lands: z.boolean().describe("true if the first ~1.5 seconds of the proposed window (or of your best_start) already pull a stranger in: action, a loud moment or a line that sets up the payoff. false for dead air, greetings, menus or a sentence picked up halfway"),
+  payoff_in_window: z.boolean().describe("true if the payoff (the thing the clip is about, plus the reaction to it) happens inside the proposed window"),
+  payoff_at: z.number().nullable().describe("Seconds into the SOURCE where the payoff happens, or null if there is none"),
   score: z.number().describe("1-10 on the rubric: how likely a stranger scrolling short-form video stops and watches to the end"),
   hook_text: z.string().describe("Short scroll-stopping hook, max 45 characters, no hashtags or emoji: on screen for the first seconds AND the first line of the post caption"),
   title: z.string().describe("Post title, max 80 characters"),
@@ -56,6 +62,8 @@ export type JudgeInput = {
   framesFailed?: boolean;
   // v1.9.4 calibration guard: one line added when the recent scores barely vary (src/lib/judge-stats.ts calibrationNudge).
   calibration?: string | null;
+  // v1.9.8: <audio_summary> block (src/lib/audio-summary.ts): loudness per 0.5s, spikes, speech/silence, chat heat.
+  audioSummary?: string | null;
 };
 
 export function judgeConfigured() {
@@ -126,8 +134,9 @@ function render(i: JudgeInput) {
   // would only repeat it. Older clips get the plain transcript.
   if (i.timedTranscript != null && i.sourceLength) lines.push("", "<source_transcript>", i.timedTranscript.trim() || "(no speech detected in the whole source)", "</source_transcript>");
   else lines.push("", "<transcript>", i.transcript?.trim() || "(no speech detected)", "</transcript>");
+  if (i.audioSummary?.trim()) lines.push("", i.audioSummary.trim());
   if (i.stats?.chat?.length) lines.push("", "<chat_sample>", ...i.stats.chat.slice(0, 40), "</chat_sample>");
-  if (i.frames?.length) lines.push("", `The ${i.frames.length} images above are stills from the source at the times shown (same seconds as the transcript). Describe what they and the transcript show in observations, then score.`);
+  if (i.frames?.length) lines.push("", `The ${i.frames.length} images above are stills from the source at the times shown (same seconds as the transcript and the audio summary). Watch the clip through them in time order with the audio summary as the soundtrack; describe what happens in observations, check the hook and the payoff, then score.`);
   else if (i.framesFailed) lines.push("", "No frames could be taken from this clip, so judge it from the text only and say so in observations.");
   if (i.calibration?.trim()) lines.push("", i.calibration.trim());
   return lines.join("\n");
@@ -144,6 +153,15 @@ export function judgeContent(input: JudgeInput): string | Anthropic.Beta.Message
   }
   blocks.push({ type: "text", text });
   return blocks;
+}
+
+/** v1.9.8: score cap when the Judge can't name a specific payoff (Krew: "fewer, higher-quality clips"). */
+export const NO_PAYOFF_CAP = 4;
+const VAGUE = /^(none|nothing|n\/?a|no (clear |real )?(payoff|event)|unclear|not sure|unknown|nothing (really )?happens|just (talking|gameplay|chatting)|random|ordinary gameplay)\b/i;
+/** A real payoff: a specific line (>= 3 words, not "nothing"/"unclear"/"just gameplay") with a time. */
+export function namedPayoff(payoff: string | null | undefined, at: number | null | undefined): boolean {
+  const p = (payoff ?? "").trim();
+  return at != null && p.split(/\s+/).length >= 3 && !VAGUE.test(p);
 }
 
 /** Ask Claude to score a clip. Returns null when the model declines or returns nothing usable. */
@@ -167,18 +185,27 @@ export async function judgeClip(input: JudgeInput, lessons: string | null = null
   const u = (res as { usage?: { input_tokens?: number | null; output_tokens?: number | null; cache_read_input_tokens?: number | null; cache_creation_input_tokens?: number | null } }).usage;
   const usage = u && typeof u.input_tokens === "number" && typeof u.output_tokens === "number"
     ? { input: u.input_tokens + (u.cache_read_input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0), output: u.output_tokens } : null;
+  const payoffAt = typeof v.payoff_at === "number" && Number.isFinite(v.payoff_at) ? Math.round(v.payoff_at * 100) / 100 : null;
+  const payoff = (v.payoff ?? "").replace(/\s+/g, " ").trim().slice(0, 200);
+  const named = namedPayoff(payoff, payoffAt);
+  let score = Math.min(10, Math.max(1, Math.round(v.score * 10) / 10));
+  if (!named && score > NO_PAYOFF_CAP) score = NO_PAYOFF_CAP;
   return {
     observations: (v.observations ?? "").replace(/\s+/g, " ").trim().slice(0, 400),
-    score: Math.min(10, Math.max(1, Math.round(v.score * 10) / 10)),
+    payoff,
+    score,
     hook_text: v.hook_text.replace(/[#\n]/g, " ").trim().slice(0, 60),
     title: v.title.replace(/[<>\n]/g, " ").trim().slice(0, 90),
     hashtags: v.hashtags,
     // Validated in code: known tags only, deduped, max 2; none → the worker's fallback (defaultExtras).
     extra_hashtags: cleanExtras(v.extra_hashtags, []),
-    reason: v.reason.trim().slice(0, 500),
+    reason: (named ? "" : "No clear payoff, so capped at 4. ") + v.reason.trim().slice(0, 500),
     category: v.category === "funny" ? "funny" : "gaming",
     best_start: typeof v.best_start === "number" && Number.isFinite(v.best_start) ? Math.round(v.best_start * 100) / 100 : null,
     best_end: typeof v.best_end === "number" && Number.isFinite(v.best_end) ? Math.round(v.best_end * 100) / 100 : null,
+    hook_lands: typeof v.hook_lands === "boolean" ? v.hook_lands : true,
+    payoff_in_window: typeof v.payoff_in_window === "boolean" ? v.payoff_in_window : true,
+    payoff_at: payoffAt,
     usage,
   };
 }

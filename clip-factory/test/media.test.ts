@@ -28,8 +28,8 @@ test("chunkWords makes short caption chunks and breaks on sentences", () => {
 
 test("buildAss has credit line, escapes braces, uppercases captions", () => {
   const ass = buildAss({ words: [{ word: "{hi}", start: 0, end: 0.5 }, { word: "chat", start: 0.5, end: 1 }], credit: "twitch.tv/test", duration: 20, layout: "blur" });
-  assert.match(ass, /Credit,,0,0,0,,twitch\.tv\/test/);
-  assert.match(ass, /Cap,,0,0,0,,\{\\fad\(60,0\)\}HI CHAT/);
+  assert.match(ass, /Credit,,0,0,0,,\{\\an8\\pos\(475,290\)[^}]*\}twitch\.tv\/test/);
+  assert.match(ass, /Cap,,0,0,0,,\{\\an5\\pos\(475,1190\)\}\{\\fad\(60,0\)\}HI CHAT/);
   assert.match(ass, /PlayResY: 1920/);
 });
 

@@ -24,7 +24,7 @@ let mock: Mock;
 before(async () => {
   mock = await startMocks();
   Object.assign(process.env, mockEnv(mock.url), {
-    DATABASE_URL: `file:${path.join(dir, "test.db")}`, STORAGE_DIR: storage, WHISPER_ENGINE: "off",
+    DATABASE_URL: `file:${path.join(dir, "test.db")}`, STORAGE_DIR: storage, WHISPER_ENGINE: "off", FINDER_GATE: "off", // v1.9.8 gate tested in v198
     REDIS_URL: "redis://localhost:6379/5", // own Redis db: don't touch other tests' queues
     MIN_FREE_GB: "5", MAX_BACKLOG: "12",
   });

@@ -127,7 +127,7 @@ test("captionCredits: the @login line or the old link both count (ClipCard warni
 // ---------- Judge ----------
 test("Judge schema has extra_hashtags (enum of the 4 extras) and the prompt keeps its opening + mentions the caption", async () => {
   const { VerdictSchema, JUDGE_SYSTEM } = await import("../src/lib/judge");
-  const base = { observations: "o", score: 7, hook_text: "h", title: "t", hashtags: [], reason: "r", category: "gaming", best_start: null, best_end: null };
+  const base = { observations: "o", payoff: "p", hook_lands: true, payoff_in_window: true, payoff_at: null, score: 7, hook_text: "h", title: "t", hashtags: [], reason: "r", category: "gaming", best_start: null, best_end: null };
   assert.ok(VerdictSchema.safeParse({ ...base, extra_hashtags: ["GTA6Clips", "Gaming"] }).success);
   assert.ok(!VerdictSchema.safeParse({ ...base, extra_hashtags: ["fyp"] }).success);
   assert.ok(JUDGE_SYSTEM.startsWith("You score short clips from streamers and YouTubers"));
@@ -216,13 +216,13 @@ test("watermark: in the ASS of both render paths (styled + plain), every layout,
         assert.match(ass, /^Style: Mark,[^,]+,34,&H80FFFFFF/m, "small, semi-transparent");
         const line = ass.split("\n").find((l) => l.includes(",Mark,,"));
         assert.ok(line, `${layout}: watermark dialogue`);
-        const y = Number(/\\pos\(1044,(\d+)\)/.exec(line!)![1]);
+        const y = Number(/\\pos\(890,(\d+)\)/.exec(line!)![1]); // v1.9.8: inside the safe box, left of the apps' buttons
         assert.match(line!, /\\an3/);
         assert.match(line!, /@ViceCityClips$/);
         const p = place ?? overlayPlace("blur", null);
         if (p.creditAlign === 2) assert.ok(y <= p.creditY - 50, "above a bottom credit");
-        assert.ok(y > p.capY + 100, "below the captions");
-        assert.ok(y <= 1890, "above the progress bar");
+        assert.ok(y < p.capY - 62 || y - 34 > p.capY + 62, "never on the captions");
+        assert.ok(y <= 1440 && y - 34 >= 290, "inside the apps' safe zone (v1.9.8)");
       }
     }
   }
@@ -230,7 +230,7 @@ test("watermark: in the ASS of both render paths (styled + plain), every layout,
   assert.doesNotMatch(buildAss({ words: [], credit: "c", duration: 5, layout: "blur" }), /,Mark,,/);
   assert.doesNotMatch(buildStyledAss({ words: [], credit: "c", duration: 5, layout: "blur", style: "clean" }), /,Mark,,/);
   // A low hook: the watermark waits until it's gone.
-  assert.equal(watermarkPlace({ capY: 1600, hookY: 1670, hookAlign: 8, creditY: 110, creditAlign: 8 }).start, 4.5);
+  assert.equal(watermarkPlace({ capY: 1190, hookY: 1250, hookAlign: 8, creditY: 290, creditAlign: 8 }).start, 4.5);
   assert.equal(watermarkPlace(null).start, 0);
   // The cutter passes Settings.watermark/channelName to both paths.
   const cutter = fs.readFileSync(path.join(ROOT, "src", "workers", "cutter.ts"), "utf8");

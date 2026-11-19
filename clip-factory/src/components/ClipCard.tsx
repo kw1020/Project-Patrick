@@ -6,11 +6,15 @@ import { captionCredits, checkCampaignCaption, creatorHandle, creatorUrl } from 
 import { CategoryChip } from "./CategoryChip";
 import { QaBox } from "./QaBox";
 import type { QaResult } from "../lib/qa";
+import { parsePlatformInfo, platformCheck } from "../lib/platform-rules";
+import { PlatformCheckBox } from "./PlatformCheckBox";
 
 export type ClipView = {
   id: string; status: string; stage: string | null; error: string | null; title: string; caption: string;
   duration: number | null; score: number | null; hook: string | null; judgeReason: string | null; hasVideo: boolean;
   observations?: string | null; judgeFrames?: number | null; // v1.9.4: what the Judge saw/heard, and how many stills it looked at
+  hookOk?: boolean | null; payoffIn?: boolean | null; // v1.9.8: the Judge's hook / payoff checks
+  platformInfo?: string | null; // v1.9.8: JSON facts for the Platform check (src/lib/platform-rules.ts)
   expired?: boolean; // the video was deleted by retention to save disk
   canRecut?: boolean; // the raw video is still there, so it can be re-cut in another editing style
   editStyle?: string | null; editNote?: string | null; version?: number;
@@ -94,6 +98,13 @@ export function ClipCard({ clip, accounts }: { clip: ClipView; accounts: Account
           <div className="rounded-lg bg-ink px-2.5 py-2 text-xs leading-relaxed text-zinc-300">
             <span className="font-bold text-zinc-100">Judge{clip.score != null ? ` · ${clip.score}/10` : ""}:</span> {clip.judgeReason}
             {clip.observations && <div className="mt-1 text-zinc-400" data-testid="judge-observations">Saw: {clip.observations}{clip.judgeFrames === 0 ? " (text only, no frames)" : ""}</div>}
+            {(clip.hookOk != null || clip.payoffIn != null) && (
+              <div className="mt-1 text-zinc-400" data-testid="judge-checks">
+                {clip.hookOk != null && <span>{clip.hookOk ? "✓ Hooks in the first second" : "✗ Slow start"}</span>}
+                {clip.hookOk != null && clip.payoffIn != null && " · "}
+                {clip.payoffIn != null && <span>{clip.payoffIn ? "✓ Payoff is in the clip" : "✗ Payoff was outside (window moved)"}</span>}
+              </div>
+            )}
             {clip.hook && <div className="mt-1 text-zinc-400">Hook on video: “{clip.hook}”</div>}
           </div>
         )}
@@ -102,6 +113,7 @@ export function ClipCard({ clip, accounts }: { clip: ClipView; accounts: Account
         {!captionCredits(caption, clip.streamer) && (
           <div className="text-xs text-sun">⚠ Caption must credit {creatorHandle(clip.streamer)}</div>
         )}
+        {clip.hasVideo && <PlatformCheckBox check={platformCheck({ caption, title, creditOk: captionCredits(caption, clip.streamer), info: parsePlatformInfo(clip.platformInfo), qa: clip.qa?.issues })} />}
         {clip.campaign && (
           <div className="space-y-0.5 rounded-lg border border-line px-2.5 py-2 text-xs" data-testid="campaign-checks">
             <div className="font-bold text-zinc-300">Campaign: {clip.campaign.name}</div>

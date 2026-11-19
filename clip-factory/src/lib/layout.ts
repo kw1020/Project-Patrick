@@ -3,6 +3,7 @@
 // run by src/lib/camdetect.ts; its JSON summary is a CamInfo.
 import type { Facecam } from "./media";
 import { type LayoutKind, type LayoutSetting } from "./edit-styles";
+import { SAFE_Y_BOTTOM, SAFE_Y_TOP, TEXT_SAFE } from "./platform-rules";
 
 export { type LayoutKind, type LayoutSetting, LAYOUTS, parseLayoutSetting, layoutChip, DEFAULT_LAYOUT } from "./edit-styles";
 
@@ -216,35 +217,46 @@ export function faceInOutput(o: { layout: LayoutKind; src: { w: number; h: numbe
 /** y positions in the 1080x1920 frame. capY = caption centre; hook anchored top (an8) or bottom (an2) at hookY; credit likewise. */
 export type OverlayPlace = { capY: number; hookY: number; hookAlign: 8 | 2; creditY: number; creditAlign: 8 | 2 };
 export const HOOK_H = 190; // two lines of hook text in its box
-const CREDIT_TOP: Pick<OverlayPlace, "creditY" | "creditAlign"> = { creditY: 110, creditAlign: 8 };
-const CREDIT_BOTTOM: Pick<OverlayPlace, "creditY" | "creditAlign"> = { creditY: H - 34, creditAlign: 2 }; // just above the progress bar
+/** Half the height of one caption line incl. outline (the biggest style, meme 100px). */
+export const CAP_HALF = 62;
+export const CREDIT_H = 52;
+// v1.9.8: every text box stays inside TEXT_SAFE (src/lib/platform-rules.ts): below the apps' top bar (y >= 290) and above
+// their caption/username block (y <= 1440). Before v1.9.8 the credit sat at y=110 (under TikTok's "For You" tabs) and the
+// bottom credit/watermark at y=1886 (under every app's caption block).
+const CREDIT_TOP: Pick<OverlayPlace, "creditY" | "creditAlign"> = { creditY: SAFE_Y_TOP, creditAlign: 8 };
+const CREDIT_BOTTOM: Pick<OverlayPlace, "creditY" | "creditAlign"> = { creditY: SAFE_Y_BOTTOM, creditAlign: 2 };
+/** The hook goes under a top credit. */
+export const HOOK_TOP = SAFE_Y_TOP + CREDIT_H + 18;
 
 /**
- * Text that never covers the face. The face rect is the detected face (eyes to chin), grown 25% for hair/forehead.
- * blur: v1.7.3 places (credit 110, hook 250, captions 62%).
+ * Text that never covers the face and never sits under an app's buttons (TEXT_SAFE). The face rect is the detected face
+ * (eyes to chin), grown 25% for hair/forehead.
+ * blur: credit at the top of the safe box, hook under it, captions 62%.
  * split: captions just under the seam (y=760); hook just above the seam (inside the cam, under the face) or, if the face is
- * low in the cam, under the captions; credit at the top unless the face reaches up there, then at the bottom.
- * fullcam: captions at 72% (pushed lower if the chin reaches there); hook at the top if the head is clear of it, else under
- * the captions; credit at the top unless the head is there, then at the bottom.
+ * low in the cam, under the captions; credit at the top unless the face is there, then at the bottom of the safe box.
+ * fullcam: captions ~68% (lower if the chin reaches there, never below the safe box); hook under the credit if the head is
+ * clear of it, else under (or over) the captions; credit at the top unless the head is there, then at the bottom.
  */
 export function overlayPlace(layout: LayoutKind | "facecam", face: Rect | null): OverlayPlace {
-  if (layout === "blur") return { capY: Math.round(H * 0.62), hookY: 250, hookAlign: 8, ...CREDIT_TOP };
+  if (layout === "blur") return { capY: Math.round(H * 0.62), hookY: HOOK_TOP, hookAlign: 8, ...CREDIT_TOP };
   const f = face ? { top: face.y - face.h * 0.25, bottom: face.y + face.h * 1.25 } : null;
+  const topFree = !f || f.top > SAFE_Y_TOP + CREDIT_H + 10;
   if (layout === "split" || layout === "facecam") {
     const capY = SEAM + 120;
     const hookAbove = !f || f.bottom + 10 < SEAM - 14 - HOOK_H;
     return {
       capY, hookY: hookAbove ? SEAM - 14 : capY + 90, hookAlign: hookAbove ? 2 : 8,
-      ...(!f || f.top > 175 ? CREDIT_TOP : CREDIT_BOTTOM),
+      ...(topFree ? CREDIT_TOP : CREDIT_BOTTOM),
     };
   }
-  let capY = Math.round(H * 0.72);
-  if (f && f.bottom + 70 > capY) capY = Math.min(H - 260, Math.round(f.bottom + 80));
-  const hookTop = !f || f.top > 250 + HOOK_H + 20;
-  return {
-    capY, hookY: hookTop ? 250 : Math.min(H - 60 - HOOK_H, capY + 90), hookAlign: 8,
-    ...(!f || f.top > 175 ? CREDIT_TOP : CREDIT_BOTTOM),
-  };
+  const capMax = SAFE_Y_BOTTOM - CAP_HALF - (topFree ? 0 : CREDIT_H + 16);
+  let capY = Math.min(capMax, Math.round(H * 0.68));
+  if (f && f.bottom + 70 > capY) capY = Math.min(capMax, Math.round(f.bottom + 80));
+  const hookTop = topFree && (!f || f.top > HOOK_TOP + HOOK_H + 20);
+  const under = capY + 90, lowest = SAFE_Y_BOTTOM - (topFree ? 0 : CREDIT_H + 8);
+  const hook: Pick<OverlayPlace, "hookY" | "hookAlign"> = hookTop ? { hookY: HOOK_TOP, hookAlign: 8 }
+    : under + HOOK_H <= lowest ? { hookY: under, hookAlign: 8 } : { hookY: capY - CAP_HALF - 16, hookAlign: 2 };
+  return { capY, ...hook, ...(topFree ? CREDIT_TOP : CREDIT_BOTTOM) };
 }
 
 // ---------- The plan the renderers use ----------
@@ -291,9 +303,17 @@ export function watermarkStyle(font: string) {
   // ~50% transparent white (&H80), thin outline, no shadow, alignment 3 (bottom right).
   return `Style: Mark,${font},${WATERMARK_SIZE},&H80FFFFFF,&H00FFFFFF,&H90000000,&H00000000,-1,0,0,0,100,100,0,0,1,2,0,3,36,36,30,1`;
 }
-/** Where it goes (bottom-right anchor) and when it starts (after the hook when a low hook could reach it). */
+/**
+ * Where it goes (bottom-right anchor) and when it starts (after the hook when a low hook could reach it). v1.9.8: inside the
+ * safe box (left of the apps' button rail, above their caption block), one line above a bottom credit; when the captions sit
+ * that low (fullcam), just under the top credit's line instead.
+ */
 export function watermarkPlace(place: OverlayPlace | null) {
-  const y = place && place.creditAlign === 2 ? place.creditY - 58 : H - 30;
-  const hookBottom = place ? (place.hookAlign === 8 ? place.hookY + HOOK_H : place.hookY) : 0;
-  return { tag: `{\\an3\\pos(${W - 36},${y})}`, y, start: hookBottom > y - WATERMARK_SIZE - 80 ? 4.5 : 0 };
+  let y = place && place.creditAlign === 2 ? place.creditY - 58 : SAFE_Y_BOTTOM;
+  const capBottom = place ? place.capY + CAP_HALF : 0;
+  if (place && capBottom > y - WATERMARK_SIZE - 6) y = SAFE_Y_TOP + CREDIT_H + WATERMARK_SIZE + 8;
+  const hookTopY = place ? (place.hookAlign === 8 ? place.hookY : place.hookY - HOOK_H) : 0;
+  const hookBottom = place ? hookTopY + HOOK_H : 0;
+  const clash = place ? hookBottom > y - WATERMARK_SIZE - 20 && hookTopY < y + 20 : false;
+  return { tag: `{\\an3\\pos(${W - TEXT_SAFE.right},${y})}`, y, start: clash ? 4.5 : 0 };
 }

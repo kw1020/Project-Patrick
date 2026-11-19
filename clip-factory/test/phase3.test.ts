@@ -27,7 +27,7 @@ async function approvedClip(login: string, extra: Record<string, unknown> = {}) 
   fs.mkdirSync(path.join(dir, "storage/final"), { recursive: true });
   const s = await prisma.streamer.upsert({ where: { twitchId: "t-" + login }, update: {}, create: { twitchId: "t-" + login, login, name: login.toUpperCase(), approved: true } });
   const m = await prisma.moment.create({ data: { streamerId: s.id, timestamp: new Date(), source: "twitch_clip" } });
-  const c = await prisma.clip.create({ data: { momentId: m.id, title: "T", caption: "c", status: "approved", ...extra } });
+  const c = await prisma.clip.create({ data: { momentId: m.id, title: "T", caption: `c\n\n🎥 @${login}`, status: "approved", ...extra } });
   fs.writeFileSync(path.join(dir, `storage/final/${c.id}.mp4`), Buffer.alloc(3000, 1));
   return prisma.clip.update({ where: { id: c.id }, data: { finalPath: `final/${c.id}.mp4` } });
 }

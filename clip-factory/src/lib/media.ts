@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { TEXT_MAX_W, TEXT_SAFE, TEXT_X, fitScale } from "./platform-rules";
 import { cropXExpr, legacyPlan, overlayPlace, watermarkPlace, watermarkStyle, watermarkText, type LayoutPlan, type OverlayPlace } from "./layout";
 
 export function run(cmd: string, args: string[], opts: { cwd?: string; timeoutMs?: number } = {}): Promise<{ stdout: string; stderr: string }> {
@@ -118,8 +119,9 @@ export function buildAss(opts: { words: Word[]; credit: string; duration: number
   const font = opts.font || process.env.CAPTION_FONT || "DejaVu Sans";
   const capMarginV = 470;
   // v1.9.0: split / fullcam place the text off the face (src/lib/layout.ts overlayPlace); blur keeps the v1.7.1 styles.
-  const place = opts.place ?? (opts.layout === "blur" ? null : overlayPlace(opts.layout, null));
-  const at = (an: number, y: number) => (place ? `{\\an${an}\\pos(540,${y})}` : "");
+  // v1.9.8: every layout (blur too) uses explicit places inside the apps' safe zone (TEXT_SAFE), centred on TEXT_X.
+  const place = opts.place ?? overlayPlace(opts.layout, null);
+  const at = (an: number, y: number, k = 1) => `{\\an${an}\\pos(${TEXT_X},${y})${k < 1 ? `\\fscx${Math.round(k * 100)}\\fscy${Math.round(k * 100)}` : ""}}`;
   const lines = [
     "[Script Info]",
     "ScriptType: v4.00+",
@@ -130,26 +132,26 @@ export function buildAss(opts: { words: Word[]; credit: string; duration: number
     "",
     "[V4+ Styles]",
     "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
-    `Style: Cap,${font},86,&H00FFFFFF,&H00FFFFFF,&H00000000,&H64000000,-1,0,0,0,100,100,1,0,1,7,3,2,60,60,${capMarginV},1`,
+    `Style: Cap,${font},86,&H00FFFFFF,&H00FFFFFF,&H00000000,&H64000000,-1,0,0,0,100,100,1,0,1,7,3,2,${TEXT_SAFE.left},${TEXT_SAFE.right},${capMarginV},1`,
     `Style: Credit,${font},40,&H30FFFFFF,&H00FFFFFF,&H00000000,&H64000000,-1,0,0,0,100,100,0,0,1,3,1,8,40,40,110,1`,
     // Hook: white text on a pink box near the top, first few seconds only.
-    `Style: Hook,${font},62,&H00FFFFFF,&H00FFFFFF,&H00813DFF,&H00813DFF,-1,0,0,0,100,100,0,0,3,14,0,8,90,90,250,1`,
+    `Style: Hook,${font},62,&H00FFFFFF,&H00FFFFFF,&H00813DFF,&H00813DFF,-1,0,0,0,100,100,0,0,3,14,0,8,${TEXT_SAFE.left + 14},${TEXT_SAFE.right + 14},250,1`,
     watermarkStyle(font),
     "",
     "[Events]",
     "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
-    `Dialogue: 1,${assTime(0)},${assTime(opts.duration)},Credit,,0,0,0,,${place ? at(place.creditAlign, place.creditY) : ""}${assEscape(opts.credit)}`,
+    `Dialogue: 1,${assTime(0)},${assTime(opts.duration)},Credit,,0,0,0,,${at(place.creditAlign, place.creditY, fitScale(assEscape(opts.credit), 40, TEXT_MAX_W, { outline: 3 }))}${assEscape(opts.credit)}`,
   ];
   // v1.9.1: "@ViceCityClips" bottom right (Settings watermark), clear of the credit and captions.
   const mark = watermarkText(opts.watermark), wm = watermarkPlace(place);
   if (mark && wm.start < opts.duration) lines.push(`Dialogue: 1,${assTime(wm.start)},${assTime(opts.duration)},Mark,,0,0,0,,${wm.tag}${mark}`);
   const hook = assEscape(opts.hook || "").slice(0, 70);
-  if (hook) lines.push(`Dialogue: 2,${assTime(0)},${assTime(Math.min(4.5, opts.duration))},Hook,,0,0,0,,${place ? at(place.hookAlign, place.hookY) : ""}{\\fad(0,250)}${hook}`);
+  if (hook) lines.push(`Dialogue: 2,${assTime(0)},${assTime(Math.min(4.5, opts.duration))},Hook,,0,0,0,,${at(place.hookAlign, place.hookY)}{\\fad(0,250)}${hook}`);
   for (const c of chunkWords(opts.words)) {
     if (c.start >= opts.duration) continue;
     const text = assEscape(c.text).toUpperCase();
     if (!text) continue;
-    lines.push(`Dialogue: 0,${assTime(c.start)},${assTime(Math.min(c.end, opts.duration))},Cap,,0,0,0,,${place ? at(5, place.capY) : ""}{\\fad(60,0)}${text}`);
+    lines.push(`Dialogue: 0,${assTime(c.start)},${assTime(Math.min(c.end, opts.duration))},Cap,,0,0,0,,${at(5, place.capY, fitScale(text, 86, TEXT_MAX_W, { spacing: 1, outline: 7 }))}{\\fad(60,0)}${text}`);
   }
   return lines.join("\n") + "\n";
 }

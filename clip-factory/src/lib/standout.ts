@@ -2,6 +2,7 @@
 // Krew: "It's only Kai and Hasan. Nothing entertaining." Raw view counts favour the biggest channels and let mediocre
 // clips in, so each clip is compared with ITS creator's usual clip, and picks are shared out round-robin.
 import type { TwitchClip } from "./twitch";
+import { twitchClipRank } from "./rank";
 
 export type Scored = { clip: TwitchClip; standout: number; rank: number; ageHours: number };
 
@@ -13,7 +14,7 @@ export function median(xs: number[]) {
 
 /**
  * Score one creator's clips from the lookback window.
- * standout = views / max(creator's median clip views, minClipViews); rank = standout / (1 + ageHours/48).
+ * standout = views / max(creator's median clip views, minClipViews); rank = twitchClipRank (v1.9.8: standout x views-per-hour heat, faded by age).
  * Kept: views >= minClipViews AND standout >= standoutMin, plus the creator's single most-viewed clip when it has
  * >= 5x minClipViews (a creator whose every clip does well still gets their best one). Best rank first.
  */
@@ -27,7 +28,9 @@ export function scoreCreatorClips(clips: TwitchClip[], o: { minClipViews: number
     const ageHours = Math.max(0, (now - new Date(c.created_at).getTime()) / 3600_000);
     const standout = c.view_count / base;
     const ok = (c.view_count >= o.minClipViews && standout >= o.standoutMin) || (c === best && c.view_count >= 5 * o.minClipViews);
-    if (ok) kept.push({ clip: c, standout: Math.round(standout * 100) / 100, rank: standout / (1 + ageHours / 48), ageHours });
+    // v1.9.8: rank also counts how fast it is getting views right now (src/lib/rank.ts twitchClipRank).
+    const byStreamer = !!c.creator_name && !!c.broadcaster_name && c.creator_name.toLowerCase() === c.broadcaster_name.toLowerCase();
+    if (ok) kept.push({ clip: c, standout: Math.round(standout * 100) / 100, rank: twitchClipRank({ views: c.view_count, base, ageHours, byStreamer }), ageHours });
   }
   kept.sort((a, b) => b.rank - a.rank || b.clip.view_count - a.clip.view_count);
   return { kept, median: med };

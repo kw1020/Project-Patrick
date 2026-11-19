@@ -28,7 +28,7 @@ before(async () => {
   delete env.TWITCH_API_URL; delete env.TWITCH_AUTH_URL; // Twitch is stubbed per test with globalThis.fetch
   Object.assign(process.env, env, {
     DATABASE_URL: `file:${path.join(dir, "test.db")}`, STORAGE_DIR: storage, REDIS_URL: "redis://localhost:6379/13",
-    TWITCH_GAME_ID: "gta6-id", MAX_BACKLOG: "100", MIN_FREE_GB: "0", WHISPER_ENGINE: "off",
+    TWITCH_GAME_ID: "gta6-id", MAX_BACKLOG: "100", MIN_FREE_GB: "0", WHISPER_ENGINE: "off", FINDER_GATE: "off", // v1.9.8 gate tested in v198 (these sources are sine tones)
   });
   execFileSync("npx", ["prisma", "db", "push", "--skip-generate"], { env: process.env, stdio: "ignore" });
   (await import("../src/lib/paths")).ensureStorage();
@@ -408,9 +408,9 @@ test("line: window lands on the late payoff; the Judge's best_start/best_end is 
   let clip = await prisma.clip.findUniqueOrThrow({ where: { id: c.id } });
   assert.ok(clip.payoffAt! > 49.5 && clip.payoffAt! < 50.5, `payoff at the burst's onset: ${clip.payoffAt}`);
   assert.equal(clip.wordsFull, true);
-  assert.equal(clip.winLength, 28, "80% of the max length");
+  assert.equal(clip.winLength, 15, "v1.9.8 tighter cut: at most 12s of build-up (tightenWindow), grown back to the 15s minimum");
   const winEnd = clip.winStart! + clip.winLength!;
-  assert.ok(winEnd >= 52.5 && winEnd <= 54, `ends ~1s after the 2s burst, not at the source end: ${winEnd}`);
+  assert.ok(winEnd >= 52 && winEnd <= 54, `ends right after the 2s burst (v1.9.8: trailing silence trimmed), not at the source end: ${winEnd}`);
 
   // Judge picks 34-56s (22s): valid, so the window moves. The prompt carried the source length + proposed window.
   mock.verdict = { ...mock.verdict, best_start: 34, best_end: 56 };
@@ -419,7 +419,7 @@ test("line: window lands on the late payoff; the Judge's best_start/best_end is 
   const sent = JSON.parse(mock.requests.slice(before).find((r) => r.path.includes("/messages"))!.body.toString());
   // v1.9.4: 8 labelled frames (image blocks) come first, then the text.
   const blocks = sent.messages[0].content as { type: string; text?: string }[];
-  assert.equal(blocks.filter((b) => b.type === "image").length, 8);
+  assert.equal(blocks.filter((b) => b.type === "image").length, 10, "v1.9.8: 8 + 2 at the loud burst (and the reaction 1s later)");
   const userMsg = blocks.at(-1)!.text!;
   assert.match(userMsg, new RegExp(`Source video: 60s\\. Proposed window: ${clip.winStart!.toFixed(1)}s to ${winEnd.toFixed(1)}s`));
   assert.match(userMsg, /<source_transcript>/);
@@ -448,7 +448,7 @@ test("line: window lands on the late payoff; the Judge's best_start/best_end is 
   mock.verdict = { ...mock.verdict, best_start: 50, best_end: 54 };
   assert.doesNotMatch(await runJudge(c.id), /Judge picked/);
   clip = await prisma.clip.findUniqueOrThrow({ where: { id: c.id } });
-  assert.deepEqual([clip.winStart! + clip.winLength!, clip.winLength], [winEnd, 28], "back to the heuristic window");
+  assert.deepEqual([clip.winStart! + clip.winLength!, clip.winLength], [winEnd, 15], "back to the heuristic window");
   // Review fix: a Judge window that leaves the payoff out gets a payoff (punch-in) inside it, not a stale one outside.
   mock.verdict = { ...mock.verdict, best_start: 10, best_end: 35 };
   assert.match(await runJudge(c.id), /Judge picked 10-35s/);

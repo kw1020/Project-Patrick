@@ -1,5 +1,13 @@
 # Clip Factory patch notes
 
+## 1.9.8 — 2026-11-19
+- Fewer, better clips: before the Judge is paid, a clip must have a real spike (sound or chat well above that streamer's usual) with someone reacting. Random pieces, just-talking, menus, AFK and silence are set aside, and the Queue shows "X found, Y kept".
+- The Judge now "watches" more: up to 12 frames picked at the loud moments, chat peaks and scene changes, plus a summary of the sound and chat. It must name the payoff in one line, or the clip scores 4 at most, and it checks the hook and that the payoff is inside the clip.
+- Tighter cuts: clips open 1-3 seconds before the setup and end right after the reaction, with silence trimmed at both ends. Min score is now 7, so about the top third reaches you, and at most 3 clips per creator per hour (the best ones; near-duplicates of one moment keep only the best). Both are in Settings.
+- Better clip finding: Twitch clips taking off right now are picked first, and moments where chat and the sound spike together go to the front of the line.
+- Platform check on every clip card in the Queue and on Upload (YouTube Shorts, TikTok, Instagram Reels): size, codec, length, file size, caption length, hashtags, banned words like "leak", creator credit and enough editing to count as original. A red problem blocks posting (and Post to all) until it's fixed; yellow is only a warning.
+- Captions, credit, hook and the watermark now stay clear of each app's buttons, top bar and caption area.
+
 ## 1.9.7 — 2026-11-19
 - Fix: "Post when I approve" now only posts to the channel the clip belongs to. Before, with all 4 channels connected, one approve could post the same clip to every YouTube.
 - A clip with no channel never auto-posts; pick its channel on Upload first.

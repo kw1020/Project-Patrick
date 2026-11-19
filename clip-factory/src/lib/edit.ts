@@ -7,6 +7,7 @@ import { run, type Facecam, type Word } from "./media";
 import { storagePath } from "./paths";
 import { type EditStyle, type JumpCutMode } from "./edit-styles";
 import { FRAME, findPayoff, meanDb } from "./window";
+import { TEXT_MAX_W, TEXT_SAFE, TEXT_X, fitScale } from "./platform-rules";
 import { SEAM, cropXExpr, legacyPlan, overlayPlace, watermarkPlace, watermarkStyle, watermarkText, type LayoutPlan, type OverlayPlace } from "./layout";
 
 export { type EditStyle, type JumpCutMode, EDIT_STYLES, JUMP_CUT_MODES, parseEditStyle, parseJumpCuts, DEFAULT_EDIT_STYLE } from "./edit-styles";
@@ -298,18 +299,20 @@ export function buildStyledAss(opts: { words: Word[]; credit: string; duration: 
   // v1.9.0: where text goes depends on the layout and where the face is (src/lib/layout.ts overlayPlace).
   const P = opts.place ?? overlayPlace(opts.layout, null);
   const hookY = P.hookY, capY = P.capY;
-  const creditTag = opts.layout === "blur" && !opts.place ? "" : `{\\an${P.creditAlign}\\pos(540,${P.creditY})}`;
+  // v1.9.8: every text line is centred on TEXT_X and shrunk to fit TEXT_MAX_W, so nothing sits under an app's buttons.
+  const credit = esc(opts.credit), creditK = fitScale(credit, 42, TEXT_MAX_W, { outline: 4 });
+  const creditTag = `{\\an${P.creditAlign}\\pos(${TEXT_X},${P.creditY})${creditK < 1 ? `\\fscx${Math.round(creditK * 100)}\\fscy${Math.round(creditK * 100)}` : ""}}`;
   const lines = [
     "[Script Info]", "ScriptType: v4.00+", "PlayResX: 1080", "PlayResY: 1920", "WrapStyle: 0", "ScaledBorderAndShadow: yes", "",
     "[V4+ Styles]",
     "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
-    `Style: Cap,${font},${S.cap.size},&H00FFFFFF,&H00FFFFFF,&H00000000,&H78000000,-1,0,0,0,100,100,1,0,1,${S.cap.outline},${S.cap.shadow},5,60,60,0,1`,
+    `Style: Cap,${font},${S.cap.size},&H00FFFFFF,&H00FFFFFF,&H00000000,&H78000000,-1,0,0,0,100,100,1,0,1,${S.cap.outline},${S.cap.shadow},5,${TEXT_SAFE.left},${TEXT_SAFE.right},0,1`,
     // Credit: always on, top centre, drawn last (above zooms, never scaled).
     `Style: Credit,${font},42,&H10FFFFFF,&H00FFFFFF,&H00000000,&H78000000,-1,0,0,0,100,100,0,0,1,4,2,8,40,40,110,1`,
-    `Style: Hook,${font},${S.hook.size},${S.hook.text},&H00FFFFFF,${S.hook.box},${S.hook.box},-1,0,0,0,100,100,0,0,3,16,0,8,90,90,${hookY},1`,
+    `Style: Hook,${font},${S.hook.size},${S.hook.text},&H00FFFFFF,${S.hook.box},${S.hook.box},-1,0,0,0,100,100,0,0,3,16,0,8,${TEXT_SAFE.left + 16},${TEXT_SAFE.right + 16},${hookY},1`,
     watermarkStyle(font),
     "", "[Events]", "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
-    `Dialogue: 3,${assTime(0)},${assTime(D)},Credit,,0,0,0,,${creditTag}${esc(opts.credit)}`,
+    `Dialogue: 3,${assTime(0)},${assTime(D)},Credit,,0,0,0,,${creditTag}${credit}`,
   ];
   // v1.9.1: "@ViceCityClips" bottom right (Settings watermark), clear of the credit and captions; drawn after the zoom.
   const mark = watermarkText(opts.watermark), wm = watermarkPlace(P);
@@ -320,10 +323,12 @@ export function buildStyledAss(opts: { words: Word[]; credit: string; duration: 
     hook = splitHook(hook);
     const end = Math.min(3.3, D);
     const an = P.hookAlign, orgY = an === 2 ? hookY - 40 : hookY + 40;
+    const longest = hook.split("\\N").reduce((a, b) => (b.length > a.length ? b : a), "");
+    const hk = fitScale(longest, S.hook.size, TEXT_MAX_W - 32), hs = (n: number) => Math.round(n * hk);
     const tags = S.hook.anim === "pop"
       // 0 → 110% → 100% in 200ms, one small wiggle, fade out.
-      ? `\\an${an}\\pos(540,${hookY})\\org(540,${orgY})\\fscx0\\fscy0\\t(0,130,\\fscx110\\fscy110)\\t(130,200,\\fscx100\\fscy100)\\t(200,300,\\frz2)\\t(300,420,\\frz-2)\\t(420,500,\\frz0)\\fad(0,300)`
-      : `\\an${an}\\pos(540,${hookY})\\fad(300,300)`;
+      ? `\\an${an}\\pos(${TEXT_X},${hookY})\\org(${TEXT_X},${orgY})\\fscx0\\fscy0\\t(0,130,\\fscx${hs(110)}\\fscy${hs(110)})\\t(130,200,\\fscx${hs(100)}\\fscy${hs(100)})\\t(200,300,\\frz2)\\t(300,420,\\frz-2)\\t(420,500,\\frz0)\\fad(0,300)`
+      : `\\an${an}\\pos(${TEXT_X},${hookY})${hk < 1 ? `\\fscx${hs(100)}\\fscy${hs(100)}` : ""}\\fad(300,300)`;
     lines.push(`Dialogue: 2,${assTime(0)},${assTime(end)},Hook,,0,0,0,,{${tags}}${hook}`);
   }
   const chunks = chunkWordsDetailed(opts.words, 3, S.cap.maxChars);
@@ -331,7 +336,9 @@ export function buildStyledAss(opts: { words: Word[]; credit: string; duration: 
     if (c.start >= D) return;
     const tokens = c.words.map((w) => (S.cap.upper ? esc(w.word).toUpperCase() : esc(w.word)));
     const tilt = S.cap.tilt ? ((ci * 7 + 3) % 7) - 3 || 2 : 0; // -3..3°, never flat, same every render
-    const base = `\\an5\\pos(540,${capY})${tilt ? `\\frz${tilt}` : ""}`;
+    const grow = S.cap.active ? 1 : S.cap.activeScale / 100;
+    const k = fitScale(tokens.join(" "), S.cap.size * grow, TEXT_MAX_W, { spacing: 1, outline: S.cap.outline }), sc = (n: number) => Math.round(n * k);
+    const base = `\\an5\\pos(${TEXT_X},${capY})${tilt ? `\\frz${tilt}` : ""}${k < 1 ? `\\fscx${sc(100)}\\fscy${sc(100)}` : ""}`;
     c.words.forEach((w, wi) => {
       const s = wi === 0 ? c.start : w.start;
       const e = wi + 1 < c.words.length ? c.words[wi + 1].start : c.end;
@@ -339,10 +346,10 @@ export function buildStyledAss(opts: { words: Word[]; credit: string; duration: 
       const text = tokens.map((t, ti) => {
         if (ti !== wi) return t;
         if (S.cap.active) return `{\\1c${S.cap.active}&}${t}{\\1c&H00FFFFFF&}`;
-        return `{\\fscx${S.cap.activeScale}\\fscy${S.cap.activeScale}}${t}{\\fscx100\\fscy100}`;
+        return `{\\fscx${sc(S.cap.activeScale)}\\fscy${sc(S.cap.activeScale)}}${t}{\\fscx${sc(100)}\\fscy${sc(100)}}`;
       }).join(" ");
       let anim = "";
-      if (wi === 0) anim = S.cap.pop ? "\\fscx80\\fscy80\\t(0,60,\\fscx105\\fscy105)\\t(60,120,\\fscx100\\fscy100)" : "\\fad(80,0)";
+      if (wi === 0) anim = S.cap.pop ? `\\fscx${sc(80)}\\fscy${sc(80)}\\t(0,60,\\fscx${sc(105)}\\fscy${sc(105)})\\t(60,120,\\fscx${sc(100)}\\fscy${sc(100)})` : "\\fad(80,0)";
       lines.push(`Dialogue: 1,${assTime(s)},${assTime(Math.min(e, D))},Cap,,0,0,0,,{${base}${anim}}${text}`);
     });
   });

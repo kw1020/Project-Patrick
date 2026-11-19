@@ -182,7 +182,8 @@ export function brandedCaption(o: {
   fallbackHook?: string | null; category?: string | null; game?: string | null;
 }) {
   const camp = o.campaign && o.campaign.active !== false ? o.campaign : null;
-  const banned = camp ? splitList(camp.bannedWords) : [];
+  // v1.9.8: "leak" never goes in a hook (GTA 6 leak posts get taken down; src/lib/platform-rules.ts BANNED_PHRASES).
+  const banned = [...(camp ? splitList(camp.bannedWords) : []), "leaked", "leaks", "leak"];
   const extras = cleanExtras(o.extras, defaultExtras(o.category, o.game ?? null));
   let hook = removeBanned(shortHook(o.hook), banned);
   if (!hook) hook = removeBanned(shortHook(o.fallbackHook), banned);

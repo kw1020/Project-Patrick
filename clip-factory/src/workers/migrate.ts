@@ -28,3 +28,16 @@ export async function migrateV190Settings(): Promise<string | null> {
   await prisma.settings.update({ where: { id: "main" }, data: { ...(moved ? { layout: "auto" } : {}), migratedAutoLayout: true } });
   return moved ? "layout moved to auto (v1.9.0)" : `layout kept (${s.layout})`;
 }
+
+/**
+ * v1.9.8 one-time move (Krew: "lesser of the clips that are lower quality and more clips that are just more higher quality"):
+ * min score 6 -> 7, so about the top third of judged clips reaches review. Only an install still on the old default moves;
+ * `migratedMinScore7` makes it run once, so a later manual change in Settings sticks.
+ */
+export async function migrateV198Settings(): Promise<string | null> {
+  const s = await prisma.settings.upsert({ where: { id: "main" }, update: {}, create: { id: "main" } });
+  if (s.migratedMinScore7) return null;
+  const moved = s.minScore === 6;
+  await prisma.settings.update({ where: { id: "main" }, data: { ...(moved ? { minScore: 7 } : {}), migratedMinScore7: true } });
+  return moved ? "min score moved 6 -> 7 (v1.9.8)" : `min score kept (${s.minScore})`;
+}

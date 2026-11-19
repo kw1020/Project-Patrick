@@ -13,7 +13,8 @@ import { parseEditStyle, parseJumpCuts, parseLayoutSetting } from "@/lib/edit-st
 import { approvalReasonFromEvidence } from "@/lib/permission";
 import { loginTakenBy } from "@/lib/streamers";
 import { parseCampaignForm, parseChannelName, parseLink } from "@/lib/campaigns";
-import { brandedCaption, captionHashtags, cleanExtras, defaultExtras, defaultTitle, isGta6, momentGame } from "@/lib/social";
+import { brandedCaption, captionCredits, captionHashtags, cleanExtras, defaultExtras, defaultTitle, isGta6, momentGame } from "@/lib/social";
+import { parsePlatformInfo, platformCheck } from "@/lib/platform-rules";
 import { autoPostTargets, channelForClip, CHANNEL_KINDS, PLATFORM_LABEL, POST_PLATFORMS, donePost, isApiPostingAccount, isPostingAccount, kindsString, parseChannelLabel, parseFocus, parseHandle, slotAccount } from "@/lib/channels";
 import { approveResolved, DEFAULT_APPROVAL_NOTE, resolveCreators, type ApprovePick, type ApproveResult, type ResolveResult } from "@/lib/creator-lookup";
 
@@ -307,13 +308,14 @@ export async function saveSettings(form: FormData) {
     create: { id: "main" },
     update: {
       spikeMultiplier: n("spikeMultiplier", 1.5, 10, 3),
-      minScore: n("minScore", 1, 10, 6),
+      minScore: n("minScore", 1, 10, 7),
       clipMinSec, clipMaxSec,
       minClipViews: Math.round(n("minClipViews", 0, 100000, 25)),
       // Shown in days since v1.8.0 (1-30); an old form posting hours still works.
       clipLookbackHrs: form.get("clipLookbackDays") != null ? Math.round(n("clipLookbackDays", 1, 30, 7) * 24) : Math.round(n("clipLookbackHrs", 1, 720, 168)),
       standoutMin: Math.round(n("standoutMin", 1, 20, 2) * 10) / 10,
       maxPerCreatorPerRun: Math.round(n("maxPerCreatorPerRun", 1, 15, 2)),
+      maxPerCreatorPerHour: Math.round(n("maxPerCreatorPerHour", 1, 30, 3)), // v1.9.8
       jumpCuts: parseJumpCuts(form.get("jumpCuts")),
       layout: parseLayoutSetting(form.get("layout")),
       captions: form.get("captions") === "on",
@@ -444,8 +446,11 @@ export async function setAccountChannel(accountId: string, channelId: string) {
  * By-hand accounts are left for the Download + copy caption → Mark posted checklist. Refuses clips that aren't approved.
  */
 export async function postToAll(clipId: string, channelId: string): Promise<{ queued: string[]; byHand: string[] }> {
-  const clip = await prisma.clip.findUniqueOrThrow({ where: { id: clipId }, include: { posts: true } });
+  const clip = await prisma.clip.findUniqueOrThrow({ where: { id: clipId }, include: { posts: true, moment: { include: { streamer: true } } } });
   if (clip.status !== "approved" && clip.status !== "posted") throw new Error("Approve the clip first");
+  // v1.9.8: a hard fail in the Platform check blocks Post to all (plain-English reasons; the Poster checks per platform too).
+  const pc = platformCheck({ caption: clip.caption || clip.title || "", title: clip.title, creditOk: captionCredits(clip.caption || "", clip.moment.streamer), info: parsePlatformInfo(clip.platformInfo) });
+  if (pc.fails) throw new Error(`Not posted. ${pc.items.filter((i) => i.level === "fail").map((i) => i.text).join("; ")}`);
   const accounts = await prisma.account.findMany({ where: { homeChannelId: channelId, platform: { in: [...POST_PLATFORMS] } }, orderBy: { createdAt: "asc" } });
   const slots = POST_PLATFORMS.map((p) => slotAccount(accounts, channelId, p)).filter((a): a is (typeof accounts)[number] => Boolean(a));
   const queued: string[] = [], byHand: string[] = [];

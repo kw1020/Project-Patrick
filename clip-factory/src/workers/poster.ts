@@ -4,6 +4,7 @@ import { resolveStored } from "../lib/paths";
 import { draftStatus, fetchTikTokStats, MAX_PENDING_DRAFTS, tiktokVideoUrl, uploadDraft } from "../lib/tiktok";
 import { fetchPublicStats, fetchStats, uploadVideo, youtubeIdFromUrl } from "../lib/youtube";
 import { isApiPostingAccount } from "../lib/channels";
+import { parsePlatformInfo, platformCheck, postBlockReason } from "../lib/platform-rules";
 import { captionCredits, creatorCreditText, creatorUrl, creditLine, defaultTitle, gameHashtags, momentGame } from "../lib/social";
 
 /** Poster: sends an APPROVED clip to one connected account. Refuses anything Krew hasn't approved. */
@@ -22,6 +23,9 @@ export async function runPost(clipId: string, accountId: string) {
   if (!clip.finalPath) throw new Error("No finished video to upload");
   const file = resolveStored(clip.finalPath);
   const streamer = clip.moment.streamer;
+  // v1.9.8: a hard fail in the Platform check (wrong format, too long, caption over the limit, banned words, no credit…) blocks it.
+  const blocked = postBlockReason(platformCheck({ caption: clip.caption || clip.title || "", title: clip.title, creditOk: captionCredits(clip.caption || "", streamer), info: parsePlatformInfo(clip.platformInfo) }), acct.platform);
+  if (blocked) throw new Error(blocked);
 
   if (acct.platform === "tiktok") {
     const waiting = await prisma.post.count({ where: { accountId: acct.id, status: "draft", postedAt: { gt: new Date(Date.now() - 24 * 3600_000) } } });

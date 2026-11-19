@@ -130,13 +130,13 @@ test("chunkWordsDetailed + buildStyledAss: active word highlight, pop-in, credit
   const chunks = chunkWordsDetailed(words);
   assert.deepEqual(chunks.map((c) => c.words.length), [3, 1]);
   const hype = buildStyledAss({ words, credit: "twitch.tv/test", duration: 20, layout: "blur", hook: "He did WHAT in GTA 6 right now", style: "hype" });
-  assert.match(hype, /Credit,,0,0,0,,twitch\.tv\/test/);
+  assert.match(hype, /Credit,,0,0,0,,\{\\an8\\pos\(475,290\)[^}]*\}twitch\.tv\/test/);
   assert.match(hype, /\{\\1c&H0035E1FF&\}NO\{\\1c&H00FFFFFF&\} WAY BRO!/, "first word yellow");
   assert.match(hype, /NO \{\\1c&H0035E1FF&\}WAY\{\\1c&H00FFFFFF&\} BRO!/, "then the second, braces escaped");
   assert.match(hype, /\\fscx80\\fscy80\\t\(0,60,\\fscx105\\fscy105\)\\t\(60,120,\\fscx100\\fscy100\)/, "pop-in");
   assert.equal((hype.match(/\\fscx80\\fscy80/g) ?? []).length, 2, "one pop per chunk, not per word");
-  assert.match(hype, new RegExp(`\\\\pos\\(540,${CAPTION_Y}\\)`));
-  assert.match(hype, /Hook,,0,0,0,,\{\\an8\\pos\(540,250\).*\\fscx0\\fscy0.*\\frz2.*\}He did WHAT in GTA\\N6 right now|Hook,.*\\N/);
+  assert.match(hype, new RegExp(`\\\\pos\\(475,${CAPTION_Y}\\)`));
+  assert.match(hype, /Hook,,0,0,0,,\{\\an8\\pos\(475,360\).*\\fscx0\\fscy0.*\\frz2.*\}He did WHAT in GTA\\N6 right now|Hook,.*\\N/);
   assert.match(hype, /Dialogue: 2,0:00:00\.00,0:00:03\.30,Hook/);
   // word lines are back to back: no flicker between words
   assert.match(hype, /Dialogue: 1,0:00:00\.50,0:00:00\.80,Cap/);
@@ -151,13 +151,13 @@ test("chunkWordsDetailed + buildStyledAss: active word highlight, pop-in, credit
   assert.match(meme, /\\1c&H0014FF39&/, "green");
   assert.match(meme, /\}LOL$/m);
   // v1.9.0: "facecam" = the split layout: hook just above the seam (an2 at 626), captions just under it, credit on top.
-  assert.match(meme, /\\an2\\pos\(540,626\)/, "hook sits on the cam/game seam in the split layout");
-  assert.match(meme, /\\an5\\pos\(540,760\)/, "captions just under the seam");
+  assert.match(meme, /\\an2\\pos\(475,626\)/, "hook sits on the cam/game seam in the split layout");
+  assert.match(meme, /\\an5\\pos\(475,760\)/, "captions just under the seam");
   assert.match(meme, /Style: Cap,DejaVu Sans,100,/);
 
   const none = buildStyledAss({ words: [], credit: "twitch.tv/x", duration: 10, layout: "blur", style: "hype" });
   assert.doesNotMatch(none, /,Cap,/);
-  assert.match(none, /Credit,,0,0,0,,twitch\.tv\/x/);
+  assert.match(none, /Credit,,0,0,0,,\{\\an8\\pos\(475,290\)[^}]*\}twitch\.tv\/x/);
   assert.equal(splitHook("short one"), "short one");
   assert.equal(splitHook("He actually jumped the bridge in GTA 6"), "He actually jumped\\Nthe bridge in GTA 6");
 });

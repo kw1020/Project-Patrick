@@ -310,6 +310,70 @@ export function snapWindowToWords(w: Window, words: Word[], o: { duration: numbe
   return { start: r2(Math.max(0, start)), length: r2(end - Math.max(0, start)) };
 }
 
+/** v1.9.8: at most this much build-up before the payoff (Krew: "keep the viewer attention"). */
+export const LEAD_MAX = 12;
+/** v1.9.8: the window opens this long before the setup sentence (1-3s asked; 1.2s keeps the first words clean). */
+export const SETUP_LEAD = 1.2;
+
+/**
+ * v1.9.8 tighter cut: start 1-3s before the SETUP (the sentence leading into the payoff, at most LEAD_MAX before it), end right
+ * after the payoff/reaction, no dead air at either end (real silence trimmed by the audio, never past the payoff), not
+ * mid-word, and still >= minSec (grown back from the start when needed) and <= maxSec.
+ */
+export function tightenWindow(w: Window, o: { payoff: number | null; words: Word[]; levels?: number[]; minSec: number; maxSec: number; duration: number; frame?: number }): Window {
+  const f = o.frame ?? FRAME, d = o.duration, minSec = Math.min(o.minSec, d);
+  let start = w.start, end = Math.min(d, w.start + w.length);
+  const p = o.payoff != null && o.payoff > start && o.payoff < end ? o.payoff : null;
+  const words = o.words.filter((x) => x.word.trim());
+  // Too much build-up: open on the setup sentence that starts within LEAD_MAX of the payoff (the earliest one, 4s+ before it).
+  if (p != null && p - start > LEAD_MAX) {
+    const setup = sentences(words).find((s) => s.start >= p - LEAD_MAX && s.start <= p - 4);
+    start = Math.max(start, setup ? setup.start - SETUP_LEAD : p - LEAD_MAX + 2);
+  }
+  // Dead air at either end (0.5s level under SILENT_DB), never trimmed into the payoff.
+  const lv = o.levels ?? [];
+  if (lv.length) {
+    const sm = smoothLevels(lv, 0.5, f);
+    const quietAt = (t: number) => { const i = Math.round(t / f); return i >= 0 && i < sm.length && sm[i] <= SILENT_DB; };
+    const firstWord = words.find((x) => x.end > start)?.start ?? Infinity;
+    while (quietAt(start) && start + f < (p != null ? p - 3 : end - minSec) && start + f < firstWord) start = r2(start + f);
+    while (quietAt(end - 0.5) && end - f > (p != null ? p + 1.5 : start + minSec)) end = r2(end - f);
+  }
+  // Not mid-word.
+  const mid = words.find((x) => x.start < start && x.end > start + 0.05);
+  if (mid) start = Math.max(0, mid.start - 0.15);
+  // Length limits: grow back from the start first (more setup), then past the end.
+  if (end - start < minSec) start = Math.max(0, end - minSec);
+  if (end - start < minSec) end = Math.min(d, start + minSec);
+  if (end - start > o.maxSec) start = end - o.maxSec;
+  return { start: r2(Math.max(0, start)), length: r2(end - Math.max(0, start)) };
+}
+
+/**
+ * v1.9.8: when the Judge gave no window of its own but said the payoff is OUTSIDE the proposed window, or that the first
+ * ~1.5s don't hook, fix the window from that: payoff outside → a fresh smart window around the Judge's payoff time;
+ * weak hook → start at the next sentence that begins >= 1s later (still >= minSec long, >= 3s before the payoff).
+ * Returns null when nothing should change.
+ */
+export function windowFromJudgeFlags(o: {
+  win: { start: number; end: number }; hookLands: boolean; payoffIn: boolean; payoffAt: number | null; currentPayoff: number | null;
+  duration: number; words: Word[]; levels?: number[]; minSec: number; maxSec: number;
+}): { window: Window; payoffAt: number | null; why: string } | null {
+  const { win, duration: d } = o;
+  if (!o.payoffIn && o.payoffAt != null && o.payoffAt >= 0 && o.payoffAt <= d && (o.payoffAt < win.start + 0.5 || o.payoffAt > win.end - 1)) {
+    const w = tightenWindow(pickSmartWindow({ duration: d, payoff: o.payoffAt, words: o.words, levels: o.levels, minSec: o.minSec, maxSec: o.maxSec }),
+      { payoff: o.payoffAt, words: o.words, levels: o.levels, minSec: o.minSec, maxSec: o.maxSec, duration: d });
+    return { window: w, payoffAt: o.payoffAt, why: `payoff at ${o.payoffAt}s was outside the window` };
+  }
+  if (!o.hookLands) {
+    const payoff = o.payoffAt ?? o.currentPayoff ?? win.end - 2;
+    const s = sentences(o.words.filter((w) => w.word.trim())).map((x) => r2(Math.max(0, x.start - 0.25)))
+      .find((t) => t >= win.start + 1 && t <= payoff - 3 && win.end - t >= Math.min(o.minSec, d) - 1e-6);
+    if (s != null) return { window: { start: s, length: r2(win.end - s) }, payoffAt: o.payoffAt ?? o.currentPayoff, why: `weak opening, starts ${r2(s - win.start)}s later` };
+  }
+  return null;
+}
+
 /**
  * What the audio says, for the Judge (it can't hear): the strongest loudness jumps (>= 6 dB over the usual level, local
  * peaks >= 3s apart, best `max`) and real silences of 1.5s+. Times in seconds of the source.
