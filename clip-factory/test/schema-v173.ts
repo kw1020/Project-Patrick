@@ -1,6 +1,15 @@
+// Today's schema turned back into the v1.9.8 (2e4801e) one: the v2.0.0 Edits models + columns removed.
+export function toV198Schema(now: string): string {
+  return now
+    .replace(/\n\/\/ ---- v2\.0\.0 Edits[\s\S]*$/, "")
+    .replace(/^ {2}edits {9}Edit\[\]\n/m, "")
+    .replace(/^ {2}(editBpm|editVibe|editLength|editAuto|editCreatorAudio) .*\n/gm, "")
+    .replace(/^ {2}editPosts {4}EditPost\[\]\n/m, "");
+}
+
 // Today's schema turned back into the v1.9.6 (7fb3948) one: the v1.9.8 columns removed, the minScore default put back.
 export function toV196Schema(now: string): string {
-  return now
+  return toV198Schema(now)
     .replace(/^ {2}(judgeHookOk|judgePayoffIn|judgePayoff|judgeAudio|platformInfo|maxPerCreatorPerHour|migratedMinScore7)\s.*\n/gm, "")
     .replace(/^ {2}\/\/ v1\.9\.8.*\n/gm, "")
     .replace(/^ {2}minScore .*\n/m, "  minScore         Float   @default(6) // Judge auto-reject below this\n");

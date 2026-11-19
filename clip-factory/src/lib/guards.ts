@@ -11,10 +11,13 @@ function envNum(name: string, fallback: number) {
 export const maxBacklog = () => envNum("MAX_BACKLOG", 12);
 export const minFreeGb = () => envNum("MIN_FREE_GB", 5);
 
-/** How many more clips the line can take right now (MAX_BACKLOG − clips in "processing", never below 0). */
+/** How many more clips the line can take right now (MAX_BACKLOG − clips and edits in "processing", never below 0). */
 export async function backlogRoom(): Promise<number> {
-  const processing = await prisma.clip.count({ where: { status: "processing" } });
-  return Math.max(0, maxBacklog() - processing);
+  const [processing, edits] = await Promise.all([
+    prisma.clip.count({ where: { status: "processing" } }),
+    prisma.edit.count({ where: { status: "processing" } }).catch(() => 0),
+  ]);
+  return Math.max(0, maxBacklog() - processing - edits);
 }
 
 async function statfsFreeGb(dir: string): Promise<number> {

@@ -1,6 +1,7 @@
 "use client";
 import { useState, useTransition } from "react";
 import { markPostedToAccount, postToAccount, postToAll, setClipChannel } from "../../app/actions";
+import { markEditPostedToAccount, postEditToAccount, postEditToAll } from "../../app/edit-actions";
 import { PLATFORM_LABEL, downloadUrl } from "../lib/channels";
 import { checkCampaignCaption } from "../lib/social";
 import { CategoryChip } from "./CategoryChip";
@@ -21,6 +22,7 @@ export type ToPostView = {
   supreme?: { rank: number | null; reason: string | null } | null;
   /** v1.9.8 Platform check facts (Clip.platformInfo JSON) + caption credit + the v1.9.6 video-check issues. */
   platformInfo?: string | null; creditOk?: boolean; qaIssues?: { type: string; detail: string; source?: string }[] | null;
+  edit?: boolean; // v2.0.0: an Edit (its own media route + actions; never auto-posted, no Move to)
 };
 
 const chip: Record<string, string> = {
@@ -28,10 +30,11 @@ const chip: Record<string, string> = {
 };
 
 /** Copies the caption and starts the download in one click (the media route sends it as an attachment). */
-export async function downloadAndCopy(clipId: string, caption: string) {
+export async function downloadAndCopy(clipId: string, caption: string, href?: string) {
   try { await navigator.clipboard.writeText(caption); } catch { /* clipboard blocked: the caption box is still there */ }
   const a = document.createElement("a");
   a.href = downloadUrl(clipId);
+  if (href) a.href = href; // v2.0.0 edits: their own media route
   a.download = "";
   document.body.appendChild(a);
   a.click();
@@ -52,18 +55,22 @@ export function ToPostCard({ clip, channels, children }: { clip: ToPostView; cha
   const checks = clip.campaign ? checkCampaignCaption(clip.caption, clip.campaign) : [];
   // v1.9.8: a hard fail in the Platform check blocks Post to all (the Poster refuses it too).
   const pc = platformCheck({ caption: clip.caption, title: clip.title, creditOk: clip.creditOk ?? true, info: parsePlatformInfo(clip.platformInfo), qa: clip.qaIssues });
+  // v2.0.0 edits use their own actions + media route
+  const doPostAll = (id: string, ch: string) => (clip.edit ? postEditToAll(id, ch) : postToAll(id, ch));
+  const media = clip.edit ? `/api/media/edit/${clip.id}` : `/api/media/${clip.id}`;
 
   return (
     <article className={`card flex min-w-0 flex-col overflow-hidden ${busy ? "opacity-70" : ""}`} data-testid="to-post-card">
       {/* v1.9.5 Upload columns: one card per clip in its channel's column, preview on top (fits a Chromebook screen). */}
       <div className="relative flex h-[22rem] w-full shrink-0 justify-center bg-black">
         {clip.hasVideo
-          ? <video src={`/api/media/${clip.id}?v=${clip.version}`} controls preload="metadata" playsInline className="h-full max-w-full object-contain" />
+          ? <video src={`${media}?v=${clip.version}`} controls preload="metadata" playsInline className="h-full max-w-full object-contain" />
           : <div className="grid h-full place-items-center p-4 text-center text-sm text-zinc-400">Video not found</div>}
         <div className="pointer-events-none absolute inset-x-2 top-2 flex flex-wrap gap-1">
           {clip.score != null && <span className="rounded-md bg-black/75 px-2 py-1 text-xs font-black text-emerald-300">{clip.score}/10</span>}
           {clip.duration != null && <span className="rounded-md bg-black/75 px-2 py-1 text-xs font-bold">{Math.round(clip.duration)}s</span>}
-          {clip.category && <span className="rounded-md bg-black/75"><CategoryChip category={clip.category} className="inline-block px-2 py-1 text-xs" /></span>}
+          {clip.edit ? <span className="rounded-md bg-black/75 px-2 py-1 text-xs font-black text-hot">Edit</span>
+            : clip.category && <span className="rounded-md bg-black/75"><CategoryChip category={clip.category} className="inline-block px-2 py-1 text-xs" /></span>}
         </div>
       </div>
 
@@ -75,12 +82,12 @@ export function ToPostCard({ clip, channels, children }: { clip: ToPostView; cha
         )}
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="min-w-0 truncate text-sm font-bold">{clip.streamer.name}</div>
-          <select aria-label="Move to channel" className="field w-36 py-1 text-xs" value="" disabled={busy} data-testid="move-to"
+          {!clip.edit && <select aria-label="Move to channel" className="field w-36 py-1 text-xs" value="" disabled={busy} data-testid="move-to"
             onChange={(e) => { const v = e.target.value; if (v) run(() => setClipChannel(clip.id, v === "auto" ? "" : v)); }}>
             <option value="">Move to…</option>
             {channels.filter((c) => c.id !== clip.channelId).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             {clip.chosenChannelId && <option value="auto">Automatic (by type)</option>}
-          </select>
+          </select>}
         </div>
         {clip.judgeReason && <div className="line-clamp-2 text-xs text-zinc-400" title={clip.judgeReason}>{clip.judgeReason}</div>}
 
@@ -98,8 +105,9 @@ export function ToPostCard({ clip, channels, children }: { clip: ToPostView; cha
           </div>
         )}
 
+        {clip.edit && <div className="text-xs text-sun">Add your sound in TikTok/Reels before posting (edits have no music).</div>}
         {!clip.channelId ? (
-          <div className="rounded-lg bg-sun/10 px-3 py-2 text-xs text-amber-200">No channel takes this clip automatically. Use Move to… (or add a channel in Settings).</div>
+          <div className="rounded-lg bg-sun/10 px-3 py-2 text-xs text-amber-200">{clip.edit ? "No channel takes Edits: tick Edits on your edit channel in Settings → Channels." : "No channel takes this clip automatically. Use Move to… (or add a channel in Settings)."}</div>
         ) : clip.rows.length === 0 ? (
           <div className="rounded-lg bg-sun/10 px-3 py-2 text-xs text-amber-200">{clip.channelName} has no accounts yet. Add its YouTube / TikTok / Instagram in <a href="/settings#channels" className="underline">Settings</a>.</div>
         ) : (
@@ -108,7 +116,7 @@ export function ToPostCard({ clip, channels, children }: { clip: ToPostView; cha
               <button className="btn-hot w-full" disabled={busy || uploading || clip.stage === "cut" || pc.fails > 0} data-testid="post-to-all"
                 title={pc.fails ? "Blocked: fix the Platform check problems first (re-cut or edit the caption in the Queue)" : undefined}
                 onClick={() => run(async () => {
-                  const r = await postToAll(clip.id, clip.channelId!);
+                  const r = await doPostAll(clip.id, clip.channelId!);
                   setMsg(r.queued.length ? `Sending to ${r.queued.join(", ")}…${r.byHand.length ? " Then do the by-hand ones below." : ""}` : "Nothing to upload: do the by-hand ones below.");
                 })}>
                 {pc.fails ? "⛔ Blocked by the Platform check: " : ""}Post to all on {clip.channelName}{autoLeft.length ? ` (${autoLeft.map((r) => PLATFORM_LABEL[r.platform]).join(" + ")} now${manualLeft.length ? `, ${manualLeft.length} by hand` : ""})` : " (by hand)"}
@@ -129,9 +137,9 @@ export function ToPostCard({ clip, channels, children }: { clip: ToPostView; cha
                       ? <span className="font-bold text-sun" title="Open TikTok, tap the inbox notification, paste the caption, post.">⏳ draft in TikTok inbox</span>
                       : r.done.url ? <a href={r.done.url} target="_blank" className="font-bold text-emerald-300">✓ posted ↗</a> : <span className="font-bold text-emerald-300">✓ posted</span>
                   ) : r.action === "manual" || r.error ? (
-                    <ManualRow clipId={clip.id} row={r} caption={clip.caption} campaign={Boolean(clip.campaign)} busy={busy} run={run} copied={copied === r.accountId} onCopied={() => flash(r.accountId)} />
+                    <ManualRow clipId={clip.id} edit={clip.edit} row={r} caption={clip.caption} campaign={Boolean(clip.campaign)} busy={busy} run={run} copied={copied === r.accountId} onCopied={() => flash(r.accountId)} />
                   ) : (
-                    <button className="btn-ghost py-1 text-xs" disabled={busy || uploading} onClick={() => run(() => postToAccount(clip.id, r.accountId))}
+                    <button className="btn-ghost py-1 text-xs" disabled={busy || uploading} onClick={() => run(() => (clip.edit ? postEditToAccount(clip.id, r.accountId) : postToAccount(clip.id, r.accountId)))}
                       title={r.action === "tiktok" ? "Sends it to the TikTok inbox as a draft" : "Uploads it to YouTube now"}>
                       {uploading ? "sending…" : r.action === "tiktok" ? "Send to TikTok" : "Post to YouTube"}
                     </button>
@@ -148,18 +156,24 @@ export function ToPostCard({ clip, channels, children }: { clip: ToPostView; cha
   );
 }
 
-function ManualRow({ clipId, row, caption, campaign, busy, run, copied, onCopied }: {
-  clipId: string; row: ToPostRow; caption: string; campaign: boolean; busy: boolean; run: (fn: () => Promise<unknown>) => void; copied: boolean; onCopied: () => void;
+function ManualRow({ clipId, edit, row, caption, campaign, busy, run, copied, onCopied }: {
+  clipId: string; edit?: boolean; row: ToPostRow; caption: string; campaign: boolean; busy: boolean; run: (fn: () => Promise<unknown>) => void; copied: boolean; onCopied: () => void;
 }) {
   const [open, setOpen] = useState(false);
   return (
     <div className="flex w-full flex-col gap-1.5">
       {row.error && <span className="text-red-300" title={row.error}>login broken: post by hand</span>}
+      {edit ? (
+        <button className="btn-ghost py-1 text-xs" data-testid="download-copy-edit" onClick={async () => { await downloadAndCopy(clipId, caption, `/api/media/edit/${clipId}?download=1`); onCopied(); setOpen(true); }}>
+          {copied ? "Downloading · caption copied ✓" : "Download + copy caption"}
+        </button>
+      ) : (
       <button className="btn-ghost py-1 text-xs" data-testid="download-copy" onClick={async () => { await downloadAndCopy(clipId, caption); onCopied(); setOpen(true); }}>
         {copied ? "Downloading · caption copied ✓" : "Download + copy caption"}
       </button>
+      )}
       {open || !campaign ? (
-        <form className="flex min-w-0 flex-wrap gap-1.5" action={(fd) => run(() => markPostedToAccount(clipId, row.accountId, fd))}>
+        <form className="flex min-w-0 flex-wrap gap-1.5" action={(fd) => run(() => (edit ? markEditPostedToAccount(clipId, row.accountId, fd) : markPostedToAccount(clipId, row.accountId, fd)))}>
           <input name="url" placeholder="Post link (optional)" className="field w-40 min-w-0 flex-1 py-1 text-xs" />
           {campaign && <input name="campaignLink" placeholder="Campaign link (optional)" className="field w-40 min-w-0 flex-1 py-1 text-xs" />}
           <button className="btn-ok py-1 text-xs" disabled={busy}>Mark posted</button>

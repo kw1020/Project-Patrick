@@ -8,6 +8,7 @@ import { QaBox } from "./QaBox";
 import type { QaResult } from "../lib/qa";
 import { parsePlatformInfo, platformCheck } from "../lib/platform-rules";
 import { PlatformCheckBox } from "./PlatformCheckBox";
+import { MakeEditFromClip } from "./MakeEditFromClip";
 
 export type ClipView = {
   id: string; status: string; stage: string | null; error: string | null; title: string; caption: string;
@@ -142,6 +143,7 @@ export function ClipCard({ clip, accounts }: { clip: ClipView; accounts: Account
         {clip.status !== "processing" && !clip.expired && <QaBox clipId={clip.id} qa={clip.qa ?? null} hasVideo={clip.hasVideo} canRecut={Boolean(clip.canRecut)} busy={busy || recutting} />}
         {recutting && <div className="animate-pulse text-xs text-sun">Re-cutting… the new version replaces this video in about a minute.</div>}
         {clip.editNote && !recutting && <div className="text-xs text-zinc-500" title={clip.editNote}>Plain edit used (the styled edit hit a problem).</div>}
+        {clip.status !== "processing" && clip.status !== "failed" && <MakeEditFromClip clipId={clip.id} />}
         {clip.canRecut && clip.status !== "processing" && (
           <details className="text-xs">
             <summary className="cursor-pointer select-none text-zinc-400 hover:text-white">Re-cut ▾</summary>

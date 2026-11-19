@@ -161,6 +161,9 @@ export async function retentionPass(now = Date.now(), opts: RetentionOptions = {
       free = await freeGb(storageDir()).catch(() => null);
     }
   }
+  // 7) v2.0.0 Edits: same windows as clips (Settings -> Storage, halved under disk pressure); leftovers in edits/<id>/ after the orphan window.
+  const e = await cleanEdits(now, w);
+  finals += e.finals; orphans += e.files; bytes += e.bytes;
 
   const mb = bytes / 1024 ** 2;
   const extra = [expired ? `${expired} unreviewed expired` : "", rows ? `${rows} old clip${rows === 1 ? "" : "s"} removed` : "", pressureFinals ? `${pressureFinals} oldest unreviewed deleted for space` : ""].filter(Boolean);
@@ -175,13 +178,71 @@ export async function diskPressure(): Promise<{ pressure: boolean; free: number 
 }
 
 /**
+ * Edits (STORAGE_DIR/edits/<id>/, the Storage card's "Edits" bucket): final.mp4 + beat.mp4 follow the clip windows: rejected
+ * (w.rejected), failed (w.failed), never reviewed (w.pending, then status "expired"), approved but never posted (w.approved),
+ * posted (w.posted); never while processing or uploading. Any other file there (downloads, work files left by a crash) after
+ * w.orphan unless the edit is processing; a folder whose edit was deleted likewise. Clears use raw SQL (updatedAt is the clock).
+ */
+export async function cleanEdits(now = Date.now(), w: RetentionWindows = retentionWindows({})) {
+  let finals = 0, files = 0, bytes = 0;
+  const before = (ms: number) => new Date(now - ms);
+  const old = await prisma.edit.findMany({
+    where: {
+      OR: [{ finalPath: { not: null } }, { finalWithBeatPath: { not: null } }],
+      stage: null,
+      AND: [{ OR: [
+        { status: "rejected", updatedAt: { lt: before(w.rejected) } },
+        { status: "failed", updatedAt: { lt: before(w.failed) } },
+        { status: "pending", updatedAt: { lt: before(w.pending) } },
+        { status: "approved", updatedAt: { lt: before(w.approved) } },
+        { status: "posted", updatedAt: { lt: before(w.posted) } },
+      ] }],
+    },
+    select: { id: true, status: true, finalPath: true, finalWithBeatPath: true },
+  });
+  for (const e of old) {
+    if (e.finalPath) bytes += remove(e.finalPath);
+    if (e.finalWithBeatPath) bytes += remove(e.finalWithBeatPath);
+    if (e.status === "pending") await prisma.$executeRaw`UPDATE Edit SET finalPath = NULL, finalWithBeatPath = NULL, status = 'expired' WHERE id = ${e.id}`;
+    else await prisma.$executeRaw`UPDATE Edit SET finalPath = NULL, finalWithBeatPath = NULL WHERE id = ${e.id}`;
+    finals++;
+  }
+  const rows = new Map((await prisma.edit.findMany({ select: { id: true, status: true, finalPath: true, finalWithBeatPath: true } })).map((e) => [e.id, e]));
+  let dirs: string[] = [];
+  try { dirs = fs.readdirSync(storagePath("edits")); } catch { return { finals, files, bytes }; }
+  for (const d of dirs) {
+    const abs = storagePath("edits", d);
+    const row = rows.get(d);
+    if (row?.status === "processing") continue;
+    const keep = new Set([row?.finalPath, row?.finalWithBeatPath].filter(Boolean).map((p) => path.basename(p!)));
+    const walk = (dir: string): void => {
+      let names: fs.Dirent[] = [];
+      try { names = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+      for (const n of names) {
+        const f = path.join(dir, n.name);
+        if (n.isDirectory()) { walk(f); try { if (!fs.readdirSync(f).length) fs.rmdirSync(f); } catch { /* not empty */ } continue; }
+        if (dir === abs && keep.has(n.name)) continue;
+        try {
+          const st = fs.statSync(f);
+          if (now - st.mtimeMs < w.orphan) continue;
+          fs.rmSync(f, { force: true }); bytes += st.size; files++;
+        } catch { /* gone */ }
+      }
+    };
+    walk(abs);
+    try { if (!fs.readdirSync(abs).length && (!row || !keep.size)) fs.rmdirSync(abs); } catch { /* not empty */ }
+  }
+  return { finals, files, bytes };
+}
+
+/**
  * Stuck-clip sweeper. A clip counts against MAX_BACKLOG while "processing"; if its job is lost
  * (Redis wiped, worker killed mid-job beyond BullMQ's stall recovery) it would block the line forever.
  * Any processing clip idle for 10+ min with no waiting/active/delayed job is marked failed (Retry button).
  */
 export async function sweepStuck(now = Date.now(), idleMs = 10 * 60_000) {
   const stale = await prisma.clip.findMany({ where: { status: "processing", updatedAt: { lt: new Date(now - idleMs) } }, select: { id: true, stage: true } });
-  if (!stale.length) return 0;
+  if (!stale.length) return sweepStuckEdits(now);
   const live = new Set<string>();
   for (const name of ["grab", "transcribe", "judge", "cut"] as const) {
     const jobs = await queue(name).getJobs(["waiting", "active", "delayed", "prioritized", "waiting-children"]);
@@ -191,6 +252,21 @@ export async function sweepStuck(now = Date.now(), idleMs = 10 * 60_000) {
   for (const c of stale) {
     if (live.has(c.id)) continue;
     await prisma.clip.update({ where: { id: c.id }, data: { status: "failed", error: `Lost in the line at the ${c.stage ?? "?"} step (worker restarted?). Press Retry.` } });
+    n++;
+  }
+  return n + await sweepStuckEdits(now);
+}
+
+/** Edits: processing for 30+ min since the last stage change with no job in the "edit" queue -> failed (Retry). */
+export async function sweepStuckEdits(now = Date.now(), idleMs = 30 * 60_000) {
+  const stale = await prisma.edit.findMany({ where: { status: "processing", updatedAt: { lt: new Date(now - idleMs) } }, select: { id: true, stage: true } });
+  if (!stale.length) return 0;
+  const jobs = await queue("edit").getJobs(["waiting", "active", "delayed", "prioritized", "waiting-children"]);
+  const live = new Set(jobs.map((j) => j?.data?.editId).filter(Boolean));
+  let n = 0;
+  for (const e of stale) {
+    if (live.has(e.id)) continue;
+    await prisma.edit.update({ where: { id: e.id }, data: { status: "failed", stage: null, error: `Lost at the ${e.stage ?? "?"} step (worker restarted?). Press Retry.` } });
     n++;
   }
   return n;

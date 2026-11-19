@@ -44,6 +44,7 @@ model Streamer {
   moments       Moment[]
   videos        YouTubeVideo[]
   suggestion    Suggestion?
+  edits         Edit[]
 
   @@index([platform, login])
 }
@@ -193,6 +194,11 @@ model Settings {
   // v1.9.8 quality over quantity (Krew: "lesser of the clips that are lower quality and more clips that are just more higher quality")
   maxPerCreatorPerHour Int    @default(3)     // at most this many clips per creator per hour reach review; the best are kept
   migratedMinScore7    Boolean @default(false) // v1.9.8 one-time move: minScore 6 -> 7
+  editBpm             Float   @default(128) // v2.0.0 Edits: steady beat when no song is picked
+  editVibe            String  @default("hype") // v2.0.0 Edits: hype | funny | smooth
+  editLength          Int     @default(20) // v2.0.0 Edits: 15 | 20 | 30 seconds
+  editAuto            Boolean @default(false) // v2.0.0 Edits: make a daily edit of each creator with enough good moments
+  editCreatorAudio    Boolean @default(true) // v2.0.0 Edits: keep the creator's audio (quieter) under the edit, else silent
 }
 
 // v1.9.5: one of Krew's brands (e.g. "ViceCityClips") = up to one YouTube + one TikTok + one Instagram account that all get the same
@@ -245,6 +251,7 @@ model Account {
   disabled     Boolean   @default(false) // v1.9.5: skipped by Post to all, not needed for "posted everywhere" (why: in error)
   createdAt    DateTime  @default(now())
   posts        Post[]
+  editPosts    EditPost[]
 
   @@unique([platform, channelId])
 }
@@ -310,4 +317,59 @@ model Suggestion {
   dismissedUntil DateTime?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
+}
+
+// ---- v2.0.0 Edits (beat-synced montages of one creator's best moments, for the edit channel) ----
+// No music is ever put into an edit: Krew adds the sound in TikTok/Reels. finalWithBeatPath is a preview with the timing
+// track (or a click) mixed in, only for checking the sync. Files live in STORAGE_DIR/edits/<id>/.
+model Edit {
+  id                String    @id @default(cuid())
+  streamerId        String
+  streamer          Streamer  @relation(fields: [streamerId], references: [id], onDelete: Cascade)
+  format            String    @default("montage") // montage (5-12 moments) | clipedit (one clip, then the edit from the drop)
+  sourceClipId      String?   // clipedit: the clip it was made from (plain id, no relation: the clip may be deleted later)
+  vibe              String    // hype | funny | smooth
+  lengthSec         Int       // asked-for length (the edit is rounded to whole bars)
+  bpm               Float     // the tempo it was cut to (Settings.editBpm, or found in the timing track)
+  beatOffset        Float     @default(0) // where in the timing track the edit starts (seconds): start the sound there
+  status            String    @default("processing") // processing | pending | approved | rejected | posted | failed
+  stage             String?   // picking | downloading | beats | rendering (while processing), post (uploading)
+  stageAt           DateTime?
+  error             String?
+  slices            String?   // JSON: the plan (picks, beat grid, slices, effects) + render report
+  finalPath         String?   // the no-music edit (the one to post)
+  finalWithBeatPath String?   // preview with the beat mixed in (never post this one)
+  title             String?
+  caption           String?
+  timingTrack       String?   // file name in the music folder, null = steady beat at bpm
+  creatorAudio      Boolean   @default(true) // keep the creator's audio (quieter) under the edit
+  captions          Boolean   @default(false) // word captions (edits normally have none)
+  endText           String?   // text over the last bar ("follow for more"), null = none
+  duration          Float?    // real length of the finished edit (seconds)
+  platformInfo      String?   // v1.9.8 Platform check facts for the final (ffprobe + render facts JSON), like Clip.platformInfo
+  postError         String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  posts             EditPost[]
+}
+
+// Where an edit went (mirrors Post, which needs a clip).
+model EditPost {
+  id         String    @id @default(cuid())
+  editId     String
+  edit       Edit      @relation(fields: [editId], references: [id], onDelete: Cascade)
+  platform   String    // youtube | tiktok | instagram
+  accountId  String?
+  account    Account?  @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  channelId  String?   // the Channel of the account (plain id, like Post.channelId)
+  status     String    @default("live") // live | draft (TikTok inbox) | failed
+  publishId  String?
+  externalId String?
+  url        String?
+  postedAt   DateTime  @default(now())
+  views      Int?
+  likes      Int?
+  comments   Int?
+  syncedAt   DateTime?
+  error      String?
 }

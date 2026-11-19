@@ -6,3 +6,6 @@ node_modules/
 storage/
 next-env.d.ts
 *.tsbuildinfo
+# v2.0.0: songs dropped in for edit timing stay on the PC (only the README is in git)
+music/*
+!music/README.txt

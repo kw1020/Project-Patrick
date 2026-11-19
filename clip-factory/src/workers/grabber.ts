@@ -32,29 +32,41 @@ export async function runGrab(clipId: string) {
   if (last && !last.ok) await setStatus("disk", true, `${free.toFixed(1)} GB free — grabbing again`);
 
   const outBase = storagePath("raw", clipId);
-  const ytdlp = ytdlpBin();
-  const common = ["--no-playlist", "--no-part", "--no-progress", "--quiet", "--merge-output-format", "mp4", "-o", `${outBase}.%(ext)s`, "--print", "after_move:filepath"];
-
-  let args: string[];
-  if (moment.source === "youtube") {
-    if (!moment.sourceUrl || moment.vodOffset == null) throw new Error("YouTube moment has no video URL or peak time");
-    const from = Math.max(0, moment.vodOffset - 25), to = moment.vodOffset + 20;
-    args = ["-f", "bv*[height<=1080]+ba/b[height<=1080]", "--download-sections", `*${from}-${to}`, "--force-keyframes-at-cuts", ...common, moment.sourceUrl];
-  } else if (moment.source === "twitch_clip" && moment.sourceUrl) {
-    args = ["-f", "best[ext=mp4]/best", ...common, moment.sourceUrl];
-  } else if (moment.vodId && moment.vodOffset != null) {
-    const from = Math.max(0, moment.vodOffset - 30), to = moment.vodOffset + 15;
-    args = ["-f", "best[height<=1080]/best", "--download-sections", `*${from}-${to}`, ...common, `https://www.twitch.tv/videos/${moment.vodId}`];
-  } else {
-    throw new Error("Moment has neither a Twitch clip URL nor a VOD offset");
-  }
-
-  const { stdout } = await run(ytdlp, args, { timeoutMs: 8 * 60_000 });
-  const file = stdout.trim().split("\n").filter(Boolean).pop();
-  if (!file || !fs.existsSync(file)) throw new Error("yt-dlp finished but no file was written");
+  const file = await ytdlpDownload(moment, outBase);
 
   const rel = "raw/" + file.split(/[\\/]/).pop();
   await prisma.clip.update({ where: { id: clipId }, data: { rawPath: rel, stage: "transcribe", stageAt: new Date(), error: null } });
   await enqueueTranscribe(clipId);
   return `downloaded ${rel}`;
+}
+
+export type Downloadable = { source: string; sourceUrl: string | null; vodId: string | null; vodOffset: number | null };
+
+/**
+ * The grabber's yt-dlp command for a moment. Default ranges: YouTube 25s before / 20s after the peak, chat-spike VOD 30s before /
+ * 15s after, Twitch clip = the whole clip. `range` (seconds in the VOD / video) replaces them (v2.0.0 Edits download short
+ * sections around the payoff). A Twitch clip is always downloaded whole (<= 60s).
+ */
+export function ytdlpArgs(moment: Downloadable, outBase: string, range?: { from: number; to: number }): string[] {
+  const common = ["--no-playlist", "--no-part", "--no-progress", "--quiet", "--merge-output-format", "mp4", "-o", `${outBase}.%(ext)s`, "--print", "after_move:filepath"];
+  const sect = (from: number, to: number) => ["--download-sections", `*${Math.max(0, Math.round(from * 10) / 10)}-${Math.round(to * 10) / 10}`];
+  if (moment.source === "youtube") {
+    if (!moment.sourceUrl || moment.vodOffset == null) throw new Error("YouTube moment has no video URL or peak time");
+    const r = range ?? { from: Math.max(0, moment.vodOffset - 25), to: moment.vodOffset + 20 };
+    return ["-f", "bv*[height<=1080]+ba/b[height<=1080]", ...sect(r.from, r.to), "--force-keyframes-at-cuts", ...common, moment.sourceUrl];
+  }
+  if (moment.source === "twitch_clip" && moment.sourceUrl) return ["-f", "best[ext=mp4]/best", ...common, moment.sourceUrl];
+  if (moment.vodId && moment.vodOffset != null) {
+    const r = range ?? { from: Math.max(0, moment.vodOffset - 30), to: moment.vodOffset + 15 };
+    return ["-f", "best[height<=1080]/best", ...sect(r.from, r.to), ...common, `https://www.twitch.tv/videos/${moment.vodId}`];
+  }
+  throw new Error("Moment has neither a Twitch clip URL nor a VOD offset");
+}
+
+/** Run yt-dlp for a moment; returns the file it wrote. */
+export async function ytdlpDownload(moment: Downloadable, outBase: string, range?: { from: number; to: number }): Promise<string> {
+  const { stdout } = await run(ytdlpBin(), ytdlpArgs(moment, outBase, range), { timeoutMs: 8 * 60_000 });
+  const file = stdout.trim().split("\n").filter(Boolean).pop();
+  if (!file || !fs.existsSync(file)) throw new Error("yt-dlp finished but no file was written");
+  return file;
 }

@@ -4,6 +4,7 @@ import { Avatar } from "@/components/Avatar";
 import { CategoryChip } from "@/components/CategoryChip";
 import { COLUMNS, getWorkroom, stageAge, type ColumnKey, type WorkItem } from "@/lib/workroom";
 import { retryClip } from "../actions";
+import { retryEdit } from "../edit-actions";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +12,7 @@ const SOURCE_CLS: Record<string, string> = {
   twitch_clip: "bg-violet-500/20 text-violet-200",
   chat: "bg-hot/20 text-pink-200",
   youtube: "bg-red-600/20 text-red-200",
+  edit: "bg-sun/20 text-amber-200",
 };
 const COLUMN_HINT: Record<ColumnKey, string> = {
   finding: "new moments, last 10 min",
@@ -81,8 +83,21 @@ export default async function WorkroomPage() {
                   <div className="text-xs text-red-300 [overflow-wrap:anywhere]">{p.error || "Failed"} <span className="text-zinc-500">· {stageAge(p.since, now)} ago</span></div>
                 </div>
                 {p.clipId && <form action={retryClip.bind(null, p.clipId)}><button className="btn-ghost text-xs">Retry</button></form>}
+                {p.editId && <form action={retryEdit.bind(null, p.editId)}><button className="btn-ghost text-xs">Retry</button></form>}
               </div>
             ))}
+          </div>
+        </section>
+      )}
+
+      {w.edits.length > 0 && (
+        <section className="card space-y-2 p-2.5" data-testid="workroom-edits">
+          <div className="flex items-center justify-between px-0.5">
+            <h2 className="text-sm font-black">Edits <span className="font-normal text-zinc-500">· being made for your edit channel</span></h2>
+            <Link href="/edits" className="text-xs text-hot">Edits page</Link>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {w.edits.map((it) => <div key={it.key} className="w-56"><Card item={it} now={now} col="cutting" /></div>)}
           </div>
         </section>
       )}

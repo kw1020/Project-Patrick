@@ -1,6 +1,6 @@
 // v1.9.5: Krew's real brands (2026-11-19), made on first start only when there are no channels yet (`ensureChannels`).
 // Handles are public. Krew's later edits are never overwritten: this runs once (Settings.migratedChannels).
-// focus/kinds map onto v2.0's Account.purpose: gta+all kinds -> "all", funny -> "funny", gaming -> "gaming", edits -> "edits".
+// focus/kinds also route v2.0 Edits: the first non-GTA channel with "edits" in its kinds (ClipFactoryGG) gets them.
 
 export type SeedAccount = { platform: "youtube" | "tiktok" | "instagram"; handle: string; youtubeChannelId?: string; disabled?: string };
 export type SeedChannel = { id: string; name: string; focus: "gta" | "any"; kinds: string; accounts: SeedAccount[] };

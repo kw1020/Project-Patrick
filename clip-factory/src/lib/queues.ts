@@ -2,7 +2,7 @@ import { Queue } from "bullmq";
 import IORedis from "ioredis";
 
 // One queue per production-line stage.
-export const QUEUES = { scout: "scout", clips: "clips", grab: "grab", transcribe: "transcribe", judge: "judge", cut: "cut", post: "post", youtube: "youtube", suggest: "suggest", supreme: "supreme", qa: "qa" } as const;
+export const QUEUES = { scout: "scout", clips: "clips", grab: "grab", transcribe: "transcribe", judge: "judge", cut: "cut", post: "post", youtube: "youtube", suggest: "suggest", supreme: "supreme", qa: "qa", edit: "edit" } as const;
 export type QueueName = keyof typeof QUEUES;
 
 let conn: IORedis | null = null;
@@ -54,6 +54,14 @@ export async function pokeSupreme() {
 /** One attempt only: a retried upload could post the same video twice. */
 export async function enqueuePost(clipId: string, accountId: string) {
   await queue("post").add("post", { clipId, accountId }, { jobId: `post-${clipId}-${accountId}-${Date.now()}`, attempts: 1 });
+}
+/** v2.0.0 Edits: one edit job (picking -> downloading -> beats -> rendering). One attempt: a failed edit gets a Retry button. */
+export async function enqueueEdit(editId: string) {
+  await queue("edit").add("edit", { editId }, { jobId: `edit-${editId}-${Date.now()}`, attempts: 1 });
+}
+/** Post an APPROVED edit to one account. One attempt only (no double posts). */
+export async function enqueuePostEdit(editId: string, accountId: string) {
+  await queue("post").add("edit", { editId, accountId }, { jobId: `post-edit-${editId}-${accountId}-${Date.now()}`, attempts: 1 });
 }
 /** Ask the worker to run the scout + clips poll right now (e.g. after approving a streamer). */
 export async function pokeScout() {

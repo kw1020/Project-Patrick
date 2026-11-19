@@ -113,7 +113,8 @@ export function sortToPost<T extends Sortable>(items: T[]): T[] {
   return [...items].sort((a, b) => rank(a) - rank(b) || (b.clip.score ?? -1) - (a.clip.score ?? -1) || b.clip.createdAt.getTime() - a.clip.createdAt.getTime());
 }
 
-/** Nav badge: approved clips not yet posted to every account of their channel. */
+/** Nav badge: approved clips (and v2.0.0 edits) not yet posted to every account of their channel. */
 export async function toPostCount() {
-  return (await toPostItems()).items.length;
+  const { toPostEditItems } = await import("./to-post-edits");
+  return (await toPostItems()).items.length + (await toPostEditItems().catch(() => ({ items: [] }))).items.length;
 }

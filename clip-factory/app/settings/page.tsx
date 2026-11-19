@@ -15,6 +15,7 @@ import { ensureChannels } from "@/lib/to-post";
 import { twitchConfigured } from "@/lib/twitch";
 import { twitchRedirectUri } from "@/lib/twitch-user";
 import { SUPREME_MODEL } from "@/lib/ai-spend";
+import { EDIT_LENGTHS, VIBES, parseVibe } from "@/lib/edit-vibes";
 
 export const dynamic = "force-dynamic";
 
@@ -214,6 +215,19 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
             </select>
           </Row>
           <Row label="Burn captions"><input name="captions" type="checkbox" defaultChecked={s.captions} className={check} /></Row>
+        </div>
+
+        <div className="card space-y-4 p-5" data-testid="edits-card">
+          <Head>Edits</Head>
+          <Row label="Default vibe" hint="For new edits, the daily edits and “Make an edit from this clip”.">
+            <select name="editVibe" defaultValue={parseVibe(s.editVibe)} className="field w-40">{VIBES.map((v) => <option key={v.key} value={v.key}>{v.label}</option>)}</select>
+          </Row>
+          <Row label="Steady beat (BPM)" hint="Used when no song is picked. 120-130 fits most trending sounds."><input name="editBpm" type="number" min="70" max="180" defaultValue={s.editBpm} className="field w-32" /></Row>
+          <Row label="Length">
+            <select name="editLength" defaultValue={String(s.editLength)} className="field w-32">{EDIT_LENGTHS.map((l) => <option key={l} value={l}>{l}s</option>)}</select>
+          </Row>
+          <Row label="Keep the creator's audio" hint="Quieter, under the sound you add. Off = a silent video."><input name="editCreatorAudio" type="checkbox" defaultChecked={s.editCreatorAudio} className={check} /></Row>
+          <Row label="Make a daily edit of each creator with enough good moments" hint="Once a day, one edit per approved creator with 8+ good moments. They wait for your Approve like everything else."><input name="editAuto" type="checkbox" defaultChecked={s.editAuto} className={check} /></Row>
         </div>
 
         <div className="card space-y-4 p-5">

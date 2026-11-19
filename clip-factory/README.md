@@ -371,6 +371,35 @@ a typed box always wins. Any clip can be re-cut in another layout from its Queue
 jump cuts on/off). The face check uses OpenCV (installed in the Docker image); if it is missing, clips use the blurred
 layout. `CAM_DETECT=off` in `.env` turns the check off.
 
+## Edits (v2.0.0)
+
+The **Edits** page makes 12-30s vertical edits for an edit channel: one creator's best moments cut exactly on the beat, with
+the biggest moment on the drop. Pick a creator (a montage needs 5+ of their clips that you haven't rejected), a vibe
+(**Hype**: hard cuts, flashes, zoom pulses, shakes, RGB split and slow-mo into the hit; **Funny**: longer slices, zoom on
+faces, freeze-frame on the punchline; **Smooth**: crossfades and whip-pans, gentle zoom drift), a length (15/20/30s) and a tempo,
+then **Make edit**. It shows up in the list a few minutes later and waits for your **Approve** like every clip. The creator's
+name pops up big on the first bar, their `twitch.tv/...` / `youtube.com/@...` credit is on screen the whole time, the channel
+watermark sits bottom right (Settings), and the caption is the usual ViceCityClips one (hook, `🎥 @login`, #GTA6 #GTAVI #ViceCity
++ extras, plus #edit; campaign rules apply).
+
+**Clip -> Edit**: the format where one clip plays normally with captions for a few seconds, then the drop lands exactly on the
+payoff (flash, punch-in, shake) and the rest is an edit of that moment (slow-mo replays, freeze-frame on the reaction, a few
+other hits of the same creator). Press **Make an edit from this clip** on any clip in the Queue (uses the vibe/tempo/length in
+Settings -> Edits).
+
+**Music and copyright:** Clip Factory never puts music into a video. Edits are cut to a beat and exported without music
+(the creator's own audio stays, quieter, unless you switch it off). Add the trending sound in TikTok/Reels when you post.
+To cut to the exact song you'll use, put the file (MP3/WAV/M4A...) in `clip-factory\music` and pick **Match a song from my
+music folder**: the song is only used to find the beat (and the drop), and the card tells you where to start the sound in
+TikTok. **Play with beat** plays a preview with the song (or a click) mixed in so you can check the timing; that file is
+labelled "don't post this one" and is never uploaded.
+
+**Edit channel:** edits go to the channel that has **Edits** ticked in Settings -> Channels (ClipFactoryGG). Approved edits wait
+in its column on the **Upload** page: **Post to all** uploads to its connected YouTube/TikTok (TikTok = a draft, so you can add the
+sound there), by-hand accounts get **Download + copy caption** then **Mark posted**. Edits are never posted automatically.
+**Make a daily edit of each creator** (Settings -> Edits, off by default) makes one edit a day per approved creator with 8+ good
+moments. The Workroom shows edits being made; failed ones have a Retry.
+
 ## Any game
 
 Settings → **Which games** → *Any game (approved streamers)* (the default since v1.8.0; older installs were moved

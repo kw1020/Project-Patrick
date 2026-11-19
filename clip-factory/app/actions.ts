@@ -16,11 +16,12 @@ import { parseCampaignForm, parseChannelName, parseLink } from "@/lib/campaigns"
 import { brandedCaption, captionCredits, captionHashtags, cleanExtras, defaultExtras, defaultTitle, isGta6, momentGame } from "@/lib/social";
 import { parsePlatformInfo, platformCheck } from "@/lib/platform-rules";
 import { autoPostTargets, channelForClip, CHANNEL_KINDS, PLATFORM_LABEL, POST_PLATFORMS, donePost, isApiPostingAccount, isPostingAccount, kindsString, parseChannelLabel, parseFocus, parseHandle, slotAccount } from "@/lib/channels";
+import { parseBpm, parseLength, parseVibe } from "@/lib/edit-vibes";
 import { approveResolved, DEFAULT_APPROVAL_NOTE, resolveCreators, type ApprovePick, type ApproveResult, type ResolveResult } from "@/lib/creator-lookup";
 
 function refreshAll() {
   try {
-    for (const p of ["/", "/queue", "/upload", "/workroom", "/posted", "/analytics", "/streamers", "/creators", "/settings"]) revalidatePath(p);
+    for (const p of ["/", "/queue", "/upload", "/workroom", "/edits", "/posted", "/analytics", "/streamers", "/creators", "/settings"]) revalidatePath(p);
   } catch {
     /* called outside a Next.js request (tests, scripts): no pages to refresh */
   }
@@ -338,6 +339,11 @@ export async function saveSettings(form: FormData) {
       // v1.9.6 Supreme Judge (an old form without the fields keeps the values).
       ...(form.get("supremePerChannel") != null ? { supremePerChannel: Math.round(n("supremePerChannel", 1, 20, 5)) } : {}),
       ...(form.get("supremeDailyDollars") != null ? { supremeDailyCents: Math.round(n("supremeDailyDollars", 0, 50, 0.25) * 100) } : {}),
+      // v2.0.0 Edits card (only when the form has it, so an older form can't reset these)
+      ...(form.get("editVibe") != null ? {
+        editVibe: parseVibe(form.get("editVibe")), editBpm: parseBpm(form.get("editBpm")), editLength: parseLength(form.get("editLength")),
+        editCreatorAudio: form.get("editCreatorAudio") === "on", editAuto: form.get("editAuto") === "on",
+      } : {}),
     },
   });
   refreshAll();

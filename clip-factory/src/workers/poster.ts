@@ -6,6 +6,7 @@ import { fetchPublicStats, fetchStats, uploadVideo, youtubeIdFromUrl } from "../
 import { isApiPostingAccount } from "../lib/channels";
 import { parsePlatformInfo, platformCheck, postBlockReason } from "../lib/platform-rules";
 import { captionCredits, creatorCreditText, creatorUrl, creditLine, defaultTitle, gameHashtags, momentGame } from "../lib/social";
+import { parseKinds } from "../lib/channels";
 
 /** Poster: sends an APPROVED clip to one connected account. Refuses anything Krew hasn't approved. */
 export async function runPost(clipId: string, accountId: string) {
@@ -52,6 +53,55 @@ export async function runPost(clipId: string, accountId: string) {
   return `uploaded ${streamer.name} clip to ${acct.channelTitle} (${privacy}): ${id}`;
 }
 
+/** v2.0.0: does this account belong to a channel whose types include Edits (ClipFactoryGG)? */
+export async function editsChannelOf(acct: { homeChannelId: string | null }) {
+  const ch = acct.homeChannelId ? await prisma.channel.findUnique({ where: { id: acct.homeChannelId } }) : null;
+  return ch && parseKinds(ch.kinds).includes("edits") ? ch : null;
+}
+
+/**
+ * v2.0.0: sends an APPROVED edit (the no-music file) to a connected YouTube/TikTok account of a channel that takes Edits.
+ * Refuses anything else; single attempt. Only Krew's Post click starts it (edits never auto-post).
+ */
+export async function runPostEdit(editId: string, accountId: string) {
+  const [edit, acct] = await Promise.all([
+    prisma.edit.findUnique({ where: { id: editId }, include: { posts: true, streamer: true } }),
+    prisma.account.findUnique({ where: { id: accountId } }),
+  ]);
+  if (!edit) return "edit deleted";
+  if (!acct) throw new Error("That account was disconnected");
+  if (edit.status !== "approved" && edit.status !== "posted") throw new Error("Edit isn't approved, so it won't be posted");
+  if (!isApiPostingAccount(acct)) throw new Error(`${acct.channelTitle ?? acct.handle ?? "That account"} is posted to by hand: use Download + copy caption on Upload`);
+  if (!(await editsChannelOf(acct))) throw new Error(`${acct.channelTitle ?? acct.handle ?? "That account"} isn't in a channel that takes Edits (Settings -> Channels).`);
+  if (edit.posts.some((p) => p.accountId === acct.id && p.status !== "failed")) return `already sent to ${acct.channelTitle}`;
+  if (!edit.finalPath) throw new Error("No finished edit to upload");
+  // v1.9.8 Platform check: a hard fail for this platform blocks the upload (edits pass the same check as clips)
+  const blockedEdit = postBlockReason(platformCheck({ caption: edit.caption || edit.title || "", title: edit.title, creditOk: captionCredits(edit.caption || "", edit.streamer), info: parsePlatformInfo(edit.platformInfo) }), acct.platform);
+  if (blockedEdit) throw new Error(blockedEdit);
+  const file = resolveStored(edit.finalPath);
+  const s = edit.streamer;
+  if (acct.platform === "tiktok") {
+    const since = new Date(Date.now() - 24 * 3600_000);
+    const waiting = (await prisma.post.count({ where: { accountId: acct.id, status: "draft", postedAt: { gt: since } } }))
+      + (await prisma.editPost.count({ where: { accountId: acct.id, status: "draft", postedAt: { gt: since } } }));
+    if (waiting >= MAX_PENDING_DRAFTS) throw new Error(`${acct.channelTitle} already has ${waiting} drafts waiting today (TikTok allows ${MAX_PENDING_DRAFTS}). Post them in the TikTok app first.`);
+    const publishId = await uploadDraft(acct, file);
+    await prisma.editPost.create({ data: { editId, platform: "tiktok", accountId: acct.id, status: "draft", publishId, channelId: acct.homeChannelId } });
+    await prisma.edit.update({ where: { id: editId }, data: { status: "posted", stage: null, stageAt: new Date(), postError: null } });
+    return `sent ${s.name} edit to ${acct.channelTitle}'s TikTok inbox (add the sound there)`;
+  }
+  // The channel link always goes into a YouTube description (like clips); the @login line is in the caption itself.
+  let description = edit.caption || edit.title || `${s.name} edit`;
+  if (!description.includes(creatorCreditText(s))) description += `\n\n${creditLine(s)}`;
+  if (!/#shorts\b/i.test(description)) description += "\n#Shorts";
+  const tags = ["edit", s.login, s.name].map((t) => t.replace(/[^\p{L}\p{N}_]/gu, "")).filter(Boolean);
+  const privacy = (["public", "unlisted", "private"] as const).find((p) => p === acct.privacy) ?? "public";
+  const id = await uploadVideo(acct, { file, title: edit.title || `${s.name} edit`, description, tags, privacy });
+  await prisma.editPost.create({ data: { editId, platform: "youtube", accountId: acct.id, externalId: id, url: `https://youtube.com/shorts/${id}`, channelId: acct.homeChannelId } });
+  await prisma.edit.update({ where: { id: editId }, data: { status: "posted", stage: null, stageAt: new Date(), postError: null } });
+  return `uploaded ${s.name} edit to ${acct.channelTitle} (${privacy}): ${id}`;
+}
+
 async function record(postId: string, prev: number | null, s: { views: number; likes: number | null; comments: number | null }) {
   await prisma.post.update({ where: { id: postId }, data: { views: s.views, likes: s.likes, comments: s.comments, syncedAt: new Date() } });
   if (prev !== s.views) await prisma.postStat.create({ data: { postId, views: s.views, likes: s.likes, comments: s.comments } });
@@ -83,6 +133,28 @@ async function syncAccount(acct: Account) {
   return `${acct.channelTitle}: ${live.length} checked, ${changed} updated`;
 }
 
+/** v2.0.0: edit posts on this account: TikTok drafts that went live, view counts. */
+async function syncEditPosts(acct: Account) {
+  if (acct.platform === "tiktok") {
+    const drafts = await prisma.editPost.findMany({ where: { accountId: acct.id, status: "draft", publishId: { not: null }, postedAt: { gt: new Date(Date.now() - 7 * 86400_000) } } });
+    for (const p of drafts) {
+      const st = await draftStatus(acct, p.publishId!);
+      if (st.status === "FAILED") await prisma.editPost.update({ where: { id: p.id }, data: { status: "failed", error: `TikTok: ${st.failReason ?? "failed"}` } });
+      else if (st.status === "PUBLISH_COMPLETE") {
+        const vid = st.postIds[0];
+        await prisma.editPost.update({ where: { id: p.id }, data: { status: "live", postedAt: new Date(), ...(vid ? { externalId: vid, url: tiktokVideoUrl(acct, vid) } : {}) } });
+      }
+    }
+  }
+  const live = await prisma.editPost.findMany({ where: { accountId: acct.id, status: "live", externalId: { not: null } }, orderBy: { postedAt: "desc" }, take: 200 });
+  if (!live.length) return;
+  const stats = acct.platform === "tiktok" ? await fetchTikTokStats(acct, live.map((p) => p.externalId!)) : await fetchStats(acct, live.map((p) => p.externalId!));
+  for (const p of live) {
+    const st = stats.get(p.externalId!);
+    if (st) await prisma.editPost.update({ where: { id: p.id }, data: { views: st.views, likes: st.likes, comments: st.comments, syncedAt: new Date() } });
+  }
+}
+
 /** Every 15 min: views/likes/comments for every account. One broken account doesn't stop the rest. */
 export async function runStatsSync() {
   const out: string[] = [];
@@ -93,6 +165,7 @@ export async function runStatsSync() {
   if (yt.length === 1) await prisma.post.updateMany({ where: { platform: "youtube", accountId: null, externalId: { not: null } }, data: { accountId: yt[0].id } });
   for (const a of accounts) {
     try { out.push(await syncAccount(a)); } catch (e) { out.push(`${a.channelTitle}: ${(e as Error).message}`); }
+    try { await syncEditPosts(a); } catch (e) { console.warn(`[stats] ${a.channelTitle} edits:`, (e as Error).message); }
   }
   // v1.9.5: posts Krew made by hand on YouTube: public stats from the link with the plain API key (no OAuth).
   try { const m = await syncManualYouTube(); if (m) out.push(m); } catch (e) { out.push(`YouTube links: ${(e as Error).message}`); }

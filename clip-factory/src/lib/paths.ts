@@ -10,7 +10,7 @@ export function storagePath(...parts: string[]) {
   return path.join(storageDir(), ...parts);
 }
 export function ensureStorage() {
-  for (const d of ["raw", "final", "work"]) fs.mkdirSync(storagePath(d), { recursive: true });
+  for (const d of ["raw", "final", "work", "edits"]) fs.mkdirSync(storagePath(d), { recursive: true });
 }
 /** Resolve a DB-stored relative path, refusing anything that escapes STORAGE_DIR. */
 export function resolveStored(rel: string) {

@@ -7,6 +7,7 @@ const LINKS = [
   { href: "/queue", label: "Queue" },
   { href: "/upload", label: "Upload" },
   { href: "/workroom", label: "Workroom" },
+  { href: "/edits", label: "Edits" },
   { href: "/posted", label: "Posted" },
   { href: "/analytics", label: "Analytics" },
   { href: "/streamers", label: "Streamers" },
@@ -14,7 +15,7 @@ const LINKS = [
   { href: "/settings", label: "Settings" },
 ];
 
-export function Nav({ pending, suggestions = 0, inLine = 0, toPost = 0 }: { pending: number; suggestions?: number; inLine?: number; toPost?: number }) {
+export function Nav({ pending, suggestions = 0, inLine = 0, toPost = 0, edits = 0 }: { pending: number; suggestions?: number; inLine?: number; toPost?: number; edits?: number }) {
   const path = usePathname();
   return (
     <nav className="flex gap-1 overflow-x-auto">
@@ -32,6 +33,9 @@ export function Nav({ pending, suggestions = 0, inLine = 0, toPost = 0 }: { pend
             )}
             {l.href === "/workroom" && inLine > 0 && (
               <span title="Clips in the line right now" className="ml-1.5 rounded-full bg-zinc-700 px-1.5 py-0.5 text-[11px] font-bold text-white">{inLine}</span>
+            )}
+            {l.href === "/edits" && edits > 0 && (
+              <span title="Edits waiting for your review" className="ml-1.5 rounded-full bg-hot px-1.5 py-0.5 text-[11px] font-bold text-white">{edits}</span>
             )}
             {l.href === "/streamers" && suggestions > 0 && (
               <span title="New suggestions" className="ml-1.5 rounded-full bg-sun px-1.5 py-0.5 text-[11px] font-bold text-black">{suggestions}</span>

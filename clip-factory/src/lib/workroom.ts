@@ -3,6 +3,7 @@
 // (pending) → Posting (uploading, or TikTok drafts waiting in Krew's inbox) → Posted (live in the last 24h).
 import { prisma } from "./db";
 import { maxBacklog } from "./guards";
+import { STAGE_LABEL, formatLabel, vibeLabel } from "./edit-vibes";
 
 export type ColumnKey = "finding" | "downloading" | "captions" | "judge" | "cutting" | "ready" | "posting" | "posted";
 export const COLUMNS: { key: ColumnKey; label: string }[] = [
@@ -29,12 +30,14 @@ export type WorkItem = {
   error?: string | null;
   url?: string | null;    // posted link
   where?: string;         // Posting / Posted: which platform
+  editId?: string;        // v2.0.0: an edit (Edits lane / problems), not a clip
 };
 
 export type Workroom = {
   columns: Record<ColumnKey, WorkItem[]>;
   counts: Record<ColumnKey, number>;
   problems: WorkItem[];
+  edits: WorkItem[];      // v2.0.0: edits being made (or sent) right now
   summary: { inLine: number; ready: number; postedToday: number; perHour: number; backlogMax: number; lineFull: boolean };
 };
 
@@ -103,6 +106,17 @@ export async function getWorkroom(now: Date = new Date()): Promise<Workroom> {
     // Clips that came out of the line (cut and scored) in the last 3h. createdAt is close enough: a clip takes minutes.
     prisma.clip.count({ where: { createdAt: { gte: since3h }, duration: { not: null }, status: { in: ["pending", "approved", "rejected", "posted"] } } }),
   ]);
+  const [editRows, editFailed] = await Promise.all([
+    prisma.edit.findMany({ where: { OR: [{ status: "processing" }, { stage: "post" }] }, orderBy: { createdAt: "asc" }, include: { streamer: true }, take: 20 }).catch(() => []),
+    prisma.edit.findMany({ where: { status: "failed", updatedAt: { gte: since24h } }, orderBy: { updatedAt: "desc" }, include: { streamer: true }, take: 5 }).catch(() => []),
+  ]);
+  const editItem = (e: (typeof editRows)[number], extra: Partial<WorkItem> = {}): WorkItem => ({
+    key: `edit-${e.id}`, clipId: null, editId: e.id,
+    creator: { name: e.streamer.name, avatar: e.streamer.profileImage, login: e.streamer.login, platform: e.streamer.platform },
+    source: "edit", sourceLabel: "Edit", title: `${formatLabel(e.format)} · ${vibeLabel(e.vibe)} · ${e.lengthSec}s`,
+    since: (e.stageAt ?? e.updatedAt).toISOString(), score: null, error: e.error, where: STAGE_LABEL[e.stage ?? ""] ?? e.stage ?? undefined, ...extra,
+  });
+  const editsInLine = editRows.filter((e) => e.status === "processing").length;
 
   const columns: Record<ColumnKey, WorkItem[]> = { finding: [], downloading: [], captions: [], judge: [], cutting: [], ready: [], posting: [], posted: [] };
 
@@ -129,11 +143,12 @@ export async function getWorkroom(now: Date = new Date()): Promise<Workroom> {
   const backlogMax = maxBacklog();
   return {
     columns, counts,
-    problems: failed.map((c) => clipItem(c, { since: c.updatedAt.toISOString() })),
+    problems: [...failed.map((c) => clipItem(c, { since: c.updatedAt.toISOString() })), ...editFailed.map((e) => editItem(e, { since: e.updatedAt.toISOString() }))],
+    edits: editRows.map((e) => editItem(e)),
     summary: {
-      inLine: processing.length, ready: readyCount, postedToday,
+      inLine: processing.length + editsInLine, ready: readyCount, postedToday,
       perHour: Math.round((made3h / 3) * 10) / 10,
-      backlogMax, lineFull: processing.length >= backlogMax,
+      backlogMax, lineFull: processing.length + editsInLine >= backlogMax,
     },
   };
 }

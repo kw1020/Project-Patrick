@@ -3,6 +3,7 @@ import { AutoRefresh } from "@/components/AutoRefresh";
 import { ToPostCard, type ToPostView } from "@/components/ToPostCard";
 import { PLATFORM_LABEL, POST_PLATFORMS, accountAction, isGtaFocus, parseKinds } from "@/lib/channels";
 import { toPostItems } from "@/lib/to-post";
+import { toPostEditItems } from "@/lib/to-post-edits";
 import { QaBox } from "@/components/QaBox";
 import { parseQa } from "@/lib/qa";
 import { captionCredits } from "@/lib/social";
@@ -34,6 +35,25 @@ function view(x: Item): ToPostView {
   };
 }
 
+type EditItem = Awaited<ReturnType<typeof toPostEditItems>>["items"][number];
+/** v2.0.0: an approved edit as an Upload card (its channel = the one whose types include Edits). */
+function editView(x: EditItem): ToPostView {
+  const e = x.edit, s = e.streamer, camp = s.campaign?.active ? s.campaign : null;
+  return {
+    id: e.id, title: e.title ?? "", caption: e.caption ?? "", score: null, judgeReason: null, hasVideo: Boolean(e.finalPath),
+    version: e.updatedAt.getTime(), stage: e.stage, postError: e.postError, category: "edits", duration: e.duration,
+    streamer: { name: s.name, login: s.login },
+    campaign: camp ? { name: camp.name, link: camp.link, requiredText: camp.requiredText, bannedWords: camp.bannedWords, maxCaptionChars: camp.maxCaptionChars } : null,
+    channelId: x.channel?.id ?? null, chosenChannelId: null, channelName: x.channel?.name ?? null,
+    rows: x.rows.map(({ account: a, post }) => ({
+      accountId: a.id, platform: a.platform, label: a.handle ?? a.channelTitle ?? a.platform, action: accountAction(a), error: a.error, disabled: a.disabled,
+      done: post ? { status: post.status, url: post.url } : null,
+    })),
+    platformInfo: e.platformInfo, creditOk: captionCredits(e.caption ?? "", s), qaIssues: null, // v1.9.8 Platform check
+    edit: true,
+  };
+}
+
 /** Green = connected (posts for you), amber = by hand (download + copy caption), grey = switched off or no account. */
 function Slot({ platform, a }: { platform: string; a: Acct | undefined }) {
   const state = !a ? "none" : a.disabled ? "off" : a.mode === "api" && a.platform !== "instagram" && !a.error ? "api" : "hand";
@@ -49,13 +69,14 @@ function Slot({ platform, a }: { platform: string; a: Acct | undefined }) {
 }
 
 export default async function UploadPage() {
-  const [{ channels, accounts, items }, budget, statuses] = await Promise.all([toPostItems(), budgetLine(), soft(getStatuses(), {} as Record<string, AgentStatus>)]);
+  const [{ channels, accounts, items }, budget, statuses, editData] = await Promise.all([toPostItems(), budgetLine(), soft(getStatuses(), {} as Record<string, AgentStatus>), toPostEditItems()]);
+  const editsFor = (channelId: string | null) => editData.items.filter((x) => (x.channel?.id ?? null) === channelId);
   const sup = statuses.supreme; // v1.9.6 Supreme Judge
   const chans = channels.map((c) => ({ id: c.id, name: c.name }));
   const noChannel = items.filter((x) => !x.channel);
   const cols = [
-    ...channels.map((c) => ({ id: c.id, name: c.name, sub: isGtaFocus(c) ? "GTA 6 · every type" : parseKinds(c.kinds).join(" + ") || "no types ticked", items: items.filter((x) => x.channel?.id === c.id), channel: c })),
-    ...(noChannel.length ? [{ id: "none", name: "No channel", sub: "Use Move to… on each clip", items: noChannel, channel: null }] : []),
+    ...channels.map((c) => ({ id: c.id, name: c.name, sub: isGtaFocus(c) ? "GTA 6 · every type" : parseKinds(c.kinds).join(" + ") || "no types ticked", items: items.filter((x) => x.channel?.id === c.id), edits: editsFor(c.id), channel: c })),
+    ...(noChannel.length || editsFor(null).length ? [{ id: "none", name: "No channel", sub: "Use Move to… on each clip", items: noChannel, edits: editsFor(null), channel: null }] : []),
   ];
   return (
     <div className="space-y-4">
@@ -84,14 +105,15 @@ export default async function UploadPage() {
               <div className="card space-y-1.5 p-3">
                 <div className="flex items-baseline justify-between gap-2">
                   <h2 className="min-w-0 truncate font-black">{col.name}</h2>
-                  <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold ${col.items.length ? "bg-emerald-500 text-black" : "bg-zinc-800 text-zinc-400"}`}>{col.items.length} waiting</span>
+                  <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold ${col.items.length + col.edits.length ? "bg-emerald-500 text-black" : "bg-zinc-800 text-zinc-400"}`}>{col.items.length} waiting{col.edits.length ? ` + ${col.edits.length} edit${col.edits.length === 1 ? "" : "s"}` : ""}</span>
                 </div>
                 <div className="text-[11px] text-zinc-500">{col.sub}</div>
                 {col.channel && POST_PLATFORMS.map((p) => <Slot key={p} platform={p} a={accounts.find((a) => a.homeChannelId === col.channel!.id && a.platform === p)} />)}
               </div>
-              {col.items.length === 0
+              {col.edits.map((x) => <ToPostCard key={`edit-${x.edit.id}`} clip={editView(x)} channels={chans} />)}
+              {col.items.length === 0 && col.edits.length === 0
                 ? <div className="rounded-xl border border-dashed border-line p-6 text-center text-xs text-zinc-500">Nothing waiting. Approve clips in the <Link href="/queue" className="text-hot">Queue</Link>.</div>
-                : col.items.map((x) => (
+                : col.items.length === 0 ? null : col.items.map((x) => (
                   <ToPostCard key={x.clip.id} clip={view(x)} channels={chans}>
                     <QaBox clipId={x.clip.id} qa={parseQa(x.clip.qa)} hasVideo={Boolean(x.clip.finalPath)} canRecut={Boolean(x.clip.rawPath)} />
                   </ToPostCard>

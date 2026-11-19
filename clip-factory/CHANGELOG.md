@@ -1,5 +1,13 @@
 # Clip Factory patch notes
 
+## 2.0.0 — 2026-11-19
+- Edits: new Edits page that makes beat-synced edits of one streamer's best moments, in three vibes: Hype, Funny and Smooth.
+- New Clip -> Edit format: one clip plays with captions, then the drop hits on the payoff and it turns into an edit. Use the "Make an edit from this clip" button on any clip in the Queue.
+- Cut to a steady beat, or to the song you'll use: drop it in the clip-factory music folder. It is only used for timing and is never put into the video. Add the sound in TikTok/Reels when you post.
+- Edits go to your edit channel (the one with Edits ticked in Settings, ClipFactoryGG): approved edits wait in its column on the Upload page. Post to all, or download + copy caption, then Mark posted. Edits never post by themselves and pass the same Platform check as clips.
+- "Play with beat" on every edit lets you check the timing with the beat mixed in (that preview is never the one to post).
+- Optional: make a daily edit of each creator with enough good moments (Settings, Edits, off by default).
+
 ## 1.9.8 — 2026-11-19
 - Fewer, better clips: before the Judge is paid, a clip must have a real spike (sound or chat well above that streamer's usual) with someone reacting. Random pieces, just-talking, menus, AFK and silence are set aside, and the Queue shows "X found, Y kept".
 - The Judge now "watches" more: up to 12 frames picked at the loud moments, chat peaks and scene changes, plus a summary of the sound and chat. It must name the payoff in one line, or the clip scores 4 at most, and it checks the hook and that the payoff is inside the clip.

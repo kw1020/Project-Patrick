@@ -9,12 +9,14 @@ x-app: &app
     HF_HOME: /models   # Whisper model cache (downloaded once)
     # v1.9.4: the folder on your PC the clips live in (shown on Settings -> Storage). Empty = ./storage.
     CLIP_STORAGE_HOST_DIR: ${CLIP_STORAGE_DIR:-}
+    MUSIC_DIR: /music  # songs for edit timing (never put into a video)
   volumes:
     - data:/data
     # Clips land in this folder on your computer too. CLIP_STORAGE_DIR in .env moves them to another drive
     # (e.g. D:/ClipFactory/storage); empty or missing = ./storage next to this file (v1.9.4).
     - ${CLIP_STORAGE_DIR:-./storage}:/storage
     - models:/models
+    - ./music:/music:ro    # drop the song you'll use in TikTok here to cut edits to its beat
   restart: unless-stopped
   depends_on:
     redis:

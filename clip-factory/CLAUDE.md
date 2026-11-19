@@ -221,7 +221,7 @@ original brief is below, and the status section says what's done. Read both befo
   matching a seed (`matchesSeed`: handle/username/title, YouTube channel id, or YouTube title = brand name) takes that slot instead;
   ClipFactoryGG's Instagram is seeded `Account.disabled` (+ note in `error`: Instagram disabled it). Leftover posting accounts go to a
   free slot of the first channel, else "Not in a channel yet". `Account.disabled`: skipped by `postToAll`, not waited for by
-  `toPostItems`; Turn off/on in the Channels card (`setAccountDisabled`). Focus/kinds map onto v2.0's Account.purpose (gta+all = all). Routing `channelForClip` (`src/lib/channels.ts`, pure):
+  `toPostItems`; Turn off/on in the Channels card (`setAccountDisabled`). (v2.0.0 routes edits by kinds too; there is no Account.purpose.) Routing `channelForClip` (`src/lib/channels.ts`, pure):
   pick > GTA 6 clip (momentGame/isGta6) → first gta channel taking its type > first non-gta channel taking its type > null ("No
   channel", Krew picks). Upload (Krew: "an upload page next to the queue with all columns of all four channels"; `app/upload/page.tsx`,
   `/to-post` redirects there; one column per channel + a "No channel" column, header = 3 handle dots + "X waiting"; md+ = side by side
@@ -306,6 +306,46 @@ original brief is below, and the status section says what's done. Read both befo
   the drawn pixels' bounding box. Measured cost estimate: ~6.5k input tokens (12 x ~308 per 640x360 still + text) + ~450
   output ≈ 1.75¢/clip at $2/$10 (8 frames ≈ 1.5¢). Unverified: real Claude with the new fields, real Twitch audio through the
   gate (thresholds from fixtures), scene detection speed on 1080p60 on Krew's PC, platform UI positions (from ad templates).
+- **v2.0.0 (2026-11-18): Edits** (Krew: "Jump to 2.0 and start doing edits. One edit channel of just edits of streamers"; music
+  decision: NO music is ever baked in, Krew adds the trending sound in TikTok/Reels). Built on v1.9.8 (2e4801e). Schema (additive, `test/v200.test.ts`
+  pushes from the 2e4801e schema with rows; `toV198Schema` in `test/schema-v173.ts` strips the v2.0.0 block and `toV196Schema`
+  etc. chain through it): `Edit` (format montage|clipedit, sourceClipId plain id, vibe, lengthSec, bpm, beatOffset = song time the edit
+  starts, status processing|pending|approved|rejected|posted|failed, stage picking|downloading|beats|rendering|post, slices = JSON
+  picks + grid + plan + render report, finalPath / finalWithBeatPath in `edits/<id>/`, creatorAudio, captions, endText, postError),
+  `EditPost` (mirrors Post, + `channelId` of the account), Settings editBpm/editVibe/editLength/editAuto/editCreatorAudio. Code: pick
+  `src/lib/edit-pick.ts` (usable = clip pending/approved/posted or no clip yet + downloadable; rank 0.45 score + 0.25 standout vs
+  creator median views + vibe fit +-0.15 + recency + payoff known; dedupe same clip / same VOD or video within 20s; moments of the
+  creator's last 3 edits only when short); beats `scripts/beats.py` (numpy only: spectral flux, autocorrelation 70-180 BPM,
+  Ellis DP, per-beat snap to the waveform attack, line fit for tempo, downbeat = phase with most kick energy, drops = bar energy
+  >= 1.4x the 2 bars before) via `src/lib/beats.ts` (ffmpeg -> 22 kHz s16le, MUSIC_DIR = /music in Docker, `./music:/music:ro`
+  mount, only `music/README.txt` in git); plan `src/lib/edit-plan.ts` (pure: frames at 30 fps, frame(t)=round(30t), slices add up
+  to the grid exactly; bars -> merge/split per vibe; the drop slice starts 1 beat early so the payoff lands ON the drop; hit on
+  each slice's 2nd beat; Hype ramps 0.5x into the hit; Funny freezes the punchline + face punch-ins; Smooth 6-frame xfades centred
+  on cuts; clipedit = whole bars of clip (~5s, 3-8s, <= setup before the payoff) ending exactly on the payoff, drop bar continues
+  from it, then ramp / double hit / other creator hits / freeze replays, creator audio ducked to 0.22 after an 18-frame stab);
+  render `src/lib/edit-render.ts` (per slice: v1.9 layout via `buildFilter` + parts (trim / setpts 2x + framerate / freeze tpad,
+  audio atempo 0.5) -> x264 ultrafast + PCM mkv; then ONE ffmpeg for concat/xfade + zoom/shake (scale eval=frame + crop, all
+  driven by output frame n) + chromashift + eq grade/flash + vignette + ASS, two outputs: final (no music) + beat preview with
+  the song/click and a "DON'T POST THIS ONE" label); layout per moment `src/lib/edit-layout.ts`; worker `src/workers/edit.ts`
+  (queue "edit", concurrency 1, attempts 1; raw files hard-linked into `edits/<id>/` so retention can't break a render; else
+  yt-dlp section 5s before/5s after the payoff, clipedit main 10/8, via `ytdlpArgs`/`ytdlpDownload` split out of the grabber;
+  `runEditAuto` daily scheduler `edit-auto-daily`). Routing = v1.9.5 Channels (no Account.purpose: an earlier
+  2.0 draft had one, dropped in the merge): an edit goes to `channelForClip(channels, {category: "edits"})` = the first non-GTA channel
+  whose kinds include "edits" (ClipFactoryGG). Upload page: `toPostEditItems` (`src/lib/to-post-edits.ts`) puts approved edits in that
+  column (ToPostCard `edit: true`: edit media route, `postEditToAll` / `postEditToAccount` / `markEditPostedToAccount` in
+  `app/edit-actions.ts`, no Move to), `toPostCount` includes them. Poster `runPostEdit` (post job name "edit"): approved only, api
+  YouTube/TikTok of a channel taking Edits only (`editsChannelOf`), credit re-added, single attempt. Edits NEVER auto-post (only the
+  Post buttons on Upload); clip auto-post is v1.9.7's `autoPostTargets`, untouched. Backlog counts processing edits; `sweepStuckEdits` (30 min); retention
+  `cleanEdits(now, windows)` uses the v1.9.4 windows (rejected/failed/pending -> "expired"/approved/posted, halved under pressure;
+  leftovers after the orphan window); the disk guard is the v1.9.4 `freeGb`/`minFreeGb`. UI: `/edits` (MakeEditForm, EditCard with Play with
+  beat + "Post it from Upload"), Nav "Edits" + pending badge, Workroom Edits lane + failed edits in Problems, Settings Edits card,
+  Queue card button `MakeEditFromClip` (separate component); the Edits page can also make a Clip -> Edit from the creator's best
+  clip. Captions = `editCaption` (`src/lib/edit-text.ts`): `brandedCaption` (hook = title, campaign rules apply) + `#edit` on the
+  hashtag line; the v1.9.1 watermark (`watermarkStyle`/`watermarkPlace`) is in `buildEditAss` too. v1.9.8: all edit
+  text inside TEXT_SAFE (centred on TEXT_X, `fitScale`; `EDIT_PLACE` -> `unsafeText` = []), one extra hashtag + #edit (<= 5), the
+  worker stores `Edit.platformInfo` (probeFinal + renderFacts), the Upload card shows/blocks on `platformCheck` and `runPostEdit`
+  refuses a hard fail (`postBlockReason`). Proof in the session scratchpad only (`v200-proof/`). Unverified on
+  real songs, real Twitch footage, yt-dlp sections and Krew's PC.
 - Docker image never built in the sandbox (no daemon); it builds fine on Krew's PC; a clean-copy `npm ci` + `next build` without `.env`
   (what the Dockerfile does) passes.
 - **Suggestions (2026-11-17):** `src/workers/suggest.ts` (queue "suggest", hourly + once ~1 min after start,

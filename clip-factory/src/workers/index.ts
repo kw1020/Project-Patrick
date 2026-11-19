@@ -10,7 +10,8 @@ import { runClipsPoll } from "./clips";
 import { runGrab } from "./grabber";
 import { runCut, runTranscribe } from "./cutter";
 import { runJudge } from "./judge";
-import { migrateLegacySettings, runPost, runStatsSync } from "./poster";
+import { migrateLegacySettings, runPost, runPostEdit, runStatsSync } from "./poster";
+import { runEdit, runEditAuto } from "./edit";
 import { runSpikeCheck } from "./spike";
 import { runYouTubeScan } from "./youtube";
 import { runSuggestScan } from "./suggest";
@@ -36,6 +37,7 @@ function worker(name: keyof typeof QUEUES, concurrency: number, fn: (job: Job) =
     console.log(`[${name}] ${msg}`);
     if (name === "scout" || name === "clips" || name === "judge" || name === "youtube" || name === "suggest" || name === "supreme" || name === "qa") await setStatus(name, true, msg);
     if (name === "post") await setStatus(job.name === "views" ? "stats" : "post", true, msg);
+    if (name === "edit") await setStatus(job.name === "auto" ? "edit_auto" : "edit", true, msg);
     return msg;
   }, { connection: redis(), concurrency });
   w.on("failed", async (job, err) => {
@@ -44,6 +46,17 @@ function worker(name: keyof typeof QUEUES, concurrency: number, fn: (job: Job) =
     if (name === "supreme" || name === "qa") return; // a failed pick or video check never fails the clip
     const clipId = job?.data?.clipId;
     if (name === "post" && job?.name === "views") { await setStatus("stats", false, err.message); return; }
+    const editId = job?.data?.editId;
+    if (name === "post" && editId) {
+      await setStatus("post", false, err.message);
+      await prisma.edit.update({ where: { id: editId }, data: { stage: null, stageAt: new Date(), postError: err.message.slice(0, 1000) } }).catch(() => {});
+      return;
+    }
+    if (name === "edit") {
+      await setStatus(job?.name === "auto" ? "edit_auto" : "edit", false, err.message);
+      if (editId) await prisma.edit.update({ where: { id: editId }, data: { status: "failed", error: err.message.slice(0, 2000) } }).catch(() => {});
+      return;
+    }
     if (name === "post") {
       // A failed upload leaves the clip approved, with the reason shown on its card.
       await setStatus("post", false, err.message);
@@ -83,7 +96,8 @@ async function main() {
     worker("suggest", 1, () => runSuggestScan()),
     worker("supreme", 1, () => runSupreme()), // v1.9.6 Supreme Judge
     worker("qa", 1, (job) => runQa(job.data.clipId)), // v1.9.6 video check
-    worker("post", 1, (job) => (job.name === "views" ? runStatsSync() : runPost(job.data.clipId, job.data.accountId))),
+        worker("post", 1, (job) => (job.name === "views" ? runStatsSync() : job.name === "edit" ? runPostEdit(job.data.editId, job.data.accountId) : runPost(job.data.clipId, job.data.accountId))),
+    worker("edit", 1, (job) => (job.name === "auto" ? runEditAuto() : runEdit(job.data.editId))), // v2.0.0 Edits: one render at a time
   ];
 
   // Scout + Clips poll every 2 minutes (and once right now).
@@ -103,6 +117,9 @@ async function main() {
   // v1.9.6 Supreme Judge: 3 times a day (every 8h; the first run 8h after the scheduler is first made), plus "Pick now".
   const supremeEvery = Number(process.env.SUPREME_INTERVAL_MS || 8 * 3600_000);
   await queue("supreme").upsertJobScheduler("supreme-every", { every: supremeEvery, startDate: Date.now() + 10 * 60_000 }, { name: "supreme", opts: { attempts: 1 } });
+  // v2.0.0: daily edits (Settings "Make a daily edit of each creator"; does nothing while that is off). First run 30 min after the scheduler is made.
+  const day = 24 * 3600_000;
+  await queue("edit").upsertJobScheduler("edit-auto-daily", { every: day, startDate: Date.now() + 30 * 60_000 }, { name: "auto", opts: { attempts: 1 } });
 
   await queue("post").upsertJobScheduler("views-every", { every: 15 * 60_000 }, { name: "views", opts: { attempts: 1 } });
   const stopRetention = startRetention(); // disk retention: now, then hourly
@@ -120,7 +137,7 @@ async function main() {
   }, 5_000);
 
   const heat = setInterval(() => flushChatHeat(chat).catch((e) => console.error("[chat]", e.message)), 10_000);
-  console.log(`Clip Factory workers up: scout + clips every ${every / 1000}s, YouTube scan every 30 min, suggestions hourly, spike check every 5s, grab x2, transcribe, judge x3, cut, post`);
+  console.log(`Clip Factory workers up: scout + clips every ${every / 1000}s, YouTube scan every 30 min, suggestions hourly, spike check every 5s, grab x2, transcribe, judge x3, cut, post, edits (daily auto when on)`);
 
   const shutdown = async () => {
     clearInterval(heat);
