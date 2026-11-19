@@ -97,3 +97,14 @@ export function parseChannelLabel(v: unknown): string | null {
   const t = String(v ?? "").replace(/[\r\n\t]+/g, " ").trim().slice(0, 40);
   return t || null;
 }
+
+/**
+ * v1.9.7: which "post when I approve" accounts an approved clip goes to. channelId undefined = no channels set up (old
+ * behaviour: every auto account); null = the clip has no channel (nothing auto-posts, Krew picks on Upload); else only
+ * the accounts in that channel's slots.
+ */
+export function autoPostTargets<A extends { homeChannelId?: string | null }>(auto: A[], channelId: string | null | undefined): A[] {
+  if (channelId === undefined) return auto;
+  if (channelId === null) return [];
+  return auto.filter((a) => a.homeChannelId === channelId);
+}

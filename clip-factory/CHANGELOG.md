@@ -1,5 +1,10 @@
 # Clip Factory patch notes
 
+## 1.9.7 — 2026-11-19
+- Fix: "Post when I approve" now only posts to the channel the clip belongs to. Before, with all 4 channels connected, one approve could post the same clip to every YouTube.
+- A clip with no channel never auto-posts; pick its channel on Upload first.
+- Switched-off accounts (like a disabled Instagram) never get auto-posts.
+
 ## 1.9.6 — 2026-11-19
 - Supreme Judge: 3 times a day it picks the best clips for each channel and says why. Picks show first on Upload with a star; press Pick now for a fresh line-up.
 - It never picks more than 2 clips of one streamer per channel per day, and puts good campaign clips first.

@@ -263,6 +263,9 @@ original brief is below, and the status section says what's done. Read both befo
   dropped. `fixClip` (Fix it): all suggested fixes in one re-cut (`fixPlan`: no jump cuts / layout / clean / winLength + 2s capped at the raw
   length) via `enqueueCut(..., qaAfter=true)`; status kept. Spend = usage x `src/lib/pricing.ts` (Opus 5.5 added; all input tokens at the input price) recorded per call, refusals
   included. Unverified against the real Claude API (image blocks + structured output on Opus 5.5) and on Krew's PC.
+- **v1.9.7 (2026-11-19): auto-post per channel.** `setClipStatus` approve → `autoPostTargets` (`src/lib/channels.ts`): with channels, only
+  api accounts whose `homeChannelId` = `channelForClip(...)`, not disabled; clip with no channel → nothing; no channels at all → old
+  behaviour. `test/v197.test.ts`. The quality build (better clips/platform rules) moves to 1.9.8.
 - Docker image never built in the sandbox (no daemon); it builds fine on Krew's PC; a clean-copy `npm ci` + `next build` without `.env`
   (what the Dockerfile does) passes.
 - **Suggestions (2026-11-17):** `src/workers/suggest.ts` (queue "suggest", hourly + once ~1 min after start,

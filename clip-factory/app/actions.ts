@@ -13,8 +13,8 @@ import { parseEditStyle, parseJumpCuts, parseLayoutSetting } from "@/lib/edit-st
 import { approvalReasonFromEvidence } from "@/lib/permission";
 import { loginTakenBy } from "@/lib/streamers";
 import { parseCampaignForm, parseChannelName, parseLink } from "@/lib/campaigns";
-import { brandedCaption, captionHashtags, cleanExtras, defaultExtras, defaultTitle, momentGame } from "@/lib/social";
-import { CHANNEL_KINDS, PLATFORM_LABEL, POST_PLATFORMS, donePost, isApiPostingAccount, isPostingAccount, kindsString, parseChannelLabel, parseFocus, parseHandle, slotAccount } from "@/lib/channels";
+import { brandedCaption, captionHashtags, cleanExtras, defaultExtras, defaultTitle, isGta6, momentGame } from "@/lib/social";
+import { autoPostTargets, channelForClip, CHANNEL_KINDS, PLATFORM_LABEL, POST_PLATFORMS, donePost, isApiPostingAccount, isPostingAccount, kindsString, parseChannelLabel, parseFocus, parseHandle, slotAccount } from "@/lib/channels";
 import { approveResolved, DEFAULT_APPROVAL_NOTE, resolveCreators, type ApprovePick, type ApproveResult, type ResolveResult } from "@/lib/creator-lookup";
 
 function refreshAll() {
@@ -166,8 +166,12 @@ export async function setClipStatus(id: string, status: "pending" | "approved" |
   await prisma.clip.update({ where: { id }, data: { status } });
   // Approving is the human sign-off. Accounts set to "post when I approve" get it now.
   if (status === "approved") {
-    const auto = await prisma.account.findMany({ where: { autoPost: true, error: null, mode: "api", platform: { in: ["youtube", "tiktok"] } } });
-    for (const a of auto) await queueUpload(id, a.id);
+    // Only the accounts of THIS clip's channel (v1.9.7): with 4 channels connected, a GTA clip must not go to all 4 YouTubes.
+    const clip = await prisma.clip.findUniqueOrThrow({ where: { id }, include: { moment: true } });
+    const channels = await prisma.channel.findMany({ orderBy: { createdAt: "asc" } });
+    const channel = channelForClip(channels, { channelId: clip.channelId, category: clip.category ?? clip.moment.category, gta: isGta6(momentGame(clip.moment)) });
+    const auto = await prisma.account.findMany({ where: { autoPost: true, error: null, disabled: false, mode: "api", platform: { in: ["youtube", "tiktok"] } } });
+    for (const a of autoPostTargets(auto, channels.length ? channel?.id ?? null : undefined)) await queueUpload(id, a.id);
   }
   refreshAll();
 }
