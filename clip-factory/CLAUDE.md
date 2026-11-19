@@ -438,6 +438,12 @@ original brief is below, and the status section says what's done. Read both befo
   the callback, after `assignHomeChannel`, runs `uploadAfterConnect` (approved only, the account must have landed in the clip's
   channel, then `uploadToChannel` "button" = single attempt + Platform check) and redirects to `/upload?msg=` (shown on Upload).
   Tested against the Google mocks. Unverified: the real Judge filling `channel`, real Google OAuth return to /upload, Krew's PC.
+- **v2.0.7 (2026-11-19): `npm run clip-link`** (`scripts/clip-link.ts`; Krew: "lets get to clipping the Mr. Beast video"):
+  `docker compose exec worker npm run clip-link -- <yt url> [--channel <Channel.id>] m:ss[=funny|gaming] ...` → one youtube Moment per
+  time (vodOffset = the payoff; the grabber takes -25..+20s) + Clip (processing/grab, optional channelId) → `enqueueGrab`. Needs the
+  video's channel as an APPROVED `yt:<channel_id>` Streamer; skips times within 15s of existing moments of that URL. Why: brand-new
+  videos have no heatmap (the scanner skips them for 6h). Cloud sessions can read captions (`yt-dlp --write-auto-subs`) to pick
+  times but can't download video (403 without deno/PO token).
 - Docker image never built in the sandbox (no daemon); it builds fine on Krew's PC; a clean-copy `npm ci` + `next build` without `.env`
   (what the Dockerfile does) passes.
 - **Suggestions (2026-11-17):** `src/workers/suggest.ts` (queue "suggest", hourly + once ~1 min after start,

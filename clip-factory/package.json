@@ -11,6 +11,7 @@
     "db:push": "prisma db push --skip-generate",
     "db:seed-demo": "tsx scripts/seed-demo.ts",
     "doctor": "tsx scripts/doctor.ts",
+    "clip-link": "tsx scripts/clip-link.ts",
     "postinstall": "prisma generate",
     "test": "tsx --test test/*.test.ts",
     "typecheck": "tsc --noEmit"

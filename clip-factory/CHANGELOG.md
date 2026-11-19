@@ -1,5 +1,11 @@
 # Clip Factory patch notes
 
+## 2.0.7 — 2026-11-19
+- New: clip chosen moments of any YouTube video with one command, for brand-new videos that YouTube has no "most replayed" data for yet.
+- Each time you give is the moment itself; Clip Factory takes the build-up before it and the reaction after, then the Judge scores it as usual.
+- Optional: send the clips straight to one channel (for example WantedLevelClips).
+- The video's channel must be an approved creator first, and the clips still wait in the Queue for your approval.
+
 ## 2.0.6 — 2026-11-19
 - An Upload button is now always on approved clips, in the Queue and on the Upload page. If the channel's YouTube is connected it uploads in one click and shows Live on YouTube with the link. If not, it says "Upload to YouTube (connect first)": it signs in to that channel's YouTube and uploads the clip as soon as you're back. A line under it says exactly why a clip can't upload yet.
 - Approve + Upload: approving a clip in the Queue uploads it to its channel's connected YouTube, TikTok and Instagram right away, and the button says what will happen. By-hand accounts still wait on Upload. Turn it off in Settings > Upload.
