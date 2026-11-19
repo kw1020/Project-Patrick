@@ -20,22 +20,28 @@ export const QUEUE_CATS = [
 ] as const;
 export type QueueCat = (typeof QUEUE_CATS)[number]["key"];
 
-export type QueueFilter = { tab: QueueTab; cat: QueueCat; creator: string | null };
+// v2.0.6: `channel` = a Channel id, or "none" for clips with no channel yet; left out = all channels.
+export type QueueFilter = { tab: QueueTab; cat: QueueCat; creator: string | null; channel?: string | null };
 
 /** Read the page's search params; anything unknown falls back to the default. */
-export function parseQueueParams(p: { tab?: string; cat?: string; creator?: string }): QueueFilter {
+export function parseQueueParams(p: { tab?: string; cat?: string; creator?: string; channel?: string }): QueueFilter {
   const tab = QUEUE_TABS.find((x) => x.key === p.tab)?.key ?? "pending";
   const cat = QUEUE_CATS.find((x) => x.key === p.cat)?.key ?? "all";
   const creator = typeof p.creator === "string" && /^[A-Za-z0-9_-]{1,64}$/.test(p.creator) ? p.creator : null;
-  return { tab, cat, creator };
+  const channel = typeof p.channel === "string" && /^[A-Za-z0-9_-]{1,64}$/.test(p.channel) && p.channel !== "all" ? p.channel : null;
+  return { tab, cat, creator, ...(channel ? { channel } : {}) };
 }
 
+/** v2.0.6: the To review tab, best first: Supreme picks, then the Judge's score (unscored last), then newest. */
+export const QUEUE_REVIEW_ORDER: Prisma.ClipOrderByWithRelationInput[] = [{ supremePick: "desc" }, { score: { sort: "desc", nulls: "last" } }, { createdAt: "desc" }];
+
 /** Prisma `where` for the clips shown. `omit` leaves one part out (used for the counts on the tabs). */
-export function queueWhere(f: QueueFilter, omit?: "tab" | "cat"): Prisma.ClipWhereInput {
+export function queueWhere(f: QueueFilter, omit?: "tab" | "cat" | "channel"): Prisma.ClipWhereInput {
   const where: Prisma.ClipWhereInput = {};
   if (omit !== "tab") where.status = f.tab;
   if (omit !== "cat" && f.cat !== "all") where.category = f.cat;
   if (f.creator) where.moment = { streamerId: f.creator };
+  if (omit !== "channel" && f.channel) where.channelId = f.channel === "none" ? null : f.channel;
   return where;
 }
 
@@ -46,6 +52,7 @@ export function queueHref(f: QueueFilter, change: Partial<QueueFilter>) {
   if (n.tab !== "pending") q.set("tab", n.tab);
   if (n.cat !== "all") q.set("cat", n.cat);
   if (n.creator) q.set("creator", n.creator);
+  if (n.channel) q.set("channel", n.channel);
   const s = q.toString();
   return s ? `/queue?${s}` : "/queue";
 }

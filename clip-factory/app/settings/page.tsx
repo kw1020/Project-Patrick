@@ -13,7 +13,7 @@ import { fmtBytes, storageUsage } from "@/lib/storage";
 import { minFreeGb } from "@/lib/guards";
 import { ChannelsCard, type ChannelAccountView } from "@/components/ChannelsCard";
 import { isApiPostingAccount, isPostingAccount } from "@/lib/channels";
-import { ensureChannels } from "@/lib/to-post";
+import { ensureChannels, migrateChannelStyles } from "@/lib/to-post";
 import { twitchConfigured } from "@/lib/twitch";
 import { twitchRedirectUri } from "@/lib/twitch-user";
 import { SUPREME_MODEL } from "@/lib/ai-spend";
@@ -35,6 +35,7 @@ const Code = ({ children }: { children: React.ReactNode }) => <code className="r
 
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ msg?: string; storage?: string }> }) {
   await ensureChannels().catch(() => null);
+  await migrateChannelStyles().catch(() => null); // v2.0.6
   const [{ msg, storage: storageMsg }, s, all, costRows, usage, channels] = await Promise.all([searchParams, getSettings(), prisma.account.findMany({ orderBy: [{ platform: "asc" }, { createdAt: "asc" }], include: { _count: { select: { posts: true } } } }),
     // v1.9.4: what the Judge costs (tokens logged per clip) and what the clips take up on disk.
     prisma.clip.findMany({ where: { judgeTokensIn: { not: null } }, orderBy: { updatedAt: "desc" }, take: 20, select: { judgeTokensIn: true, judgeTokensOut: true } }),
@@ -69,7 +70,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
                 <div className="font-semibold">{a.channelTitle}</div>
                 {a.error ? <div className="text-xs text-red-300">{a.error}</div> : <div className="text-xs text-zinc-500">{a._count.posts} posts{a.platform === "tiktok" ? (a.directPost ? " · posts directly as private (only you see it)" : " · sends drafts to your TikTok inbox") : a.platform === "instagram" ? " · posts Reels" : ""}</div>}
               </div>
-              <label className="flex items-center gap-2 text-sm"><input name="autoPost" type="checkbox" defaultChecked={a.autoPost} className={check} />{a.platform === "tiktok" && !a.directPost ? "Send draft when I approve" : "Post when I approve"}</label>
+              <label className="flex items-center gap-2 text-sm" title={s.approveUploads ? "Not used while \"Approve uploads to the clip's channel\" is on (Settings, Upload): approving already sends it to every connected account of the clip's channel" : undefined}><input name="autoPost" type="checkbox" defaultChecked={a.autoPost} className={check} />{a.platform === "tiktok" && !a.directPost ? "Send draft when I approve" : "Post when I approve"}{s.approveUploads ? <span className="text-xs text-zinc-500">(Approve uploads is on)</span> : null}</label>
               {a.platform === "tiktok" && canDirectPost(a) && (
                 <label className="flex items-center gap-2 text-sm" title="TikTok only allows apps it hasn't approved yet to post as 'only me', and only to accounts set to private. Leave off to keep sending drafts."><input name="directPost" type="checkbox" defaultChecked={a.directPost} className={check} />Post directly (private until TikTok approves the app)</label>
               )}
@@ -127,8 +128,8 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         </form>
       </div>
 
-      <ChannelsCard channels={channels.map((c) => ({ id: c.id, name: c.name, kinds: c.kinds, focus: c.focus }))} accounts={channelAccounts}
-        canConnect={{ youtube: youtubeConfigured(), tiktok: tiktokConfigured(), instagram: instagramConfigured() }} />
+      <ChannelsCard channels={channels.map((c) => ({ id: c.id, name: c.name, kinds: c.kinds, focus: c.focus, editStyle: c.editStyle, layout: c.layout, captionStyle: c.captionStyle }))} accounts={channelAccounts}
+        canConnect={{ youtube: youtubeConfigured(), tiktok: tiktokConfigured(), instagram: instagramConfigured() }} defaults={{ editStyle: s.editStyle, layout: s.layout }} />
 
       <div className="card space-y-3 p-5" id="twitch-connect" data-testid="twitch-connect">
         <Head>Twitch follower counts</Head>
@@ -147,8 +148,14 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
       <form action={saveSettings} className="space-y-6">
         <div className="card space-y-4 p-5" data-testid="branding">
           <Head>Your channel</Head>
-          <Row label="Channel name" hint="Shown in the header and used for the watermark."><input name="channelName" defaultValue={s.channelName} maxLength={30} className="field" /></Row>
-          <Row label="Watermark on new clips" hint={`A small, see-through "@${s.channelName}" in the bottom-right corner. Re-cuts get it too.`}><input name="watermark" type="checkbox" defaultChecked={s.watermark} className={check} /></Row>
+          <Row label="Name in the header" hint="Shown at the top of the dashboard. Clips with no channel use it as their watermark."><input name="channelName" defaultValue={s.channelName} maxLength={30} className="field" /></Row>
+          <Row label="Watermark on new clips" hint={"A small, see-through @name in the corner of each clip: the name of the channel the clip goes to (\"@StreamHeistClips\" on StreamHeistClips clips). Re-cuts get it too."}><input name="watermark" type="checkbox" defaultChecked={s.watermark} className={check} /></Row>
+        </div>
+        <div className="card space-y-4 p-5" data-testid="upload-settings">
+          <Head>Upload</Head>
+          <input type="hidden" name="approveUploadsShown" value="1" />
+          <Row label="Approve uploads to the clip's channel" hint="On: pressing Approve + Upload in the Queue sends the clip straight to every connected account of its channel (its YouTube, TikTok and Instagram; TikTok lands as a draft in its inbox unless you switched on Post directly). Accounts you post to yourself wait on the Upload page with Download + copy caption. Off: approving only uploads to accounts ticked &quot;Post when I approve&quot; above. Edits never upload by themselves."><input name="approveUploads" type="checkbox" defaultChecked={s.approveUploads} className={check} /></Row>
+          <p className="text-xs text-zinc-500">The Judge picks each clip&apos;s channel before it&apos;s cut (GTA 6 clips can go to ViceCityClips, funny ones to StreamHeistClips, big plays to WantedLevelClips; edits only go to ClipFactoryGG), so it&apos;s cut in that channel&apos;s style. Change a clip&apos;s channel with Move to... on the Upload page.</p>
         </div>
         <div className="card space-y-4 p-5" data-testid="what-to-clip">
           <Head>What to clip</Head>
@@ -198,7 +205,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           <Row label="Max clips per creator per hour" hint="Only the best this many of one creator's clips in an hour reach review; near-duplicates of the same moment keep only the best."><input name="maxPerCreatorPerHour" type="number" min="1" max="30" defaultValue={s.maxPerCreatorPerHour} className="field w-32" /></Row>
           <Row label="Min Twitch clip views" hint="Only grab viewer clips with at least this many views."><input name="minClipViews" type="number" defaultValue={s.minClipViews} className="field w-32" /></Row>
           <Row label="Look back (days)" hint="How old a Twitch clip can be (1-30 days)."><input name="clipLookbackDays" type="number" min="1" max="30" defaultValue={Math.max(1, Math.round(s.clipLookbackHrs / 24))} className="field w-32" /></Row>
-          <Row label="Layout" hint="How the wide stream is fitted into the tall video. You can re-cut any clip in another layout from its card in the Queue.">
+          <Row label="Layout" hint="How the wide stream is fitted into the tall video, unless the clip's channel has its own layout. You can re-cut any clip in another layout from its card in the Queue.">
             <div className="space-y-1.5" data-testid="layout-choice">
               {LAYOUTS.map((x) => (
                 <label key={x.key} className="flex items-start gap-2 text-sm">
@@ -208,7 +215,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
               ))}
             </div>
           </Row>
-          <Row label="Editing style" hint="How new clips are edited. You can re-cut any clip in another style from its card in the Queue.">
+          <Row label="Editing style" hint="How new clips are edited, unless their channel has its own style (Channels card above). You can re-cut any clip in another style from its card in the Queue.">
             <div className="space-y-1.5">
               {EDIT_STYLES.map((x) => (
                 <label key={x.key} className="flex items-start gap-2 text-sm">

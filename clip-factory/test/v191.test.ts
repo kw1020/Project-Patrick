@@ -127,7 +127,7 @@ test("captionCredits: the @login line or the old link both count (ClipCard warni
 // ---------- Judge ----------
 test("Judge schema has extra_hashtags (enum of the 4 extras) and the prompt keeps its opening + mentions the caption", async () => {
   const { VerdictSchema, JUDGE_SYSTEM } = await import("../src/lib/judge");
-  const base = { observations: "o", payoff: "p", hook_lands: true, payoff_in_window: true, payoff_at: null, score: 7, hook_text: "h", title: "t", hashtags: [], reason: "r", category: "gaming", best_start: null, best_end: null };
+  const base = { observations: "o", payoff: "p", hook_lands: true, payoff_in_window: true, payoff_at: null, score: 7, hook_text: "h", title: "t", hashtags: [], reason: "r", category: "gaming", channel: "", best_start: null, best_end: null };
   assert.ok(VerdictSchema.safeParse({ ...base, extra_hashtags: ["GTA6Clips", "Gaming"] }).success);
   assert.ok(!VerdictSchema.safeParse({ ...base, extra_hashtags: ["fyp"] }).success);
   assert.ok(JUDGE_SYSTEM.startsWith("You score short clips from streamers and YouTubers"));
@@ -232,9 +232,9 @@ test("watermark: in the ASS of both render paths (styled + plain), every layout,
   // A low hook: the watermark waits until it's gone.
   assert.equal(watermarkPlace({ capY: 1190, hookY: 1250, hookAlign: 8, creditY: 290, creditAlign: 8 }).start, 4.5);
   assert.equal(watermarkPlace(null).start, 0);
-  // The cutter passes Settings.watermark/channelName to both paths.
+  // The cutter passes the watermark to both paths (v2.0.6: the clip's channel name via cutChoices, test/v202.test.ts).
   const cutter = fs.readFileSync(path.join(ROOT, "src", "workers", "cutter.ts"), "utf8");
-  assert.match(cutter, /settings\.watermark \? settings\.channelName : null/);
+  assert.match(cutter, /const watermark = choice\.watermark;/);
   assert.equal((cutter.match(/buildAss\(\{[^}]*watermark \}\)/g) ?? []).length, 2);
   assert.match(cutter, /hook: clip\.hookText \|\| clip\.title, watermark,/);
 });

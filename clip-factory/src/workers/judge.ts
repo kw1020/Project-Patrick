@@ -14,6 +14,7 @@ import { redis, soft } from "../lib/queues";
 import { detectScenes, extractFrames, pickFrameTimes, type JudgeFrame } from "../lib/frames";
 import { CALIBRATION_WINDOW, calibrationNudge } from "../lib/judge-stats";
 import { MAX_SOURCE_SEC, payoffHint } from "./cutter";
+import { judgeChannelList, pickClipChannel } from "../lib/to-post";
 
 /** v1.9.4: the last Judge scores, newest first (Redis list), for the calibration guard. */
 export const RECENT_SCORES_KEY = "cf:judge:recent";
@@ -51,8 +52,10 @@ export async function runJudge(clipId: string) {
 
   const skip = async (why: string) => {
     await prisma.clip.update({ where: { id: clipId }, data: { stage: "cut", stageAt: new Date(), judgeReason: why } });
+    // v2.0.6: an unscored clip still goes to review, so it gets its channel (balanced) before the cut, for that channel's style.
+    const ch = await pickClipChannel(clipId).catch(() => null);
     await enqueueCut(clipId);
-    return `unscored (${why})`;
+    return `unscored (${why})${ch?.channel ? ` → ${ch.channel.name}` : ""}`;
   };
   if (!settings.judgeEnabled) return skip("Judge is switched off in Settings");
 
@@ -99,13 +102,15 @@ export async function runJudge(clipId: string) {
   const calibration = calibrationNudge(await recentScores());
 
   const lessons = settings.judgeLearns ? await buildLessons().catch(() => null) : null;
+  // v2.0.6: the Judge also picks the channel (checked in code after; Krew's own pick is never replaced).
+  const channels = clip.channelId ? null : await judgeChannelList().catch(() => null);
   let verdict;
   try {
     verdict = await judgeClip({
       streamer: streamer.name, game, durationSec: clip.duration ?? 0, source: moment.source === "chat" ? "chat" : moment.source === "youtube" ? "youtube" : "twitch_clip",
       replayScore: moment.source === "youtube" ? moment.spikeScore : undefined,
       sourceTitle: moment.sourceTitle, sourceViews: moment.sourceViews, transcript: clip.transcript, stats, minScore: settings.minScore,
-      category: clip.category ?? moment.category, frames: shot.frames, framesFailed: shot.failed, calibration, audioSummary: heard?.text ?? null,
+      category: clip.category ?? moment.category, frames: shot.frames, framesFailed: shot.failed, calibration, audioSummary: heard?.text ?? null, channels,
       ...(streamer.campaign?.active ? { campaignRules: streamer.campaign.rules, bannedWords: streamer.campaign.bannedWords } : {}),
       ...(sourceLength && win ? { sourceLength, window: win, timedTranscript: timedTranscript(words, 80, marks), lengthRange: { min: settings.clipMinSec, max: settings.clipMaxSec } } : {}),
     }, lessons?.text ?? null);
@@ -159,8 +164,11 @@ export async function runJudge(clipId: string) {
     },
   });
   const rejected = verdict.score < settings.minScore || off;
+  // v2.0.6: clips going to review get their channel now, before the cut (the Judge's pick if it fits the rules, else balanced).
+  const routed = rejected ? null : await pickClipChannel(clipId, verdict.channel).catch((e) => { console.warn(`[judge] ${clipId}: no channel:`, (e as Error).message); return null; });
   await enqueueCut(clipId, rejected ? 10 : 1);
-  return `${streamer.name}: ${verdict.score}/10 ${category}${shot.frames ? ` (saw ${shot.frames.length} frames)` : shot.failed ? " (text only: no frames)" : ""}${calibration ? " (nudged: recent scores too similar)" : ""}${moved ? ` (${flagged && !own ? `window fixed: ${flagged.why}` : "Judge picked"} ${moved.start}-${Math.round((moved.start + moved.length) * 10) / 10}s)` : ""}${off ? ` (${offReason(category).toLowerCase()})` : verdict.score < settings.minScore ? " (below cut-off)" : ""}`;
+  const routeNote = routed?.channel ? ` → ${routed.channel.name}${routed.how === "judge" ? "" : routed.how === "krew" ? " (your pick)" : verdict.channel ? ` (balanced: "${verdict.channel}" didn't fit)` : " (balanced)"}` : "";
+  return `${streamer.name}: ${verdict.score}/10 ${category}${shot.frames ? ` (saw ${shot.frames.length} frames)` : shot.failed ? " (text only: no frames)" : ""}${calibration ? " (nudged: recent scores too similar)" : ""}${moved ? ` (${flagged && !own ? `window fixed: ${flagged.why}` : "Judge picked"} ${moved.start}-${Math.round((moved.start + moved.length) * 10) / 10}s)` : ""}${off ? ` (${offReason(category).toLowerCase()})` : verdict.score < settings.minScore ? " (below cut-off)" : ""}${routeNote}`;
 }
 
 /** Length of the source the words cover (seconds): the raw file's duration, never shorter than the window's end. */

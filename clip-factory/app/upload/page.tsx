@@ -11,6 +11,11 @@ import { budgetLine } from "@/lib/ai-spend";
 import { getStatuses, soft, type AgentStatus } from "@/lib/queues";
 import { ago } from "@/lib/format";
 import { pickNow } from "../actions";
+import { getSettings } from "@/lib/db";
+import { cutChoices, uploadButton } from "@/lib/channels";
+import { youtubeKeysMissing } from "@/lib/youtube";
+import { parsePlatformInfo, platformCheck } from "@/lib/platform-rules";
+import { editStyleLabel } from "@/lib/edit-styles";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +37,17 @@ function view(x: Item): ToPostView {
     })),
     supreme: k.supremePick ? { rank: k.supremeRank, reason: k.supremeReason } : null, // v1.9.6
     platformInfo: k.platformInfo, creditOk: captionCredits(k.caption ?? "", s), qaIssues: parseQa(k.qa)?.issues ?? null, // v1.9.8
+    canRecut: Boolean(k.rawPath && k.words != null && !k.stage), editStyle: k.editStyle, // v2.0.6 Move to... can re-cut
+    // v2.0.6: the always-visible Upload button (connect-first when the channel's YouTube isn't connected).
+    upload: (() => {
+      const pc = platformCheck({ caption: k.caption ?? "", title: k.title, creditOk: captionCredits(k.caption ?? "", s), info: parsePlatformInfo(k.platformInfo), qa: parseQa(k.qa)?.issues ?? null });
+      return uploadButton({
+        clipId: k.id, status: k.status, channel: x.channel, ytKeysMissing: youtubeKeysMissing(), uploading: k.stage === "post",
+        platformFail: pc.fails ? pc.items.filter((i) => i.level === "fail").map((i) => i.text).join("; ") : null,
+        slots: x.rows.map(({ account: a, post }) => ({ platform: a.platform, mode: a.mode, error: a.error, disabled: a.disabled, done: Boolean(post) })),
+      });
+    })(),
+    ytUrl: k.posts.find((p) => p.platform === "youtube" && p.status !== "failed" && p.url)?.url ?? null,
   };
 }
 
@@ -68,11 +84,14 @@ function Slot({ platform, a }: { platform: string; a: Acct | undefined }) {
   );
 }
 
-export default async function UploadPage() {
-  const [{ channels, accounts, items }, budget, statuses, editData] = await Promise.all([toPostItems(), budgetLine(), soft(getStatuses(), {} as Record<string, AgentStatus>), toPostEditItems()]);
+export default async function UploadPage({ searchParams }: { searchParams?: Promise<{ msg?: string }> }) {
+  // v2.0.6: Connect YouTube from a clip's Upload button comes back here with what happened.
+  const msg = (await searchParams)?.msg?.slice(0, 500) ?? null;
+  const [{ channels, accounts, items }, budget, statuses, editData, settings] = await Promise.all([toPostItems(), budgetLine(), soft(getStatuses(), {} as Record<string, AgentStatus>), toPostEditItems(), getSettings()]);
   const editsFor = (channelId: string | null) => editData.items.filter((x) => (x.channel?.id ?? null) === channelId);
   const sup = statuses.supreme; // v1.9.6 Supreme Judge
-  const chans = channels.map((c) => ({ id: c.id, name: c.name }));
+  // v2.0.6: each channel's editing style, for Move to...'s "re-cut it in <channel>'s style?" offer.
+  const chans = channels.map((c) => ({ id: c.id, name: c.name, style: editStyleLabel(cutChoices(c, settings).style) }));
   const noChannel = items.filter((x) => !x.channel);
   const cols = [
     ...channels.map((c) => ({ id: c.id, name: c.name, sub: isGtaFocus(c) ? "GTA 6 · every type" : parseKinds(c.kinds).join(" + ") || "no types ticked", items: items.filter((x) => x.channel?.id === c.id), edits: editsFor(c.id), channel: c })),
@@ -84,13 +103,14 @@ export default async function UploadPage() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">
           <h1 className="text-2xl font-black">Upload</h1>
-          <p className="text-sm text-zinc-400">Approved clips, in the column of the channel they go to. <b>Post to all</b> uploads to the channel&apos;s connected YouTube, TikTok and Instagram; by-hand accounts: Download + copy caption, post it, then Mark posted. Done clips move to Posted.</p>
+          <p className="text-sm text-zinc-400">Approved clips, in the column of the channel they go to. <b>Upload</b> sends it to the channel&apos;s connected YouTube, TikTok and Instagram in one click; by-hand accounts: Download + copy caption, post it, then Mark posted. Done clips move to Posted.{settings.approveUploads ? " (Approving in the Queue already uploads, so most clips only wait here for their by-hand accounts.)" : ""}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <form action={pickNow}><button className="btn-hot text-sm" disabled={budget.over} title={budget.over ? "Today's budget is used" : "Ask the Supreme Judge for today's best clips per channel"}>⭐ Pick now</button></form>
           <Link href="/queue" className="btn-ghost text-sm">Review more in the Queue</Link>
         </div>
       </div>
+      {msg && <div className="rounded-lg bg-emerald-500/15 px-3 py-2 text-sm text-emerald-200 [overflow-wrap:anywhere]" data-testid="upload-msg">{msg}</div>}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-zinc-400" data-testid="supreme-status">
         <span className={budget.over ? "font-bold text-sun" : "font-semibold text-zinc-300"}>{budget.text}</span>
         {sup && <span className={sup.ok ? "" : "text-red-300"}>Last run {ago(sup.at)}: {sup.msg}</span>}

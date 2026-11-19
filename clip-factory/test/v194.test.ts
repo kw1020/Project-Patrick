@@ -262,6 +262,8 @@ test("retention: rejected after 6h, unreviewed after 48h (→ expired), approved
   await resetClips();
   const { prisma } = await import("../src/lib/db");
   const { runRetention } = await import("../src/workers/retention");
+  // v2.0.6: the default is 24h now; this install still has the old 48h.
+  await prisma.settings.upsert({ where: { id: "main" }, update: { retainPendingHrs: 48 }, create: { id: "main", retainPendingHrs: 48 } });
   const rej5 = await make("rej5", "rejected", 5, { final: true });
   const rej7 = await make("rej7", "rejected", 7, { final: true });
   const pend47 = await make("pend47", "pending", 47, { final: true });
@@ -314,7 +316,7 @@ test("retention: the windows come from Settings (Storage card fields)", async ()
   const w = retentionWindows({ retainRejectedHrs: 6, retainPendingHrs: 48, retainApprovedDays: 5, retainPostedDays: 3, retainRawHrs: 6, retainRowsDays: 7 });
   assert.deepEqual(w, { rejected: 6 * H, pending: 48 * H, approved: 5 * D, posted: 3 * D, raw: 6 * H, rows: 7 * D, failed: 24 * H, orphan: 24 * H });
   const half = retentionWindows({}, true);
-  assert.deepEqual(half, { rejected: 3 * H, pending: 24 * H, approved: 2.5 * D, posted: 1.5 * D, raw: 3 * H, rows: 3.5 * D, failed: 12 * H, orphan: 12 * H });
+  assert.deepEqual(half, { rejected: 3 * H, pending: 12 * H, /* v2.0.6 default 24h, halved */ approved: 2.5 * D, posted: 1.5 * D, raw: 3 * H, rows: 3.5 * D, failed: 12 * H, orphan: 12 * H });
   // the form: whole numbers, clamped, blanks = defaults
   const fd = (o: Record<string, string>) => ({ get: (k: string) => o[k] ?? null });
   assert.deepEqual(parseRetentionForm(fd({ retainRejectedHrs: "3", retainPendingHrs: "0", retainApprovedDays: "", retainPostedDays: "2.6", retainRawHrs: "abc", retainRowsDays: "9999" })),
@@ -442,7 +444,7 @@ test("db push upgrade from the v1.9.1 schema (1ac085c) with rows: no prompt, row
   assert.deepEqual(JSON.parse(sql("SELECT id, score, judgeReason, judgeObservations, judgeFrames, judgeTokensIn, judgeTokensOut FROM Clip")),
     [{ id: "c1", score: 6, judgeReason: "meh", judgeObservations: null, judgeFrames: null, judgeTokensIn: null, judgeTokensOut: null }]);
   assert.deepEqual(JSON.parse(sql("SELECT channelName, retainRejectedHrs, retainPendingHrs, retainApprovedDays, retainPostedDays, retainRawHrs, retainRowsDays FROM Settings")),
-    [{ channelName: "MyClips", retainRejectedHrs: 6, retainPendingHrs: 48, retainApprovedDays: 5, retainPostedDays: 3, retainRawHrs: 6, retainRowsDays: 7 }]);
+    [{ channelName: "MyClips", retainRejectedHrs: 6, retainPendingHrs: 24 /* v2.0.6 default; the worker's 48 -> 24 move is the same */, retainApprovedDays: 5, retainPostedDays: 3, retainRawHrs: 6, retainRowsDays: 7 }]);
   assert.deepEqual(JSON.parse(sql("SELECT COUNT(*) AS n FROM Post")), [{ n: 1 }]);
   assert.equal(push(SCHEMA).status, 0, "pushing again is a no-op");
 });

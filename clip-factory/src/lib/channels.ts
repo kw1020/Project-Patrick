@@ -124,10 +124,121 @@ export function balancedChannel<C extends ChannelLite>(channels: C[], clip: { ch
   }
   const first = channelForClip(channels, { ...clip, channelId: null });
   if (!first) return null;
-  const cat = clip.category === "funny" || clip.category === "gaming" || clip.category === "edits" ? clip.category : "gaming";
-  const takes = (c: C) => parseKinds(c.kinds).includes(cat);
-  const pool = channels.filter((c) => takes(c) && (clip.gta || !isGtaFocus(c)));
+  // v2.0.6: the same pool the Judge's pick is checked against (an edits-only channel never gets a plain clip).
+  const pool = clip.category === "edits" ? [first] : channelPool(channels, clip);
   const weight = (c: C) => (clip.gta && isGtaFocus(c) ? 2 : 1);
   const order = (c: C) => (c.id === first.id ? 0 : 1);
   return [...pool].sort((a, b) => (load[a.id] ?? 0) / weight(a) - (load[b.id] ?? 0) / weight(b) || order(a) - order(b))[0] ?? first;
+}
+
+// ---------- v2.0.6: the Judge picks the channel, each channel has its own editing ----------
+
+/** A channel whose only type is Edits (ClipFactoryGG): never gets a plain clip. */
+export function isEditsOnly(c: Pick<ChannelLite, "kinds">) {
+  const k = parseKinds(c.kinds);
+  return k.length > 0 && k.every((x) => x === "edits");
+}
+
+/**
+ * The channels a clip may go to (the same rules as balancedChannel): it takes the clip's type (funny | gaming), and a GTA-focus
+ * channel only gets GTA 6 clips. Edits-only channels never take a plain clip.
+ */
+export function channelPool<C extends ChannelLite>(channels: C[], clip: { category?: string | null; gta?: boolean }): C[] {
+  const cat = clip.category === "funny" || clip.category === "gaming" ? clip.category : "gaming";
+  return channels.filter((c) => parseKinds(c.kinds).includes(cat) && !isEditsOnly(c) && (clip.gta || !isGtaFocus(c)));
+}
+
+/** One plain line about a channel for the Judge (from its focus + types, so a renamed or new channel still describes itself). */
+export function channelBlurb(c: Pick<ChannelLite, "kinds" | "focus">): string {
+  const k = parseKinds(c.kinds).filter((x) => x !== "edits");
+  if (isEditsOnly(c)) return "edits only (beat-synced montages); never give it a plain clip";
+  if (isGtaFocus(c)) return `GTA 6 anything (${k.join(" or ") || "any type"}); never a clip from another game`;
+  if (k.includes("funny") && !k.includes("gaming")) return "funny streamer moments from any game or Just Chatting: laughs, banter, reactions, fails";
+  if (k.includes("gaming") && !k.includes("funny")) return "big plays and clutches from any game: chases, insane moves, wins";
+  return `${k.join(" and ") || "no"} clips from any game`;
+}
+
+const normName = (s: string | null | undefined) => String(s ?? "").toLowerCase().replace(/^@+/, "").replace(/[^a-z0-9]/g, "");
+
+/**
+ * The Judge's channel pick, checked in code: it must name (or be the id of) a channel in `channelPool` for this clip. Anything
+ * else (unknown name, the GTA channel for a non-GTA clip, an edits-only channel, empty) → null, and the caller balances instead.
+ */
+export function validChannelPick<C extends ChannelLite>(channels: C[], clip: { category?: string | null; gta?: boolean }, pick: string | null | undefined): C | null {
+  const p = normName(pick);
+  if (!p) return null;
+  return channelPool(channels, clip).find((c) => c.id === pick || normName(c.name) === p) ?? null;
+}
+
+export type ChannelStyle = { name?: string | null; editStyle?: string | null; layout?: string | null; captionStyle?: string | null };
+/** "" / unknown → null (= use the global Settings value). */
+export function parseChannelStyle(v: unknown): "hype" | "clean" | "meme" | null {
+  return v === "hype" || v === "clean" || v === "meme" ? v : null;
+}
+export function parseChannelLayout(v: unknown): "auto" | "split" | "fullcam" | "blur" | null {
+  return v === "auto" || v === "split" || v === "fullcam" || v === "blur" ? v : null;
+}
+
+/**
+ * v2.0.6: how the Cutter renders a clip: its channel's style (null fields = the global Settings); a Re-cut choice wins.
+ * The watermark is the clip's channel name (Settings.channelName only when the clip has no channel); none when Settings has it
+ * off. The channel's caption style only applies when the editing style wasn't picked by hand in Re-cut.
+ */
+export function cutChoices(channel: ChannelStyle | null, s: { editStyle: string; layout: string; watermark: boolean; channelName: string }, over: { style?: string; layout?: string } = {}) {
+  const style = parseChannelStyle(over.style) ?? parseChannelStyle(channel?.editStyle) ?? parseChannelStyle(s.editStyle) ?? "hype";
+  return {
+    style,
+    captionStyle: over.style ? null : parseChannelStyle(channel?.captionStyle),
+    layout: over.layout ?? parseChannelLayout(channel?.layout) ?? s.layout,
+    watermark: s.watermark ? (channel?.name || s.channelName || null) : null,
+  };
+}
+
+/** An account that Upload / approve sends to by itself: API YouTube/TikTok/Instagram (v2.0.3), switched on, login working. */
+export const isAutoUploadAccount = (a: Pick<AccountLite, "platform" | "mode" | "error"> & { disabled?: boolean | null }) => isApiPostingAccount(a) && !a.disabled && !a.error;
+
+/**
+ * v2.0.6 (Krew: "a button for YouTube that says upload and just uploads it"): what the always-visible Upload button does for a
+ * clip, and the plain-English blocker for the "Why can't I upload?" line. kind:
+ * upload = one click uploads every connected account of the channel; connect = YouTube isn't connected (or its login broke):
+ * the button goes to Connect YouTube for the clip's channel and uploads when it comes back (`href`); keys = the .env lines are
+ * missing; blocked = not approved / no channel / Platform check fail / YouTube switched off; done = already on YouTube.
+ * `restNow` = other connected accounts (TikTok, Instagram) that could upload right away.
+ */
+export type UploadButtonState = { kind: "upload" | "connect" | "keys" | "blocked" | "done"; label: string; href?: string; why: string | null; restNow: number };
+export type UploadSlot = { platform: string; mode?: string | null; error?: string | null; disabled?: boolean | null; done: boolean };
+export function uploadButton(o: {
+  clipId: string; status: string; channel: { id: string; name: string } | null; slots: UploadSlot[];
+  ytKeysMissing: string[]; platformFail: string | null; uploading?: boolean;
+}): UploadButtonState {
+  const label = (l: string) => (o.uploading ? "Uploading…" : l);
+  const auto = (s: UploadSlot) => isAutoUploadAccount({ platform: s.platform, mode: s.mode ?? "api", error: s.error ?? null, disabled: s.disabled });
+  if (!o.channel) return { kind: "blocked", label: "Upload", why: "It has no channel yet: use Move to… to pick one.", restNow: 0 };
+  if (o.status !== "approved" && o.status !== "posted") return { kind: "blocked", label: "Upload", why: "Approve it first.", restNow: 0 };
+  if (o.platformFail) return { kind: "blocked", label: "Upload", why: `The Platform check failed: ${o.platformFail}`, restNow: 0 };
+  const yt = o.slots.find((s) => s.platform === "youtube") ?? null;
+  const rest = o.slots.filter((s) => s.platform !== "youtube" && !s.done && auto(s)).length;
+  if (yt && !yt.done && !yt.disabled && auto(yt)) return { kind: "upload", label: label("Upload"), why: null, restNow: rest };
+  if (yt?.done) return rest ? { kind: "upload", label: label("Upload"), why: null, restNow: rest } : { kind: "done", label: "Live on YouTube ✓", why: null, restNow: 0 };
+  if (yt?.disabled) {
+    const why = `${o.channel.name}'s YouTube is switched off (Settings → Channels → Turn on).`;
+    return rest ? { kind: "upload", label: label("Upload"), why, restNow: rest } : { kind: "blocked", label: "Upload", why, restNow: 0 };
+  }
+  if (o.ytKeysMissing.length) {
+    return { kind: "keys", label: "Upload to YouTube (keys missing)", why: `YouTube isn't set up: add ${o.ytKeysMissing.join(" and ")} to .env, then restart Clip Factory.`, restNow: rest };
+  }
+  const href = `/api/youtube/connect?channel=${encodeURIComponent(o.channel.id)}&then=${encodeURIComponent(`upload:${o.clipId}`)}`;
+  if (yt && yt.mode !== "manual" && yt.error) {
+    return { kind: "connect", label: label("Reconnect + upload"), href, why: `${o.channel.name}'s YouTube login stopped working (${yt.error.slice(0, 120)}). The button signs in again, then uploads.`, restNow: rest };
+  }
+  return { kind: "connect", label: label("Upload to YouTube (connect first)"), href, why: `${o.channel.name}'s YouTube isn't connected yet${yt ? " (it's a by-hand handle)" : ""}. The button connects it, then uploads.`, restNow: rest };
+}
+
+/** v2.0.6 button text: "YouTube + TikTok now, Instagram by hand" (disabled accounts are left out). */
+export function uploadSummary(rows: { platform: string; auto: boolean }[]): string {
+  const now = rows.filter((r) => r.auto).map((r) => PLATFORM_LABEL[r.platform] ?? r.platform);
+  const hand = rows.filter((r) => !r.auto).map((r) => PLATFORM_LABEL[r.platform] ?? r.platform);
+  if (!now.length && !hand.length) return "no accounts yet";
+  if (!now.length) return `${hand.join(" + ")} by hand`;
+  return `${now.join(" + ")} now${hand.length ? `, ${hand.join(" + ")} by hand` : ""}`;
 }

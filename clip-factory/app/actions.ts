@@ -13,10 +13,10 @@ import { parseEditStyle, parseJumpCuts, parseLayoutSetting } from "@/lib/edit-st
 import { approvalReasonFromEvidence } from "@/lib/permission";
 import { loginTakenBy } from "@/lib/streamers";
 import { parseCampaignForm, parseChannelName, parseLink } from "@/lib/campaigns";
-import { brandedCaption, captionCredits, captionHashtags, cleanExtras, defaultExtras, defaultTitle, isGta6, momentGame } from "@/lib/social";
-import { parsePlatformInfo, platformCheck } from "@/lib/platform-rules";
-import { assignChannels } from "@/lib/to-post";
-import { autoPostTargets, channelForClip, CHANNEL_KINDS, PLATFORM_LABEL, POST_PLATFORMS, donePost, isApiPostingAccount, isPostingAccount, kindsString, parseChannelLabel, parseFocus, parseHandle, slotAccount } from "@/lib/channels";
+import { brandedCaption, captionHashtags, cleanExtras, defaultExtras, defaultTitle, momentGame } from "@/lib/social";
+import { assignChannels, uploadOnApprove, uploadToChannel } from "@/lib/to-post";
+import { cleanUpQueue } from "@/lib/queue-clean";
+import { CHANNEL_KINDS, parseChannelLayout, parseChannelStyle, PLATFORM_LABEL, POST_PLATFORMS, donePost, isApiPostingAccount, isPostingAccount, kindsString, parseChannelLabel, parseFocus, parseHandle, slotAccount } from "@/lib/channels";
 import { parseBpm, parseLength, parseVibe } from "@/lib/edit-vibes";
 import { approveResolved, DEFAULT_APPROVAL_NOTE, resolveCreators, type ApprovePick, type ApproveResult, type ResolveResult } from "@/lib/creator-lookup";
 
@@ -167,17 +167,21 @@ export async function updateClipText(id: string, title: string, caption: string)
 
 export async function setClipStatus(id: string, status: "pending" | "approved" | "rejected") {
   await prisma.clip.update({ where: { id }, data: { status } });
-  // Approving is the human sign-off. Accounts set to "post when I approve" get it now.
+  // Approving is the human sign-off. v2.0.6: with Settings "Approve uploads" on (default) it uploads to every connected account
+  // of the clip's channel (its YouTube + TikTok + Instagram; by-hand ones wait on Upload). Off = the per-account "Post when
+  // I approve" ticks (v1.9.7: only accounts of THIS clip's channel, so a GTA clip never goes to all 4 YouTubes).
   if (status === "approved") {
-    // Only the accounts of THIS clip's channel (v1.9.7): with 4 channels connected, a GTA clip must not go to all 4 YouTubes.
-    await assignChannels([id]); // v2.0.1: spread over all channels (saved on Clip.channelId)
-    const clip = await prisma.clip.findUniqueOrThrow({ where: { id }, include: { moment: true } });
-    const channels = await prisma.channel.findMany({ orderBy: { createdAt: "asc" } });
-    const channel = channelForClip(channels, { channelId: clip.channelId, category: clip.category ?? clip.moment.category, gta: isGta6(momentGame(clip.moment)) });
-    const auto = await prisma.account.findMany({ where: { autoPost: true, error: null, disabled: false, mode: "api", platform: { in: [...POST_PLATFORMS] } } }); // v2.0.3: + Instagram
-    for (const a of autoPostTargets(auto, channels.length ? channel?.id ?? null : undefined)) await queueUpload(id, a.id);
+    await assignChannels([id]); // v2.0.1: a clip that still has no channel gets one (saved on Clip.channelId)
+    await uploadOnApprove(id);
   }
   refreshAll();
+}
+
+/** v2.0.6 Queue "Clean up queue": pending clips below the min score or never scored → rejected. Returns how many. */
+export async function cleanUpQueueNow(): Promise<number> {
+  const n = await cleanUpQueue();
+  refreshAll();
+  return n;
 }
 
 async function queueUpload(clipId: string, accountId: string) {
@@ -338,6 +342,8 @@ export async function saveSettings(form: FormData) {
       // v1.9.1 branding. An old form without the field keeps the name.
       ...(form.get("channelName") != null ? { channelName: parseChannelName(form.get("channelName")) } : {}),
       watermark: form.get("watermark") === "on",
+      // v2.0.6: only when the form has the Upload card (an older form can't switch it off by leaving it out).
+      ...(form.get("approveUploadsShown") != null ? { approveUploads: form.get("approveUploads") === "on" } : {}),
       // v1.9.6 Supreme Judge (an old form without the fields keeps the values).
       ...(form.get("supremePerChannel") != null ? { supremePerChannel: Math.round(n("supremePerChannel", 1, 20, 5)) } : {}),
       ...(form.get("supremeDailyDollars") != null ? { supremeDailyCents: Math.round(n("supremeDailyDollars", 0, 50, 0.25) * 100) } : {}),
@@ -391,7 +397,13 @@ export async function saveChannel(id: string, form: FormData) {
   const name = parseChannelLabel(form.get("name"));
   await prisma.channel.update({
     where: { id },
-    data: { ...(name ? { name } : {}), ...(form.get("focus") != null ? { focus: parseFocus(form.get("focus")) } : {}), kinds: readKinds(form).join(",") },
+    data: {
+      ...(name ? { name } : {}), ...(form.get("focus") != null ? { focus: parseFocus(form.get("focus")) } : {}), kinds: readKinds(form).join(","),
+      // v2.0.6 per-channel editing ("" = use the Settings default). An older form without the fields keeps them.
+      ...(form.get("editStyle") != null ? { editStyle: parseChannelStyle(form.get("editStyle")) } : {}),
+      ...(form.get("layout") != null ? { layout: parseChannelLayout(form.get("layout")) } : {}),
+      ...(form.get("captionStyle") != null ? { captionStyle: parseChannelStyle(form.get("captionStyle")) } : {}),
+    },
   });
   refreshAll();
 }
@@ -454,29 +466,31 @@ export async function setAccountChannel(accountId: string, channelId: string) {
  * By-hand accounts are left for the Download + copy caption → Mark posted checklist. Refuses clips that aren't approved.
  */
 export async function postToAll(clipId: string, channelId: string): Promise<{ queued: string[]; byHand: string[] }> {
-  const clip = await prisma.clip.findUniqueOrThrow({ where: { id: clipId }, include: { posts: true, moment: { include: { streamer: true } } } });
-  if (clip.status !== "approved" && clip.status !== "posted") throw new Error("Approve the clip first");
-  // v1.9.8: a hard fail in the Platform check blocks Post to all (plain-English reasons; the Poster checks per platform too).
-  const pc = platformCheck({ caption: clip.caption || clip.title || "", title: clip.title, creditOk: captionCredits(clip.caption || "", clip.moment.streamer), info: parsePlatformInfo(clip.platformInfo) });
-  if (pc.fails) throw new Error(`Not posted. ${pc.items.filter((i) => i.level === "fail").map((i) => i.text).join("; ")}`);
-  const accounts = await prisma.account.findMany({ where: { homeChannelId: channelId, platform: { in: [...POST_PLATFORMS] } }, orderBy: { createdAt: "asc" } });
-  const slots = POST_PLATFORMS.map((p) => slotAccount(accounts, channelId, p)).filter((a): a is (typeof accounts)[number] => Boolean(a));
-  const queued: string[] = [], byHand: string[] = [];
-  for (const a of slots) {
-    if (a.disabled || donePost(clip.posts, a.id)) continue; // disabled (e.g. Instagram banned it): skipped
-    const label = `${PLATFORM_LABEL[a.platform]} ${a.handle ?? a.channelTitle ?? ""}`.trim();
-    if (isApiPostingAccount(a) && !a.error) { await queueUpload(clipId, a.id); queued.push(label); }
-    else byHand.push(label);
-  }
+  // v2.0.6: the "Upload" button; the same code as Approve + Upload (src/lib/to-post.ts uploadToChannel).
+  const { queued, byHand } = await uploadToChannel(clipId, channelId, "button");
   refreshAll();
   return { queued, byHand };
 }
 
-/** Upload: send this clip to another channel ("" = back to automatic, by its category). */
-export async function setClipChannel(clipId: string, channelId: string) {
+/**
+ * Upload / Queue "Move to…": send this clip to another channel ("" = back to automatic, by its category). v2.0.6: with
+ * `recut` (Krew said yes to "re-cut it in <channel>'s style?") and the raw video still there, it is cut again with the new
+ * channel's editing style + watermark (status kept). Returns whether a re-cut was queued.
+ */
+export async function setClipChannel(clipId: string, channelId: string, recut = false): Promise<{ recut: boolean }> {
   if (channelId && !(await prisma.channel.findUnique({ where: { id: channelId } }))) throw new Error("That channel was deleted");
   await prisma.clip.update({ where: { id: clipId }, data: { channelId: channelId || null } });
+  let queued = false;
+  if (recut) {
+    const clip = await prisma.clip.findUnique({ where: { id: clipId } });
+    if (clip?.rawPath && clip.words != null && clip.stage == null && clip.status !== "processing") {
+      await prisma.clip.update({ where: { id: clipId }, data: { stage: "cut", stageAt: new Date(), error: null } });
+      await enqueueCut(clipId, 1); // no style override: the cutter uses the clip's (new) channel style
+      queued = true;
+    }
+  }
   refreshAll();
+  return { recut: queued };
 }
 
 /**

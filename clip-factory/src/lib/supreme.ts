@@ -18,6 +18,8 @@ export type ClipSummary = {
   id: string; creator: string; creatorId: string; category: string | null; game: string | null; score: number | null; reason: string | null; hook: string | null;
   standout: number | null; ageHours: number; length: number | null; campaign: string | null; layout: string | null; style: string | null;
   status: string; autoChannelId: string | null; qa: "ok" | "issues" | "unchecked";
+  /** v2.0.6: Clip.channelId is set (the Judge or Krew chose it): the clip may only be picked for that channel. */
+  channelSet?: boolean;
 };
 export type ChannelContext = {
   id: string; name: string; focus: string; kinds: string; postsToday: number; want: number;
@@ -37,7 +39,7 @@ export function renderSupremeInput(channels: ChannelContext[], clips: ClipSummar
     `- id=${k.id}`, `creator="${k.creator}"`, `type=${k.category ?? "?"}`, `game="${cut(k.game, 40) || "?"}"`, `score=${k.score ?? "unscored"}`,
     `standout=${k.standout != null ? `${Math.round(k.standout * 10) / 10}x` : "?"}`, `age=${Math.round(k.ageHours)}h`, `length=${k.length != null ? Math.round(k.length) : "?"}s`,
     `status=${k.status}`, `campaign=${k.campaign ? `"${cut(k.campaign, 40)}"` : "none"}`, `layout=${k.layout ?? "?"}/${k.style ?? "plain"}`,
-    `auto_channel=${k.autoChannelId ?? "none"}`, `video_check=${k.qa}`, `hook="${cut(k.hook, 70)}"`, `judge="${cut(k.reason, 160)}"`,
+    k.channelSet && k.autoChannelId ? `channel=${k.autoChannelId}(set)` : `auto_channel=${k.autoChannelId ?? "none"}`, `video_check=${k.qa}`, `hook="${cut(k.hook, 70)}"`, `judge="${cut(k.reason, 160)}"`,
   ].join(" "));
   return ["<channels>", ...ch, "</channels>", "", `<clips count="${clips.length}">`, ...cl, "</clips>", "",
     "For each channel, pick up to picks_wanted clips, best first, with a one-line reason each."].join("\n");
@@ -84,6 +86,7 @@ export function enforcePicks(answer: SupremeAnswer | null, channels: ChannelCont
       const k = byId.get(p.clip_id);
       if (!k) { dropped.push(`unknown clip ${p.clip_id}`); continue; }
       if (used.has(k.id)) { dropped.push(`${k.id}: already picked for another channel`); continue; }
+      if (k.channelSet && k.autoChannelId && k.autoChannelId !== c.id) { dropped.push(`${k.id}: belongs to channel ${k.autoChannelId}`); continue; }
       if (k.qa === "issues") { dropped.push(`${k.id}: video check found problems`); continue; }
       if (rank >= Math.min(perChannel, c.want)) { dropped.push(`${k.id}: over ${c.name}'s limit`); continue; }
       if ((perCreator[k.creatorId] ?? 0) >= MAX_PER_CREATOR_PER_DAY) { dropped.push(`${k.id}: 3rd ${k.creator} clip for ${c.name} today`); continue; }

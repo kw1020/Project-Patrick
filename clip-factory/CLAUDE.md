@@ -400,6 +400,44 @@ original brief is below, and the status section says what's done. Read both befo
   punches only on drop + freezes; smooth no drifts; clipedit no beat pulses). **Measured here (4 cores):** a 54.5s Top 5 from 5 1280x720
   fixtures rendered in 47s (entries ~5s each, final encode ~22s). Proof contact sheets in the session scratchpad only. Unverified on real
   Twitch footage/webcams, real Judge data and Krew's PC.
+- **v2.0.6 (2026-11-19, built as "2.0.2" on v2.0.1, then 2.0.4 on v2.0.3, rebased onto v2.0.5 adfefea): the Judge picks the channel, per-channel editing,
+  Approve = Upload, queue clean-up** (Krew: "the scout and the judge just determines what channel it should go to", "each channel have
+  different editing", "when I approve it, I want it to go on all of them" = every connected account of the clip's ONE channel, "a
+  button that says upload", then "so many queued piled up"). Schema additive (`test/v206.test.ts` pushes from the adfefea schema
+  with rows; `toV205Schema` in `test/schema-v173.ts`, the older ones chain through it): `Channel.editStyle/layout/captionStyle`
+  (null = Settings), Settings `approveUploads` (true), `migratedChannelStyles`, `migratedQueueCleanup`, `migratedPending24`;
+  `retainPendingHrs` default 48 -> 24. **Routing** (`src/lib/channels.ts`): `channelPool` (takes the type, GTA-focus = GTA clips only,
+  edits-only never a plain clip; `balancedChannel` uses it), `channelBlurb`, `validChannelPick` (name/id, case-insensitive). The
+  Judge's zod schema has `channel: z.string()` (plain string so the schema is fixed; same call shape) and its user message ends
+  with "Krew's channels" (name, blurb, focus, types, clips in 24h from `channelLoad` = processing/pending/approved/posted by
+  channel). `pickClipChannel` (`src/lib/to-post.ts`): Krew's pick stays, else the valid Judge pick, else balanced; saved on
+  Clip.channelId in `runJudge` for clips going to review (and for unscored ones), NOT for gate/low-score rejects; the Cutter
+  assigns one for a review-bound clip that still has none. **Editing** `cutChoices(channel, settings, override)`: Re-cut choice >
+  channel > Settings; watermark = channel name (Settings.channelName only without a channel); `captionStyle` = another style's
+  caption look (`buildStyledAss` `C = STYLES[captionStyle ?? style].cap`), ignored when Re-cut picks a style. Edits'
+  watermark = the edits channel's name. Seeds: ViceCityClips = Settings.editStyle at migration (hype by default), StreamHeistClips
+  meme, WantedLevelClips clean, ClipFactoryGG none, layouts null (= Auto); `migrateChannelStyles` (worker start + Settings page)
+  only fills seeded ids still null. Channels card selects (Same as Settings / style; layout; captions). `setClipChannel(id, ch,
+  recut)`: Upload's Move to... asks (window.confirm) and re-cuts with NO style override. **Upload** `uploadToChannel(clip, channel,
+  "button"|"approve")` = every `isAutoUploadAccount` slot (api YouTube/TikTok/Instagram, not disabled, no error), single attempt;
+  Platform check hard fail: button throws "Not posted. ...", approve stores `postError` "Not uploaded. Platform check failed: ..."
+  (clip stays approved). `uploadOnApprove`: approveUploads on → uploadToChannel; off → v1.9.7 autoPost accounts of the channel.
+  `postToAll` = uploadToChannel. Queue: channel chip, `?channel=<id>|none` chips (`queueWhere` channelId), "Approve + Upload to X"
+  + `uploadSummary` line, Upload button on approved clips, notYet buttons only for the clip's channel. Supreme: `channelSet`
+  clips only for their channel (`enforcePicks`). **Clean-up** (`src/lib/queue-clean.ts`): `cleanUpQueue` = pending with score <
+  minScore or null → rejected, judgeReason "Cleaned up: below the new bar" (retention deletes files 6h later);
+  `migrateV206Settings` (worker start, after the v1.9.8 minScore move) runs it once + moves retainPendingHrs 48 -> 24 once; Queue
+  "Clean up queue (N)" button (`CleanUpQueue`, two-step) = `cleanUpQueueNow`. To review order `QUEUE_REVIEW_ORDER`: Supreme
+  picks, score (null last), newest. **Always-visible Upload button** (Krew, 3 times: "a button for YouTube that says upload"):
+  `uploadButton` (`src/lib/channels.ts`, pure) → kind upload (YouTube slot api + ok: `postToAll`) | connect ("Upload to YouTube
+  (connect first)" / "Reconnect + upload" when the api account has an error; href `/api/youtube/connect?channel=<id>&then=
+  upload:<clipId>`) | keys (`youtubeKeysMissing()` .env lines) | blocked (not approved / no channel / Platform check fail /
+  YouTube switched off) | done ("Live on YouTube ✓" + link); `restNow` = other connected accounts that can go now; `why` = the
+  "Why can't I upload?" line. `src/components/UploadButton.tsx` on approved Queue cards (`ClipView.upload/ytUrl`) and Upload
+  cards (clips only; edits keep their Post to all). Connect route stores `cf_then` = "upload:<id>" (600s, next to cf_channel);
+  the callback, after `assignHomeChannel`, runs `uploadAfterConnect` (approved only, the account must have landed in the clip's
+  channel, then `uploadToChannel` "button" = single attempt + Platform check) and redirects to `/upload?msg=` (shown on Upload).
+  Tested against the Google mocks. Unverified: the real Judge filling `channel`, real Google OAuth return to /upload, Krew's PC.
 - Docker image never built in the sandbox (no daemon); it builds fine on Krew's PC; a clean-copy `npm ci` + `next build` without `.env`
   (what the Dockerfile does) passes.
 - **Suggestions (2026-11-17):** `src/workers/suggest.ts` (queue "suggest", hourly + once ~1 min after start,

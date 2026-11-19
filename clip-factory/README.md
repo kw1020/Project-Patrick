@@ -214,11 +214,13 @@ window** (not the Clip Factory app window: step 9 needs the address bar).
    paste it in the **Connecting Instagram?** box at the top → **Finish connecting**. (Or just change `https` to `http` at the
    start of that address and press Enter.) Settings says "Connected @yourbrand". The by-hand entry in that slot is replaced
    by the connected account; posts you marked by hand stay.
-10. Settings → **Connected posting accounts** → tick **Post when I approve** on the Instagram account → Save. Repeat
+10. Since v2.0.6 nothing else is needed: with Settings → Upload → **Approve uploads to the clip's channel** on (the default),
+    approving uploads to every connected account of the clip's channel. (With it off, tick **Post when I approve** on the
+    Instagram account instead.) Repeat
     steps 8-10 for each brand.
 
 Then: Approve a clip and it posts to its channel's Instagram too (and Upload has **Post to Instagram**; Post to all includes
-it). A Reel takes a minute or two (Instagram processes the video first). Each upload is tried once, so it's never posted
+it; since v2.0.6 it is the big **Upload** button). A Reel takes a minute or two (Instagram processes the video first). Each upload is tried once, so it's never posted
 twice. Views, likes and comments update every 15 minutes on Posted and Analytics.
 
 Good to know (Meta's docs, 2026-11-19): at most **100 posts a day per account** through apps; captions max 2200 characters,

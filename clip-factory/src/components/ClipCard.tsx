@@ -9,6 +9,8 @@ import type { QaResult } from "../lib/qa";
 import { parsePlatformInfo, platformCheck } from "../lib/platform-rules";
 import { PlatformCheckBox } from "./PlatformCheckBox";
 import { MakeEditFromClip } from "./MakeEditFromClip";
+import { UploadButton } from "./UploadButton";
+import type { UploadButtonState } from "../lib/channels";
 
 export type ClipView = {
   id: string; status: string; stage: string | null; error: string | null; title: string; caption: string;
@@ -26,13 +28,17 @@ export type ClipView = {
   posts: { platform: string; accountId: string | null; status: string; url: string | null; error: string | null }[]; postError: string | null;
   supreme?: { rank: number | null; reason: string | null; channel: string | null } | null; // v1.9.6 Supreme Judge pick
   qa?: QaResult | null; // v1.9.6 video check
+  // v2.0.6: the channel it goes to (set = chosen by the Judge or Krew), what Upload does there, and what's still to do.
+  channel?: { id: string; name: string; color?: string | null; set: boolean; plan: string; autoLeft: number; handLeft: number } | null;
+  upload?: UploadButtonState; // v2.0.6: the always-visible Upload button's state + "Why can't I upload?"
+  ytUrl?: string | null; // v2.0.6: the YouTube link once it's live
 };
-export type AccountView = { id: string; platform: string; label: string; autoPost: boolean; privacy: string };
+export type AccountView = { id: string; platform: string; label: string; autoPost: boolean; privacy: string; homeChannelId?: string | null };
 
 const STAGE: Record<string, string> = { grab: "Grabbing video…", transcribe: "Transcribing…", judge: "The Judge is scoring it…", cut: "Cutting + captioning…" };
 const PLATFORM: Record<string, string> = { youtube: "YouTube", tiktok: "TikTok", instagram: "Reels" };
 
-export function ClipCard({ clip, accounts }: { clip: ClipView; accounts: AccountView[] }) {
+export function ClipCard({ clip, accounts, approveUploads = false }: { clip: ClipView; accounts: AccountView[]; approveUploads?: boolean }) {
   const [title, setTitle] = useState(clip.title);
   const [caption, setCaption] = useState(clip.caption);
   const [saved, setSaved] = useState(true);
@@ -41,10 +47,18 @@ export function ClipCard({ clip, accounts }: { clip: ClipView; accounts: Account
   const [recutStyle, setRecutStyle] = useState<string>(parseEditStyle(clip.editStyle));
   const [recutLayout, setRecutLayout] = useState<string>(clip.layout === "facecam" ? "split" : clip.layout ?? "auto");
   const [recutJumps, setRecutJumps] = useState(true);
+  const [upMsg, setUpMsg] = useState<string | null>(null);
+  const [upErr, setUpErr] = useState<string | null>(null);
   const dirty = title !== clip.title || caption !== clip.caption;
 
   const save = () => { if (dirty || !saved) start(async () => { await updateClipText(clip.id, title, caption); setSaved(true); }); };
-  const act = (fn: () => Promise<unknown>) => start(async () => { if (dirty) await updateClipText(clip.id, title, caption); await fn(); });
+  const act = (fn: () => Promise<unknown>) => start(async () => {
+    setUpMsg(null); setUpErr(null);
+    try { if (dirty) await updateClipText(clip.id, title, caption); await fn(); } catch (e) { setUpErr((e as Error).message); }
+  });
+  const ch = clip.channel ?? null;
+  // v2.0.6: Approve uploads to every connected account of the clip's channel (Settings -> Upload).
+  const approveLabel = approveUploads && ch ? `Approve + Upload to ${ch.name}` : null;
   const copy = async () => {
     await navigator.clipboard.writeText(caption);
     setCopied(true); setTimeout(() => setCopied(false), 1500);
@@ -77,6 +91,7 @@ export function ClipCard({ clip, accounts }: { clip: ClipView; accounts: Account
           {layoutName && <span className="rounded-md bg-black/75 px-2 py-1 text-xs font-bold text-zinc-300" data-testid="layout-chip">{layoutName}</span>}
           <span className="rounded-md bg-black/75 px-2 py-1 text-xs font-bold text-zinc-300">{clip.source === "chat" ? `Chat spike ${clip.spikeScore}x` : clip.source === "youtube" ? "YouTube peak" : "Twitch clip"}</span>
           {clip.category && <span className="rounded-md bg-black/75"><CategoryChip category={clip.category} className="inline-block px-2 py-1 text-xs" /></span>}
+          {ch && <span className="rounded-md bg-black/75 px-2 py-1 text-xs font-black text-emerald-300" data-testid="channel-chip" title={ch.set ? "Picked for this channel (Move to... on the Upload page changes it)" : "Goes to this channel by its type"}>{ch.name}</span>}
         </div>
       </div>
 
@@ -126,8 +141,11 @@ export function ClipCard({ clip, accounts }: { clip: ClipView; accounts: Account
 
         <div className="mt-auto flex flex-wrap gap-2 pt-1">
           {clip.status === "pending" && <>
-            <button className="btn-ok flex-1" disabled={busy} onClick={() => act(() => setClipStatus(clip.id, "approved"))}>
-              {auto.length ? `Approve + send to ${auto.length === 1 ? auto[0].label : `${auto.length} accounts`}` : "Approve"}
+            <button className="btn-ok flex-1" disabled={busy} data-testid="approve" onClick={() => act(() => setClipStatus(clip.id, "approved"))}
+              title={approveLabel ? `Approves it and uploads it to ${ch!.name}: ${ch!.plan}` : undefined}>
+              {approveLabel
+                ? <>{approveLabel}<span className="block text-[11px] font-semibold opacity-80">{ch!.plan}</span></>
+                : auto.length ? `Approve + send to ${auto.length === 1 ? auto[0].label : `${auto.length} accounts`}` : "Approve"}
             </button>
             <button className="btn-bad flex-1" disabled={busy} onClick={() => act(() => setClipStatus(clip.id, "rejected"))}>Reject</button>
           </>}
@@ -141,6 +159,7 @@ export function ClipCard({ clip, accounts }: { clip: ClipView; accounts: Account
           )}
         </div>
         {clip.status !== "processing" && !clip.expired && <QaBox clipId={clip.id} qa={clip.qa ?? null} hasVideo={clip.hasVideo} canRecut={Boolean(clip.canRecut)} busy={busy || recutting} />}
+        {upErr && <div className="text-xs text-red-300 [overflow-wrap:anywhere]">{upErr}</div>}
         {recutting && <div className="animate-pulse text-xs text-sun">Re-cutting… the new version replaces this video in about a minute.</div>}
         {clip.editNote && !recutting && <div className="text-xs text-zinc-500" title={clip.editNote}>Plain edit used (the styled edit hit a problem).</div>}
         {clip.status !== "processing" && clip.status !== "failed" && <MakeEditFromClip clipId={clip.id} />}
@@ -180,6 +199,16 @@ export function ClipCard({ clip, accounts }: { clip: ClipView; accounts: Account
                 })}
               </div>
             )}
+            {clip.upload && (
+              <div data-testid="queue-upload">
+                <UploadButton clipId={clip.id} channelId={ch?.id ?? null} state={clip.upload} ytUrl={clip.ytUrl} uploading={uploading} big={false} />
+                {ch && clip.upload.kind === "upload" && <div className="mt-0.5 text-[11px] text-zinc-400">to {ch.name}: {ch.plan}</div>}
+              </div>
+            )}
+            {ch && !uploading && ch.autoLeft === 0 && ch.handLeft > 0 && (
+              <a href="/upload" className="btn-ghost block w-full text-center text-xs">{ch.handLeft} by hand left on {ch.name}: open Upload</a>
+            )}
+            {upMsg && <div className="text-xs text-emerald-300 [overflow-wrap:anywhere]">{upMsg}</div>}
             {uploading && <div className="animate-pulse text-xs text-sun">Sending…</div>}
             {clip.postError && <div className="text-xs text-red-300">Posting failed: {clip.postError}</div>}
             {!uploading && notYet.length > 0 && (

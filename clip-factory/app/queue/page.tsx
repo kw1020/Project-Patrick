@@ -3,25 +3,38 @@ import { prisma } from "@/lib/db";
 import { AutoRefresh } from "@/components/AutoRefresh";
 import { ClipCard, type ClipView } from "@/components/ClipCard";
 import { parseQa } from "@/lib/qa";
-import { parseQueueParams, QUEUE_CATS, QUEUE_TABS, queueHref, queueWhere } from "@/lib/queue-filter";
+import { parseQueueParams, QUEUE_CATS, QUEUE_REVIEW_ORDER, QUEUE_TABS, queueHref, queueWhere } from "@/lib/queue-filter";
+import { CleanUpQueue } from "@/components/CleanUpQueue";
 import { funnelCounts, funnelLine } from "@/lib/funnel";
 import { FINDER_PREFIX } from "@/lib/rank";
+import { getSettings } from "@/lib/db";
+import { POST_PLATFORMS, channelForClip, donePost, isAutoUploadAccount, slotAccount, uploadButton, uploadSummary } from "@/lib/channels";
+import { youtubeKeysMissing } from "@/lib/youtube";
+import { parsePlatformInfo, platformCheck } from "@/lib/platform-rules";
+import { captionCredits, isGta6, momentGame } from "@/lib/social";
 
 export const dynamic = "force-dynamic";
 
-export default async function QueuePage({ searchParams }: { searchParams: Promise<{ tab?: string; cat?: string; creator?: string }> }) {
+export default async function QueuePage({ searchParams }: { searchParams: Promise<{ tab?: string; cat?: string; creator?: string; channel?: string }> }) {
   const f = parseQueueParams(await searchParams);
   const { tab, cat } = f;
   const accounts = (await prisma.account.findMany({ where: { error: null, mode: "api", disabled: false, platform: { in: ["youtube", "tiktok", "instagram"] } }, orderBy: [{ platform: "asc" }, { createdAt: "asc" }] }))
-    .map((a) => ({ id: a.id, platform: a.platform, label: a.channelTitle ?? a.platform, autoPost: a.autoPost, privacy: a.privacy }));
+    .map((a) => ({ id: a.id, platform: a.platform, label: a.channelTitle ?? a.platform, autoPost: a.autoPost, privacy: a.privacy, homeChannelId: a.homeChannelId, disabled: a.disabled }));
+  const [channels, slotAccounts, settings] = await Promise.all([
+    prisma.channel.findMany({ orderBy: { createdAt: "asc" } }),
+    prisma.account.findMany({ where: { platform: { in: [...POST_PLATFORMS] }, homeChannelId: { not: null } }, orderBy: { createdAt: "asc" } }),
+    getSettings(),
+  ]);
+  // v2.0.6: approving uploads to the clip's channel (Settings -> Upload); off = the old per-account "Post when I approve".
+  const approveUploads = settings.approveUploads && channels.length > 0;
+  const ytKeysMissing = youtubeKeysMissing();
   const autoCount = accounts.filter((a) => a.autoPost).length;
-  const channels = await prisma.channel.findMany({ select: { id: true, name: true } });
-  const [clips, counts, catCounts, creator, recent] = await Promise.all([
+  const [clips, counts, catCounts, creator, recent, chanCounts, belowBar] = await Promise.all([
     prisma.clip.findMany({
       where: queueWhere(f),
       include: { posts: true, moment: { include: { streamer: { include: { campaign: true } } } } },
       // Best first: Judge score, then how big the moment was.
-      orderBy: tab === "pending" ? [{ supremePick: "desc" }, { score: { sort: "desc", nulls: "last" } }, { moment: { spikeScore: "desc" } }] : [{ updatedAt: "desc" }],
+      orderBy: tab === "pending" ? QUEUE_REVIEW_ORDER : [{ updatedAt: "desc" }],
       take: 60,
     }),
     prisma.clip.groupBy({ by: ["status"], where: queueWhere(f, "tab"), _count: true }),
@@ -29,7 +42,13 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
     f.creator ? prisma.streamer.findUnique({ where: { id: f.creator }, select: { name: true, platform: true } }) : null,
     // v1.9.8: "X found, Y kept" so Krew sees the filtering (last 24h).
     prisma.clip.findMany({ where: { createdAt: { gte: new Date(Date.now() - 24 * 3600_000) } }, select: { status: true, judgeReason: true } }),
+    // v2.0.6: per-channel counts for the channel chips (Clip.channelId, set by the Judge before the cut or by Krew).
+    prisma.clip.groupBy({ by: ["channelId"], where: queueWhere(f, "channel"), _count: true }),
+    // v2.0.6 "Clean up queue": how many waiting clips are below the bar (or never scored).
+    prisma.clip.count({ where: { status: "pending", OR: [{ score: null }, { score: { lt: settings.minScore } }] } }),
   ]);
+  const chc: Record<string, number> = { all: chanCounts.reduce((a, x) => a + x._count, 0) };
+  for (const x of chanCounts) chc[x.channelId ?? "none"] = (chc[x.channelId ?? "none"] ?? 0) + x._count;
   const c = Object.fromEntries(counts.map((x) => [x.status, x._count])) as Record<string, number>;
   const cc: Record<string, number> = { all: catCounts.reduce((a, x) => a + x._count, 0) };
   for (const x of catCounts) if (x.category) cc[x.category] = x._count;
@@ -49,7 +68,32 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
     posts: k.posts.map((p) => ({ platform: p.platform, accountId: p.accountId, status: p.status, url: p.url, error: p.error })), postError: k.postError,
     supreme: k.supremePick ? { rank: k.supremeRank, reason: k.supremeReason, channel: channels.find((c) => c.id === k.supremeChannelId)?.name ?? null } : null,
     qa: parseQa(k.qa),
+    channel: (() => {
+      // v2.0.6: the channel it goes to + what Approve / Upload will do there ("YouTube + TikTok now, Instagram by hand").
+      const ch = channelForClip(channels, { channelId: k.channelId, category: k.category ?? k.moment.category, gta: isGta6(momentGame(k.moment)) });
+      if (!ch) return null;
+      const slots = POST_PLATFORMS.map((p) => slotAccount(slotAccounts, ch.id, p)).filter((a): a is (typeof slotAccounts)[number] => Boolean(a && !a.disabled));
+      const left = slots.filter((a) => !donePost(k.posts, a.id));
+      return {
+        id: ch.id, name: ch.name, color: ch.color, set: Boolean(k.channelId),
+        plan: uploadSummary(slots.map((a) => ({ platform: a.platform, auto: isAutoUploadAccount(a) }))),
+        autoLeft: left.filter(isAutoUploadAccount).length, handLeft: left.filter((a) => !isAutoUploadAccount(a)).length,
+      };
+    })(),
+    // v2.0.6: the always-visible Upload button (connect-first when the channel's YouTube isn't connected) + why it can't.
+    upload: (() => {
+      const ch = channelForClip(channels, { channelId: k.channelId, category: k.category ?? k.moment.category, gta: isGta6(momentGame(k.moment)) });
+      const all = ch ? POST_PLATFORMS.map((p) => slotAccount(slotAccounts, ch.id, p)).filter((a): a is (typeof slotAccounts)[number] => Boolean(a)) : [];
+      const pc = platformCheck({ caption: k.caption ?? "", title: k.title, creditOk: captionCredits(k.caption ?? "", k.moment.streamer), info: parsePlatformInfo(k.platformInfo) });
+      return uploadButton({
+        clipId: k.id, status: k.status, channel: ch, ytKeysMissing, uploading: k.stage === "post",
+        platformFail: pc.fails ? pc.items.filter((i) => i.level === "fail").map((i) => i.text).join("; ") : null,
+        slots: all.map((a) => ({ platform: a.platform, mode: a.mode, error: a.error, disabled: a.disabled, done: Boolean(donePost(k.posts, a.id)) })),
+      });
+    })(),
+    ytUrl: k.posts.find((p) => p.platform === "youtube" && p.status !== "failed" && p.url)?.url ?? null,
   }));
+  const chanFilters = [{ key: "all", label: "All" }, ...channels.map((c) => ({ key: c.id, label: c.name })), ...(chc.none ? [{ key: "none", label: "No channel" }] : [])];
 
   const pill = (on: boolean) => `rounded-md px-3 py-1 ${on ? "bg-panel font-bold" : "text-zinc-400 hover:text-white"}`;
   return (
@@ -59,8 +103,9 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
         <div className="min-w-0">
           <h1 className="text-2xl font-black">Queue <Link href="/upload" className="ml-2 align-middle text-sm font-semibold text-emerald-300 hover:underline" data-testid="to-post-link">Ready to post → Upload</Link></h1>
           <p className="text-sm font-semibold text-zinc-300" data-testid="funnel">{funnelLine(funnelCounts(recent, FINDER_PREFIX))}</p>
-          <p className="text-sm text-zinc-400">Nothing posts without your OK. {autoCount ? `Approve also sends the clip to ${autoCount} account${autoCount > 1 ? "s" : ""} (set in Settings). TikTok drafts are finished in the TikTok app.` : "Approve, then post with the account buttons, or download and post by hand."}</p>
+          <p className="text-sm text-zinc-400">Nothing posts without your OK. {approveUploads ? "Approve + Upload sends the clip to its channel's connected YouTube, TikTok and Instagram right away; by-hand accounts wait on the Upload page. TikTok drafts are finished in the TikTok app." : autoCount ? `Approve also sends the clip to ${autoCount} account${autoCount > 1 ? "s" : ""} (set in Settings). TikTok drafts are finished in the TikTok app.` : "Approve, then post with the account buttons, or download and post by hand."}</p>
         </div>
+        {tab === "pending" && <CleanUpQueue minScore={settings.minScore} count={belowBar} />}
         <div className="flex flex-wrap gap-1 rounded-lg border border-line p-1 text-sm">
           {QUEUE_TABS.map((x) => (
             <Link key={x.key} href={queueHref(f, { tab: x.key })} className={pill(tab === x.key)}>
@@ -77,6 +122,18 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
             </Link>
           ))}
         </div>
+        {channels.length > 0 && (
+          <div className="flex flex-wrap gap-1 rounded-lg border border-line p-1 text-sm" role="tablist" aria-label="Channel" data-testid="channel-tabs">
+            {chanFilters.map((x) => {
+              const on = (f.channel ?? "all") === x.key;
+              return (
+                <Link key={x.key} href={queueHref(f, { channel: x.key === "all" ? null : x.key })} role="tab" aria-selected={on} className={pill(on)}>
+                  {x.label} <span className="text-zinc-500">{chc[x.key] ?? 0}</span>
+                </Link>
+              );
+            })}
+          </div>
+        )}
         {f.creator && (
           <div className="flex min-w-0 items-center gap-2 rounded-lg border border-line px-3 py-1.5 text-sm">
             <span className="min-w-0 truncate">Only <b>{creator?.name ?? "this creator"}</b>{creator?.platform === "youtube" ? " (YouTube)" : ""}</span>
@@ -91,7 +148,7 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {views.map((v) => <ClipCard key={v.id} clip={v} accounts={accounts} />)}
+          {views.map((v) => <ClipCard key={v.id} clip={v} accounts={channels.length && v.channel ? accounts.filter((a) => a.homeChannelId === v.channel!.id && !a.disabled) : accounts} approveUploads={approveUploads} />)}
         </div>
       )}
     </div>

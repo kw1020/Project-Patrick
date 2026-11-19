@@ -56,7 +56,7 @@ export function parseRetentionForm(form: { get(k: string): unknown }) {
   };
   return {
     retainRejectedHrs: n("retainRejectedHrs", 1, 24 * 30, 6),
-    retainPendingHrs: n("retainPendingHrs", 1, 24 * 30, 48),
+    retainPendingHrs: n("retainPendingHrs", 1, 24 * 30, 24),
     retainApprovedDays: n("retainApprovedDays", 1, 90, 5),
     retainPostedDays: n("retainPostedDays", 1, 90, 3),
     retainRawHrs: n("retainRawHrs", 1, 24 * 7, 6),

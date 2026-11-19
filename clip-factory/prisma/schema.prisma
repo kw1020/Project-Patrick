@@ -183,7 +183,7 @@ model Settings {
   watermark           Boolean @default(true) // v1.9.1: burn a small "@<channelName>" into new clips (bottom right)
   // v1.9.4 Storage: auto-delete clips nobody uses (src/workers/retention.ts). Halved in disk-pressure mode.
   retainRejectedHrs   Int     @default(6)  // rejected / auto-rejected: raw + final deleted after this
-  retainPendingHrs    Int     @default(48) // never reviewed: final deleted after this, then status "expired"
+  retainPendingHrs    Int     @default(24) // never reviewed: final deleted after this, then status "expired" (v2.0.6: 48 -> 24)
   retainApprovedDays  Int     @default(5)  // approved but never posted: final deleted (the row stays)
   retainPostedDays    Int     @default(3)  // posted: final deleted (it's on the platform already)
   retainRawHrs        Int     @default(6)  // raw: deleted once cut + reviewed, and at most this long after the cut
@@ -199,6 +199,11 @@ model Settings {
   editLength          Int     @default(20) // v2.0.0 Edits: 15 | 20 | 30 seconds
   editAuto            Boolean @default(false) // v2.0.0 Edits: make a daily edit of each creator with enough good moments
   editCreatorAudio    Boolean @default(true) // v2.0.0 Edits: keep the creator's audio (quieter) under the edit, else silent
+  // v2.0.6 Approve = upload everywhere on the clip's channel
+  approveUploads        Boolean @default(true) // approving queues every connected account of the clip's channel
+  migratedChannelStyles Boolean @default(false) // v2.0.6 one-time: Krew's seeded channels get their own editing style
+  migratedQueueCleanup  Boolean @default(false) // v2.0.6 one-time: pending clips below minScore / never scored -> rejected
+  migratedPending24     Boolean @default(false) // v2.0.6 one-time: retainPendingHrs 48 -> 24
 }
 
 // v1.9.5: one of Krew's brands (e.g. "ViceCityClips") = up to one YouTube + one TikTok + one Instagram account that all get the same
@@ -211,6 +216,10 @@ model Channel {
   focus     String   @default("any") // gta = GTA 6 clips of any type (ViceCityClips) | any = clips whose type is in kinds
   color     String?
   createdAt DateTime @default(now())
+  // v2.0.6 per-channel editing (null = the global Settings value)
+  editStyle    String? // hype | clean | meme
+  layout       String? // auto | split | fullcam | blur
+  captionStyle String? // hype | clean | meme: caption look only (null = the editing style's own captions)
 }
 
 // v1.9.1 Campaign mode: a Whop Content Rewards campaign. Creators are tagged with one (Streamer.campaignId) and their

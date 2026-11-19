@@ -293,8 +293,10 @@ export function splitHook(text: string, maxLine = 24) {
 /** Caption block centre: 62% of the frame height, clear of the hook (top) and the progress bar (bottom). */
 export const CAPTION_Y = Math.round(H * 0.62);
 
-export function buildStyledAss(opts: { words: Word[]; credit: string; duration: number; layout: "blur" | "facecam" | "split" | "fullcam"; hook?: string | null; style: EditStyle; font?: string; place?: OverlayPlace | null; watermark?: string | null }) {
+export function buildStyledAss(opts: { words: Word[]; credit: string; duration: number; layout: "blur" | "facecam" | "split" | "fullcam"; hook?: string | null; style: EditStyle; font?: string; place?: OverlayPlace | null; watermark?: string | null; captionStyle?: EditStyle | null }) {
   const S = STYLES[opts.style], font = opts.font || process.env.CAPTION_FONT || "DejaVu Sans";
+  // v2.0.6: a channel can have its own caption look (another style's captions); everything else follows the editing style.
+  const C = STYLES[opts.captionStyle ?? opts.style].cap;
   const D = opts.duration;
   // v1.9.0: where text goes depends on the layout and where the face is (src/lib/layout.ts overlayPlace).
   const P = opts.place ?? overlayPlace(opts.layout, null);
@@ -306,7 +308,7 @@ export function buildStyledAss(opts: { words: Word[]; credit: string; duration: 
     "[Script Info]", "ScriptType: v4.00+", "PlayResX: 1080", "PlayResY: 1920", "WrapStyle: 0", "ScaledBorderAndShadow: yes", "",
     "[V4+ Styles]",
     "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
-    `Style: Cap,${font},${S.cap.size},&H00FFFFFF,&H00FFFFFF,&H00000000,&H78000000,-1,0,0,0,100,100,1,0,1,${S.cap.outline},${S.cap.shadow},5,${TEXT_SAFE.left},${TEXT_SAFE.right},0,1`,
+    `Style: Cap,${font},${C.size},&H00FFFFFF,&H00FFFFFF,&H00000000,&H78000000,-1,0,0,0,100,100,1,0,1,${C.outline},${C.shadow},5,${TEXT_SAFE.left},${TEXT_SAFE.right},0,1`,
     // Credit: always on, top centre, drawn last (above zooms, never scaled).
     `Style: Credit,${font},42,&H10FFFFFF,&H00FFFFFF,&H00000000,&H78000000,-1,0,0,0,100,100,0,0,1,4,2,8,40,40,110,1`,
     `Style: Hook,${font},${S.hook.size},${S.hook.text},&H00FFFFFF,${S.hook.box},${S.hook.box},-1,0,0,0,100,100,0,0,3,16,0,8,${TEXT_SAFE.left + 16},${TEXT_SAFE.right + 16},${hookY},1`,
@@ -331,13 +333,13 @@ export function buildStyledAss(opts: { words: Word[]; credit: string; duration: 
       : `\\an${an}\\pos(${TEXT_X},${hookY})${hk < 1 ? `\\fscx${hs(100)}\\fscy${hs(100)}` : ""}\\fad(300,300)`;
     lines.push(`Dialogue: 2,${assTime(0)},${assTime(end)},Hook,,0,0,0,,{${tags}}${hook}`);
   }
-  const chunks = chunkWordsDetailed(opts.words, 3, S.cap.maxChars);
+  const chunks = chunkWordsDetailed(opts.words, 3, C.maxChars);
   chunks.forEach((c, ci) => {
     if (c.start >= D) return;
-    const tokens = c.words.map((w) => (S.cap.upper ? esc(w.word).toUpperCase() : esc(w.word)));
-    const tilt = S.cap.tilt ? ((ci * 7 + 3) % 7) - 3 || 2 : 0; // -3..3°, never flat, same every render
-    const grow = S.cap.active ? 1 : S.cap.activeScale / 100;
-    const k = fitScale(tokens.join(" "), S.cap.size * grow, TEXT_MAX_W, { spacing: 1, outline: S.cap.outline }), sc = (n: number) => Math.round(n * k);
+    const tokens = c.words.map((w) => (C.upper ? esc(w.word).toUpperCase() : esc(w.word)));
+    const tilt = C.tilt ? ((ci * 7 + 3) % 7) - 3 || 2 : 0; // -3..3°, never flat, same every render
+    const grow = C.active ? 1 : C.activeScale / 100;
+    const k = fitScale(tokens.join(" "), C.size * grow, TEXT_MAX_W, { spacing: 1, outline: C.outline }), sc = (n: number) => Math.round(n * k);
     const base = `\\an5\\pos(${TEXT_X},${capY})${tilt ? `\\frz${tilt}` : ""}${k < 1 ? `\\fscx${sc(100)}\\fscy${sc(100)}` : ""}`;
     c.words.forEach((w, wi) => {
       const s = wi === 0 ? c.start : w.start;
@@ -345,11 +347,11 @@ export function buildStyledAss(opts: { words: Word[]; credit: string; duration: 
       if (e - s < 0.02 || s >= D) return;
       const text = tokens.map((t, ti) => {
         if (ti !== wi) return t;
-        if (S.cap.active) return `{\\1c${S.cap.active}&}${t}{\\1c&H00FFFFFF&}`;
-        return `{\\fscx${sc(S.cap.activeScale)}\\fscy${sc(S.cap.activeScale)}}${t}{\\fscx${sc(100)}\\fscy${sc(100)}}`;
+        if (C.active) return `{\\1c${C.active}&}${t}{\\1c&H00FFFFFF&}`;
+        return `{\\fscx${sc(C.activeScale)}\\fscy${sc(C.activeScale)}}${t}{\\fscx${sc(100)}\\fscy${sc(100)}}`;
       }).join(" ");
       let anim = "";
-      if (wi === 0) anim = S.cap.pop ? `\\fscx${sc(80)}\\fscy${sc(80)}\\t(0,60,\\fscx${sc(105)}\\fscy${sc(105)})\\t(60,120,\\fscx${sc(100)}\\fscy${sc(100)})` : "\\fad(80,0)";
+      if (wi === 0) anim = C.pop ? `\\fscx${sc(80)}\\fscy${sc(80)}\\t(0,60,\\fscx${sc(105)}\\fscy${sc(105)})\\t(60,120,\\fscx${sc(100)}\\fscy${sc(100)})` : "\\fad(80,0)";
       lines.push(`Dialogue: 1,${assTime(s)},${assTime(Math.min(e, D))},Cap,,0,0,0,,{${base}${anim}}${text}`);
     });
   });
@@ -532,6 +534,8 @@ export async function renderStyled(opts: {
   words: Word[]; credit: string; hook: string | null; minSec: number; hasAudio: boolean;
   /** v1.9.1: channel watermark text ("ViceCityClips"), null/empty = none. */
   watermark?: string | null;
+  /** v2.0.6: the channel's caption look (null = the style's own captions). */
+  captionStyle?: EditStyle | null;
   peakHint?: { source: string; vodOffset: number | null; vodId?: string | null } | null; workDir: string; id: string;
   /** v1.8.0: the payoff in WINDOW seconds (from Clip.payoffAt); used as the peak instead of recomputing. */
   peakAt?: number | null;
@@ -547,7 +551,7 @@ export async function renderStyled(opts: {
   const lp = opts.plan ?? legacyPlan(opts.facecam, src);
   fs.mkdirSync(opts.workDir, { recursive: true });
   const assName = `${opts.id}.styled.ass`, assPath = path.join(opts.workDir, assName);
-  fs.writeFileSync(assPath, buildStyledAss({ words: plan.words, credit: opts.credit, duration: plan.duration, layout: lp.kind, hook: opts.hook, style: opts.style, place: lp.place, watermark: opts.watermark }));
+  fs.writeFileSync(assPath, buildStyledAss({ words: plan.words, credit: opts.credit, duration: plan.duration, layout: lp.kind, hook: opts.hook, style: opts.style, place: lp.place, watermark: opts.watermark, captionStyle: opts.captionStyle }));
   const sfx = S.sfx && opts.hasAudio ? await ensureSfx() : null;
   const whooshAt = sfx && opts.hook ? 0 : null;
   const boomAt = sfx && plan.punchStart != null ? plan.punchStart : null;

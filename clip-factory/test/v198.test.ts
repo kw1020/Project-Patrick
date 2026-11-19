@@ -224,7 +224,7 @@ test("Judge: no named payoff = score capped at 4 (enforced in code), with the re
   assert.equal(namedPayoff("Nothing really happens", 12), false);
   assert.equal(namedPayoff("just gameplay", 12), false);
   const fake = (out: Record<string, unknown>) => ({ beta: { messages: { parse: async () => ({ stop_reason: "end_turn", parsed_output: out, usage: { input_tokens: 4000, output_tokens: 300 } }) } } });
-  const base = { observations: "o", hook_lands: true, payoff_in_window: true, score: 8, hook_text: "h", title: "t", hashtags: [], extra_hashtags: [], reason: "Looks fun.", category: "gaming", best_start: null, best_end: null };
+  const base = { observations: "o", hook_lands: true, payoff_in_window: true, score: 8, hook_text: "h", title: "t", hashtags: [], extra_hashtags: [], reason: "Looks fun.", category: "gaming", channel: "", best_start: null, best_end: null };
   const input = { streamer: "Kai", durationSec: 20, source: "twitch_clip" as const, transcript: "x", minScore: 7 };
   const capped = await judgeClip(input, null, fake({ ...base, payoff: "", payoff_at: null }) as never);
   assert.equal(capped!.score, 4);

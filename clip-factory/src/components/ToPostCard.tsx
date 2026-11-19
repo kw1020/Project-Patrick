@@ -6,6 +6,8 @@ import { PLATFORM_LABEL, downloadUrl } from "../lib/channels";
 import { checkCampaignCaption } from "../lib/social";
 import { CategoryChip } from "./CategoryChip";
 import { PlatformCheckBox } from "./PlatformCheckBox";
+import { UploadButton } from "./UploadButton";
+import type { UploadButtonState } from "../lib/channels";
 import { parsePlatformInfo, platformCheck } from "../lib/platform-rules";
 
 export type ToPostRow = {
@@ -23,7 +25,13 @@ export type ToPostView = {
   /** v1.9.8 Platform check facts (Clip.platformInfo JSON) + caption credit + the v1.9.6 video-check issues. */
   platformInfo?: string | null; creditOk?: boolean; qaIssues?: { type: string; detail: string; source?: string }[] | null;
   edit?: boolean; // v2.0.0: an Edit (its own media route + actions; never auto-posted, no Move to)
+  canRecut?: boolean; // v2.0.6: the raw video is still there, so Move to... can re-cut it in the new channel's style
+  editStyle?: string | null; // v2.0.6: the style it was cut with
+  upload?: UploadButtonState; // v2.0.6: the always-visible Upload button (clips; edits keep their own button)
+  ytUrl?: string | null;
 };
+/** v2.0.6: a channel in the Move to... list, with its editing style ("Meme") for the re-cut offer. */
+export type MoveChannel = { id: string; name: string; style?: string | null };
 
 const chip: Record<string, string> = {
   youtube: "bg-red-600/20 text-red-300", tiktok: "bg-cyan-500/15 text-cyan-300", instagram: "bg-fuchsia-500/15 text-fuchsia-300",
@@ -41,7 +49,7 @@ export async function downloadAndCopy(clipId: string, caption: string, href?: st
   a.remove();
 }
 
-export function ToPostCard({ clip, channels, children }: { clip: ToPostView; channels: { id: string; name: string }[]; children?: React.ReactNode }) {
+export function ToPostCard({ clip, channels, children }: { clip: ToPostView; channels: MoveChannel[]; children?: React.ReactNode }) {
   const [busy, start] = useTransition();
   const [copied, setCopied] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
@@ -83,7 +91,14 @@ export function ToPostCard({ clip, channels, children }: { clip: ToPostView; cha
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="min-w-0 truncate text-sm font-bold">{clip.streamer.name}</div>
           {!clip.edit && <select aria-label="Move to channel" className="field w-36 py-1 text-xs" value="" disabled={busy} data-testid="move-to"
-            onChange={(e) => { const v = e.target.value; if (v) run(() => setClipChannel(clip.id, v === "auto" ? "" : v)); }}>
+            onChange={(e) => {
+              const v = e.target.value;
+              if (!v) return;
+              // v2.0.6: each channel has its own editing; offer to cut it again in the new channel's style + watermark.
+              const to = channels.find((c) => c.id === v);
+              const recut = Boolean(clip.canRecut && to && window.confirm(`Re-cut it for ${to.name}${to.style ? ` (${to.style} style` : " (its style"} and the @${to.name} watermark)? It takes about a minute. Cancel = just move it.`));
+              run(async () => { const r = await setClipChannel(clip.id, v === "auto" ? "" : v, recut); setMsg(r.recut ? `Moved to ${to?.name}. Re-cutting it in its style...` : `Moved${to ? ` to ${to.name}` : ""}.`); });
+            }}>
             <option value="">Move to…</option>
             {channels.filter((c) => c.id !== clip.channelId).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             {clip.chosenChannelId && <option value="auto">Automatic (by type)</option>}
@@ -106,20 +121,22 @@ export function ToPostCard({ clip, channels, children }: { clip: ToPostView; cha
         )}
 
         {clip.edit && <div className="text-xs text-sun">Add your sound in TikTok/Reels before posting (edits have no music).</div>}
+        {!clip.edit && clip.upload && <UploadButton clipId={clip.id} channelId={clip.channelId} state={clip.upload} ytUrl={clip.ytUrl} uploading={uploading} />}
         {!clip.channelId ? (
           <div className="rounded-lg bg-sun/10 px-3 py-2 text-xs text-amber-200">{clip.edit ? "No channel takes Edits: tick Edits on your edit channel in Settings → Channels." : "No channel takes this clip automatically. Use Move to… (or add a channel in Settings)."}</div>
         ) : clip.rows.length === 0 ? (
           <div className="rounded-lg bg-sun/10 px-3 py-2 text-xs text-amber-200">{clip.channelName} has no accounts yet. Add its YouTube / TikTok / Instagram in <a href="/settings#channels" className="underline">Settings</a>.</div>
         ) : (
           <div className="space-y-2">
-            {left.length > 0 && (
-              <button className="btn-hot w-full" disabled={busy || uploading || clip.stage === "cut" || pc.fails > 0} data-testid="post-to-all"
+            {left.length > 0 && (clip.edit || !clip.upload) && (
+              <button className="btn-hot w-full py-3 text-lg font-black" disabled={busy || uploading || clip.stage === "cut" || pc.fails > 0} data-testid="post-to-all"
                 title={pc.fails ? "Blocked: fix the Platform check problems first (re-cut or edit the caption in the Queue)" : undefined}
                 onClick={() => run(async () => {
                   const r = await doPostAll(clip.id, clip.channelId!);
                   setMsg(r.queued.length ? `Sending to ${r.queued.join(", ")}…${r.byHand.length ? " Then do the by-hand ones below." : ""}` : "Nothing to upload: do the by-hand ones below.");
                 })}>
-                {pc.fails ? "⛔ Blocked by the Platform check: " : ""}Post to all on {clip.channelName}{autoLeft.length ? ` (${autoLeft.map((r) => PLATFORM_LABEL[r.platform]).join(" + ")} now${manualLeft.length ? `, ${manualLeft.length} by hand` : ""})` : " (by hand)"}
+                {pc.fails ? "⛔ Blocked by the Platform check: " : ""}Upload
+                <span className="block text-xs font-semibold opacity-80">to {clip.channelName}: {autoLeft.length ? `${autoLeft.map((r) => PLATFORM_LABEL[r.platform]).join(" + ")} now${manualLeft.length ? `, ${manualLeft.map((r) => PLATFORM_LABEL[r.platform]).join(" + ")} by hand` : ""}` : "all by hand (Download + copy caption below)"}</span>
               </button>
             )}
             {msg && <div className="text-xs text-emerald-300">{msg}</div>}

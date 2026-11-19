@@ -3,13 +3,13 @@
 // focus/kinds also route v2.0 Edits: the first non-GTA channel with "edits" in its kinds (ClipFactoryGG) gets them.
 
 export type SeedAccount = { platform: "youtube" | "tiktok" | "instagram"; handle: string; youtubeChannelId?: string; disabled?: string };
-export type SeedChannel = { id: string; name: string; focus: "gta" | "any"; kinds: string; accounts: SeedAccount[] };
+export type SeedChannel = { id: string; name: string; focus: "gta" | "any"; kinds: string; accounts: SeedAccount[]; editStyle?: "hype" | "clean" | "meme" };
 
 export const DISABLED_IG_NOTE = "Instagram disabled this account, appeal in the app";
 
 export const CHANNEL_SEEDS: SeedChannel[] = [
   {
-    id: "main", name: "ViceCityClips", focus: "gta", kinds: "gaming,funny,edits",
+    id: "main", name: "ViceCityClips", focus: "gta", kinds: "gaming,funny,edits", editStyle: "hype",
     accounts: [
       { platform: "youtube", handle: "@ViceCityClips1-r2c" },
       { platform: "tiktok", handle: "@vicecityclips997" },
@@ -17,7 +17,7 @@ export const CHANNEL_SEEDS: SeedChannel[] = [
     ],
   },
   {
-    id: "streamheist", name: "StreamHeistClips", focus: "any", kinds: "funny",
+    id: "streamheist", name: "StreamHeistClips", focus: "any", kinds: "funny", editStyle: "meme",
     accounts: [
       { platform: "youtube", handle: "@StreamHeistClips-k4f" },
       { platform: "tiktok", handle: "@streamheistclips0" },
@@ -25,7 +25,7 @@ export const CHANNEL_SEEDS: SeedChannel[] = [
     ],
   },
   {
-    id: "wantedlevel", name: "WantedLevelClips", focus: "any", kinds: "gaming",
+    id: "wantedlevel", name: "WantedLevelClips", focus: "any", kinds: "gaming", editStyle: "clean",
     accounts: [
       { platform: "youtube", handle: "@WantedLevelClips-k1e", youtubeChannelId: "UCqnlrJu2A_P-OLH2zvT_IBg" },
       { platform: "tiktok", handle: "@wantedlevelclips02" },

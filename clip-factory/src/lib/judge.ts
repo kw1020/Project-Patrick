@@ -25,6 +25,9 @@ const Verdict = z.object({
   extra_hashtags: z.array(z.enum(EXTRA_TAGS)).describe("1-2 extra hashtags for the caption, without #: GTA6Funny for funny moments, GTA6Clips for GTA gameplay, StreamerMoments for reactions/IRL, Gaming for other games"),
   reason: z.string().describe("One or two plain sentences on why this score"),
   category: z.enum(["funny", "gaming"]).describe("funny: comedy, banter, reactions, funny fails (any stream, not only games). gaming: plays, clutches, chases, game moments"),
+  // v2.0.6 (Krew: "the judge just determines what channel it should go to"): a plain string (checked in code), so the schema
+  // stays the same for every call whatever the channels are called.
+  channel: z.string().describe("The name of the ONE channel from the message's channel list whose audience fits this clip best, copied exactly. Empty string if the message has no channel list"),
   best_start: z.number().nullable().describe("Seconds into the SOURCE where the best stretch starts, or null to keep the proposed window"),
   best_end: z.number().nullable().describe("Seconds into the SOURCE where the best stretch ends (after the payoff lands), or null"),
 });
@@ -64,6 +67,8 @@ export type JudgeInput = {
   calibration?: string | null;
   // v1.9.8: <audio_summary> block (src/lib/audio-summary.ts): loudness per 0.5s, spikes, speech/silence, chat heat.
   audioSummary?: string | null;
+  // v2.0.6: Krew's channels the clip can go to (name, focus, types, one line about it, clips it got in the last 24h).
+  channels?: { name: string; focus: string; kinds: string; about: string; recent: number }[] | null;
 };
 
 export function judgeConfigured() {
@@ -139,6 +144,11 @@ function render(i: JudgeInput) {
   if (i.frames?.length) lines.push("", `The ${i.frames.length} images above are stills from the source at the times shown (same seconds as the transcript and the audio summary). Watch the clip through them in time order with the audio summary as the soundtrack; describe what happens in observations, check the hook and the payoff, then score.`);
   else if (i.framesFailed) lines.push("", "No frames could be taken from this clip, so judge it from the text only and say so in observations.");
   if (i.calibration?.trim()) lines.push("", i.calibration.trim());
+  if (i.channels?.length) {
+    lines.push("", "Krew's channels (put the name of the best fit in \"channel\"):",
+      ...i.channels.map((c) => `- ${c.name}: ${c.about}. Focus: ${c.focus === "gta" ? "GTA 6" : "any game"}; types: ${c.kinds || "none"}; ${c.recent} clip${c.recent === 1 ? "" : "s"} in the last 24h`),
+      "Pick by who would watch it. When two channels fit about equally, pick the one with fewer clips in the last 24h so every channel gets a fair share.");
+  }
   return lines.join("\n");
 }
 
@@ -201,6 +211,7 @@ export async function judgeClip(input: JudgeInput, lessons: string | null = null
     extra_hashtags: cleanExtras(v.extra_hashtags, []),
     reason: (named ? "" : "No clear payoff, so capped at 4. ") + v.reason.trim().slice(0, 500),
     category: v.category === "funny" ? "funny" : "gaming",
+    channel: (v.channel ?? "").replace(/\s+/g, " ").trim().slice(0, 60), // checked against the routing rules by the worker
     best_start: typeof v.best_start === "number" && Number.isFinite(v.best_start) ? Math.round(v.best_start * 100) / 100 : null,
     best_end: typeof v.best_end === "number" && Number.isFinite(v.best_end) ? Math.round(v.best_end * 100) / 100 : null,
     hook_lands: typeof v.hook_lands === "boolean" ? v.hook_lands : true,

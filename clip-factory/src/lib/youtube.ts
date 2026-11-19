@@ -13,6 +13,10 @@ const SCOPES = ["https://www.googleapis.com/auth/youtube.upload", "https://www.g
 export function youtubeConfigured() {
   return Boolean(process.env.YOUTUBE_CLIENT_ID && process.env.YOUTUBE_CLIENT_SECRET);
 }
+/** v2.0.6: which .env lines Connect YouTube still needs (for the Upload button's "Why can't I upload?" line). */
+export function youtubeKeysMissing(): string[] {
+  return ["YOUTUBE_CLIENT_ID", "YOUTUBE_CLIENT_SECRET"].filter((k) => !process.env[k]);
+}
 export function appUrl() {
   return (process.env.APP_URL || "http://localhost:3000").replace(/\/$/, "");
 }

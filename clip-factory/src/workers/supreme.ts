@@ -59,6 +59,7 @@ export async function runSupreme(): Promise<string> {
       campaign: s.campaign?.active ? s.campaign.name : null, layout: k.layout, style: k.editStyle, status: k.status,
       autoChannelId: channelForClip(channels, { channelId: k.channelId, category: k.category ?? k.moment.category, gta: isGta6(momentGame(k.moment)) })?.id ?? null,
       qa: !qa ? "unchecked" : qa.ok ? "ok" : "issues",
+      channelSet: Boolean(k.channelId && channels.some((c) => c.id === k.channelId)), // v2.0.6: the Judge / Krew chose its channel
     };
   });
 

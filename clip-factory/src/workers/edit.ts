@@ -19,6 +19,7 @@ import { editCaption, editTitle } from "../lib/edit-text";
 import { ytdlpDownload } from "./grabber";
 import { probeFinal, renderFacts } from "../lib/platform-file";
 import { watermarkText } from "../lib/layout";
+import { channelForClip } from "../lib/channels";
 import { EDIT_PLACE } from "../lib/edit-plan";
 
 const r3 = (t: number) => Math.round(t * 1000) / 1000;
@@ -149,7 +150,9 @@ export async function runEdit(editId: string): Promise<string> {
   const vibe = parseVibe(edit.vibe), format = parseFormat(edit.format);
   const t0 = Date.now();
   const settings = await getSettings();
-  const watermark = settings.watermark ? settings.channelName : null; // v1.9.1 "@ViceCityClips" on edits too
+  // v1.9.1 watermark on edits too; v2.0.6: the name of the channel that gets edits (ClipFactoryGG), not Settings.channelName.
+  const editChannel = channelForClip(await prisma.channel.findMany({ orderBy: { createdAt: "asc" } }), { category: "edits" });
+  const watermark = settings.watermark ? editChannel?.name ?? settings.channelName : null;
   const dir = storagePath("edits", editId), work = path.join(dir, "work");
   fs.mkdirSync(work, { recursive: true });
 

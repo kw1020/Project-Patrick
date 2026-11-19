@@ -101,6 +101,8 @@ Choose the stretch like a short-form editor and give it as best_start and best_e
 
 Label the category: "funny" for comedy, banter, reactions and fails that are funny, whether or not a game is on screen; "gaming" for plays, clutches, chases and other game moments. The first guess you're given is a hint, not the answer.
 
+Channel: when the message lists Krew's channels, put the name of the one whose audience fits this clip best in "channel", copied exactly. A GTA 6 channel only takes GTA 6 clips, an edits-only channel never takes a plain clip, and a channel only takes the types it lists. When two fit about equally, pick the one with fewer clips in the last 24h. The pipeline checks your pick and moves the clip if it breaks these rules.
+
 Hook (on screen for the first 3 seconds, and the first line of the post caption): a short scroll-stopping line that makes people wait for the payoff without giving it away, specific to this clip, e.g. "He was sure the cops didn't see him". Title: what happens, in plain words. No clickbait the clip doesn't deliver, no all-caps, no emoji, no hashtags. Don't put the streamer's name or credit in either; the pipeline adds the credit.
 
 The post caption is your hook, then the creator credit, then hashtags; the pipeline adds the credit and #GTA6 #GTAVI #ViceCity. Pick 1–2 extra_hashtags from the list: GTA6Funny for funny moments, GTA6Clips for GTA gameplay, StreamerMoments for reactions and IRL, Gaming for other games. If the message has "Campaign caption rules", the hook must follow them, and never use a campaign's banned words.

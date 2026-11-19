@@ -299,7 +299,8 @@ test("To post actions: Post to all queues the API accounts (single attempt), lis
   assert.deepEqual({ platform: ig[0].platform, channelId: ig[0].channelId, url: ig[0].url, campaignLink: ig[0].campaignLink, campaignId: ig[0].campaignId },
     { platform: "instagram", channelId: "vcc", url: "https://instagram.com/reel/abc", campaignLink: "https://whop.com/sub/9", campaignId: camp.id });
   assert.equal((await w.prisma.clip.findUniqueOrThrow({ where: { id: c.id } })).status, "posted");
-  // Queue's auto-post on Approve only uses API YouTube/TikTok accounts.
+  // Queue's auto-post on Approve only uses API YouTube/TikTok accounts (v2.0.6: the old per-account rule = approveUploads off).
+  await w.prisma.settings.upsert({ where: { id: "main" }, update: { approveUploads: false }, create: { id: "main", approveUploads: false } });
   await w.prisma.account.update({ where: { id: w.tt.id }, data: { autoPost: true } });
   await queue("post").obliterate({ force: true });
   const c2 = await w.mk(w.gtaM.id, "pending");

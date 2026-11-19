@@ -23,7 +23,7 @@ export function retentionWindows(s: Partial<RetentionSettings>, pressure = false
   const k = pressure ? 0.5 : 1;
   return {
     rejected: v(s.retainRejectedHrs, 6) * H * k,
-    pending: v(s.retainPendingHrs, 48) * H * k,
+    pending: v(s.retainPendingHrs, 24) * H * k,
     approved: v(s.retainApprovedDays, 5) * D * k,
     posted: v(s.retainPostedDays, 3) * D * k,
     raw: v(s.retainRawHrs, 6) * H * k,

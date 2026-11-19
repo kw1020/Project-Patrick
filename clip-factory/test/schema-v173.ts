@@ -1,6 +1,17 @@
+// Today's schema turned back into the v2.0.5 (adfefea) one: the v2.0.6 per-channel editing + approve-upload + clean-up columns removed.
+export function toV205Schema(now: string): string {
+  return now
+    .replace(/^ {2}\/\/ v2\.0\.6 .*\n/gm, "")
+    .replace(/^ {2}editStyle {4}String\? \/\/ hype \| clean \| meme\n/m, "")
+    .replace(/^ {2}layout {7}String\? \/\/ auto \| split \| fullcam \| blur\n/m, "")
+    .replace(/^ {2}captionStyle String\? .*\n/m, "")
+    .replace(/^ {2}(approveUploads|migratedChannelStyles|migratedQueueCleanup|migratedPending24) .*\n/gm, "")
+    .replace(/^ {2}retainPendingHrs .*\n/m, "  retainPendingHrs    Int     @default(48) // never reviewed: final deleted after this, then status \"expired\"\n");
+}
+
 // Today's schema turned back into the v2.0.3 (f01d7cb) one: the v2.0.5 Top 5 Edit columns (theme, creators) removed.
 export function toV203Schema(now: string): string {
-  return now.replace(/^ {2}\w+ +\w+\??(?: +@default\([^)]*\))? *\/\/ v2\.0\.5.*\n/gm, "");
+  return toV205Schema(now).replace(/^ {2}\w+ +\w+\??(?: +@default\([^)]*\))? *\/\/ v2\.0\.5.*\n/gm, "");
 }
 
 // Today's schema turned back into the v2.0.0 (87ddbb4) one: the v2.0.3 Account columns (scopes, directPost) removed.

@@ -12,9 +12,11 @@ import { detectCam } from "../lib/camdetect";
 import { boxToRemember, camInfoFits, chooseLayout, needsDetect, overlayPlace, parseCamInfo, parseLayoutSetting, planLayout, watermarkText, type CamInfo, type LayoutPlan } from "../lib/layout";
 import { audioCues, findPayoff, pickSmartWindow, tightenWindow, windowWords } from "../lib/window";
 import { audioSummary, chatInSource, chatPeak } from "../lib/audio-summary";
-import { candidateScore, gateInputs, judgePriority } from "../lib/rank";
+import { FINDER_PREFIX, candidateScore, gateInputs, judgePriority } from "../lib/rank";
 import { probeFinal, renderFacts } from "../lib/platform-file";
 import { keepBest, vodSpan, type KeepClip } from "../lib/funnel";
+import { cutChoices } from "../lib/channels";
+import { pickClipChannel } from "../lib/to-post";
 
 /** Longest stretch of source we transcribe (Twitch clips are <= 60s, VOD/YouTube sections 45s). */
 export const MAX_SOURCE_SEC = 180;
@@ -139,8 +141,15 @@ export async function runCut(clipId: string, styleOverride?: string, jumpOverrid
     const win = pickWindow(await probeDuration(raw), settings.clipMinSec, settings.clipMaxSec);
     start = win.start; length = win.length;
   }
+  // v2.0.6: cut in the style of the clip's channel (the Judge picked it before the cut; Krew's pick wins). A clip on its way to
+  // review that still has none (judged before v2.0.6, or the pick failed) gets one now. Re-cut choices win over the channel.
+  let channel = clip.channelId ? await prisma.channel.findUnique({ where: { id: clip.channelId } }) : null;
+  const toReview = (clip.status === "processing" || clip.status === "failed") && !(clip.judgeReason ?? "").startsWith(FINDER_PREFIX)
+    && !(settings.judgeEnabled && clip.score != null && clip.score < settings.minScore);
+  if (!channel && toReview) channel = (await pickClipChannel(clipId).catch(() => null))?.channel ?? null;
+  const choice = cutChoices(channel, settings, { style: styleOverride, layout: layoutOverride });
   const lay = await resolveLayout({
-    raw, start, length, mode: layoutOverride ?? settings.layout, category: clip.category, gameName: clip.moment.gameName, camInfo: clip.camInfo, streamer,
+    raw, start, length, mode: choice.layout, category: clip.category, gameName: clip.moment.gameName, camInfo: clip.camInfo, streamer,
   });
   const plan = lay.plan, layout = plan.kind;
   const facecam = plan.kind === "split" ? plan.cam : null;
@@ -156,17 +165,18 @@ export async function runCut(clipId: string, styleOverride?: string, jumpOverrid
   const peakAt = clip.payoffAt != null ? clip.payoffAt - start : null;
 
   const assPath = storagePath("work", `${clipId}.ass`);
-  // v1.9.1: Settings watermark on = "@<channelName>" burned in (styled and plain edits; re-cuts too).
-  const watermark = settings.watermark ? settings.channelName : null;
+  // v1.9.1: Settings watermark on = "@<name>" burned in (styled and plain edits; re-cuts too). v2.0.6: the clip's CHANNEL name
+  // ("@StreamHeistClips" on a StreamHeistClips clip), Settings.channelName only for a clip with no channel.
+  const watermark = choice.watermark;
   let usedLayout: string = layout;
   try {
     const finalRel = `final/${clipId}.mp4`;
-    const style = parseEditStyle(styleOverride ?? settings.editStyle);
+    const style = parseEditStyle(choice.style);
     const jumpCuts = parseJumpCuts(jumpOverride ?? settings.jumpCuts);
     // Never lose a clip to a fancy effect: if the styled render fails, the plain v1.7.1 edit is made instead.
     const audio = await hasAudio(raw);
     const r = await renderOrFallback(style, () => renderStyled({
-      input: raw, output: storagePath(finalRel), start, length, facecam, plan, style, words, credit: creatorCreditText(streamer), hook: clip.hookText || clip.title, watermark,
+      input: raw, output: storagePath(finalRel), start, length, facecam, plan, style, words, credit: creatorCreditText(streamer), hook: clip.hookText || clip.title, watermark, captionStyle: choice.captionStyle,
       minSec: settings.clipMinSec, hasAudio: audio, workDir: storagePath("work"), id: clipId,
       peakHint: { source: clip.moment.source, vodOffset: clip.moment.vodOffset, vodId: clip.moment.vodId }, peakAt, jumpCuts,
     }), async () => {

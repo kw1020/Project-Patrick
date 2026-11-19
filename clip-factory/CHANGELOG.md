@@ -1,5 +1,13 @@
 # Clip Factory patch notes
 
+## 2.0.6 — 2026-11-19
+- An Upload button is now always on approved clips, in the Queue and on the Upload page. If the channel's YouTube is connected it uploads in one click and shows Live on YouTube with the link. If not, it says "Upload to YouTube (connect first)": it signs in to that channel's YouTube and uploads the clip as soon as you're back. A line under it says exactly why a clip can't upload yet.
+- Approve + Upload: approving a clip in the Queue uploads it to its channel's connected YouTube, TikTok and Instagram right away, and the button says what will happen. By-hand accounts still wait on Upload. Turn it off in Settings > Upload.
+- The Judge now picks each clip's channel before it is cut: GTA 6 clips to ViceCityClips, funny moments to StreamHeistClips, big plays to WantedLevelClips. Edits still only go to ClipFactoryGG. Every channel gets a fair share.
+- Each channel has its own editing: ViceCityClips Hype, StreamHeistClips Meme, WantedLevelClips Clean (change it in Settings > Channels). The watermark is now the clip's own channel name, and Move to... offers to re-cut a clip in its new channel's style.
+- The Queue shows each clip's channel, with a chip per channel to review one channel at a time. To review is sorted best first.
+- Queue clean-up: clips waiting for review that scored under 7 (or never got a score) were cleared out once, and a Clean up queue button does it again any time. Clips nobody reviews now expire after 24 hours instead of 48.
+
 ## 2.0.5 — 2026-11-19
 - New default edit: Top 5. Pick a theme (Top 5 funniest, Top 5 craziest plays, Top 5 GTA 6 moments, or one creator's top 5) and press Make it.
 - It counts down #5 to #1: each moment is its own short cut (setup, payoff, reaction) with its own sound and captions, with a quick "#3" card and whoosh between them. It opens on the title and ends on "Follow @ClipFactoryGG".
