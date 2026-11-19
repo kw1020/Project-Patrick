@@ -4,6 +4,8 @@ import { markPosted, postToAccount, rebuildCaption, recutClip, retryClip, setCli
 import { EDIT_STYLES, LAYOUTS, editStyleLabel, layoutChip, parseEditStyle } from "../lib/edit-styles";
 import { captionCredits, checkCampaignCaption, creatorHandle, creatorUrl } from "../lib/social";
 import { CategoryChip } from "./CategoryChip";
+import { QaBox } from "./QaBox";
+import type { QaResult } from "../lib/qa";
 
 export type ClipView = {
   id: string; status: string; stage: string | null; error: string | null; title: string; caption: string;
@@ -17,6 +19,8 @@ export type ClipView = {
   category?: string | null; // funny | gaming (null on older clips)
   campaign?: { name: string; requiredText: string | null; bannedWords: string | null; maxCaptionChars: number | null } | null; // v1.9.1: the creator's active campaign
   posts: { platform: string; accountId: string | null; status: string; url: string | null; error: string | null }[]; postError: string | null;
+  supreme?: { rank: number | null; reason: string | null; channel: string | null } | null; // v1.9.6 Supreme Judge pick
+  qa?: QaResult | null; // v1.9.6 video check
 };
 export type AccountView = { id: string; platform: string; label: string; autoPost: boolean; privacy: string };
 
@@ -72,6 +76,12 @@ export function ClipCard({ clip, accounts }: { clip: ClipView; accounts: Account
       </div>
 
       <div className="flex flex-1 flex-col gap-2 p-3">
+        {clip.supreme && (
+          <div className="rounded-lg border border-sun/40 bg-sun/10 px-2.5 py-1.5 text-xs text-amber-100" data-testid="supreme-pick">
+            <b>⭐ Supreme pick{clip.supreme.channel ? ` for ${clip.supreme.channel}` : ""}</b>{clip.supreme.reason ? `: ${clip.supreme.reason}` : ""}
+            {clip.status === "pending" && <span className="text-amber-300/80"> (approve it to post it)</span>}
+          </div>
+        )}
         <div className="flex items-center justify-between gap-2 text-xs text-zinc-400">
           <a href={creatorUrl(clip.streamer)} target="_blank" className="font-bold text-zinc-200 hover:text-hot">{clip.streamer.name}</a>
           {clip.sourceUrl && (
@@ -117,6 +127,7 @@ export function ClipCard({ clip, accounts }: { clip: ClipView; accounts: Account
               onClick={() => start(async () => { const c = await rebuildCaption(clip.id); setCaption(c); setSaved(true); })}>Rebuild caption</button>
           )}
         </div>
+        {clip.status !== "processing" && !clip.expired && <QaBox clipId={clip.id} qa={clip.qa ?? null} hasVideo={clip.hasVideo} canRecut={Boolean(clip.canRecut)} busy={busy || recutting} />}
         {recutting && <div className="animate-pulse text-xs text-sun">Re-cutting… the new version replaces this video in about a minute.</div>}
         {clip.editNote && !recutting && <div className="text-xs text-zinc-500" title={clip.editNote}>Plain edit used (the styled edit hit a problem).</div>}
         {clip.canRecut && clip.status !== "processing" && (

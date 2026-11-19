@@ -56,17 +56,18 @@ export function pickFrameTimes(o: { start: number; end: number; payoffAt?: numbe
 }
 
 /**
+ * (v1.9.6: `width` lets the Supreme Judge's video check ask for 540 wide = 540x960 from a 1080x1920 clip.)
  * Grab the frames with ONE ffmpeg run (an input seek per frame, so it's fast on long files), scaled to 640px wide JPEGs.
  * Throws if ffmpeg fails or any frame is missing; the caller then judges from text only.
  */
-export async function extractFrames(input: string, times: number[], workDir: string, id: string, timeoutMs = 60_000): Promise<JudgeFrame[]> {
+export async function extractFrames(input: string, times: number[], workDir: string, id: string, timeoutMs = 60_000, width = JUDGE_FRAME_WIDTH): Promise<JudgeFrame[]> {
   if (!times.length) return [];
   fs.mkdirSync(workDir, { recursive: true });
   const outs = times.map((_, i) => path.join(workDir, `${id}-judge-${i}.jpg`));
   const args = ["-hide_banner", "-loglevel", "error", "-y"];
   for (const t of times) args.push("-ss", t.toFixed(2), "-i", input);
   times.forEach((_, i) => {
-    args.push("-map", `${i}:v:0`, "-frames:v", "1", "-vf", `scale=${JUDGE_FRAME_WIDTH}:-2`, "-q:v", String(JUDGE_FRAME_Q), "-f", "image2", outs[i]);
+    args.push("-map", `${i}:v:0`, "-frames:v", "1", "-vf", `scale=${width}:-2`, "-q:v", String(JUDGE_FRAME_Q), "-f", "image2", outs[i]);
   });
   try {
     await run(process.env.FFMPEG || "ffmpeg", args, { timeoutMs });

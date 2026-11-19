@@ -14,6 +14,7 @@ import { migrateLegacySettings, runPost, runStatsSync } from "./poster";
 import { runSpikeCheck } from "./spike";
 import { runYouTubeScan } from "./youtube";
 import { runSuggestScan } from "./suggest";
+import { runQa, runSupreme } from "./supreme";
 import { migrateV180Settings, migrateV190Settings } from "./migrate";
 import { startRetention } from "./retention";
 import { judgeConfigured } from "../lib/judge";
@@ -33,13 +34,14 @@ function worker(name: keyof typeof QUEUES, concurrency: number, fn: (job: Job) =
   const w = new Worker(QUEUES[name], async (job) => {
     const msg = await fn(job);
     console.log(`[${name}] ${msg}`);
-    if (name === "scout" || name === "clips" || name === "judge" || name === "youtube" || name === "suggest") await setStatus(name, true, msg);
+    if (name === "scout" || name === "clips" || name === "judge" || name === "youtube" || name === "suggest" || name === "supreme" || name === "qa") await setStatus(name, true, msg);
     if (name === "post") await setStatus(job.name === "views" ? "stats" : "post", true, msg);
     return msg;
   }, { connection: redis(), concurrency });
   w.on("failed", async (job, err) => {
     console.error(`[${name}] failed:`, err.message);
-    if (name === "scout" || name === "clips" || name === "youtube" || name === "suggest") await setStatus(name, false, err.message);
+    if (name === "scout" || name === "clips" || name === "youtube" || name === "suggest" || name === "supreme" || name === "qa") await setStatus(name, false, err.message);
+    if (name === "supreme" || name === "qa") return; // a failed pick or video check never fails the clip
     const clipId = job?.data?.clipId;
     if (name === "post" && job?.name === "views") { await setStatus("stats", false, err.message); return; }
     if (name === "post") {
@@ -75,9 +77,11 @@ async function main() {
     worker("grab", 2, (job) => runGrab(job.data.clipId)),
     worker("transcribe", 1, (job) => runTranscribe(job.data.clipId)),
     worker("judge", 3, (job) => runJudge(job.data.clipId)),
-    worker("cut", Number(process.env.CUT_CONCURRENCY || 1), (job) => runCut(job.data.clipId, job.data.style, job.data.jumpCuts, job.data.layout)), // ffmpeg is CPU-heavy: one at a time
+    worker("cut", Number(process.env.CUT_CONCURRENCY || 1), (job) => runCut(job.data.clipId, job.data.style, job.data.jumpCuts, job.data.layout, Boolean(job.data.qaAfter))), // ffmpeg is CPU-heavy: one at a time
     worker("youtube", 1, () => runYouTubeScan()),
     worker("suggest", 1, () => runSuggestScan()),
+    worker("supreme", 1, () => runSupreme()), // v1.9.6 Supreme Judge
+    worker("qa", 1, (job) => runQa(job.data.clipId)), // v1.9.6 video check
     worker("post", 1, (job) => (job.name === "views" ? runStatsSync() : runPost(job.data.clipId, job.data.accountId))),
   ];
 
@@ -94,6 +98,10 @@ async function main() {
   const suggestEvery = Number(process.env.SUGGEST_INTERVAL_MS || 60 * 60_000);
   await queue("suggest").upsertJobScheduler("suggest-every", { every: suggestEvery, startDate: Date.now() + suggestEvery }, { name: "suggest", opts: { attempts: 1 } });
   await queue("suggest").add("suggest", {}, { delay: 60_000, attempts: 1, removeOnComplete: true });
+
+  // v1.9.6 Supreme Judge: 3 times a day (every 8h; the first run 8h after the scheduler is first made), plus "Pick now".
+  const supremeEvery = Number(process.env.SUPREME_INTERVAL_MS || 8 * 3600_000);
+  await queue("supreme").upsertJobScheduler("supreme-every", { every: supremeEvery, startDate: Date.now() + 10 * 60_000 }, { name: "supreme", opts: { attempts: 1 } });
 
   await queue("post").upsertJobScheduler("views-every", { every: 15 * 60_000 }, { name: "views", opts: { attempts: 1 } });
   const stopRetention = startRetention(); // disk retention: now, then hourly

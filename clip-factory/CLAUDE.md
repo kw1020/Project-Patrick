@@ -243,6 +243,26 @@ original brief is below, and the status section says what's done. Read both befo
   5M+/2M+/below, then score; no token = peak viewers then score + note. Streamers page chips "Big only (2M+)" (default on, `?big=0`
   off) and "GTA 6 now" (`?gta=1`); also refreshes approved creators' followers (Creators page). Unverified against real Twitch
   user-token OAuth / followers API and on Krew's PC.
+- **v1.9.6 (2026-11-19): Supreme Judge** (own files: `src/lib/supreme.ts`, `src/lib/qa.ts`, `src/lib/ai-spend.ts`, `src/lib/prompt-file.ts`,
+  `src/workers/supreme.ts`, `prompts/supreme.md`, `prompts/supreme-qa.md`, `src/components/QaBox.tsx`; the per-clip Judge files are untouched).
+  Additive schema (`test/v196.test.ts` pushes from d757285 = v1.9.5 with rows; `toV195Schema`; built as "1.9.3"): Clip `supremePick/supremeRank/supremeReason/supremeAt/
+  supremeChannelId`, `qa` (JSON `QaResult`) + `qaAt`, `cutPlan` (JSON {segs in window seconds, punchStart, duration} written by the cutter on
+  every cut; every cut clears `qa`); Settings `supremePerChannel` (5) + `supremeDailyCents` (25); model `AiSpend {day (local YYYY-MM-DD),
+  model, purpose supreme|qa, cents}` (plain index on day). Queues "supreme" (scheduler every 8h, first run 10 min after the scheduler is
+  first made; "Pick now" = `pokeSupreme`) and "qa" (`enqueueQa`; `enqueueCut(..., qaAfter)` → job data `qaAfter` → the cutter queues the check
+  after the cut). `runSupreme`: no key / over budget / no channels → skipped with a status line; candidates = approved + pending clips with a
+  video from the last 72h, best score first, max 40; channel context = focus, types, posts today (+ per creator), last-14-day breakdowns by
+  creator/type/platform (`performance`); ONE `client.beta.messages.parse` on claude-opus-5-5 (effort medium, `zodOutputFormat(SupremePicks)`,
+  betas server-side-fallback + `fallbacks: "default"`); refusal → no picks (old line-up kept). `enforcePicks` (safety net): known
+  channels/clips, one channel per clip, <= min(perChannel, want), <= 2 per creator per channel per day counting today's posts, never a clip
+  whose `qa` has issues. The new line-up replaces the old; unchecked picks get `enqueueQa`. `runQa`: ffmpeg one pass (blackdetect d=0.4,
+  freezedetect d=1.5 → issue at >= 2s and not inside black, silencedetect -50dB → issue at >= 3s, ebur128 → < -30 LUFS), length vs
+  `Clip.duration`, `planIssues` (cut boundary inside a word by > 0.05s, piece < 0.5s, window end inside a word → extend_end); then (key +
+  budget) ~10 frames (`frameTimes`: hook 0.6s, cut + 0.25s, punch + 0.4s, last 0.4s, evenly to fill) grabbed by the v1.9.4 `extractFrames` (`src/lib/frames.ts`, new optional width arg = 540 → 540x960 JPEG) → claude-sonnet-5-5
+  effort low with labelled image blocks + cut list + `transcriptAroundCuts` (`QaVerdict` enum types/fixes); model black/frozen duplicates
+  dropped. `fixClip` (Fix it): all suggested fixes in one re-cut (`fixPlan`: no jump cuts / layout / clean / winLength + 2s capped at the raw
+  length) via `enqueueCut(..., qaAfter=true)`; status kept. Spend = usage x `src/lib/pricing.ts` (Opus 5.5 added; all input tokens at the input price) recorded per call, refusals
+  included. Unverified against the real Claude API (image blocks + structured output on Opus 5.5) and on Krew's PC.
 - Docker image never built in the sandbox (no daemon); it builds fine on Krew's PC; a clean-copy `npm ci` + `next build` without `.env`
   (what the Dockerfile does) passes.
 - **Suggestions (2026-11-17):** `src/workers/suggest.ts` (queue "suggest", hourly + once ~1 min after start,

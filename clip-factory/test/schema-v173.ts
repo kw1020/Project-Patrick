@@ -1,7 +1,14 @@
+// Today's schema turned back into the v1.9.5 one: the v1.9.6 columns (Supreme Judge, video checks) and AiSpend removed.
+export function toV195Schema(now: string): string {
+  return now
+    .replace(/^ {2}\w+ +\w+\??(?: +@default\([^)]*\))? *\/\/ v1\.9\.6.*\n/gm, "")
+    .replace(/\/\/ v1\.9\.6: what the Supreme Judge[\s\S]*?\nmodel AiSpend \{[\s\S]*?\n\}\n\n/, "");
+}
+
 // Today's schema turned back into the v1.9.4 (de19280) one: the v1.9.5 columns (Channels, manual accounts, followers)
 // and the Channel model removed.
 export function toV194Schema(now: string): string {
-  return now
+  return toV195Schema(now)
     .replace(/^ {2}\w+ +\w+\??(?: +@default\([^)]*\))? *\/\/ v1\.9\.5.*\n/gm, "")
     .replace(/^\/\/ v1\.9\.5: mode "manual".*\n\/\/ platform "twitch".*\n/m, "")
     .replace("  platform     String    // youtube | tiktok | instagram | twitch (follower counts only)\n", "  platform     String    // youtube | tiktok\n")

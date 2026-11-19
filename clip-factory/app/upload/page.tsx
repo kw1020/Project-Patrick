@@ -3,6 +3,12 @@ import { AutoRefresh } from "@/components/AutoRefresh";
 import { ToPostCard, type ToPostView } from "@/components/ToPostCard";
 import { PLATFORM_LABEL, POST_PLATFORMS, accountAction, isGtaFocus, parseKinds } from "@/lib/channels";
 import { toPostItems } from "@/lib/to-post";
+import { QaBox } from "@/components/QaBox";
+import { parseQa } from "@/lib/qa";
+import { budgetLine } from "@/lib/ai-spend";
+import { getStatuses, soft, type AgentStatus } from "@/lib/queues";
+import { ago } from "@/lib/format";
+import { pickNow } from "../actions";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +28,7 @@ function view(x: Item): ToPostView {
       accountId: a.id, platform: a.platform, label: a.handle ?? a.channelTitle ?? a.platform, action: accountAction(a), error: a.error, disabled: a.disabled,
       done: post ? { status: post.status, url: post.url } : null,
     })),
-    supreme: null,
+    supreme: k.supremePick ? { rank: k.supremeRank, reason: k.supremeReason } : null, // v1.9.6
   };
 }
 
@@ -41,7 +47,8 @@ function Slot({ platform, a }: { platform: string; a: Acct | undefined }) {
 }
 
 export default async function UploadPage() {
-  const { channels, accounts, items } = await toPostItems();
+  const [{ channels, accounts, items }, budget, statuses] = await Promise.all([toPostItems(), budgetLine(), soft(getStatuses(), {} as Record<string, AgentStatus>)]);
+  const sup = statuses.supreme; // v1.9.6 Supreme Judge
   const chans = channels.map((c) => ({ id: c.id, name: c.name }));
   const noChannel = items.filter((x) => !x.channel);
   const cols = [
@@ -56,7 +63,15 @@ export default async function UploadPage() {
           <h1 className="text-2xl font-black">Upload</h1>
           <p className="text-sm text-zinc-400">Approved clips, in the column of the channel they go to. <b>Post to all</b> uploads to the channel&apos;s connected YouTube and TikTok; Instagram and by-hand accounts: Download + copy caption, post it, then Mark posted. Done clips move to Posted.</p>
         </div>
-        <Link href="/queue" className="btn-ghost text-sm">Review more in the Queue</Link>
+        <div className="flex flex-wrap items-center gap-2">
+          <form action={pickNow}><button className="btn-hot text-sm" disabled={budget.over} title={budget.over ? "Today's budget is used" : "Ask the Supreme Judge for today's best clips per channel"}>⭐ Pick now</button></form>
+          <Link href="/queue" className="btn-ghost text-sm">Review more in the Queue</Link>
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-zinc-400" data-testid="supreme-status">
+        <span className={budget.over ? "font-bold text-sun" : "font-semibold text-zinc-300"}>{budget.text}</span>
+        {sup && <span className={sup.ok ? "" : "text-red-300"}>Last run {ago(sup.at)}: {sup.msg}</span>}
+        {!sup && <span>Runs 3 times a day; press Pick now for a line-up right away. Picks come first in each column.</span>}
       </div>
       {channels.length === 0 ? (
         <div className="card p-10 text-center text-zinc-400">No channels yet. Add them in <Link href="/settings#channels" className="text-hot">Settings → Channels</Link>.</div>
@@ -74,7 +89,11 @@ export default async function UploadPage() {
               </div>
               {col.items.length === 0
                 ? <div className="rounded-xl border border-dashed border-line p-6 text-center text-xs text-zinc-500">Nothing waiting. Approve clips in the <Link href="/queue" className="text-hot">Queue</Link>.</div>
-                : col.items.map((x) => <ToPostCard key={x.clip.id} clip={view(x)} channels={chans} />)}
+                : col.items.map((x) => (
+                  <ToPostCard key={x.clip.id} clip={view(x)} channels={chans}>
+                    <QaBox clipId={x.clip.id} qa={parseQa(x.clip.qa)} hasVideo={Boolean(x.clip.finalPath)} canRecut={Boolean(x.clip.rawPath)} />
+                  </ToPostCard>
+                ))}
             </section>
           ))}
         </div>

@@ -97,6 +97,14 @@ model Clip {
   category    String? // funny | gaming: the moment's guess at first, replaced by the Judge's label; null on older rows
   postError   String? // last YouTube upload error
   channelId   String? // v1.9.5: the Channel this clip goes to when Krew picked one on To post (null = by category, src/lib/channels.ts)
+  cutPlan     String? // v1.9.6: JSON of the last render's edit {segs (window seconds), punchStart, duration} (Supreme QA cut checks)
+  supremePick Boolean @default(false) // v1.9.6: the Supreme Judge picked it (shown first on To post / starred on the Queue)
+  supremeRank Int? // v1.9.6: its place in that channel's picks (1 = best)
+  supremeReason String? // v1.9.6: one line on why
+  supremeAt   DateTime? // v1.9.6: when it was picked
+  supremeChannelId String? // v1.9.6: the channel it was picked for
+  qa          String? // v1.9.6: JSON video check (src/lib/qa.ts QaResult): free ffmpeg checks + the vision check
+  qaAt        DateTime? // v1.9.6: when the video was last checked
   title      String?
   caption    String?
   // processing -> pending (waiting for review) -> approved | rejected -> posted ; failed on error
@@ -175,6 +183,8 @@ model Settings {
   retainRawHrs        Int     @default(6)  // raw: deleted once cut + reviewed, and at most this long after the cut
   retainRowsDays      Int     @default(7)  // rejected / expired clip rows deleted after this (clips with posts are kept)
   migratedChannels    Boolean @default(false) // v1.9.5 one-time: first Channel made from channelName, existing accounts put in it
+  supremePerChannel   Int     @default(5) // v1.9.6: Supreme Judge picks per channel per run
+  supremeDailyCents   Int     @default(25) // v1.9.6: daily cap for Supreme Judge + video checks, in US cents
 }
 
 // v1.9.5: one of Krew's brands (e.g. "ViceCityClips") = up to one YouTube + one TikTok + one Instagram account that all get the same
@@ -229,6 +239,19 @@ model Account {
   posts        Post[]
 
   @@unique([platform, channelId])
+}
+
+// v1.9.6: what the Supreme Judge and its video checks cost, one row per Claude call (summed per day for the daily cap).
+// purpose: supreme | qa. The per-clip Judge is not written here. No unique constraint (plain index on day).
+model AiSpend {
+  id        String   @id @default(cuid())
+  day       String   // YYYY-MM-DD, the computer's local day
+  model     String
+  purpose   String   @default("supreme")
+  cents     Float
+  createdAt DateTime @default(now())
+
+  @@index([day])
 }
 
 // View-count history for each post (one row per sync where something changed).

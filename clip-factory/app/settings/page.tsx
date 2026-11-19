@@ -14,6 +14,7 @@ import { isApiPostingAccount, isPostingAccount } from "@/lib/channels";
 import { ensureChannels } from "@/lib/to-post";
 import { twitchConfigured } from "@/lib/twitch";
 import { twitchRedirectUri } from "@/lib/twitch-user";
+import { SUPREME_MODEL } from "@/lib/ai-spend";
 
 export const dynamic = "force-dynamic";
 
@@ -169,6 +170,13 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
             The Judge looks at 8 frames of each clip plus its transcript.{" "}
             {cents != null ? <>Cost: <b className="text-zinc-200">~{cents < 1 ? cents.toFixed(1) : Math.round(cents * 10) / 10}¢ per clip</b> (last {costRows.length}).</> : "Cost per clip shows here once clips have been scored."}
           </div>
+        </div>
+
+        <div className="card space-y-4 p-5" data-testid="supreme-settings">
+          <Head>Supreme Judge</Head>
+          <p className="text-xs text-zinc-500">3 times a day (and on Upload → Pick now) {SUPREME_MODEL} picks the best clips for each channel, then watches each pick for bad cuts, captions over faces, bad crops and frozen or black video. It never posts or approves anything.</p>
+          <Row label="Picks per channel" hint="How many clips it picks for each channel each run."><input name="supremePerChannel" type="number" min="1" max="20" defaultValue={s.supremePerChannel} className="field w-32" /></Row>
+          <Row label="Daily budget (US$)" hint="When the Supreme Judge and its video checks have spent this today, they wait until tomorrow. The per-clip Judge is not counted."><input name="supremeDailyDollars" type="number" step="0.05" min="0" max="50" defaultValue={(s.supremeDailyCents / 100).toFixed(2)} className="field w-32" /></Row>
         </div>
 
         <div className="card space-y-4 p-5" data-testid="clips-card">

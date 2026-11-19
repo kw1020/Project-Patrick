@@ -1,6 +1,7 @@
 // v1.9.4: what the Judge costs. The one place for model prices (USD per million tokens). Check anthropic.com/pricing if they change.
 export const MODEL_PRICES: Record<string, { inPerMTok: number; outPerMTok: number }> = {
   "claude-sonnet-5-5": { inPerMTok: 2, outPerMTok: 10 },
+  "claude-opus-5-5": { inPerMTok: 4, outPerMTok: 20 }, // v1.9.6 Supreme Judge
 };
 /** Used for a model that isn't listed (e.g. JUDGE_MODEL set to something else): Sonnet 5.5's price. */
 export const DEFAULT_PRICE = MODEL_PRICES["claude-sonnet-5-5"];

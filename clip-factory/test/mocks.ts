@@ -3,7 +3,7 @@ import http from "node:http";
 
 export type Mock = { tiktokStatus: Record<string, unknown>; refreshCount: number; url: string; requests: { method: string; path: string; headers: http.IncomingHttpHeaders; body: Buffer }[]; close: () => Promise<void>; verdict: Record<string, unknown>;
   followers: Record<string, number>; // v1.9.5: Helix /channels/followers totals by broadcaster_id (missing = 1000)
-  /** v1.9.3: what the stand-in Claude returns for Supreme (claude-opus-5-5) and QA (image) requests. */
+  /** v1.9.6: what the stand-in Claude returns for Supreme (claude-opus-5-5) and QA (image) requests. */
   supreme: Record<string, unknown>; qa: Record<string, unknown>; supremeStop: string; usage: { input_tokens: number; output_tokens: number };
 };
 
@@ -25,9 +25,16 @@ export async function startMocks(port = 0): Promise<Mock> {
 
       if (path.startsWith("/v1/messages")) {
         // v1.9.4: content is a string (text only) or blocks ("[frame at Xs]" text + image per frame, then the text).
-        const content = JSON.parse(body.toString()).messages[0].content as string | { type: string; text?: string; source?: { type: string; media_type: string; data: string } }[];
+        const req = JSON.parse(body.toString());
+        const reply = (model: string, obj: unknown, stop = "end_turn") => json(200, { id: "msg_mock", type: "message", role: "assistant", model, stop_reason: stop, stop_sequence: null,
+          content: stop === "refusal" ? [] : [{ type: "text", text: JSON.stringify(obj) }], usage: mock.usage });
+        // v1.9.6: the Supreme Judge (Opus).
+        if (req.model === "claude-opus-5-5") return reply(req.model, mock.supreme, mock.supremeStop);
+        const content = req.messages[0].content as string | { type: string; text?: string; source?: { type: string; media_type: string; data: string } }[];
         const blocks = typeof content === "string" ? [{ type: "text", text: content }] : content;
         if (blocks.some((b) => b.type === "image" && (b.source?.type !== "base64" || b.source?.media_type !== "image/jpeg" || !b.source?.data))) return json(400, { type: "error", error: { type: "invalid_request_error", message: "mock: bad image block" } });
+        // v1.9.6: the Supreme Judge's video check (its own system prompt; the per-clip Judge sends frames too since v1.9.4).
+        if (JSON.stringify(req.system ?? "").includes("You check finished vertical clips")) return reply(req.model, mock.qa);
         const text = blocks.filter((b) => b.type === "text").map((b) => b.text ?? "").join("\n");
         const images = blocks.filter((b) => b.type === "image").length;
         const verdict = text.includes("(no speech detected)") && text.includes("viewer made") && text.includes(", 600 views") ? { ...mock.verdict, score: 3, reason: "Nothing happens and the audience was flat." } : mock.verdict;

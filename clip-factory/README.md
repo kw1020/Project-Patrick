@@ -325,6 +325,24 @@ which is on C: by default, and that's usually what fills C:. Docker Desktop → 
   "6.2M followers" with **5M+ / 2M+** badges, "Big only (2M+)" is on by default, "GTA 6 now" shows who is in GTA 6, and
   your top 21 are pinned first when found. Without it suggestions are ranked by viewers. The Creators page shows followers too.
 
+## Supreme Judge (v1.9.6)
+- Three times a day (every 8 hours) and when you press **Pick now** on Upload, one request to `claude-opus-5-5` looks at the
+  approved and waiting clips of the last 3 days (up to 40: creator, type, Judge score + reason + hook, how standout it was,
+  age, length, campaign, layout/style) plus what did well on each channel in the last 14 days and what each channel already
+  posted today, and picks up to **Picks per channel** (Settings, default 5) for each channel, best first, with a one-line reason.
+- Rules: at most 2 clips of one streamer per channel per day (also enforced in code), fresh clips first, good campaign clips
+  first, lean on what performed, never a clip whose video check found problems. Picks show first on **Upload** with
+  ⭐ Supreme pick + the reason; picks that you haven't approved yet are starred on the Queue (you still approve them).
+- **Video check**: each new pick is watched: free ffmpeg checks (black, frozen, long silence, loudness, length) + the cut list
+  (a jump cut inside a word, pieces under 0.5s, ending mid-word), then ~10 frames (the hook, right after each cut, the punch-in,
+  the last second) go to `claude-sonnet-5-5`, which flags bad cuts, captions over a face, webcam crops, frozen/black video,
+  audio problems, a missing credit or a bad ending. Cards show **Checked ✓** or the problems with a **Fix it** button (re-cuts
+  without jump cuts / in another layout / in the Clean style / 2s longer at the end, then checks again). Any clip card has
+  **Check video**. A pick with problems stays picked but shows the warning until fixed.
+- **Budget**: Settings → Supreme Judge → **Daily budget** (default $0.25). When today's Supreme Judge + video check spend
+  reaches it, they wait until tomorrow (the free ffmpeg checks still run). Upload shows "Supreme Judge today: $0.08 of $0.25".
+  The per-clip Judge isn't counted. Prices (Opus 5.5 $4/$20, Sonnet 5.5 $2/$10 per million tokens) are in `src/lib/pricing.ts`.
+
 ## Settings worth knowing
 
 - **Min Twitch clip views** (default 25): raise it on launch day when there are thousands of clips.

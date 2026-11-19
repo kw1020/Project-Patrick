@@ -2,7 +2,7 @@ import fs from "node:fs";
 import { prisma, getSettings } from "../lib/db";
 import { buildAss, extractAudio, hasAudio, parseFacecam, pickWindow, probeDuration, renderVertical, type Word } from "../lib/media";
 import { resolveStored, storagePath } from "../lib/paths";
-import { enqueueJudge } from "../lib/queues";
+import { enqueueJudge, enqueueQa } from "../lib/queues";
 import { transcribe } from "../lib/transcribe";
 import { creatorCreditText } from "../lib/social";
 import { categoryOff, isCategory, offReason } from "../lib/category";
@@ -89,7 +89,7 @@ export async function resolveLayout(o: {
   return { plan, det, why: choice.why, remembered: keep };
 }
 
-export async function runCut(clipId: string, styleOverride?: string, jumpOverride?: string, layoutOverride?: string) {
+export async function runCut(clipId: string, styleOverride?: string, jumpOverride?: string, layoutOverride?: string, qaAfter = false) {
   const clip = await prisma.clip.findUnique({ where: { id: clipId }, include: { moment: { include: { streamer: true } } } });
   if (!clip) return "clip deleted";
   if (!clip.rawPath) throw new Error("No raw video to cut (grab step didn't finish)");
@@ -163,10 +163,14 @@ export async function runCut(clipId: string, styleOverride?: string, jumpOverrid
       where: { id: clipId },
       data: {
         finalPath: finalRel, duration: outLen, winLength: length, editStyle: cutWith, editNote, layout: usedLayout,
+        // v1.9.6: the edit as rendered (for the video check's cut checks); a new video is unchecked until checked again.
+        cutPlan: JSON.stringify(r.result ? { segs: r.result.segs, punchStart: r.result.punchStart, duration: r.result.duration } : { segs: [{ start: 0, end: length }], punchStart: null, duration: length }),
+        qa: null, qaAt: null,
         ...(lay.det && !lay.det.error ? { camInfo: JSON.stringify(lay.det) } : {}), stage: null, stageAt: new Date(), error: null, status: fresh ? (autoReject ? "rejected" : "pending") : clip.status,
         ...(fresh ? kindReason : {}),
       },
     });
+    if (qaAfter) await enqueueQa(clipId).catch(() => {}); // v1.9.6 "Fix it": watch the new version
     return `cut ${outLen}s ${cutWith ?? "plain"} ${usedLayout} (${lay.why}${lay.det?.ms != null ? `, face check ${(lay.det.ms / 1000).toFixed(1)}s` : ""}${lay.remembered ? ", webcam spot remembered" : ""})${cuts ? ` (${cuts} jump cut${cuts === 1 ? "" : "s"})` : ""}${words.length ? " + captions" : ""}${clip.hookText ? " + hook" : ""}${fresh && autoReject ? " (auto-rejected)" : ""}`;
   } finally {
     fs.rmSync(assPath, { force: true });

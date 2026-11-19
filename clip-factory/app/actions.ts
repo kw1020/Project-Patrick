@@ -2,7 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
-import { enqueueCut, enqueueGrab, enqueuePost, enqueueTranscribe, pokeScout, pokeSuggest, pokeYouTube } from "@/lib/queues";
+import { enqueueCut, enqueueGrab, enqueuePost, enqueueQa, enqueueTranscribe, pokeScout, pokeSuggest, pokeSupreme, pokeYouTube } from "@/lib/queues";
+import { fixPlan, parseQa } from "@/lib/qa";
+import { probeDuration } from "@/lib/media";
+import { resolveStored } from "@/lib/paths";
 import { resolveChannel } from "@/lib/ytdlp";
 import { getUsers, twitchConfigured } from "@/lib/twitch";
 import { parseFacecam } from "@/lib/media";
@@ -326,6 +329,9 @@ export async function saveSettings(form: FormData) {
       // v1.9.1 branding. An old form without the field keeps the name.
       ...(form.get("channelName") != null ? { channelName: parseChannelName(form.get("channelName")) } : {}),
       watermark: form.get("watermark") === "on",
+      // v1.9.6 Supreme Judge (an old form without the fields keeps the values).
+      ...(form.get("supremePerChannel") != null ? { supremePerChannel: Math.round(n("supremePerChannel", 1, 20, 5)) } : {}),
+      ...(form.get("supremeDailyDollars") != null ? { supremeDailyCents: Math.round(n("supremeDailyDollars", 0, 50, 0.25) * 100) } : {}),
     },
   });
   refreshAll();
@@ -487,6 +493,44 @@ export async function setAccountDisabled(accountId: string, disabled: boolean) {
   const a = await prisma.account.findUniqueOrThrow({ where: { id: accountId } });
   await prisma.account.update({ where: { id: accountId }, data: { disabled, ...(disabled ? { error: a.error ?? "Switched off in Settings" } : { error: null }) } });
   refreshAll();
+}
+
+// ---------- Supreme Judge (v1.9.6) ----------
+/** Upload "Pick now". The worker runs it (budget + key checks there). */
+export async function pickNow() {
+  await pokeSupreme();
+  refreshAll();
+}
+
+/** "Check video" on any clip card: free ffmpeg checks + the vision check (worker queue "qa"). */
+export async function checkVideo(clipId: string) {
+  const clip = await prisma.clip.findUniqueOrThrow({ where: { id: clipId } });
+  if (!clip.finalPath) throw new Error("There's no finished video to check");
+  await enqueueQa(clipId);
+  refreshAll();
+}
+
+/**
+ * "Fix it": applies the check's suggested fixes in ONE re-cut (no jump cuts / another layout / clean style / +2s at the end)
+ * through the normal re-cut path, then the check runs again by itself. The review status is kept.
+ */
+export async function fixClip(clipId: string) {
+  const clip = await prisma.clip.findUniqueOrThrow({ where: { id: clipId } });
+  const qa = parseQa(clip.qa);
+  const plan = qa ? fixPlan(qa.issues) : null;
+  if (!plan) throw new Error("Nothing here can be fixed automatically: re-cut it by hand or reject it.");
+  if (!clip.rawPath) throw new Error("The original video is gone (deleted to save space), so this clip can't be re-cut.");
+  if (clip.words == null) throw new Error("This clip was never transcribed; use Retry instead.");
+  const extra: { winLength?: number } = {};
+  if (plan.extendSec && clip.winStart != null) {
+    const len = clip.winLength ?? clip.duration ?? 0;
+    const raw = await probeDuration(resolveStored(clip.rawPath)).catch(() => clip.winStart! + len);
+    extra.winLength = Math.round(Math.max(len, Math.min(raw - clip.winStart, len + plan.extendSec)) * 100) / 100;
+  }
+  await prisma.clip.update({ where: { id: clipId }, data: { ...extra, stage: "cut", stageAt: new Date(), error: null, ...(clip.status === "failed" ? { status: "processing" } : {}) } });
+  await enqueueCut(clipId, 1, parseEditStyle(plan.style ?? clip.editStyle), plan.jumpCuts, plan.layout ? parseLayoutSetting(plan.layout) : undefined, true);
+  refreshAll();
+  return plan.fixes;
 }
 
 /** Settings: forget the Twitch login used for follower counts. */

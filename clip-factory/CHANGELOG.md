@@ -1,5 +1,12 @@
 # Clip Factory patch notes
 
+## 1.9.6 — 2026-11-19
+- Supreme Judge: 3 times a day it picks the best clips for each channel and says why. Picks show first on Upload with a star; press Pick now for a fresh line-up.
+- It never picks more than 2 clips of one streamer per channel per day, and puts good campaign clips first.
+- It watches each pick and flags bad cuts, captions over faces, bad webcam crops, frozen or black video and silent audio.
+- Clips with problems get a Fix it button that re-cuts them the right way and checks them again. Any clip card has Check video too.
+- Daily budget in Settings (25 cents by default). Upload shows what it has spent today.
+
 ## 1.9.5 — 2026-11-19
 - Channels: your 4 brands (ViceCityClips, StreamHeistClips, WantedLevelClips, ClipFactoryGG) are set up with their YouTube, TikTok and Instagram handles. Connect, change or add more in Settings.
 - New Upload page next to the Queue: one column per channel with the clips you approved. Post to all uploads to YouTube and sends the TikTok draft; for the others it is Download + copy caption, then Mark posted. Move to... sends a clip to another channel.

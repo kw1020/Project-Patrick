@@ -2,7 +2,7 @@ import { Queue } from "bullmq";
 import IORedis from "ioredis";
 
 // One queue per production-line stage.
-export const QUEUES = { scout: "scout", clips: "clips", grab: "grab", transcribe: "transcribe", judge: "judge", cut: "cut", post: "post", youtube: "youtube", suggest: "suggest" } as const;
+export const QUEUES = { scout: "scout", clips: "clips", grab: "grab", transcribe: "transcribe", judge: "judge", cut: "cut", post: "post", youtube: "youtube", suggest: "suggest", supreme: "supreme", qa: "qa" } as const;
 export type QueueName = keyof typeof QUEUES;
 
 let conn: IORedis | null = null;
@@ -38,8 +38,17 @@ export async function enqueueJudge(clipId: string) {
 }
 /** priority 1 = render first (clips headed for review); 10 = when idle (auto-rejected clips). */
 /** `style` = re-cut in this editing style (else Settings.editStyle); `jumpCuts` = off|light|normal for this cut only. */
-export async function enqueueCut(clipId: string, priority = 1, style?: string, jumpCuts?: string, layout?: string) {
-  await queue("cut").add("cut", { clipId, ...(style ? { style } : {}), ...(jumpCuts ? { jumpCuts } : {}), ...(layout ? { layout } : {}) }, { jobId: `cut-${clipId}-${Date.now()}`, priority });
+/** `qaAfter` (v1.9.6 "Fix it") = run the video check again once this cut is done. */
+export async function enqueueCut(clipId: string, priority = 1, style?: string, jumpCuts?: string, layout?: string, qaAfter = false) {
+  await queue("cut").add("cut", { clipId, ...(style ? { style } : {}), ...(jumpCuts ? { jumpCuts } : {}), ...(layout ? { layout } : {}), ...(qaAfter ? { qaAfter: true } : {}) }, { jobId: `cut-${clipId}-${Date.now()}`, priority });
+}
+/** v1.9.6: watch one clip's final video (free ffmpeg checks + the vision check). */
+export async function enqueueQa(clipId: string) {
+  await queue("qa").add("qa", { clipId }, { jobId: `qa-${clipId}-${Date.now()}`, attempts: 1 });
+}
+/** v1.9.6: "Pick now" on Upload. */
+export async function pokeSupreme() {
+  await queue("supreme").add("supreme", {}, { removeOnComplete: true, attempts: 1 });
 }
 /** One attempt only: a retried upload could post the same video twice. */
 export async function enqueuePost(clipId: string, accountId: string) {

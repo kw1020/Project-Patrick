@@ -2,6 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { AutoRefresh } from "@/components/AutoRefresh";
 import { ClipCard, type ClipView } from "@/components/ClipCard";
+import { parseQa } from "@/lib/qa";
 import { parseQueueParams, QUEUE_CATS, QUEUE_TABS, queueHref, queueWhere } from "@/lib/queue-filter";
 
 export const dynamic = "force-dynamic";
@@ -12,12 +13,13 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
   const accounts = (await prisma.account.findMany({ where: { error: null, mode: "api", platform: { in: ["youtube", "tiktok"] } }, orderBy: [{ platform: "asc" }, { createdAt: "asc" }] }))
     .map((a) => ({ id: a.id, platform: a.platform, label: a.channelTitle ?? a.platform, autoPost: a.autoPost, privacy: a.privacy }));
   const autoCount = accounts.filter((a) => a.autoPost).length;
+  const channels = await prisma.channel.findMany({ select: { id: true, name: true } });
   const [clips, counts, catCounts, creator] = await Promise.all([
     prisma.clip.findMany({
       where: queueWhere(f),
       include: { posts: true, moment: { include: { streamer: { include: { campaign: true } } } } },
       // Best first: Judge score, then how big the moment was.
-      orderBy: tab === "pending" ? [{ score: { sort: "desc", nulls: "last" } }, { moment: { spikeScore: "desc" } }] : [{ updatedAt: "desc" }],
+      orderBy: tab === "pending" ? [{ supremePick: "desc" }, { score: { sort: "desc", nulls: "last" } }, { moment: { spikeScore: "desc" } }] : [{ updatedAt: "desc" }],
       take: 60,
     }),
     prisma.clip.groupBy({ by: ["status"], where: queueWhere(f, "tab"), _count: true }),
@@ -41,6 +43,8 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
     category: k.category ?? k.moment.category,
     campaign: k.moment.streamer.campaign?.active ? (({ name, requiredText, bannedWords, maxCaptionChars }) => ({ name, requiredText, bannedWords, maxCaptionChars }))(k.moment.streamer.campaign) : null,
     posts: k.posts.map((p) => ({ platform: p.platform, accountId: p.accountId, status: p.status, url: p.url, error: p.error })), postError: k.postError,
+    supreme: k.supremePick ? { rank: k.supremeRank, reason: k.supremeReason, channel: channels.find((c) => c.id === k.supremeChannelId)?.name ?? null } : null,
+    qa: parseQa(k.qa),
   }));
 
   const pill = (on: boolean) => `rounded-md px-3 py-1 ${on ? "bg-panel font-bold" : "text-zinc-400 hover:text-white"}`;
