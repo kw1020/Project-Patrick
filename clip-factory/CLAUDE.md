@@ -352,6 +352,30 @@ original brief is below, and the status section says what's done. Read both befo
   `assignChannels` (`src/lib/to-post.ts`): approved clips with no channelId get one SAVED (load = approved/posted with that
   channel in the last 24h); called by `setClipStatus` approve (before `autoPostTargets`) and `toPostItems`. One channel per clip
   (same video on 4 channels = reused-content risk). `test/v201.test.ts`. Instagram auto-post moves to 2.0.2.
+- **v2.0.3 (2026-11-19): Instagram auto-post + opt-in TikTok Direct Post** (Krew: "i need [auto upload] for all accounts"; built
+  as "2.0.1" on a5f494e, rebased on 2.0.1). `src/lib/instagram.ts` (Meta doc links in its header): Business Login for Instagram, scopes
+  instagram_business_basic + instagram_business_content_publish + instagram_business_manage_insights (`INSTAGRAM_INSIGHTS=off` drops
+  the last); code → api.instagram.com short-lived → graph.instagram.com `ig_exchange_token` long-lived 60 days → `/me` user_id
+  (= Account.channelId, what /media takes), account_type (PERSONAL → Account.error), granted scopes → new `Account.scopes`.
+  `instagramToken` refreshes (`ig_refresh_token`) when < 7 days left and >= 24h old; the stats sync calls it every 15 min. Meta saves
+  only https redirect URIs, so `instagramRedirectUri` = APP_URL with https + `/api/instagram/callback` (`INSTAGRAM_REDIRECT_URI`
+  overrides): the browser lands on a page that can't load, Krew pastes the address into Settings (`InstagramPaste`,
+  `src/lib/instagram-paste.ts` `pastedCallbackPath`) or swaps https→http; the http route `/api/instagram/callback` checks cookie
+  `ig_state` (1h) and `cf_channel`. `publishReel`: POST /<ig>/media REELS + upload_type=resumable → rupload `ig-api-upload/<ver>/<id>`
+  (headers OAuth/offset/file_size, body = the local final file) → a rupload error is NOT final (Meta forum: 400 on 45s+ videos while
+  the upload worked) → poll status_code (INSTAGRAM_POLL_MS 10s, max 6 min) → media_publish → permalink. Poster `postInstagram`:
+  100/24h guard, Post row "processing" (publishId = container) written the moment the container exists (a restarted job sees
+  "already sent"), live on success; on error asks the container: PUBLISHED → live without link, unknown → stays processing, else
+  failed (safe to retry). Sync settles processing rows > 20 min old, reads `like_count/comments_count` + insights `views,likes,comments`.
+  `assignHomeChannel`: connecting into a slot held by a MANUAL account moves its posts to the new account and deletes it (any
+  platform; ChannelsCard shows Connect next to by-hand handles). `isApiPostingAccount`/`accountAction` include Instagram; approve
+  auto-post, Queue, Upload, doctor all handle it. TikTok: `TIKTOK_DIRECT_POST=on` adds video.publish to the scopes; `Account.directPost`
+  (Settings checkbox, only when `canDirectPost`) → `directPost`: creator_info → SELF_ONLY (unaudited rule) + creator's disable_* →
+  /v2/post/publish/video/init/ → Post status "live" with publishId, sync follows it. Schema additive (`Account.scopes`,
+  `Account.directPost`; `toV200Schema`, `test/v203.test.ts` pushes from 87ddbb4 with rows; Instagram also posts approved edits in `runPostEdit`, after the Platform check). **UNVERIFIED (no Meta/TikTok account in
+  the sandbox):** whether rupload/resumable works for Instagram-Login apps (Meta's page says Facebook Login only; third-party 2026
+  guides show it on graph.instagram.com), whether Meta saves `https://localhost:3000/...` as a redirect URI, the insights scope
+  name on Business Login, the exact Meta error subcodes, TikTok Direct Post on Krew's app.
 - Docker image never built in the sandbox (no daemon); it builds fine on Krew's PC; a clean-copy `npm ci` + `next build` without `.env`
   (what the Dockerfile does) passes.
 - **Suggestions (2026-11-17):** `src/workers/suggest.ts` (queue "suggest", hourly + once ~1 min after start,

@@ -174,7 +174,7 @@ export async function setClipStatus(id: string, status: "pending" | "approved" |
     const clip = await prisma.clip.findUniqueOrThrow({ where: { id }, include: { moment: true } });
     const channels = await prisma.channel.findMany({ orderBy: { createdAt: "asc" } });
     const channel = channelForClip(channels, { channelId: clip.channelId, category: clip.category ?? clip.moment.category, gta: isGta6(momentGame(clip.moment)) });
-    const auto = await prisma.account.findMany({ where: { autoPost: true, error: null, disabled: false, mode: "api", platform: { in: ["youtube", "tiktok"] } } });
+    const auto = await prisma.account.findMany({ where: { autoPost: true, error: null, disabled: false, mode: "api", platform: { in: [...POST_PLATFORMS] } } }); // v2.0.3: + Instagram
     for (const a of autoPostTargets(auto, channels.length ? channel?.id ?? null : undefined)) await queueUpload(id, a.id);
   }
   refreshAll();
@@ -360,7 +360,7 @@ export async function saveAccount(id: string, form: FormData) {
   const privacy = String(form.get("privacy") || "public");
   await prisma.account.update({
     where: { id },
-    data: { autoPost: form.get("autoPost") === "on", privacy: ["public", "unlisted", "private"].includes(privacy) ? privacy : "public" },
+    data: { autoPost: form.get("autoPost") === "on", privacy: ["public", "unlisted", "private"].includes(privacy) ? privacy : "public", directPost: form.get("directPost") === "on" },
   });
   refreshAll();
 }

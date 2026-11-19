@@ -8,9 +8,11 @@ export type ChannelView = { id: string; name: string; kinds: string; focus: stri
 
 const chip: Record<string, string> = { youtube: "bg-red-600/20 text-red-300", tiktok: "bg-cyan-500/15 text-cyan-300", instagram: "bg-fuchsia-500/15 text-fuchsia-300" };
 const box = "h-4 w-4 accent-[#ff3d81]";
+type Connectable = { youtube: boolean; tiktok: boolean; instagram?: boolean };
+const canConnectTo = (c: Connectable, platform: string) => Boolean((c as Record<string, boolean | undefined>)[platform]);
 
 /** Settings → Channels (v1.9.5): each brand = one YouTube + one TikTok + one Instagram slot (Connect or Add handle). */
-export function ChannelsCard({ channels, accounts, canConnect }: { channels: ChannelView[]; accounts: ChannelAccountView[]; canConnect: { youtube: boolean; tiktok: boolean } }) {
+export function ChannelsCard({ channels, accounts, canConnect }: { channels: ChannelView[]; accounts: ChannelAccountView[]; canConnect: Connectable }) {
   const unplaced = accounts.filter((a) => !a.homeChannelId || !channels.some((c) => c.id === a.homeChannelId));
   return (
     <div className="card space-y-5 p-5" id="channels" data-testid="channels-card">
@@ -57,7 +59,7 @@ function QuickAdd({ channels }: { channels: ChannelView[] }) {
   );
 }
 
-function ChannelBlock({ c, accounts, canConnect, canDelete }: { c: ChannelView; accounts: ChannelAccountView[]; canConnect: { youtube: boolean; tiktok: boolean }; canDelete: boolean }) {
+function ChannelBlock({ c, accounts, canConnect, canDelete }: { c: ChannelView; accounts: ChannelAccountView[]; canConnect: Connectable; canDelete: boolean }) {
   const kinds = parseKinds(c.kinds), focus = parseFocus(c.focus);
   const [confirm, setConfirm] = useState(false);
   const [busy, start] = useTransition();
@@ -87,7 +89,8 @@ function ChannelBlock({ c, accounts, canConnect, canDelete }: { c: ChannelView; 
                 <span className={`rounded px-1.5 py-0.5 text-[10px] font-black uppercase ${chip[p]}`}>{PLATFORM_LABEL[p]}</span>
                 {a && <span className="text-[10px] uppercase text-zinc-500">{a.mode === "manual" ? "by hand" : "connected"}</span>}
               </div>
-              {a ? <AccountLine a={a} channels={null} /> : <EmptySlot channelId={c.id} platform={p} connect={p === "youtube" ? canConnect.youtube : p === "tiktok" ? canConnect.tiktok : false} />}
+              {a ? <AccountLine a={a} channels={null} connectFrom={a.mode === "manual" && canConnectTo(canConnect, p) ? c.id : null} />
+                : <EmptySlot channelId={c.id} platform={p} connect={canConnectTo(canConnect, p)} />}
             </div>
           );
         })}
@@ -108,13 +111,12 @@ function EmptySlot({ channelId, platform, connect }: { channelId: string; platfo
         <button className="btn-ghost shrink-0 px-2 py-1 text-xs" disabled={pending}>Add handle</button>
       </form>
       {state?.error && <div className="text-[11px] text-red-300">{state.error}</div>}
-      {!connect && platform !== "instagram" && <div className="text-[11px] text-zinc-500">Connecting needs the {PLATFORM_LABEL[platform]} keys in .env; a handle works without.</div>}
-      {platform === "instagram" && <div className="text-[11px] text-zinc-500">Instagram is always posted by hand.</div>}
+      {!connect && <div className="text-[11px] text-zinc-500">Connecting needs the {PLATFORM_LABEL[platform]} keys in .env{platform === "instagram" ? " (README: Connect Instagram)" : ""}; a handle works without.</div>}
     </div>
   );
 }
 
-function AccountLine({ a, channels }: { a: ChannelAccountView; channels: ChannelView[] | null }) {
+function AccountLine({ a, channels, connectFrom = null }: { a: ChannelAccountView; channels: ChannelView[] | null; connectFrom?: string | null }) {
   const [busy, start] = useTransition();
   const [err, setErr] = useState<string | null>(null);
   const run = (fn: () => Promise<unknown>) => start(async () => { setErr(null); try { await fn(); } catch (e) { setErr((e as Error).message); } });
@@ -137,6 +139,8 @@ function AccountLine({ a, channels }: { a: ChannelAccountView; channels: Channel
           <button className="btn-ghost px-2 py-0.5 text-xs" disabled={busy} title="Take it out of this channel (it stays connected)" onClick={() => run(() => setAccountChannel(a.id, ""))}>Take out</button>
         )}
         <button className="btn-ghost px-2 py-0.5 text-xs" disabled={busy} title={a.disabled ? "Post to all uses it again" : "Post to all skips it and clips don't wait for it"} onClick={() => run(() => setAccountDisabled(a.id, !a.disabled))}>{a.disabled ? "Turn on" : "Turn off"}</button>
+        {/* v2.0.3: a by-hand account can be swapped for a connected login (its posts are kept). */}
+        {connectFrom && <a href={`/api/${a.platform}/connect?channel=${connectFrom}`} className="btn-hot px-2 py-0.5 text-xs" title="Sign in so Clip Factory posts for you. This by-hand entry is replaced; its posts stay.">Connect</a>}
         {a.mode === "manual" && <button className="btn-bad px-2 py-0.5 text-xs" disabled={busy} onClick={() => run(() => disconnectAccount(a.id))}>Remove</button>}
       </div>
       {err && <div className="text-xs text-red-300">{err}</div>}

@@ -85,7 +85,7 @@ async function editAndAccount(id: string, accountId: string) {
   return { e, a };
 }
 
-/** "Post one" on an edit: connected YouTube/TikTok of the Edits channel only. Single attempt; Krew's click only. */
+/** "Post one" on an edit: connected YouTube/TikTok/Instagram of the Edits channel only. Single attempt; Krew's click only. */
 export async function postEditToAccount(id: string, accountId: string) {
   const { a } = await editAndAccount(id, accountId);
   if (!isApiPostingAccount(a)) throw new Error("That account is posted to by hand: use Download + copy caption, then Mark posted");

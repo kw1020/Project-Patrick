@@ -186,7 +186,7 @@ export function ClipCard({ clip, accounts }: { clip: ClipView; accounts: Account
               <div className="flex flex-wrap gap-2">
                 {notYet.map((a) => (
                   <button key={a.id} className="btn-hot flex-1" disabled={busy} onClick={() => act(() => postToAccount(clip.id, a.id))}>
-                    {a.platform === "tiktok" ? `TikTok draft → ${a.label}` : `YouTube → ${a.label} (${a.privacy})`}
+                    {a.platform === "tiktok" ? `TikTok → ${a.label}` : a.platform === "instagram" ? `Instagram Reel → ${a.label}` : `YouTube → ${a.label} (${a.privacy})`}
                   </button>
                 ))}
               </div>

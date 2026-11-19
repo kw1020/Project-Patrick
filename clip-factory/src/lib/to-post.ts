@@ -61,7 +61,8 @@ export async function ensureChannels(): Promise<string | null> {
 
 /**
  * After an OAuth connect: an account with no channel goes into the channel Krew connected it from (its slot for that
- * platform), else the first channel whose slot for that platform is free. A taken slot is never overwritten.
+ * platform), else the first channel whose slot for that platform is free. A slot taken by a connected account is never
+ * overwritten; a by-hand account in the wanted slot is replaced (v2.0.3, its posts kept).
  */
 export async function assignHomeChannel(accountId: string, wanted?: string | null) {
   await ensureChannels().catch(() => null);
@@ -72,6 +73,15 @@ export async function assignHomeChannel(accountId: string, wanted?: string | nul
     prisma.account.findMany({ where: { platform: a.platform, id: { not: a.id } } }),
   ]);
   const free = (id: string) => !slotAccount(accounts, id, a.platform);
+  // v2.0.3: connecting into a slot held by a BY-HAND account (Krew's seeded handles) replaces it: its posts move to the
+  // connected account (so Upload/Posted keep them), then the by-hand row goes. A connected (api) account is never replaced.
+  const held = wanted && channels.some((c) => c.id === wanted) ? slotAccount(accounts, wanted, a.platform) : null;
+  if (held && held.mode === "manual" && a.mode === "api") {
+    await prisma.post.updateMany({ where: { accountId: held.id }, data: { accountId: a.id } });
+    await prisma.editPost.updateMany({ where: { accountId: held.id }, data: { accountId: a.id } });
+    await prisma.account.delete({ where: { id: held.id } });
+    accounts.splice(accounts.indexOf(held), 1);
+  }
   if (wanted && channels.some((c) => c.id === wanted) && free(wanted)) {
     await prisma.account.update({ where: { id: a.id }, data: { homeChannelId: wanted } });
     return wanted;

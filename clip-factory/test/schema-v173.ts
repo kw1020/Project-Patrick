@@ -1,6 +1,11 @@
+// Today's schema turned back into the v2.0.0 (87ddbb4) one: the v2.0.3 Account columns (scopes, directPost) removed.
+export function toV200Schema(now: string): string {
+  return now.replace(/^ {2}\w+ +\w+\??(?: +@default\([^)]*\))? *\/\/ v2\.0\.3.*\n/gm, "");
+}
+
 // Today's schema turned back into the v1.9.8 (2e4801e) one: the v2.0.0 Edits models + columns removed.
 export function toV198Schema(now: string): string {
-  return now
+  return toV200Schema(now)
     .replace(/\n\/\/ ---- v2\.0\.0 Edits[\s\S]*$/, "")
     .replace(/^ {2}edits {9}Edit\[\]\n/m, "")
     .replace(/^ {2}(editBpm|editVibe|editLength|editAuto|editCreatorAudio) .*\n/gm, "")

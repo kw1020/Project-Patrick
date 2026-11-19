@@ -166,6 +166,79 @@ notification, paste the caption (Copy caption button), post. Limit: 5 waiting dr
 Not yet confirmed: whether TikTok's sandbox allows inbox drafts. If the first draft fails with a
 permission error, submit the app for review (TikTok says several days to two weeks).
 
+### TikTok "Post directly" (optional, v2.0.3)
+Drafts stay the default. TikTok's rules for apps it hasn't audited yet (checked 2026-11-19, TikTok's Content Sharing
+Guidelines): a direct post is always **private ("only me")**, the TikTok account must be **set to private** when it posts,
+and at most 5 accounts a day can post through the app. To make such a video public later you switch the account to public
+and set each video to "Everyone" in the TikTok app. TikTok lifts the limits only after its audit, which checks your posting
+screen against its guidelines (it doesn't promise how long that takes). So for public brand accounts, drafts are still the
+way; this is mainly useful for testing or private accounts.
+1. In your TikTok app (developers.tiktok.com) → Content Posting API → switch **Direct Post** on and add the `video.publish` scope.
+2. Put `TIKTOK_DIRECT_POST=on` in `.env`, restart, and **reconnect** the TikTok account (Settings → Reconnect / Connect).
+3. Settings → Connected posting accounts → tick **Post directly (private until TikTok approves the app)** on that account → Save.
+If TikTok refuses ("only lets apps it hasn't approved yet post to PRIVATE accounts"), untick it and drafts work as before.
+
+## Connect Instagram (≈20 min, once)
+
+Approved clips go up as **Reels** on your Instagram accounts, like YouTube. You make a small app at Meta for your own
+accounts; Meta needs **no App Review** for an app that only posts to accounts you own (Meta's App Review page: "My app is only
+for a business I own or manage → Instagram Login → Standard Access → Not required"). Do it on your PC in a **normal Chrome
+window** (not the Clip Factory app window: step 9 needs the address bar).
+
+1. **Make each Instagram account Professional.** In the Instagram app, on each brand account: Profile → ☰ → **Settings and
+   activity → Account type and tools → Switch to professional account** → pick **Creator** (or Business) → Done. No Facebook
+   Page is needed. Personal accounts can't be posted to by apps.
+2. Go to **developers.facebook.com**, log in with your Facebook account, press **Get started** if asked (verify your phone),
+   then **My Apps → Create app**.
+3. App name: `Clip Factory`, your email → Next. Use case: **Manage messaging & content on Instagram** → Next. If it asks
+   about a business portfolio, choose **I don't want to connect a business portfolio yet** → Next → **Create app**
+   (re-enter your Facebook password if asked).
+4. In the app's left menu: **Instagram → API setup with Instagram login** (if Meta also offers "Unified login", pick the
+   *Instagram login* one).
+5. Under **1. Generate access tokens** press **Add account**, log in to one of your brand Instagram accounts and allow it.
+   Repeat for every brand account you want to post to (each must be a role on the app; if Instagram shows a tester invite,
+   accept it in the Instagram app). You don't need to copy the token it shows.
+6. Under **3. Set up Instagram business login** press **Set up**. Redirect URL, exactly:
+   `https://localhost:3000/api/instagram/callback` → **Save**. Open **Business login settings** and check the
+   **OAuth redirect URIs** list shows exactly that address (no slash added at the end). *Why https:* Meta only saves https
+   addresses. Clip Factory runs on plain http, so step 9 has one extra paste.
+7. On the same page copy the **Instagram app ID** and **Instagram app secret** (press Show). These are NOT the Facebook App
+   ID on "App settings → Basic". Put them in `.env`:
+   `INSTAGRAM_CLIENT_ID=<Instagram app ID>` and `INSTAGRAM_CLIENT_SECRET=<Instagram app secret>`. Leave the app in
+   **Development** mode (don't press Publish / don't submit for review). Restart Clip Factory.
+8. Open `http://localhost:3000/settings` in Chrome. Under **Channels**, each brand has an Instagram slot: press **Connect**
+   (next to the @handle that's already there, or in an empty slot). Instagram asks you to log in: use **that brand's**
+   account, then press **Allow**.
+9. Instagram now opens `https://localhost:3000/api/instagram/callback?code=...` and Chrome says the page can't be reached
+   (or "ERR_SSL_PROTOCOL_ERROR"). **That's expected.** Copy the whole address from the address bar, go back to Settings and
+   paste it in the **Connecting Instagram?** box at the top → **Finish connecting**. (Or just change `https` to `http` at the
+   start of that address and press Enter.) Settings says "Connected @yourbrand". The by-hand entry in that slot is replaced
+   by the connected account; posts you marked by hand stay.
+10. Settings → **Connected posting accounts** → tick **Post when I approve** on the Instagram account → Save. Repeat
+    steps 8-10 for each brand.
+
+Then: Approve a clip and it posts to its channel's Instagram too (and Upload has **Post to Instagram**; Post to all includes
+it). A Reel takes a minute or two (Instagram processes the video first). Each upload is tried once, so it's never posted
+twice. Views, likes and comments update every 15 minutes on Posted and Analytics.
+
+Good to know (Meta's docs, 2026-11-19): at most **100 posts a day per account** through apps; captions max 2200 characters,
+30 hashtags and 20 @mentions (Clip Factory keeps the first 30 hashtags); the sign-in lasts **60 days** and Clip Factory
+renews it by itself while it's running (if it was off for 2 months, Settings shows "Reconnect"). `npm run doctor` checks
+each Instagram account.
+
+If something goes wrong:
+- **"Invalid redirect URI"**: the address in step 6 must match exactly. If you open the dashboard on another address
+  (APP_URL), the redirect is that address with https.
+- **"Invalid scope"** when connecting: put `INSTAGRAM_INSIGHTS=off` in `.env` and restart (Reel views then aren't read;
+  likes and comments still are).
+- **Meta won't save `https://localhost...`**: use an https tunnel to port 3000 (for example VS Code → Ports → Forward a
+  Port), save `<tunnel address>/api/instagram/callback` in step 6 and put the same in `.env` as `INSTAGRAM_REDIRECT_URI=`.
+  The tunnel is only needed while connecting.
+- **"Instagram refused uploading the video file directly"** when posting: Meta's docs say direct file upload is for apps
+  using *Facebook* login, while other 2026 guides show it working with Instagram login. This hasn't been tried on a real
+  account yet. If you see it, Instagram for that account stays Download + copy caption → Mark posted (still works), and
+  tell Claude: the fix is the Facebook-login version of this setup.
+
 ## Analytics + the Judge learning
 
 The **Analytics** page compares every post with that account's typical post (2× = twice its usual
@@ -204,7 +277,7 @@ Live page says so and you still get their viewer-made Twitch clips.
 Good to know: Google allows 100 uploads a day per project. Uploads go out as Shorts (vertical,
 under 60s) with the streamer credit and `#Shorts` in the description. Start with visibility set to
 **Unlisted** for your first clip to check it looks right, then switch to Public. YouTube view
-counts show up on the Posted page every 15 minutes. TikTok and Reels are still Download + Copy caption.
+counts show up on the Posted page every 15 minutes. TikTok sends drafts; Instagram posts Reels once connected (Connect Instagram).
 
 ## Captions + branding (v1.9.1)
 
@@ -299,8 +372,8 @@ which is on C: by default, and that's usually what fills C:. Docker Desktop → 
 ## Channels + Upload (v1.9.5)
 - **Channels** (Settings → Channels): a channel is one of your brands, e.g. **ViceCityClips**, with up to one YouTube, one
   TikTok and one Instagram account. What goes on its YouTube goes on its TikTok and Instagram too. Each slot is either
-  **Connect** (YouTube / TikTok login, posts for you) or **Add handle** (an account you post to yourself; Instagram is always
-  by hand). To add many accounts quickly use **Add an account by handle** at the top: platform + @handle + channel, Add,
+  **Connect** (YouTube / TikTok / Instagram login, posts for you; v2.0.3: also next to a by-hand @handle, which it replaces) or **Add handle** (an account you post to yourself).
+  To add many accounts quickly use **Add an account by handle** at the top: platform + @handle + channel, Add,
   then type the next one. On first start (only when there are no channels yet) Clip Factory sets up your 4 brands with their
   handles: **ViceCityClips** (GTA 6, every type), **StreamHeistClips** (funny), **WantedLevelClips** (gaming), **ClipFactoryGG**
   (edits; its Instagram is switched **Off** because Instagram disabled it: appeal in the app, then press Turn on). Accounts you

@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 export default async function QueuePage({ searchParams }: { searchParams: Promise<{ tab?: string; cat?: string; creator?: string }> }) {
   const f = parseQueueParams(await searchParams);
   const { tab, cat } = f;
-  const accounts = (await prisma.account.findMany({ where: { error: null, mode: "api", platform: { in: ["youtube", "tiktok"] } }, orderBy: [{ platform: "asc" }, { createdAt: "asc" }] }))
+  const accounts = (await prisma.account.findMany({ where: { error: null, mode: "api", disabled: false, platform: { in: ["youtube", "tiktok", "instagram"] } }, orderBy: [{ platform: "asc" }, { createdAt: "asc" }] }))
     .map((a) => ({ id: a.id, platform: a.platform, label: a.channelTitle ?? a.platform, autoPost: a.autoPost, privacy: a.privacy }));
   const autoCount = accounts.filter((a) => a.autoPost).length;
   const channels = await prisma.channel.findMany({ select: { id: true, name: true } });

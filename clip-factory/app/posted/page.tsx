@@ -80,7 +80,7 @@ export default async function PostedPage({ searchParams }: { searchParams: Promi
                 <form key={p.id} action={updatePost.bind(null, p.id)} className="flex flex-wrap items-center gap-3 px-4 py-3">
                   <div className="min-w-0 flex-1 basis-60">
                     <div className="truncate font-semibold">{p.clip.title}</div>
-                    <div className="text-xs text-zinc-400 [overflow-wrap:anywhere]">{p.clip.moment.streamer.name} · {LABEL[p.platform] ?? p.platform}{p.account ? ` (${p.account.handle ?? p.account.channelTitle})` : ""} · {ago(p.postedAt)}{p.status === "draft" ? " · draft waiting in TikTok" : p.status === "failed" ? ` · failed: ${p.error}` : ""}{p.likes != null ? ` · ${p.likes.toLocaleString()} likes` : ""}</div>
+                    <div className="text-xs text-zinc-400 [overflow-wrap:anywhere]">{p.clip.moment.streamer.name} · {LABEL[p.platform] ?? p.platform}{p.account ? ` (${p.account.handle ?? p.account.channelTitle})` : ""} · {ago(p.postedAt)}{p.status === "draft" ? " · draft waiting in TikTok" : p.status === "processing" ? " · Instagram is still posting it" : p.status === "failed" ? ` · failed: ${p.error}` : ""}{p.likes != null ? ` · ${p.likes.toLocaleString()} likes` : ""}</div>
                   </div>
                   <input name="url" defaultValue={p.url ?? ""} placeholder="Post link" className="field w-64 min-w-0 max-w-full" />
                   {p.url && <a href={p.url} target="_blank" className="text-xs text-hot">open ↗</a>}

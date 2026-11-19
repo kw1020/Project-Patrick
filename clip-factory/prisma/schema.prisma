@@ -249,6 +249,8 @@ model Account {
   handle       String?   // v1.9.5: e.g. "@vicecityclips" (manual accounts; shown on To post)
   homeChannelId String?  // v1.9.5: the Channel this account belongs to (Account.channelId is the platform's own id)
   disabled     Boolean   @default(false) // v1.9.5: skipped by Post to all, not needed for "posted everywhere" (why: in error)
+  scopes       String?   // v2.0.3: permissions the platform granted (comma list; Instagram insights, TikTok video.publish)
+  directPost   Boolean   @default(false) // v2.0.3: TikTok Direct Post (private until TikTok audits the app) instead of an inbox draft
   createdAt    DateTime  @default(now())
   posts        Post[]
   editPosts    EditPost[]

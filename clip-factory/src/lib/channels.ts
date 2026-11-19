@@ -61,17 +61,18 @@ export function slotAccount<A extends AccountLite & { createdAt?: Date | string 
 
 export type AccountLite = { id: string; platform: string; mode?: string | null; homeChannelId?: string | null; error?: string | null };
 
-/** What the Upload row for this account does: Post (YouTube API upload), Send to TikTok (inbox draft) or by hand. */
-export function accountAction(a: Pick<AccountLite, "platform" | "mode">): "post" | "tiktok" | "manual" {
-  if (a.mode === "manual" || a.platform === "instagram") return "manual";
+/** What the Upload row for this account does: Post (YouTube upload), Send to TikTok (draft / direct), Post to Instagram (Reel; v2.0.3) or by hand. */
+export function accountAction(a: Pick<AccountLite, "platform" | "mode">): "post" | "tiktok" | "instagram" | "manual" {
+  if (a.mode === "manual") return "manual";
   if (a.platform === "tiktok") return "tiktok";
+  if (a.platform === "instagram") return "instagram";
   return "post";
 }
 
 /** Accounts that can be posted to (any mode), i.e. not the Twitch follower-count login. */
 export const isPostingAccount = (a: Pick<AccountLite, "platform">) => (POST_PLATFORMS as readonly string[]).includes(a.platform);
-/** Accounts the Poster may upload to through the API (Queue buttons, auto-post on approve). */
-export const isApiPostingAccount = (a: Pick<AccountLite, "platform" | "mode">) => (a.platform === "youtube" || a.platform === "tiktok") && (a.mode ?? "api") === "api";
+/** Accounts the Poster may upload to through the API (Queue buttons, auto-post on approve). v2.0.3: Instagram too. */
+export const isApiPostingAccount = (a: Pick<AccountLite, "platform" | "mode">) => (POST_PLATFORMS as readonly string[]).includes(a.platform) && (a.mode ?? "api") === "api";
 
 export type PostLite = { accountId: string | null; status: string; url?: string | null };
 /** The post that counts as "done" for this account (a TikTok draft counts: it's in Krew's inbox), or null. */

@@ -97,6 +97,7 @@ async function main() {
   const { judgeConfigured, judgeClip, JUDGE_MODEL } = await import("../src/lib/judge");
   const yt = await import("../src/lib/youtube");
   const tt = await import("../src/lib/tiktok");
+  const ig = await import("../src/lib/instagram");
 
   console.log("Clip Factory doctor — checking everything the pipeline needs.\n");
 
@@ -119,6 +120,9 @@ async function main() {
   print("TikTok keys", tt.tiktokConfigured()
     ? { status: "ok", detail: "TIKTOK_CLIENT_KEY and TIKTOK_CLIENT_SECRET are set" }
     : { status: "warn", detail: "not set — TikTok drafts are off (optional)", fix: "Only needed to send TikTok drafts: follow the TikTok steps in README.md." });
+  print("Instagram keys", ig.instagramConfigured()
+    ? { status: "ok", detail: `INSTAGRAM_CLIENT_ID and INSTAGRAM_CLIENT_SECRET are set (redirect URI ${ig.instagramRedirectUri()})` }
+    : { status: "warn", detail: "not set — Instagram Reels are posted by hand (optional)", fix: "Only needed to post Reels for you: follow Connect Instagram in README.md." });
 
   // ---------- 2. Tools ----------
   section("Tools");
@@ -295,12 +299,12 @@ async function main() {
   // ---------- 7. Accounts ----------
   section("Connected accounts");
   let accounts: Awaited<ReturnType<typeof prisma.account.findMany>> = [];
-  try { accounts = await withTimeout(prisma.account.findMany({ where: { mode: "api", platform: { in: ["youtube", "tiktok"] } }, orderBy: { createdAt: "asc" } }), 30_000); } catch { /* the Database line already says why */ }
+  try { accounts = await withTimeout(prisma.account.findMany({ where: { mode: "api", platform: { in: ["youtube", "tiktok", "instagram"] } }, orderBy: { createdAt: "asc" } }), 30_000); } catch { /* the Database line already says why */ }
   if (!accounts.length) {
-    print("Accounts", { status: "warn", detail: "no YouTube or TikTok accounts connected", fix: "Optional: connect them on the Settings page so approved clips can be posted." });
+    print("Accounts", { status: "warn", detail: "no YouTube, TikTok or Instagram accounts connected", fix: "Optional: connect them on the Settings page so approved clips can be posted." });
   }
   for (const a of accounts) {
-    const label = `${a.platform === "youtube" ? "YouTube" : a.platform === "tiktok" ? "TikTok" : a.platform}: ${a.channelTitle ?? a.channelId ?? a.id}`;
+    const label = `${a.platform === "youtube" ? "YouTube" : a.platform === "tiktok" ? "TikTok" : a.platform === "instagram" ? "Instagram" : a.platform}: ${a.channelTitle ?? a.channelId ?? a.id}`;
     await check(label, 30_000, async () => {
       if (a.platform === "youtube") {
         if (!yt.youtubeConfigured()) return { status: "fail", detail: "YouTube keys missing in .env, so this channel can't post", fix: "Put YOUTUBE_CLIENT_ID / YOUTUBE_CLIENT_SECRET back in .env." };
@@ -308,6 +312,11 @@ async function main() {
       } else if (a.platform === "tiktok") {
         if (!tt.tiktokConfigured()) return { status: "fail", detail: "TikTok keys missing in .env, so this account can't get drafts", fix: "Put TIKTOK_CLIENT_KEY / TIKTOK_CLIENT_SECRET back in .env." };
         await tt.checkAccount(a);
+      } else if (a.platform === "instagram") {
+        if (!ig.instagramConfigured()) return { status: "fail", detail: "Instagram keys missing in .env, so this account can't post Reels", fix: "Put INSTAGRAM_CLIENT_ID / INSTAGRAM_CLIENT_SECRET back in .env." };
+        await ig.checkInstagram(a);
+        const days = a.expiresAt ? Math.floor((a.expiresAt.getTime() - Date.now()) / 86400_000) : null;
+        return { status: "ok", detail: `signed in${days != null ? ` (sign-in renews itself; ${days} days left right now)` : ""}, ready to post Reels` };
       } else {
         return { status: "warn", detail: `unknown platform "${a.platform}"`, fix: "Remove it on the Settings page." };
       }

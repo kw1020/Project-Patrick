@@ -9,7 +9,7 @@ import { PlatformCheckBox } from "./PlatformCheckBox";
 import { parsePlatformInfo, platformCheck } from "../lib/platform-rules";
 
 export type ToPostRow = {
-  accountId: string; platform: string; label: string; action: "post" | "tiktok" | "manual"; error: string | null; disabled?: boolean;
+  accountId: string; platform: string; label: string; action: "post" | "tiktok" | "instagram" | "manual"; error: string | null; disabled?: boolean;
   done: { status: string; url: string | null } | null;
 };
 export type ToPostView = {
@@ -135,13 +135,14 @@ export function ToPostCard({ clip, channels, children }: { clip: ToPostView; cha
                   ) : r.done ? (
                     r.done.status === "draft"
                       ? <span className="font-bold text-sun" title="Open TikTok, tap the inbox notification, paste the caption, post.">⏳ draft in TikTok inbox</span>
+                      : r.done.status === "processing" ? <span className="animate-pulse font-bold text-sun" title="Instagram is processing the Reel">⏳ posting…</span>
                       : r.done.url ? <a href={r.done.url} target="_blank" className="font-bold text-emerald-300">✓ posted ↗</a> : <span className="font-bold text-emerald-300">✓ posted</span>
                   ) : r.action === "manual" || r.error ? (
                     <ManualRow clipId={clip.id} edit={clip.edit} row={r} caption={clip.caption} campaign={Boolean(clip.campaign)} busy={busy} run={run} copied={copied === r.accountId} onCopied={() => flash(r.accountId)} />
                   ) : (
                     <button className="btn-ghost py-1 text-xs" disabled={busy || uploading} onClick={() => run(() => (clip.edit ? postEditToAccount(clip.id, r.accountId) : postToAccount(clip.id, r.accountId)))}
-                      title={r.action === "tiktok" ? "Sends it to the TikTok inbox as a draft" : "Uploads it to YouTube now"}>
-                      {uploading ? "sending…" : r.action === "tiktok" ? "Send to TikTok" : "Post to YouTube"}
+                      title={r.action === "tiktok" ? "Sends it to TikTok (inbox draft, or a private direct post if you switched that on)" : r.action === "instagram" ? "Posts it as a Reel now (takes a minute or two)" : "Uploads it to YouTube now"}>
+                      {uploading ? "sending…" : r.action === "tiktok" ? "Send to TikTok" : r.action === "instagram" ? "Post to Instagram" : "Post to YouTube"}
                     </button>
                   )}
                 </li>

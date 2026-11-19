@@ -132,7 +132,7 @@ export async function getWorkroom(now: Date = new Date()): Promise<Workroom> {
     ...uploading.map((c) => clipItem(c, { where: "uploading" })),
     ...drafts.map((p) => clipItem(p.clip, { key: `post-${p.id}`, since: p.postedAt.toISOString(), where: "TikTok draft (finish in the app)" })),
   ].slice(0, LIMIT);
-  columns.posted = posted.map((p) => clipItem(p.clip, { key: `post-${p.id}`, since: p.postedAt.toISOString(), url: p.url, where: p.platform === "youtube" ? "YouTube" : p.platform === "tiktok" ? "TikTok" : p.platform }));
+  columns.posted = posted.map((p) => clipItem(p.clip, { key: `post-${p.id}`, since: p.postedAt.toISOString(), url: p.url, where: p.platform === "youtube" ? "YouTube" : p.platform === "tiktok" ? "TikTok" : p.platform === "instagram" ? "Instagram" : p.platform }));
 
   const counts = Object.fromEntries(Object.entries(columns).map(([k, v]) => [k, v.length])) as Record<ColumnKey, number>;
   counts.finding = momentCount;

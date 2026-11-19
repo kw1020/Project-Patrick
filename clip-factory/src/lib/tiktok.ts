@@ -1,6 +1,13 @@
 // TikTok: Login Kit (desktop flow, so plain http://localhost works), upload-to-inbox drafts, stats.
 // Krew finishes each post in the TikTok app: TikTok only lets audited apps post publicly, and its
 // audit rules out re-upload tools, so drafts are the route that works.
+// v2.0.3: opt-in Direct Post per account (TIKTOK_DIRECT_POST=on adds the video.publish scope). Checked 2026-11-19:
+// https://developers.tiktok.com/docs/en/content-sharing-guidelines - an UNAUDITED client may Direct Post only with
+// privacy SELF_ONLY, only to accounts that are set to private at posting time, for at most 5 users per 24h; the video then
+// shows only to the account owner until the owner makes the account public and sets each video to "Everyone". The audit
+// (https://developers.tiktok.com/docs/en/content-posting-api-get-started) checks the posting UI against those guidelines.
+// Flow: https://developers.tiktok.com/docs/en/content-posting-api-reference-direct-post (creator_info/query, then
+// /v2/post/publish/video/init/ with post_info + FILE_UPLOAD, same chunk PUTs as the inbox upload; 6 init calls/min/token).
 import crypto from "node:crypto";
 import fs from "node:fs";
 import type { Account } from "@prisma/client";
@@ -10,6 +17,10 @@ import { appUrl } from "./youtube";
 const AUTH_URL = () => process.env.TIKTOK_AUTH_URL || "https://www.tiktok.com/v2/auth/authorize/";
 const API = () => (process.env.TIKTOK_API_URL || "https://open.tiktokapis.com").replace(/\/$/, "");
 const SCOPES = "user.info.basic,user.info.profile,video.upload,video.list";
+/** Direct Post needs video.publish approved on the TikTok app first, so it is only asked for when Krew switches it on. */
+export const directPostEnabled = () => process.env.TIKTOK_DIRECT_POST === "on";
+const scopes = () => (directPostEnabled() ? `${SCOPES},video.publish` : SCOPES);
+export const canDirectPost = (a: { scopes?: string | null }) => (a.scopes ?? "").split(",").includes("video.publish");
 export const MAX_PENDING_DRAFTS = 5; // TikTok: at most 5 drafts waiting in an inbox per 24h
 
 export function tiktokConfigured() {
@@ -28,7 +39,7 @@ export function pkce() {
 export function tiktokAuthUrl(state: string, challenge: string) {
   const u = new URL(AUTH_URL());
   u.search = new URLSearchParams({
-    client_key: process.env.TIKTOK_CLIENT_KEY!, response_type: "code", scope: SCOPES, redirect_uri: tiktokRedirectUri(),
+    client_key: process.env.TIKTOK_CLIENT_KEY!, response_type: "code", scope: scopes(), redirect_uri: tiktokRedirectUri(),
     state, code_challenge: challenge, code_challenge_method: "S256", disable_auto_auth: "1",
   }).toString();
   return u.toString();
@@ -69,6 +80,8 @@ export function explain(code: string | undefined, message: string | undefined, s
     case "scope_not_authorized": return "This TikTok account didn't allow uploads. Reconnect it and tick every permission.";
     case "access_token_invalid": return "TikTok sign-in expired. Reconnect the account on the Settings page.";
     case "rate_limit_exceeded": return "TikTok says too many requests. Wait a minute and retry.";
+    case "unaudited_client_can_only_post_to_private_accounts": return "TikTok only lets apps it hasn't approved yet post to PRIVATE accounts. Set this TikTok account to private, or switch off \"Post directly\" in Settings to send drafts instead.";
+    case "privacy_level_option_mismatch": return "TikTok won't allow a private (only me) post on this account right now. Switch off \"Post directly\" in Settings to send drafts instead.";
     default: return `TikTok error ${code ?? status}: ${message || "request failed"}`;
   }
 }
@@ -87,6 +100,7 @@ export async function connectTikTok(code: string, verifier: string) {
     channelTitle: user.username ? `@${user.username}` : user.display_name || "TikTok account", username: user.username ?? null,
     refreshToken: t.refresh_token, accessToken: t.access_token!, expiresAt: new Date(Date.now() + (t.expires_in ?? 7200) * 1000),
     error: missing.length ? `Missing permission: ${missing.join(", ")}. Reconnect and allow everything.` : null,
+    scopes: t.scope ?? null,
   };
   return prisma.account.upsert({
     where: { platform_channelId: { platform: "tiktok", channelId: t.open_id } },
@@ -128,10 +142,28 @@ export function chunkPlan(size: number) {
 /** Send a finished clip to the account's TikTok inbox as a draft. Returns the publish_id. */
 export async function uploadDraft(acct: Account, file: string): Promise<string> {
   const token = await accessToken(acct);
+  return initAndUpload(token, file, "/v2/post/publish/inbox/video/init/", {});
+}
+
+/**
+ * v2.0.3 Direct Post (opt-in per account): posts the clip as SELF_ONLY ("only me"), the one privacy an unaudited app may use.
+ * Interaction switches follow what the creator allows (creator_info). Returns the publish_id.
+ */
+export async function directPost(acct: Account, file: string, caption: string): Promise<string> {
+  if (!canDirectPost(acct)) throw new Error(`${acct.channelTitle ?? "This TikTok account"} didn't allow direct posting. Put TIKTOK_DIRECT_POST=on in .env, add Direct Post in your TikTok app, then reconnect.`);
+  const token = await accessToken(acct);
+  const info = await api<{ privacy_level_options?: string[]; comment_disabled?: boolean; duet_disabled?: boolean; stitch_disabled?: boolean }>(token, "/v2/post/publish/creator_info/query/", {});
+  if (!(info.privacy_level_options ?? []).includes("SELF_ONLY")) throw new Error(explain("privacy_level_option_mismatch", undefined, 400));
+  return initAndUpload(token, file, "/v2/post/publish/video/init/", {
+    post_info: { title: caption.slice(0, 2200), privacy_level: "SELF_ONLY", disable_comment: Boolean(info.comment_disabled), disable_duet: Boolean(info.duet_disabled), disable_stitch: Boolean(info.stitch_disabled) },
+  });
+}
+
+async function initAndUpload(token: string, file: string, path: string, extra: Record<string, unknown>): Promise<string> {
   const size = fs.statSync(file).size;
   const plan = chunkPlan(size);
-  const init = await api<{ publish_id: string; upload_url: string }>(token, "/v2/post/publish/inbox/video/init/", {
-    source_info: { source: "FILE_UPLOAD", video_size: size, chunk_size: plan.chunkSize, total_chunk_count: plan.count },
+  const init = await api<{ publish_id: string; upload_url: string }>(token, path, {
+    ...extra, source_info: { source: "FILE_UPLOAD", video_size: size, chunk_size: plan.chunkSize, total_chunk_count: plan.count },
   });
   const buf = fs.readFileSync(file);
   for (let i = 0; i < plan.count; i++) {

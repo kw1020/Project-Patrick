@@ -63,7 +63,7 @@ test("channels: kinds/focus/handle parsing, account actions, done/fully posted, 
   assert.equal(accountAction({ platform: "youtube", mode: "api" }), "post");
   assert.equal(accountAction({ platform: "tiktok", mode: "api" }), "tiktok");
   assert.equal(accountAction({ platform: "tiktok", mode: "manual" }), "manual");
-  assert.equal(accountAction({ platform: "instagram", mode: "api" }), "manual", "Instagram is always by hand");
+  assert.equal(accountAction({ platform: "instagram", mode: "api" }), "instagram", "v2.0.3: connected Instagram posts Reels");
   const posts = [{ accountId: "a", status: "live" }, { accountId: "b", status: "failed" }, { accountId: "c", status: "draft" }];
   assert.ok(donePost(posts, "a")); assert.equal(donePost(posts, "b"), null); assert.ok(donePost(posts, "c"), "a TikTok draft counts as sent");
   assert.equal(isFullyPosted(posts, [{ id: "a" }, { id: "c" }]), true);

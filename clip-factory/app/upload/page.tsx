@@ -56,7 +56,7 @@ function editView(x: EditItem): ToPostView {
 
 /** Green = connected (posts for you), amber = by hand (download + copy caption), grey = switched off or no account. */
 function Slot({ platform, a }: { platform: string; a: Acct | undefined }) {
-  const state = !a ? "none" : a.disabled ? "off" : a.mode === "api" && a.platform !== "instagram" && !a.error ? "api" : "hand";
+  const state = !a ? "none" : a.disabled ? "off" : a.mode === "api" && !a.error ? "api" : "hand";
   const dot = { api: "bg-emerald-400", hand: "bg-amber-400", off: "bg-zinc-600", none: "border border-zinc-600" }[state];
   const why = { api: "connected: Clip Factory posts it", hand: "by hand: download + copy caption", off: `switched off${a?.error ? `: ${a.error}` : ""}`, none: "no account yet" }[state];
   return (
@@ -84,7 +84,7 @@ export default async function UploadPage() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">
           <h1 className="text-2xl font-black">Upload</h1>
-          <p className="text-sm text-zinc-400">Approved clips, in the column of the channel they go to. <b>Post to all</b> uploads to the channel&apos;s connected YouTube and TikTok; Instagram and by-hand accounts: Download + copy caption, post it, then Mark posted. Done clips move to Posted.</p>
+          <p className="text-sm text-zinc-400">Approved clips, in the column of the channel they go to. <b>Post to all</b> uploads to the channel&apos;s connected YouTube, TikTok and Instagram; by-hand accounts: Download + copy caption, post it, then Mark posted. Done clips move to Posted.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <form action={pickNow}><button className="btn-hot text-sm" disabled={budget.over} title={budget.over ? "Today's budget is used" : "Ask the Supreme Judge for today's best clips per channel"}>⭐ Pick now</button></form>

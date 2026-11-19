@@ -1,7 +1,9 @@
 import { getSettings, prisma } from "@/lib/db";
 import { judgeConfigured, JUDGE_MODEL } from "@/lib/judge";
 import { MIN_POSTS_TO_LEARN } from "@/lib/learning";
-import { tiktokConfigured, tiktokRedirectUri } from "@/lib/tiktok";
+import { canDirectPost, directPostEnabled, tiktokConfigured, tiktokRedirectUri } from "@/lib/tiktok";
+import { instagramConfigured, instagramRedirectUri } from "@/lib/instagram";
+import { InstagramPaste } from "@/components/InstagramPaste";
 import { redirectUri, youtubeConfigured } from "@/lib/youtube";
 import { EDIT_STYLES, JUMP_CUT_MODES, LAYOUTS, parseEditStyle, parseJumpCuts, parseLayoutSetting } from "@/lib/edit-styles";
 import { disconnectAccount, disconnectTwitch, saveAccount, saveSettings } from "../actions";
@@ -41,7 +43,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   ]);
   const cents = avgCostCents(costRows, JUDGE_MODEL);
   const low = usage.freeGb != null && usage.freeGb < 2 * minFreeGb();
-  // v1.9.5: OAuth-connected YouTube/TikTok (auto-post + privacy) here; by-hand accounts live in the Channels card; Twitch has its own card.
+  // v1.9.5: OAuth-connected YouTube/TikTok (v2.0.3: + Instagram) (auto-post + privacy) here; by-hand accounts live in the Channels card; Twitch has its own card.
   const accounts = all.filter((a) => isApiPostingAccount(a));
   const twitchUser = all.find((a) => a.platform === "twitch") ?? null;
   const channelAccounts: ChannelAccountView[] = all.filter(isPostingAccount).map((a) => ({
@@ -62,12 +64,15 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         <div className="divide-y divide-line">
           {accounts.map((a) => (
             <form key={a.id} action={saveAccount.bind(null, a.id)} className="flex flex-wrap items-center gap-3 py-3">
-              <span className={`rounded-md px-2 py-1 text-[11px] font-black uppercase ${a.platform === "youtube" ? "bg-red-600/20 text-red-300" : "bg-cyan-500/15 text-cyan-300"}`}>{a.platform === "youtube" ? "YouTube" : "TikTok"}</span>
+              <span className={`rounded-md px-2 py-1 text-[11px] font-black uppercase ${a.platform === "youtube" ? "bg-red-600/20 text-red-300" : a.platform === "instagram" ? "bg-fuchsia-500/15 text-fuchsia-300" : "bg-cyan-500/15 text-cyan-300"}`}>{a.platform === "youtube" ? "YouTube" : a.platform === "instagram" ? "Instagram" : "TikTok"}</span>
               <div className="min-w-40 flex-1">
                 <div className="font-semibold">{a.channelTitle}</div>
-                {a.error ? <div className="text-xs text-red-300">{a.error}</div> : <div className="text-xs text-zinc-500">{a._count.posts} posts{a.platform === "tiktok" ? " · sends drafts to your TikTok inbox" : ""}</div>}
+                {a.error ? <div className="text-xs text-red-300">{a.error}</div> : <div className="text-xs text-zinc-500">{a._count.posts} posts{a.platform === "tiktok" ? (a.directPost ? " · posts directly as private (only you see it)" : " · sends drafts to your TikTok inbox") : a.platform === "instagram" ? " · posts Reels" : ""}</div>}
               </div>
-              <label className="flex items-center gap-2 text-sm"><input name="autoPost" type="checkbox" defaultChecked={a.autoPost} className={check} />{a.platform === "tiktok" ? "Send draft when I approve" : "Post when I approve"}</label>
+              <label className="flex items-center gap-2 text-sm"><input name="autoPost" type="checkbox" defaultChecked={a.autoPost} className={check} />{a.platform === "tiktok" && !a.directPost ? "Send draft when I approve" : "Post when I approve"}</label>
+              {a.platform === "tiktok" && canDirectPost(a) && (
+                <label className="flex items-center gap-2 text-sm" title="TikTok only allows apps it hasn't approved yet to post as 'only me', and only to accounts set to private. Leave off to keep sending drafts."><input name="directPost" type="checkbox" defaultChecked={a.directPost} className={check} />Post directly (private until TikTok approves the app)</label>
+              )}
               {a.platform === "youtube" && (
                 <select name="privacy" defaultValue={a.privacy} className="field w-28"><option value="public">Public</option><option value="unlisted">Unlisted</option><option value="private">Private</option></select>
               )}
@@ -82,7 +87,11 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
             : <div className="text-xs text-zinc-400">YouTube: add <Code>YOUTUBE_CLIENT_ID</Code> / <Code>YOUTUBE_CLIENT_SECRET</Code> to <Code>.env</Code> (redirect URL <Code>{redirectUri()}</Code>).</div>}
           {tiktokConfigured() ? <a href="/api/tiktok/connect" className="btn-hot">+ Connect a TikTok account</a>
             : <div className="text-xs text-zinc-400">TikTok: add <Code>TIKTOK_CLIENT_KEY</Code> / <Code>TIKTOK_CLIENT_SECRET</Code> to <Code>.env</Code> (redirect URL <Code>{tiktokRedirectUri()}</Code>).</div>}
+          {instagramConfigured() ? <a href="/api/instagram/connect" className="btn-hot">+ Connect an Instagram account</a>
+            : <div className="text-xs text-zinc-400">Instagram: add <Code>INSTAGRAM_CLIENT_ID</Code> / <Code>INSTAGRAM_CLIENT_SECRET</Code> to <Code>.env</Code> (redirect URL <Code>{instagramRedirectUri()}</Code>, README: Connect Instagram).</div>}
         </div>
+        {instagramConfigured() && <InstagramPaste redirectUri={instagramRedirectUri()} />}
+        {tiktokConfigured() && directPostEnabled() && <p className="text-xs text-zinc-500">TikTok direct posting is switched on: reconnect a TikTok account to give it the new permission, then tick &ldquo;Post directly&rdquo; on it. Until TikTok approves your app, direct posts are private (only you can see them) and only work on private accounts; drafts stay the safe default.</p>}
         <p className="text-xs text-zinc-500">To add a second channel or account, connect again and pick a different one when Google or TikTok asks. TikTok drafts land in that account&apos;s inbox: open TikTok, paste the caption, post. TikTok allows 5 waiting drafts per account per day.</p>
       </div>
 
@@ -119,7 +128,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
       </div>
 
       <ChannelsCard channels={channels.map((c) => ({ id: c.id, name: c.name, kinds: c.kinds, focus: c.focus }))} accounts={channelAccounts}
-        canConnect={{ youtube: youtubeConfigured(), tiktok: tiktokConfigured() }} />
+        canConnect={{ youtube: youtubeConfigured(), tiktok: tiktokConfigured(), instagram: instagramConfigured() }} />
 
       <div className="card space-y-3 p-5" id="twitch-connect" data-testid="twitch-connect">
         <Head>Twitch follower counts</Head>

@@ -1,7 +1,8 @@
 import type { Account } from "@prisma/client";
 import { prisma } from "../lib/db";
 import { resolveStored } from "../lib/paths";
-import { draftStatus, fetchTikTokStats, MAX_PENDING_DRAFTS, tiktokVideoUrl, uploadDraft } from "../lib/tiktok";
+import { directPost, draftStatus, fetchTikTokStats, MAX_PENDING_DRAFTS, tiktokVideoUrl, uploadDraft } from "../lib/tiktok";
+import { containerStatus, fetchInstagramStats, IG_DAILY_LIMIT, instagramToken, publishReel } from "../lib/instagram";
 import { fetchPublicStats, fetchStats, uploadVideo, youtubeIdFromUrl } from "../lib/youtube";
 import { isApiPostingAccount } from "../lib/channels";
 import { parsePlatformInfo, platformCheck, postBlockReason } from "../lib/platform-rules";
@@ -11,7 +12,7 @@ import { parseKinds } from "../lib/channels";
 /** Poster: sends an APPROVED clip to one connected account. Refuses anything Krew hasn't approved. */
 export async function runPost(clipId: string, accountId: string) {
   const [clip, acct] = await Promise.all([
-    prisma.clip.findUnique({ where: { id: clipId }, include: { posts: true, moment: { include: { streamer: true } } } }),
+    loadClip(clipId),
     prisma.account.findUnique({ where: { id: accountId } }),
   ]);
   if (!clip) return "clip deleted";
@@ -28,6 +29,14 @@ export async function runPost(clipId: string, accountId: string) {
   const blocked = postBlockReason(platformCheck({ caption: clip.caption || clip.title || "", title: clip.title, creditOk: captionCredits(clip.caption || "", streamer), info: parsePlatformInfo(clip.platformInfo) }), acct.platform);
   if (blocked) throw new Error(blocked);
 
+  if (acct.platform === "instagram") return postInstagram(clip, acct, file, channelId);
+  if (acct.platform === "tiktok" && acct.directPost) {
+    // v2.0.3 opt-in: Direct Post (only-me until TikTok audits the app). The post is "live" (private); stats sync follows it.
+    const publishId = await directPost(acct, file, igOrTikTokCaption(clip.caption || clip.title || "", streamer));
+    await prisma.post.create({ data: { clipId, platform: "tiktok", accountId: acct.id, status: "live", publishId, campaignId: streamer.campaignId ?? null, channelId } });
+    await prisma.clip.update({ where: { id: clipId }, data: { status: "posted", stage: null, stageAt: new Date(), postError: null } });
+    return `posted ${streamer.name} clip to ${acct.channelTitle} on TikTok (private: only you can see it until TikTok approves the app)`;
+  }
   if (acct.platform === "tiktok") {
     const waiting = await prisma.post.count({ where: { accountId: acct.id, status: "draft", postedAt: { gt: new Date(Date.now() - 24 * 3600_000) } } });
     if (waiting >= MAX_PENDING_DRAFTS) throw new Error(`${acct.channelTitle} already has ${waiting} drafts waiting today (TikTok allows ${MAX_PENDING_DRAFTS}). Post them in the TikTok app first.`);
@@ -60,7 +69,7 @@ export async function editsChannelOf(acct: { homeChannelId: string | null }) {
 }
 
 /**
- * v2.0.0: sends an APPROVED edit (the no-music file) to a connected YouTube/TikTok account of a channel that takes Edits.
+ * v2.0.0: sends an APPROVED edit (the no-music file) to a connected YouTube/TikTok (v2.0.3: /Instagram) account of a channel that takes Edits.
  * Refuses anything else; single attempt. Only Krew's Post click starts it (edits never auto-post).
  */
 export async function runPostEdit(editId: string, accountId: string) {
@@ -80,6 +89,15 @@ export async function runPostEdit(editId: string, accountId: string) {
   if (blockedEdit) throw new Error(blockedEdit);
   const file = resolveStored(edit.finalPath);
   const s = edit.streamer;
+  if (acct.platform === "instagram") {
+    return publishInstagram(acct, file, igOrTikTokCaption(edit.caption || edit.title || `${s.name} edit`, s), {
+      label: `${s.name} edit`,
+      create: async (containerId) => (await prisma.editPost.create({ data: { editId, platform: "instagram", accountId: acct.id, status: "processing", publishId: containerId, channelId: acct.homeChannelId } })).id,
+      update: (id, data) => prisma.editPost.update({ where: { id }, data }),
+      publishId: async (id) => (await prisma.editPost.findUnique({ where: { id } }))?.publishId ?? null,
+      markPosted: () => prisma.edit.update({ where: { id: editId }, data: { status: "posted", stage: null, stageAt: new Date(), postError: null } }),
+    });
+  }
   if (acct.platform === "tiktok") {
     const since = new Date(Date.now() - 24 * 3600_000);
     const waiting = (await prisma.post.count({ where: { accountId: acct.id, status: "draft", postedAt: { gt: since } } }))
@@ -102,6 +120,67 @@ export async function runPostEdit(editId: string, accountId: string) {
   return `uploaded ${s.name} edit to ${acct.channelTitle} (${privacy}): ${id}`;
 }
 
+/** The credit must be in what gets posted even if the caption was edited (same rule as YouTube, without the link line). */
+function igOrTikTokCaption(caption: string, streamer: Parameters<typeof captionCredits>[1]) {
+  return captionCredits(caption, streamer) ? caption : `${caption}\n\n${creditLine(streamer)}`;
+}
+
+type PostClip = NonNullable<Awaited<ReturnType<typeof loadClip>>>;
+function loadClip(id: string) {
+  return prisma.clip.findUnique({ where: { id }, include: { posts: true, moment: { include: { streamer: true } } } });
+}
+
+/** Where an Instagram publish writes its row: a clip's Post or an edit's EditPost (same fields). */
+type IgTarget = {
+  label: string;
+  create: (containerId: string) => Promise<string>;
+  update: (id: string, data: { status?: string; externalId?: string; url?: string | null; postedAt?: Date; error?: string | null }) => Promise<unknown>;
+  publishId: (id: string) => Promise<string | null>;
+  markPosted: () => Promise<unknown>;
+};
+
+/**
+ * v2.0.3 Instagram Reel. A "processing" row is written as soon as Instagram has made the upload slot, so a worker that
+ * restarts mid-publish can never post the same clip twice (runPost then says "already sent"); the stats sync settles it.
+ */
+async function publishInstagram(acct: Account, file: string, caption: string, t: IgTarget) {
+  const since = new Date(Date.now() - 24 * 3600_000), counted = { accountId: acct.id, status: { in: ["live", "processing"] }, postedAt: { gt: since } };
+  const today = (await prisma.post.count({ where: counted })) + (await prisma.editPost.count({ where: counted }));
+  if (today >= IG_DAILY_LIMIT) throw new Error(`${acct.channelTitle} already posted ${today} Reels through Clip Factory today (Instagram allows ${IG_DAILY_LIMIT} a day).`);
+  let rowId: string | null = null;
+  try {
+    const r = await publishReel(acct, file, caption, { onContainer: async (containerId) => { rowId = await t.create(containerId); } });
+    await t.update(rowId!, { status: "live", externalId: r.mediaId, url: r.permalink, postedAt: new Date(), error: null });
+  } catch (e) {
+    if (rowId) {
+      // If the publish call itself broke (network), the Reel may be up anyway: ask before calling it failed (never post twice).
+      const containerId = await t.publishId(rowId);
+      const st = containerId ? await containerStatus(acct, containerId).catch(() => "UNKNOWN") : "UNKNOWN";
+      if (st === "PUBLISHED") {
+        await t.update(rowId, { status: "live", error: "Posted, but Clip Factory didn't get the link" });
+        await t.markPosted();
+        return `posted ${t.label} to ${acct.channelTitle} as an Instagram Reel (link not known yet)`;
+      }
+      // UNKNOWN: leave it "processing" so it can't be posted again; the stats sync settles it.
+      if (st !== "UNKNOWN") await t.update(rowId, { status: "failed", error: (e as Error).message.slice(0, 500) });
+    }
+    throw e;
+  }
+  await t.markPosted();
+  return `posted ${t.label} to ${acct.channelTitle} as an Instagram Reel`;
+}
+
+function postInstagram(clip: PostClip, acct: Account, file: string, channelId: string | null) {
+  const streamer = clip.moment.streamer;
+  return publishInstagram(acct, file, igOrTikTokCaption(clip.caption || clip.title || "", streamer), {
+    label: `${streamer.name} clip`,
+    create: async (containerId) => (await prisma.post.create({ data: { clipId: clip.id, platform: "instagram", accountId: acct.id, status: "processing", publishId: containerId, campaignId: streamer.campaignId ?? null, channelId } })).id,
+    update: (id, data) => prisma.post.update({ where: { id }, data }),
+    publishId: async (id) => (await prisma.post.findUnique({ where: { id } }))?.publishId ?? null,
+    markPosted: () => prisma.clip.update({ where: { id: clip.id }, data: { status: "posted", stage: null, stageAt: new Date(), postError: null } }),
+  });
+}
+
 async function record(postId: string, prev: number | null, s: { views: number; likes: number | null; comments: number | null }) {
   await prisma.post.update({ where: { id: postId }, data: { views: s.views, likes: s.likes, comments: s.comments, syncedAt: new Date() } });
   if (prev !== s.views) await prisma.postStat.create({ data: { postId, views: s.views, likes: s.likes, comments: s.comments } });
@@ -109,6 +188,27 @@ async function record(postId: string, prev: number | null, s: { views: number; l
 
 async function syncAccount(acct: Account) {
   let changed = 0, finished = 0;
+  if (acct.platform === "instagram") {
+    // Keeps the 60-day sign-in alive even on days nothing is posted (refreshes once under 7 days are left).
+    await instagramToken(acct);
+    // A publish whose worker stopped half-way: PUBLISHED = it went up (no link known), never published = safe to post again.
+    const stuck = await prisma.post.findMany({ where: { accountId: acct.id, status: "processing", publishId: { not: null }, postedAt: { lt: new Date(Date.now() - 20 * 60_000) } } });
+    for (const p of stuck) {
+      const st = await containerStatus(acct, p.publishId!).catch(() => "UNKNOWN");
+      if (st === "PUBLISHED") await prisma.post.update({ where: { id: p.id }, data: { status: "live", error: "Posted, but Clip Factory didn't get the link" } });
+      else if (st !== "IN_PROGRESS" && st !== "UNKNOWN") await prisma.post.update({ where: { id: p.id }, data: { status: "failed", error: `Instagram upload stopped (${st}); it was not published` } });
+    }
+    const live = await prisma.post.findMany({ where: { accountId: acct.id, status: "live", externalId: { not: null } }, orderBy: { postedAt: "desc" }, take: 100 });
+    const stats = await fetchInstagramStats(acct, live.map((p) => p.externalId!));
+    for (const p of live) {
+      const s = stats.get(p.externalId!);
+      if (!s) continue;
+      // Without the insights permission Instagram gives likes + comments only: keep the views we had.
+      await record(p.id, p.views, { views: s.views ?? p.views ?? 0, likes: s.likes, comments: s.comments });
+      if (s.views != null && p.views !== s.views) changed++;
+    }
+    return `${acct.channelTitle}: ${live.length} Reels checked, ${changed} updated`;
+  }
   if (acct.platform === "tiktok") {
     // Follow drafts until Krew posts them in the app (or 7 days pass).
     const drafts = await prisma.post.findMany({ where: { accountId: acct.id, status: "draft", publishId: { not: null }, postedAt: { gt: new Date(Date.now() - 7 * 86400_000) } } });
@@ -119,6 +219,17 @@ async function syncAccount(acct: Account) {
       } else if (st.status === "PUBLISH_COMPLETE") {
         const vid = st.postIds[0];
         await prisma.post.update({ where: { id: p.id }, data: { status: "live", postedAt: new Date(), ...(vid ? { externalId: vid, url: tiktokVideoUrl(acct, vid) } : {}) } });
+        finished++;
+      }
+    }
+    // v2.0.3 Direct Posts (private): follow until TikTok says they're done, then keep the video id when it gives one.
+    const direct = await prisma.post.findMany({ where: { accountId: acct.id, status: "live", publishId: { not: null }, externalId: null, error: null, postedAt: { gt: new Date(Date.now() - 7 * 86400_000) } } });
+    for (const p of direct) {
+      const st = await draftStatus(acct, p.publishId!);
+      if (st.status === "FAILED") await prisma.post.update({ where: { id: p.id }, data: { status: "failed", error: `TikTok: ${st.failReason ?? "failed"}` } });
+      else if (st.status === "PUBLISH_COMPLETE") {
+        const vid = st.postIds[0];
+        await prisma.post.update({ where: { id: p.id }, data: vid ? { externalId: vid, url: tiktokVideoUrl(acct, vid) } : { error: "Posted as private (only you can see it)" } });
         finished++;
       }
     }
@@ -147,7 +258,23 @@ async function syncEditPosts(acct: Account) {
     }
   }
   const live = await prisma.editPost.findMany({ where: { accountId: acct.id, status: "live", externalId: { not: null } }, orderBy: { postedAt: "desc" }, take: 200 });
+  if (acct.platform === "instagram") {
+    const stuck = await prisma.editPost.findMany({ where: { accountId: acct.id, status: "processing", publishId: { not: null }, postedAt: { lt: new Date(Date.now() - 20 * 60_000) } } });
+    for (const p of stuck) {
+      const st = await containerStatus(acct, p.publishId!).catch(() => "UNKNOWN");
+      if (st === "PUBLISHED") await prisma.editPost.update({ where: { id: p.id }, data: { status: "live", error: "Posted, but Clip Factory didn't get the link" } });
+      else if (st !== "IN_PROGRESS" && st !== "UNKNOWN") await prisma.editPost.update({ where: { id: p.id }, data: { status: "failed", error: `Instagram upload stopped (${st}); it was not published` } });
+    }
+  }
   if (!live.length) return;
+  if (acct.platform === "instagram") {
+    const ig = await fetchInstagramStats(acct, live.map((p) => p.externalId!));
+    for (const p of live) {
+      const st = ig.get(p.externalId!);
+      if (st) await prisma.editPost.update({ where: { id: p.id }, data: { views: st.views ?? p.views, likes: st.likes, comments: st.comments, syncedAt: new Date() } });
+    }
+    return;
+  }
   const stats = acct.platform === "tiktok" ? await fetchTikTokStats(acct, live.map((p) => p.externalId!)) : await fetchStats(acct, live.map((p) => p.externalId!));
   for (const p of live) {
     const st = stats.get(p.externalId!);
@@ -158,7 +285,7 @@ async function syncEditPosts(acct: Account) {
 /** Every 15 min: views/likes/comments for every account. One broken account doesn't stop the rest. */
 export async function runStatsSync() {
   const out: string[] = [];
-  // Only OAuth-connected YouTube/TikTok accounts sync through their own login (manual + Twitch rows are skipped).
+  // Only OAuth-connected YouTube/TikTok/Instagram accounts sync through their own login (manual + Twitch rows are skipped).
   const accounts = (await prisma.account.findMany()).filter(isApiPostingAccount);
   // Phase 2 YouTube posts were saved before accounts had ids; attach them if there's exactly one channel.
   const yt = accounts.filter((a) => a.platform === "youtube");

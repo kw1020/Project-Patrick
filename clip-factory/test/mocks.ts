@@ -5,6 +5,11 @@ export type Mock = { tiktokStatus: Record<string, unknown>; refreshCount: number
   followers: Record<string, number>; // v1.9.5: Helix /channels/followers totals by broadcaster_id (missing = 1000)
   /** v1.9.6: what the stand-in Claude returns for Supreme (claude-opus-5-5) and QA (image) requests. */
   supreme: Record<string, unknown>; qa: Record<string, unknown>; supremeStop: string; usage: { input_tokens: number; output_tokens: number };
+  /** v2.0.3 Instagram stand-in: container statuses returned in order (last one repeats), and switches for the error paths. */
+  ig: { statuses: string[]; uploadHttp: number; publishError: Record<string, unknown> | null; containerError: Record<string, unknown> | null;
+    tokenError: boolean; accountType: string; permissions: string; refreshCount: number; insightsError: boolean; published: number; resumableRefused: boolean };
+  /** v2.0.3 TikTok Direct Post stand-in: creator_info privacy options + the init error code (null = ok). */
+  ttCreator: { privacy_level_options: string[] }; ttDirectError: string | null; ttScope: string;
 };
 
 export async function startMocks(port = 0): Promise<Mock> {
@@ -14,7 +19,12 @@ export async function startMocks(port = 0): Promise<Mock> {
     verdict: { observations: "He drives off the bridge and lands on a moving truck; he screams and chat explodes.", score: 8.4, hook_text: "He jumped the bridge?!", title: "Impossible bridge jump in GTA 6", hashtags: ["GTA6", "#gaming", "vice city", "GTA6"], reason: "Clear payoff and chat exploded.", category: "gaming", extra_hashtags: ["GTA6Clips"], best_start: null, best_end: null, hook_lands: true, payoff_in_window: true, payoff_at: 12, payoff: "He jumps the bridge and lands on a moving truck" },
     followers: {},
     supreme: { picks: [] }, qa: { ok: true, issues: [] }, supremeStop: "end_turn", usage: { input_tokens: 10, output_tokens: 10 },
+    ig: { statuses: ["IN_PROGRESS", "FINISHED"], uploadHttp: 200, publishError: null, containerError: null, tokenError: false, accountType: "MEDIA_CREATOR",
+      permissions: "instagram_business_basic,instagram_business_content_publish,instagram_business_manage_insights", refreshCount: 0, insightsError: false, published: 0, resumableRefused: false },
+    ttCreator: { privacy_level_options: ["PUBLIC_TO_EVERYONE", "MUTUAL_FOLLOW_FRIENDS", "SELF_ONLY"] }, ttDirectError: null,
+    ttScope: "user.info.basic,user.info.profile,video.upload,video.list",
   };
+  let igStatusAt = 0;
   const server = http.createServer((req, res) => {
     const chunks: Buffer[] = [];
     req.on("data", (c) => chunks.push(c));
@@ -46,13 +56,62 @@ export async function startMocks(port = 0): Promise<Mock> {
       if (path.startsWith("/v2/oauth/token/")) {
         const f = new URLSearchParams(body.toString());
         if (f.get("grant_type") === "refresh_token") mock.refreshCount++;
-        return json(200, { access_token: `act.mock${mock.refreshCount}`, refresh_token: `rft.mock${mock.refreshCount}`, expires_in: 7200, open_id: "open-123", scope: "user.info.basic,user.info.profile,video.upload,video.list", token_type: "Bearer" });
+        return json(200, { access_token: `act.mock${mock.refreshCount}`, refresh_token: `rft.mock${mock.refreshCount}`, expires_in: 7200, open_id: "open-123", scope: mock.ttScope, token_type: "Bearer" });
       }
       if (path.startsWith("/v2/user/info/")) return tt({ user: { open_id: "open-123", display_name: "Krew", username: "krewclips" } });
       if (path.startsWith("/v2/post/publish/inbox/video/init/")) return tt({ publish_id: "v_inbox_file~v2.1", upload_url: `${mock.url}/tt-upload/1` });
+      // v2.0.3 Direct Post
+      if (path.startsWith("/v2/post/publish/creator_info/query/")) return tt({ creator_username: "krewclips", creator_nickname: "Krew", comment_disabled: false, duet_disabled: true, stitch_disabled: false, max_video_post_duration_sec: 600, ...mock.ttCreator });
+      if (path.startsWith("/v2/post/publish/video/init/")) {
+        if (mock.ttDirectError) return json(403, { error: { code: mock.ttDirectError, message: "mock", log_id: "x" } });
+        return tt({ publish_id: "v_pub_file~v2.9", upload_url: `${mock.url}/tt-upload/2` });
+      }
       if (path.startsWith("/tt-upload/")) { res.writeHead(201); return res.end(); }
       if (path.startsWith("/v2/post/publish/status/fetch/")) return tt(mock.tiktokStatus);
       if (path.startsWith("/v2/video/query/")) return tt({ videos: [{ id: "7300000000000000001", view_count: 12000, like_count: 900, comment_count: 40 }] });
+
+      // ---- Instagram (v2.0.3): Business Login token exchange, Graph API, rupload ----
+      if (path.startsWith("/ig/oauth/access_token") && req.method === "POST") {
+        const f = new URLSearchParams(body.toString());
+        if (mock.ig.tokenError || f.get("code") === "bad") return json(400, { error_type: "OAuthException", code: 400, error_message: "Matching code was not found or was already used" });
+        return json(200, { data: [{ access_token: "IGshort", user_id: "1784", permissions: mock.ig.permissions }] });
+      }
+      if (path.startsWith("/ig-graph/")) {
+        const u = new URL(path, "http://x"), ep = u.pathname.slice("/ig-graph".length);
+        const token = u.searchParams.get("access_token") || String(req.headers.authorization ?? "").replace(/^Bearer /, "");
+        if (ep === "/access_token") return u.searchParams.get("access_token") === "IGshort" && u.searchParams.get("grant_type") === "ig_exchange_token" ? json(200, { access_token: "IGlong", token_type: "bearer", expires_in: 5183944 }) : json(400, { error: { message: "Invalid OAuth access token", type: "OAuthException", code: 190 } });
+        if (ep === "/refresh_access_token") { mock.ig.refreshCount++; return json(200, { access_token: `IGlong${mock.ig.refreshCount}`, token_type: "bearer", expires_in: 5183944 }); }
+        if (!token.startsWith("IGlong")) return json(400, { error: { message: "Invalid OAuth access token", type: "OAuthException", code: 190 } });
+        const m = /^\/v[\d.]+(\/.*)$/.exec(ep);
+        const rest = m ? m[1] : ep;
+        const form = new URLSearchParams(body.toString());
+        if (rest === "/me") return json(200, { id: "app-scoped-1", user_id: "17841400001", username: "vicecity.clips", account_type: mock.ig.accountType, name: "ViceCityClips" });
+        if (rest === "/17841400001/media" && req.method === "POST") {
+          if (mock.ig.containerError) return json(400, { error: mock.ig.containerError });
+          if (mock.ig.resumableRefused) return json(400, { error: { message: "(#100) The parameter upload_type is not supported for this app", type: "OAuthException", code: 100 } });
+          if (form.get("media_type") !== "REELS" || form.get("upload_type") !== "resumable") return json(400, { error: { message: "mock: want REELS + resumable", code: 100 } });
+          igStatusAt = 0;
+          return json(200, { id: "cont-1", uri: "https://rupload.facebook.com/ig-api-upload/v27.0/cont-1" });
+        }
+        if (rest === "/cont-1") { const st = mock.ig.statuses[Math.min(igStatusAt++, mock.ig.statuses.length - 1)]; return json(200, { id: "cont-1", status_code: st, status: st === "ERROR" ? "Error: unsupported audio codec" : st }); }
+        if (rest === "/17841400001/media_publish" && req.method === "POST") {
+          if (mock.ig.publishError) return json(400, { error: mock.ig.publishError });
+          if (form.get("creation_id") !== "cont-1") return json(400, { error: { message: "mock: bad creation_id", code: 100 } });
+          mock.ig.published++;
+          return json(200, { id: "reel-9" });
+        }
+        if (rest === "/reel-9" && u.searchParams.get("fields") === "permalink") return json(200, { permalink: "https://www.instagram.com/reel/ABC123/" });
+        if (rest === "/reel-9") return json(200, { id: "reel-9", like_count: 77, comments_count: 5 });
+        if (rest === "/reel-9/insights") return mock.ig.insightsError ? json(400, { error: { message: "(#10) Application does not have permission for this action", code: 10 } })
+          : json(200, { data: [{ name: "views", period: "lifetime", values: [{ value: 4321 }] }, { name: "likes", period: "lifetime", values: [{ value: 80 }] }, { name: "comments", period: "lifetime", values: [{ value: 6 }] }] });
+        return json(404, { error: { message: "mock: no ig " + rest, code: 803 } });
+      }
+      if (path.startsWith("/ig-rupload/")) {
+        if (req.headers.authorization !== "OAuth IGlong" && !String(req.headers.authorization).startsWith("OAuth IGlong")) return json(400, { debug_info: { retriable: false, type: "ProcessingFailedError", message: "unauthorized user request" } });
+        if (req.headers.offset !== "0" || Number(req.headers.file_size) !== body.length) return json(400, { debug_info: { retriable: false, type: "ProcessingFailedError", message: "mock: bad offset/file_size" } });
+        if (mock.ig.uploadHttp !== 200) return json(mock.ig.uploadHttp, { debug_info: { retriable: false, type: "ProcessingFailedError", message: "Request processing failed" } });
+        return json(200, { success: true, message: "Upload successful." });
+      }
 
       // ---- Twitch (client-credentials token + Helix) ----
       if (path.startsWith("/oauth2/token") && req.method === "POST") {
@@ -122,6 +181,8 @@ export function mockEnv(url: string) {
     TIKTOK_CLIENT_KEY: "mock-key", TIKTOK_CLIENT_SECRET: "mock-secret", TIKTOK_AUTH_URL: `${url}/tt-auth`, TIKTOK_API_URL: url,
     YOUTUBE_API_KEY: "mock-yt-key", YOUTUBE_CLIENT_ID: "mock-client", YOUTUBE_CLIENT_SECRET: "mock-secret",
     GOOGLE_OAUTH_URL: `${url}/auth`, GOOGLE_TOKEN_URL: `${url}/token`, YOUTUBE_API_URL: `${url}/youtube/v3`, YOUTUBE_UPLOAD_URL: `${url}/upload/youtube/v3/videos`,
+    INSTAGRAM_CLIENT_ID: "mock-ig-id", INSTAGRAM_CLIENT_SECRET: "mock-ig-secret", INSTAGRAM_AUTH_URL: `${url}/ig-auth`, INSTAGRAM_TOKEN_URL: `${url}/ig/oauth/access_token`,
+    INSTAGRAM_GRAPH_URL: `${url}/ig-graph`, INSTAGRAM_UPLOAD_URL: `${url}/ig-rupload`, INSTAGRAM_POLL_MS: "20",
     TWITCH_CLIENT_ID: "mock-twitch-id", TWITCH_CLIENT_SECRET: "mock-twitch-secret", TWITCH_API_URL: `${url}/helix`, TWITCH_AUTH_URL: `${url}/oauth2/token`,
   };
 }

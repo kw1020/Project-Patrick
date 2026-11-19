@@ -1,5 +1,12 @@
 # Clip Factory patch notes
 
+## 2.0.3 — 2026-11-19
+- Instagram can now post for you: connect an Instagram account in Settings > Channels and approved clips go up as Reels, like YouTube. One-time setup in README: Connect Instagram.
+- The account must be a Professional account (Creator or Business). Connecting into a channel slot replaces its by-hand entry and keeps its posts.
+- Upload has a real Post to Instagram button for connected accounts, and Post to all includes Instagram. Reel views, likes and comments update by themselves.
+- TikTok still sends drafts by default. New opt-in: Post directly, which posts the video as private (only you see it) until TikTok approves the app.
+- Instagram sign-in lasts 60 days and renews itself while Clip Factory runs. If it ever runs out, Settings asks you to reconnect.
+
 ## 2.0.1 — 2026-11-19
 - Clips now spread over all your channels instead of piling up on ViceCityClips.
 - GTA 6 clips: about 2 of 3 go to ViceCityClips, the rest to StreamHeistClips (funny) or WantedLevelClips (big plays).
