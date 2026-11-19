@@ -323,30 +323,24 @@ function planMontage(o: PlanInput): EditPlan {
 
   // ---- effects on the beat ----
   const dropHit = dropSlot >= 0 ? slices[dropSlot].hitFrame! : bf[g.dropBeat];
-  const strong = slotOrder.filter((i) => i !== dropSlot).slice(0, 2);
+  // v2.0.5 (Krew: "it just zooms in, zooms out ... that's not an edit"): zoom only on the drop (and on a Funny freeze), at most
+  // one zoom per 2 bars (spaceZooms), no zoom pulse on every beat, no shake except the drop's, no drifting in and out.
   if (vibe === "hype") {
-    for (const sl of slices) if (sl.beat0 % 4 === 0) fx.flashes.push(sl.f0);
+    for (const sl of slices) if (sl.beat0 % 16 === 0 && sl.beat0 > 0) fx.flashes.push(sl.f0);
     fx.flashes.push(dropHit);
-    for (let k = 0; k < N; k++) fx.pulses.push({ f: bf[k], len: Math.min(10, bf[k + 1] - bf[k]), amp: k % 4 === 0 ? 0.08 : 0.05 });
-    fx.shakes.push({ f0: dropHit, f1: dropHit + 9 });
-    fx.rgb.push({ f0: dropHit, f1: dropHit + 8 });
-    for (const i of strong) { const h = slices[i].hitFrame!; fx.shakes.push({ f0: h, f1: h + 6 }); fx.rgb.push({ f0: h, f1: h + 4 }); }
+    fx.pulses.push({ f: dropHit, len: 12, amp: 0.08 });
+    fx.shakes.push({ f0: dropHit, f1: dropHit + 6 });
+    fx.rgb.push({ f0: dropHit, f1: dropHit + 6 });
   } else if (vibe === "funny") {
     fx.flashes.push(dropHit);
-    fx.shakes.push({ f0: dropHit, f1: dropHit + 6 });
+    fx.punches.push({ f: dropHit, end: dropSlot >= 0 ? slices[dropSlot].f1 : dropHit + 30, amp: 0.1 });
     for (const sl of slices) {
-      if (sl.role === "freeze") {
-        const frz = sl.parts[sl.parts.length - 1].frames - sl.post;
-        fx.punches.push({ f: sl.hitFrame!, end: sl.f1 - frz, amp: 0.1 });
-        fx.drifts.push({ f0: sl.f1 - frz, f1: sl.f1, a: 0.1, b: 0.24 });
-      } else if (sl.beat1 - sl.beat0 >= 2) {
-        fx.punches.push({ f: sl.hitFrame!, end: sl.f1, amp: 0.1 });
-      }
+      if (sl.role !== "freeze") continue;
+      const frz = sl.parts[sl.parts.length - 1].frames - sl.post;
+      fx.punches.push({ f: sl.f1 - frz, end: sl.f1, amp: 0.1 });
     }
-    for (let k = 0; k < N; k += 4) fx.pulses.push({ f: bf[k], len: Math.min(8, bf[k + 1] - bf[k]), amp: 0.03 });
-  } else {
-    slices.forEach((sl, i) => fx.drifts.push({ f0: sl.f0, f1: sl.f1, a: i % 2 ? 0.06 : 0, b: i % 2 ? 0 : 0.06 }));
   }
+  spaceZooms(fx, bf, dropHit);
   fx.flashes = [...new Set(fx.flashes)].sort((a, b) => a - b);
   return base(o, slices, fx, { transition: { kind: xf ? "xfade" : "cut", frames: xf }, captions: o.captions ? planCaptions(o, slices) : [] });
 }
@@ -414,23 +408,19 @@ function planClipEdit(o: PlanInput): EditPlan {
   const drop = bf[D];
   const calm = o.vibe === "smooth";
   fx.flashes.push(drop);
-  fx.punches.push({ f: drop, end: bf[dropEnd], amp: 0.14 });
-  fx.shakes.push({ f0: drop, f1: drop + (calm ? 5 : 10) });
-  fx.rgb.push({ f0: drop, f1: drop + 8 });
-  for (let k = D + 1; k < N; k++) {
-    if (k < dropEnd) continue;
-    fx.pulses.push({ f: bf[k], len: Math.min(10, bf[k + 1] - bf[k]), amp: calm ? 0.03 : k % 4 === 0 ? 0.09 : 0.05 });
-    if (k % 4 === 0 && !calm) fx.rgb.push({ f0: bf[k], f1: bf[k] + 3 });
-  }
+  fx.punches.push({ f: drop, end: bf[dropEnd], amp: 0.12 });
+  fx.shakes.push({ f0: drop, f1: drop + (calm ? 4 : 6) });
+  fx.rgb.push({ f0: drop, f1: drop + 6 });
+  // v2.0.5: no zoom pulse on every beat after the drop any more; a flash every 2 bars and one slow push-in on the freeze
   for (const sl of slices) {
     if (sl.f0 <= drop) continue;
-    if (sl.beat0 % 4 === 0 && !calm) fx.flashes.push(sl.f0);
+    if (sl.beat0 % 8 === 0 && !calm) fx.flashes.push(sl.f0);
     if (sl.role === "freeze") {
       const frz = sl.parts[sl.parts.length - 1].frames;
-      fx.drifts.push({ f0: sl.f1 - frz, f1: sl.f1, a: 0.04, b: 0.22 });
+      fx.drifts.push({ f0: sl.f1 - frz, f1: sl.f1, a: 0, b: 0.12 });
     }
-    if (sl.role === "replay" && sl.hitFrame != null && sl.hitFrame > sl.f0 && !calm) fx.shakes.push({ f0: sl.hitFrame, f1: sl.hitFrame + 6 });
   }
+  spaceZooms(fx, bf, drop);
   fx.flashes = [...new Set(fx.flashes)].sort((a, b) => a - b);
   // the name pops on the drop bar (the clip part has the captions)
   const plan = base(o, slices, fx, {
@@ -439,6 +429,26 @@ function planClipEdit(o: PlanInput): EditPlan {
   });
   plan.captions = planCaptions(o, slices.filter((s) => s.role === "clip"));
   return plan;
+}
+
+/** v2.0.5: zoom moves (pulses, punches, drifts) must start at least 2 bars (8 beats) apart; the one on the drop wins. */
+export const ZOOM_GAP_BEATS = 8;
+export function spaceZooms(fx: Fx, beatFrames: number[], dropFrame: number) {
+  const beat = beatFrames.length > 1 ? (beatFrames[beatFrames.length - 1] - beatFrames[0]) / (beatFrames.length - 1) : 15;
+  const gap = Math.round(beat * ZOOM_GAP_BEATS) - 1;
+  type Z = { f: number; kind: "pulses" | "punches" | "drifts"; i: number };
+  const all: Z[] = [
+    ...fx.pulses.map((p, i) => ({ f: p.f, kind: "pulses" as const, i })),
+    ...fx.punches.map((p, i) => ({ f: p.f, kind: "punches" as const, i })),
+    ...fx.drifts.map((d, i) => ({ f: d.f0, kind: "drifts" as const, i })),
+  ].sort((a, b) => Math.abs(a.f - dropFrame) - Math.abs(b.f - dropFrame) || a.f - b.f);
+  const kept: Z[] = [];
+  for (const z of all) if (kept.every((k) => Math.abs(k.f - z.f) >= gap)) kept.push(z);
+  const keep = (kind: Z["kind"]) => new Set(kept.filter((k) => k.kind === kind).map((k) => k.i));
+  const kp = keep("pulses"), kq = keep("punches"), kd = keep("drifts");
+  fx.pulses = fx.pulses.filter((_, i) => kp.has(i));
+  fx.punches = fx.punches.filter((_, i) => kq.has(i));
+  fx.drifts = fx.drifts.filter((_, i) => kd.has(i));
 }
 
 /** Make a list of parts play exactly n frames (rounding can leave a frame over or short): the last part absorbs it. */

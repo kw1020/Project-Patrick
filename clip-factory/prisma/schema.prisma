@@ -350,6 +350,8 @@ model Edit {
   duration          Float?    // real length of the finished edit (seconds)
   platformInfo      String?   // v1.9.8 Platform check facts for the final (ffprobe + render facts JSON), like Clip.platformInfo
   postError         String?
+  theme             String?   // v2.0.5 Top 5: funny | gaming | gta | creator (streamerId = that creator, else the #1 entry's creator)
+  creators          String?   // v2.0.5 Top 5: JSON [{id, login, name, platform}] of every creator in it (caption credits)
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
   posts             EditPost[]

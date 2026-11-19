@@ -9,6 +9,8 @@ export type EditView = {
   lengthSec: number; duration: number | null; bpm: number; timingTrack: string | null; startAt: string | null; creatorAudio: boolean;
   title: string; caption: string; hasVideo: boolean; hasBeat: boolean; version: number; slices: number | null;
   streamer: { name: string; login: string; platform: string };
+  /** v2.0.5 Top 5: the theme label + every creator in it (null / [] for montages and clip edits). */
+  theme?: string | null; creators?: { login: string; name: string; platform: string }[];
   posts: { platform: string; accountId: string | null; status: string; url: string | null; error: string | null }[];
 };
 
@@ -27,6 +29,8 @@ export function EditCard({ edit, channelName }: { edit: EditView; channelName: s
   const sending = edit.stage === "post";
   const src = `/api/media/edit/${edit.id}?variant=${withBeat ? "beat" : "final"}&v=${edit.version}`;
   const chip = "rounded-md bg-black/75 px-2 py-1 text-xs font-bold";
+  const top5 = edit.format === "top5";
+  const credited = (top5 && edit.creators?.length ? edit.creators : [edit.streamer]).filter((c) => !captionCredits(caption, c));
   return (
     <div className={`card flex flex-col overflow-hidden ${busy ? "opacity-60" : ""}`} data-testid="edit-card">
       <div className="relative aspect-[9/16] w-full bg-black">
@@ -42,16 +46,18 @@ export function EditCard({ edit, channelName }: { edit: EditView; channelName: s
         <div className="pointer-events-none absolute inset-x-2 top-2 flex flex-wrap gap-1">
           <span className={`${chip} text-hot`}>Edit</span>
           <span className={chip}>{formatLabel(edit.format)}</span>
-          <span className={`${chip} text-zinc-300`}>{vibeLabel(edit.vibe)}</span>
+          {top5 ? <span className={`${chip} text-zinc-300`}>{edit.theme}</span> : <span className={`${chip} text-zinc-300`}>{vibeLabel(edit.vibe)}</span>}
           <span className={chip}>{Math.round(edit.duration ?? edit.lengthSec)}s</span>
-          <span className={`${chip} text-zinc-300`}>{Math.round(edit.bpm)} BPM{edit.timingTrack ? " · song" : ""}</span>
+          {!top5 && <span className={`${chip} text-zinc-300`}>{Math.round(edit.bpm)} BPM{edit.timingTrack ? " · song" : ""}</span>}
           {withBeat && <span className={`${chip} text-red-300`}>Preview with beat</span>}
         </div>
       </div>
       <div className="flex flex-1 flex-col gap-2 p-3">
         <div className="flex items-center justify-between gap-2 text-xs text-zinc-400">
-          <a href={creatorUrl(edit.streamer)} target="_blank" className="font-bold text-zinc-200 hover:text-hot">{edit.streamer.name}</a>
-          <span>{edit.slices ? `${edit.slices} cuts` : ""}{edit.creatorAudio ? "" : " · no creator audio"}</span>
+          {top5 && edit.creators?.length
+            ? <span className="truncate font-bold text-zinc-200">{edit.creators.map((c) => c.name).join(", ")}</span>
+            : <a href={creatorUrl(edit.streamer)} target="_blank" className="font-bold text-zinc-200 hover:text-hot">{edit.streamer.name}</a>}
+          <span>{top5 ? "5 moments" : edit.slices ? `${edit.slices} cuts` : ""}{edit.creatorAudio ? "" : " · no creator audio"}</span>
         </div>
         {edit.hasBeat && (
           <label className="flex items-center gap-2 text-xs text-zinc-300">
@@ -64,7 +70,7 @@ export function EditCard({ edit, channelName }: { edit: EditView; channelName: s
         )}
         <input className="field font-semibold" value={title} onChange={(e) => setTitle(e.target.value)} onBlur={() => dirty && start(() => updateEditText(edit.id, title, caption))} maxLength={100} />
         <textarea className="field min-h-24 text-xs leading-relaxed" value={caption} onChange={(e) => setCaption(e.target.value)} onBlur={() => dirty && start(() => updateEditText(edit.id, title, caption))} />
-        {!captionCredits(caption, edit.streamer) && <div className="text-xs text-sun">⚠ Caption must credit {creatorHandle(edit.streamer)}</div>}
+        {credited.length > 0 && <div className="text-xs text-sun">⚠ Caption must credit {credited.map(creatorHandle).join(" ")}</div>}
         <div className="mt-auto flex flex-wrap gap-2 pt-1">
           {edit.status === "pending" && <>
             <button className="btn-ok flex-1" disabled={busy} onClick={() => act(() => setEditStatus(edit.id, "approved"))}>Approve</button>

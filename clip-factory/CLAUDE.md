@@ -376,6 +376,30 @@ original brief is below, and the status section says what's done. Read both befo
   the sandbox):** whether rupload/resumable works for Instagram-Login apps (Meta's page says Facebook Login only; third-party 2026
   guides show it on graph.instagram.com), whether Meta saves `https://localhost:3000/...` as a redirect URI, the insights scope
   name on Business Login, the exact Meta error subcodes, TikTok Direct Post on Krew's app.
+- **v2.0.5 (2026-11-19): Top 5 countdown edits** (Krew on v2.0.0: "it just zooms in, zooms out... That's not an edit... like top 5
+  funniest parts... a montage of multiple clips"; 2.0.4 is built separately on channels/cutter/actions, so this stays in edit files).
+  Format `top5` = the Edits page default (`DEFAULT_FORMAT`, `TOP5_THEMES` funny|gaming|gta|creator in `src/lib/edit-vibes.ts`). Schema additive:
+  `Edit.theme`, `Edit.creators` (JSON [{id,login,name,platform}]); `streamerId` = the one creator, else the #1 entry's creator (so cascade/
+  campaign/credit checks still work); `toV203Schema` + `test/v205.test.ts` pushes from f01d7cb with rows. Pure `src/lib/top5.ts`:
+  `pickTop5` (approved, not paused, `isUsable`; theme by Judge category / `isGtaMoment` / streamerId; strength = 0.55 score + 0.25
+  log standout (Moment.spikeScore) + 0.12 named Judge payoff (0.08 payoffAt only) + recency 3-day half-life; last 7 days, widened to 30;
+  dedupe `sameMoment` + same clip; <= 2 per creator except "creator"; moments of the last 3 Top 5s of that theme last; 3 spares),
+  `entryWindow` (sentence start 2.5-6s before the payoff closest to 4s, payoff + 4.5s, word-snapped, inside the clip's tightened window,
+  6-12s), `fitTotal` (stretch to >= 45s total, trim to <= 75s), `punchExpr` (the ONLY zoom: 1.12 smoothstep at payoff-0.1, 0.2/0.9/0.3s),
+  ASS for title (1.4s: "TOP 5" yellow + wrapped rest, "#5" pops at 0.65s), number card (0.7s, "#N" 380px + "@login"), end (1.5s
+  "FOLLOW @<edit channel>"), entry ("#N  @login" at the layout's credit spot, captions at its capY, watermark) — all inside TEXT_SAFE,
+  `top5Caption` (brandedCaption + every creator on one "🎥 @a @b @c" line + #edit if <= 5 tags; the hook keeps its closing emoji).
+  Render `src/lib/top5-render.ts`: one ffmpeg per entry (own layout chain = buildStyledFilter geometry with the punch on the zoom layer;
+  card = the entry's first frame gblur 24 + darker, tpad; #1 also gets the end card from its last frame; whoosh under each card; audio
+  loudnorm -14 per entry) -> crf16 + PCM mkv, then one concat encode (veryfast crf 20, AAC, faststart). No beat preview
+  (finalWithBeatPath null). Worker `src/workers/top5.ts`: `createTop5Edit` picks at creation (readable "only N different funny moments"
+  error on the page; picks + spares in `slices.top5`), `runEdit` hands format top5 to `runTop5` (raw files reused via `getSource`
+  before 14/after 12, spares replace failed downloads, layout = the clip's own `Clip.layout` via `editLayout({mode})`, watermark/end card =
+  the Edits channel's name). Re-make picks other moments; the daily auto edit is now each creator's Top 5. Montage/clipedit toned down
+  (`spaceZooms` in edit-plan.ts: zoom events >= 8 beats apart, drop first; hype one pulse on the drop, shake/RGB only there; funny
+  punches only on drop + freezes; smooth no drifts; clipedit no beat pulses). **Measured here (4 cores):** a 54.5s Top 5 from 5 1280x720
+  fixtures rendered in 47s (entries ~5s each, final encode ~22s). Proof contact sheets in the session scratchpad only. Unverified on real
+  Twitch footage/webcams, real Judge data and Krew's PC.
 - Docker image never built in the sandbox (no daemon); it builds fine on Krew's PC; a clean-copy `npm ci` + `next build` without `.env`
   (what the Dockerfile does) passes.
 - **Suggestions (2026-11-17):** `src/workers/suggest.ts` (queue "suggest", hourly + once ~1 min after start,

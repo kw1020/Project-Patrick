@@ -1,5 +1,12 @@
 # Clip Factory patch notes
 
+## 2.0.5 — 2026-11-19
+- New default edit: Top 5. Pick a theme (Top 5 funniest, Top 5 craziest plays, Top 5 GTA 6 moments, or one creator's top 5) and press Make it.
+- It counts down #5 to #1: each moment is its own short cut (setup, payoff, reaction) with its own sound and captions, with a quick "#3" card and whoosh between them. It opens on the title and ends on "Follow @ClipFactoryGG".
+- The 5 moments are picked by the Judge's score, the payoff and how much they stood out. The same moment never shows twice, and at most 2 per creator unless it's one creator's top 5.
+- No more constant zooming: a Top 5 only zooms once, on each payoff. Old montages and Clip -> Edit now only zoom on the drop, at most once every 2 bars.
+- The caption credits every creator in the edit, and the title is the hook ("Top 5 funniest GTA 6 moments"). No music is added: put the trending sound on in TikTok/Reels.
+
 ## 2.0.3 — 2026-11-19
 - Instagram can now post for you: connect an Instagram account in Settings > Channels and approved clips go up as Reels, like YouTube. One-time setup in README: Connect Instagram.
 - The account must be a Professional account (Creator or Business). Connecting into a channel slot replaces its by-hand entry and keeps its posts.

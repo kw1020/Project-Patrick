@@ -1,6 +1,11 @@
+// Today's schema turned back into the v2.0.3 (f01d7cb) one: the v2.0.5 Top 5 Edit columns (theme, creators) removed.
+export function toV203Schema(now: string): string {
+  return now.replace(/^ {2}\w+ +\w+\??(?: +@default\([^)]*\))? *\/\/ v2\.0\.5.*\n/gm, "");
+}
+
 // Today's schema turned back into the v2.0.0 (87ddbb4) one: the v2.0.3 Account columns (scopes, directPost) removed.
 export function toV200Schema(now: string): string {
-  return now.replace(/^ {2}\w+ +\w+\??(?: +@default\([^)]*\))? *\/\/ v2\.0\.3.*\n/gm, "");
+  return toV203Schema(now).replace(/^ {2}\w+ +\w+\??(?: +@default\([^)]*\))? *\/\/ v2\.0\.3.*\n/gm, "");
 }
 
 // Today's schema turned back into the v1.9.8 (2e4801e) one: the v2.0.0 Edits models + columns removed.

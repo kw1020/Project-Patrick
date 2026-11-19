@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { getSettings, prisma } from "@/lib/db";
 import { enqueueEdit, enqueuePostEdit } from "@/lib/queues";
 import { musicPath } from "@/lib/beats";
-import { parseBpm, parseFormat, parseLength, parseVibe } from "@/lib/edit-vibes";
+import { parseBpm, parseFormat, parseLength, parseTheme, parseVibe, themeLabel } from "@/lib/edit-vibes";
+import { createTop5Edit } from "../src/workers/top5";
 import { PLATFORM_LABEL, POST_PLATFORMS, donePost, isApiPostingAccount, isPostingAccount, parseKinds, slotAccount } from "@/lib/channels";
 import { parseLink } from "@/lib/campaigns";
 import { editsChannelOf } from "../src/workers/poster";
@@ -18,13 +19,22 @@ export type MakeEditResult = { ok?: string; error?: string };
 
 /** "Make edit" on the Edits page. */
 export async function makeEdit(_prev: MakeEditResult | null, form: FormData): Promise<MakeEditResult> {
+  const format = parseFormat(form.get("format") ?? "top5");
+  if (format === "top5") {
+    // v2.0.5 Top 5 countdown: the moments are picked now, so "not enough moments" shows up right here
+    const theme = parseTheme(form.get("theme"));
+    try {
+      await createTop5Edit({ theme, creatorId: theme === "creator" ? String(form.get("streamerId") || "") || null : null });
+    } catch (e) { return { error: (e as Error).message }; }
+    refresh();
+    return { ok: `Making "${themeLabel(theme)}". It shows up below in a minute or two.` };
+  }
   const streamerId = String(form.get("streamerId") || "");
   const s = await prisma.streamer.findUnique({ where: { id: streamerId } });
   if (!s || !s.approved) return { error: "Pick an approved creator." };
   const tempo = String(form.get("tempo") || "steady");
   const song = tempo === "song" ? String(form.get("song") || "") : "";
   if (tempo === "song" && !musicPath(song)) return { error: "Pick a song from the music folder (or use a steady beat)." };
-  const format = parseFormat(form.get("format"));
   await createEdit({
     streamerId, vibe: parseVibe(form.get("vibe")), lengthSec: parseLength(form.get("length")), bpm: parseBpm(form.get("bpm")),
     timingTrack: song || null, creatorAudio: form.get("creatorAudio") === "on", format,
@@ -50,6 +60,12 @@ export async function makeEditFromClip(clipId: string) {
 /** Re-make: same settings, new picks (the worker picks other moments than the creator's last edits first). */
 export async function remakeEdit(id: string) {
   const e = await prisma.edit.findUniqueOrThrow({ where: { id } });
+  if (e.format === "top5") {
+    const theme = parseTheme(e.theme);
+    await createTop5Edit({ theme, creatorId: theme === "creator" ? e.streamerId : null });
+    refresh();
+    return;
+  }
   await createEdit({
     streamerId: e.streamerId, vibe: parseVibe(e.vibe), lengthSec: e.lengthSec, bpm: e.bpm, timingTrack: e.timingTrack,
     creatorAudio: e.creatorAudio, format: parseFormat(e.format), sourceClipId: e.sourceClipId, captions: e.captions, endText: e.endText,

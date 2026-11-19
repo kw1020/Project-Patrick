@@ -189,7 +189,8 @@ test("plan: allocateBeats keeps bars, splits the build-up first for Hype, merges
 test("plan: per-vibe effects", async () => {
   const g = steadyGrid(128, 20);
   const hype = buildPlan({ format: "montage", vibe: "hype", grid: g, sources: srcs(8), title: "X" });
-  assert.ok(hype.fx.flashes.length >= 5 && hype.fx.rgb.length >= 1 && hype.fx.shakes.length >= 1 && hype.fx.pulses.length === 44);
+  // v2.0.5: no zoom pulse on every beat any more: one zoom on the drop, a shake + RGB split only there
+  assert.ok(hype.fx.flashes.length >= 1 && hype.fx.rgb.length === 1 && hype.fx.shakes.length === 1 && hype.fx.pulses.length === 1);
   assert.ok(hype.slices.some((s) => s.parts.some((p) => p.speed === 0.5)), "speed ramp");
   const drop = hype.slices.find((s) => s.role === "drop")!;
   assert.deepEqual(drop.parts.map((p) => p.speed), [0.5, 1], "slow-mo into the hit, then 1x");
@@ -202,13 +203,13 @@ test("plan: per-vibe effects", async () => {
   assert.equal(funny.fx.rgb.length, 0, "no RGB split");
   assert.ok(funny.fx.flashes.length <= 2, "less flashing");
   assert.ok(funny.slices.some((s) => s.role === "freeze" && s.parts[s.parts.length - 1].speed === 0), "freeze-frame on the punchline");
-  assert.ok(funny.fx.punches.length >= 3, "zoom-in on faces");
+  assert.ok(funny.fx.punches.length >= 1 && funny.fx.punches.length <= 3, "a punch-in on the drop / freeze, not on every slice");
   assert.match(zoomExprN(funny.fx), /min\(1\.4,1\+/);
 
   const smooth = buildPlan({ format: "montage", vibe: "smooth", grid: g, sources: srcs(8), title: "X" });
   assert.equal(smooth.transition.kind, "xfade");
   assert.equal(smooth.fx.flashes.length + smooth.fx.shakes.length + smooth.fx.rgb.length, 0);
-  assert.equal(smooth.fx.drifts.length, smooth.slices.length);
+  assert.equal(smooth.fx.drifts.length, 0, "v2.0.5: no zoom drifting in and out on every slice");
   smooth.slices.forEach((s, i) => { assert.equal(s.pre, i ? 3 : 0); assert.equal(s.post, i < smooth.slices.length - 1 ? 3 : 0); });
 
   const ass = buildEditAss(hype, { credit: "twitch.tv/kaicenat" });

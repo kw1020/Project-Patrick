@@ -115,7 +115,7 @@ export async function getSource(editId: string, n: number, c: Candidate, words: 
   return { file, payoff: Math.max(0, Math.min(dur - 0.2, payoff)), dur, words: ws, cand: c, reused: false };
 }
 
-async function clipWords(clipId: string | null): Promise<Word[]> {
+export async function clipWords(clipId: string | null): Promise<Word[]> {
   if (!clipId) return [];
   const c = await prisma.clip.findUnique({ where: { id: clipId }, select: { words: true, wordsFull: true, winStart: true } });
   if (!c?.words) return [];
@@ -138,6 +138,7 @@ export async function runEdit(editId: string): Promise<string> {
   const edit = await prisma.edit.findUnique({ where: { id: editId }, include: { streamer: { include: { campaign: true } } } });
   if (!edit) return "edit deleted";
   if (edit.status !== "processing") return `edit is ${edit.status}, nothing to do`;
+  if (edit.format === "top5") return (await import("./top5")).runTop5(editId); // v2.0.5 countdown compilation
   const streamer = edit.streamer;
   if (!streamer.approved) {
     await prisma.edit.update({ where: { id: editId }, data: { status: "failed", stage: null, error: "This creator is not approved any more." } });
@@ -284,8 +285,9 @@ export async function runEditAuto(now = new Date()): Promise<string> {
     if (last) { recent++; continue; }
     if (usableCount(await loadCandidates(c.id)) < AUTO_MIN_MOMENTS) { few++; continue; }
     if ((await backlogRoom()) <= 0) { full = true; break; }
-    await createEdit({ streamerId: c.id, vibe: parseVibe(s.editVibe), lengthSec: s.editLength, bpm: s.editBpm, creatorAudio: s.editCreatorAudio, endText: "follow for more" });
-    made++;
+    // v2.0.5: the daily edit is that creator's Top 5 (the new default format), not a beat montage
+    try { await (await import("./top5")).createTop5Edit({ theme: "creator", creatorId: c.id }); made++; }
+    catch { few++; }
   }
   return `daily edits: made ${made}${recent ? `, ${recent} had one today` : ""}${few ? `, ${few} without ${AUTO_MIN_MOMENTS}+ good moments` : ""}${full ? ", line full (rest tomorrow)" : ""}`;
 }

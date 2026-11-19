@@ -1,24 +1,81 @@
 "use client";
 import { useActionState, useState } from "react";
 import { makeEdit, type MakeEditResult } from "../../app/edit-actions";
-import { EDIT_LENGTHS, FORMATS, MIN_MOMENTS, VIBES } from "../lib/edit-vibes";
+import { DEFAULT_FORMAT, EDIT_LENGTHS, FORMATS, MIN_MOMENTS, TOP5_COUNT, TOP5_THEMES, VIBES, type EditFormat, type Top5Theme } from "../lib/edit-vibes";
 
 export type CreatorOption = { id: string; name: string; platform: string; usable: number };
 
-export function MakeEditForm({ creators, songs, defaults }: {
+export function MakeEditForm({ creators, songs, defaults, themeCounts }: {
   creators: CreatorOption[]; songs: { name: string; mb: number }[];
   defaults: { vibe: string; length: number; bpm: number; creatorAudio: boolean };
+  /** v2.0.5: how many different moments each Top 5 theme has right now (a Top 5 needs 5). */
+  themeCounts: Record<string, number>;
 }) {
   const [state, action, pending] = useActionState<MakeEditResult | null, FormData>(makeEdit, null);
   const first = creators.find((c) => c.usable >= MIN_MOMENTS)?.id ?? "";
   const [creator, setCreator] = useState(first);
   const [tempo, setTempo] = useState<"steady" | "song">("steady");
-  const [format, setFormat] = useState<"montage" | "clipedit">("montage");
+  const [format, setFormat] = useState<EditFormat>(DEFAULT_FORMAT);
+  const [theme, setTheme] = useState<Top5Theme>(() => TOP5_THEMES.find((t) => t.key !== "creator" && (themeCounts[t.key] ?? 0) >= TOP5_COUNT)?.key ?? "funny");
   const pick = creators.find((c) => c.id === creator);
-  const enough = (pick?.usable ?? 0) >= (format === "clipedit" ? 1 : MIN_MOMENTS);
+  const enough = format === "top5"
+    ? (theme === "creator" ? (pick?.usable ?? 0) >= TOP5_COUNT : (themeCounts[theme] ?? 0) >= TOP5_COUNT)
+    : (pick?.usable ?? 0) >= (format === "clipedit" ? 1 : MIN_MOMENTS);
+  const formatPicker = (
+    <div className="space-y-1">
+      <div className="text-sm font-semibold">Format</div>
+      <div className="flex flex-wrap gap-2">
+        {FORMATS.map((f) => (
+          <label key={f.key} title={f.hint} className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-sm has-[:checked]:border-hot has-[:checked]:bg-hot/10">
+            <input type="radio" name="format" value={f.key} checked={format === f.key} onChange={() => setFormat(f.key)} className="accent-[#ff3d81]" />{f.label}
+          </label>
+        ))}
+      </div>
+      <div className="text-xs text-zinc-500">{FORMATS.find((f) => f.key === format)?.hint}{format === "clipedit" ? " Uses their best clip; for a specific clip press “Make an edit from this clip” on it in the Queue." : ""}</div>
+    </div>
+  );
+  if (format === "top5") return (
+    <form action={action} className="card space-y-4 p-5" data-testid="make-edit">
+      <div className="text-xs font-bold uppercase tracking-wide text-zinc-400">Make an edit</div>
+      {formatPicker}
+      <div className="space-y-1">
+        <div className="text-sm font-semibold">Theme</div>
+        <div className="flex flex-wrap gap-2">
+          {TOP5_THEMES.map((t) => (
+            <label key={t.key} title={t.hint} className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-sm has-[:checked]:border-hot has-[:checked]:bg-hot/10">
+              <input type="radio" name="theme" value={t.key} checked={theme === t.key} onChange={() => setTheme(t.key)} className="accent-[#ff3d81]" />
+              {t.label}{t.key !== "creator" && <span className="text-xs text-zinc-500">· {themeCounts[t.key] ?? 0}</span>}
+            </label>
+          ))}
+        </div>
+        <div className="text-xs text-zinc-500">{TOP5_THEMES.find((t) => t.key === theme)?.hint} Picked by the Judge&apos;s score, the payoff and how much it stood out; the same moment never twice{theme === "creator" ? "" : ", at most 2 per creator"}. About 45-75s, ending on #1.</div>
+      </div>
+      {theme === "creator" && (
+        <label className="block space-y-1">
+          <div className="text-sm font-semibold">Creator</div>
+          <select name="streamerId" className="field" value={creator} onChange={(e) => setCreator(e.target.value)}>
+            {creators.length === 0 && <option value="">No approved creators yet</option>}
+            {creators.map((c) => (
+              <option key={c.id} value={c.id} disabled={c.usable < TOP5_COUNT}>
+                {c.name}{c.platform === "youtube" ? " (YouTube)" : ""} · {c.usable} good moment{c.usable === 1 ? "" : "s"}{c.usable < TOP5_COUNT ? ` (needs ${TOP5_COUNT})` : ""}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+      <div className="flex flex-wrap items-center gap-3">
+        <button className="btn-hot" disabled={pending || !enough}>{pending ? "Starting…" : "Make it"}</button>
+        {!enough && <span className="text-xs text-zinc-400">Needs {TOP5_COUNT} different moments.</span>}
+        {state?.ok && <span className="text-sm text-emerald-300">{state.ok}</span>}
+        {state?.error && <span className="text-sm text-red-300">{state.error}</span>}
+      </div>
+      <p className="text-xs text-zinc-500">Each moment keeps its own sound and captions. No music is put in: add the trending sound in TikTok/Reels when you post.</p>
+    </form>
+  );
   return (
     <form action={action} className="card space-y-4 p-5" data-testid="make-edit">
       <div className="text-xs font-bold uppercase tracking-wide text-zinc-400">Make an edit</div>
+      {formatPicker}
       <div className="grid gap-4 md:grid-cols-2">
         <label className="space-y-1">
           <div className="text-sm font-semibold">Creator</div>
@@ -32,17 +89,6 @@ export function MakeEditForm({ creators, songs, defaults }: {
           </select>
           <div className="text-xs text-zinc-500">A montage needs {MIN_MOMENTS}+ of their clips that you haven&apos;t rejected. For one clip, use &ldquo;Make an edit from this clip&rdquo; on its card in the Queue.</div>
         </label>
-        <div className="space-y-1 md:col-span-2">
-          <div className="text-sm font-semibold">Format</div>
-          <div className="flex flex-wrap gap-2">
-            {FORMATS.map((f) => (
-              <label key={f.key} title={f.hint} className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-sm has-[:checked]:border-hot has-[:checked]:bg-hot/10">
-                <input type="radio" name="format" value={f.key} checked={format === f.key} onChange={() => setFormat(f.key)} className="accent-[#ff3d81]" />{f.label}
-              </label>
-            ))}
-          </div>
-          <div className="text-xs text-zinc-500">{FORMATS.find((f) => f.key === format)?.hint}{format === "clipedit" ? " Uses their best clip; for a specific clip press \u201cMake an edit from this clip\u201d on it in the Queue." : ""}</div>
-        </div>
         <div className="space-y-1">
           <div className="text-sm font-semibold">Vibe</div>
           <div className="flex flex-wrap gap-2">
