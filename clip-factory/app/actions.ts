@@ -15,6 +15,7 @@ import { loginTakenBy } from "@/lib/streamers";
 import { parseCampaignForm, parseChannelName, parseLink } from "@/lib/campaigns";
 import { brandedCaption, captionCredits, captionHashtags, cleanExtras, defaultExtras, defaultTitle, isGta6, momentGame } from "@/lib/social";
 import { parsePlatformInfo, platformCheck } from "@/lib/platform-rules";
+import { assignChannels } from "@/lib/to-post";
 import { autoPostTargets, channelForClip, CHANNEL_KINDS, PLATFORM_LABEL, POST_PLATFORMS, donePost, isApiPostingAccount, isPostingAccount, kindsString, parseChannelLabel, parseFocus, parseHandle, slotAccount } from "@/lib/channels";
 import { parseBpm, parseLength, parseVibe } from "@/lib/edit-vibes";
 import { approveResolved, DEFAULT_APPROVAL_NOTE, resolveCreators, type ApprovePick, type ApproveResult, type ResolveResult } from "@/lib/creator-lookup";
@@ -169,6 +170,7 @@ export async function setClipStatus(id: string, status: "pending" | "approved" |
   // Approving is the human sign-off. Accounts set to "post when I approve" get it now.
   if (status === "approved") {
     // Only the accounts of THIS clip's channel (v1.9.7): with 4 channels connected, a GTA clip must not go to all 4 YouTubes.
+    await assignChannels([id]); // v2.0.1: spread over all channels (saved on Clip.channelId)
     const clip = await prisma.clip.findUniqueOrThrow({ where: { id }, include: { moment: true } });
     const channels = await prisma.channel.findMany({ orderBy: { createdAt: "asc" } });
     const channel = channelForClip(channels, { channelId: clip.channelId, category: clip.category ?? clip.moment.category, gta: isGta6(momentGame(clip.moment)) });

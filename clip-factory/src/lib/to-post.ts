@@ -2,7 +2,7 @@
 import { getSettings, prisma } from "./db";
 import { DEFAULT_CHANNEL } from "./campaigns";
 import { isGta6, momentGame } from "./social";
-import { channelForClip, donePost, isFullyPosted, isPostingAccount, POST_PLATFORMS, slotAccount } from "./channels";
+import { balancedChannel, channelForClip, donePost, isFullyPosted, isPostingAccount, POST_PLATFORMS, slotAccount } from "./channels";
 import { CHANNEL_SEEDS, matchesSeed } from "./channel-seeds";
 
 /** The id of the channel the one-time migration makes, so two processes starting at once can't make two. */
@@ -90,6 +90,7 @@ const clipInclude = { posts: true, moment: { include: { streamer: { include: { c
  * never come back. Sorted Supreme picks first, then the Judge's score, then newest.
  */
 export async function toPostItems(take = 200) {
+  await assignChannels(); // v2.0.1: spread unassigned approved clips over all channels first
   const [channels, accounts, clips] = await Promise.all([
     prisma.channel.findMany({ orderBy: { createdAt: "asc" } }),
     prisma.account.findMany({ where: { platform: { in: [...POST_PLATFORMS] } }, orderBy: [{ createdAt: "asc" }] }),
@@ -117,4 +118,31 @@ export function sortToPost<T extends Sortable>(items: T[]): T[] {
 export async function toPostCount() {
   const { toPostEditItems } = await import("./to-post-edits");
   return (await toPostItems()).items.length + (await toPostEditItems().catch(() => ({ items: [] }))).items.length;
+}
+
+/**
+ * v2.0.1: give every approved clip without a channel one, spread over all channels (`balancedChannel`), and save it on
+ * Clip.channelId so the Upload page, auto-post and Supreme agree. Load = clips given to each channel that were approved or
+ * posted in the last 24h. Returns how many clips got a channel.
+ */
+export async function assignChannels(clipIds?: string[]): Promise<number> {
+  const channels = await prisma.channel.findMany({ orderBy: { createdAt: "asc" } });
+  if (!channels.length) return 0;
+  const since = new Date(Date.now() - 24 * 3600_000);
+  const counts = await prisma.clip.groupBy({ by: ["channelId"], where: { channelId: { not: null }, status: { in: ["approved", "posted"] }, updatedAt: { gte: since } }, _count: { _all: true } });
+  const load: Record<string, number> = {};
+  for (const c of counts) if (c.channelId) load[c.channelId] = c._count._all;
+  const clips = await prisma.clip.findMany({
+    where: { status: "approved", channelId: null, ...(clipIds ? { id: { in: clipIds } } : {}) },
+    include: { moment: true }, orderBy: { createdAt: "asc" },
+  });
+  let n = 0;
+  for (const clip of clips) {
+    const ch = balancedChannel(channels, { category: clip.category ?? clip.moment.category, gta: isGta6(momentGame(clip.moment)) }, load);
+    if (!ch) continue;
+    await prisma.clip.update({ where: { id: clip.id }, data: { channelId: ch.id } });
+    load[ch.id] = (load[ch.id] ?? 0) + 1;
+    n++;
+  }
+  return n;
 }

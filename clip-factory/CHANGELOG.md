@@ -1,5 +1,11 @@
 # Clip Factory patch notes
 
+## 2.0.1 — 2026-11-19
+- Clips now spread over all your channels instead of piling up on ViceCityClips.
+- GTA 6 clips: about 2 of 3 go to ViceCityClips, the rest to StreamHeistClips (funny) or WantedLevelClips (big plays).
+- Other games: funny goes to StreamHeistClips, gaming to WantedLevelClips. Edits go to ClipFactoryGG.
+- Each clip still goes to one channel only. Use Move to on the Upload page to change it.
+
 ## 2.0.0 — 2026-11-19
 - Edits: new Edits page that makes beat-synced edits of one streamer's best moments, in three vibes: Hype, Funny and Smooth.
 - New Clip -> Edit format: one clip plays with captions, then the drop hits on the payoff and it turns into an edit. Use the "Make an edit from this clip" button on any clip in the Queue.

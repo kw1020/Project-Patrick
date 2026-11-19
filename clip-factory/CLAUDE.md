@@ -346,6 +346,12 @@ original brief is below, and the status section says what's done. Read both befo
   worker stores `Edit.platformInfo` (probeFinal + renderFacts), the Upload card shows/blocks on `platformCheck` and `runPostEdit`
   refuses a hard fail (`postBlockReason`). Proof in the session scratchpad only (`v200-proof/`). Unverified on
   real songs, real Twitch footage, yt-dlp sections and Krew's PC.
+- **v2.0.1 (2026-11-19): clips spread over all channels** (Krew: "it only does the videos for one channel. I want it to do all of
+  them"). `balancedChannel` (`src/lib/channels.ts`, pure): Krew's pick wins; else pool = channels taking the type (GTA clip: the
+  gta channel weight 2 + non-gta ones; non-GTA clip: non-gta only), lowest load/weight, ties = `channelForClip` order.
+  `assignChannels` (`src/lib/to-post.ts`): approved clips with no channelId get one SAVED (load = approved/posted with that
+  channel in the last 24h); called by `setClipStatus` approve (before `autoPostTargets`) and `toPostItems`. One channel per clip
+  (same video on 4 channels = reused-content risk). `test/v201.test.ts`. Instagram auto-post moves to 2.0.2.
 - Docker image never built in the sandbox (no daemon); it builds fine on Krew's PC; a clean-copy `npm ci` + `next build` without `.env`
   (what the Dockerfile does) passes.
 - **Suggestions (2026-11-17):** `src/workers/suggest.ts` (queue "suggest", hourly + once ~1 min after start,

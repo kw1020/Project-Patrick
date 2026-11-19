@@ -108,3 +108,25 @@ export function autoPostTargets<A extends { homeChannelId?: string | null }>(aut
   if (channelId === null) return [];
   return auto.filter((a) => a.homeChannelId === channelId);
 }
+
+/**
+ * v2.0.1 (Krew: "it only does the videos for one channel. I want it to do all of them"): spread clips over every channel
+ * that can take them instead of always the first. A GTA 6 clip can go to the GTA channel (weight 2, so it still gets about
+ * 2 of 3) or to a non-GTA channel taking its type; a non-GTA clip only to non-GTA channels taking its type. Lowest
+ * load / weight wins; ties keep channelForClip's order. Krew's own pick (clip.channelId) always wins.
+ * `load` = clips already given to each channel recently (see assignChannels).
+ */
+export function balancedChannel<C extends ChannelLite>(channels: C[], clip: { channelId?: string | null; category?: string | null; gta?: boolean }, load: Record<string, number>): C | null {
+  if (clip.channelId) {
+    const picked = channels.find((c) => c.id === clip.channelId);
+    if (picked) return picked;
+  }
+  const first = channelForClip(channels, { ...clip, channelId: null });
+  if (!first) return null;
+  const cat = clip.category === "funny" || clip.category === "gaming" || clip.category === "edits" ? clip.category : "gaming";
+  const takes = (c: C) => parseKinds(c.kinds).includes(cat);
+  const pool = channels.filter((c) => takes(c) && (clip.gta || !isGtaFocus(c)));
+  const weight = (c: C) => (clip.gta && isGtaFocus(c) ? 2 : 1);
+  const order = (c: C) => (c.id === first.id ? 0 : 1);
+  return [...pool].sort((a, b) => (load[a.id] ?? 0) / weight(a) - (load[b.id] ?? 0) / weight(b) || order(a) - order(b))[0] ?? first;
+}
