@@ -168,6 +168,7 @@ test("grabber: low disk re-queues the grab in 5 min (clip stays processing); eno
   assert.equal(disk.ok, true, "disk status recovers");
 });
 
+// v1.9.4 defaults: raw 6h after the cut, rejected 6h, unreviewed 48h (then "expired"), approved 5d, posted 3d (test/v194.test.ts has every rule).
 test("retention deletes the right files only and clears their DB paths", async () => {
   await clearClips();
   const { prisma } = await import("../src/lib/db");
@@ -186,13 +187,13 @@ test("retention deletes the right files only and clears their DB paths", async (
     await prisma.$executeRaw`UPDATE Clip SET updatedAt = ${ago(hoursAgo)} WHERE id = ${c.id}`;
     return c.id;
   }
-  const oldCut = await make("oldcut", "pending", 13, { raw: true, final: true });      // raw yes, final no (pending)
+  const oldCut = await make("oldcut", "pending", 13, { raw: true, final: true });      // raw yes (> 6h), final no (pending < 48h)
   const freshCut = await make("freshcut", "pending", 2, { raw: true, final: true });   // nothing
   const rejectedOld = await make("rejold", "rejected", 25, { final: true });          // final yes
-  const rejectedNew = await make("rejnew", "rejected", 10, { final: true });          // nothing
-  const pendingOld = await make("pendold", "pending", 30 * 24, { final: true });      // never
-  const approvedOld = await make("approld", "approved", 30 * 24, { final: true });    // never
-  const posted3d = await make("p3", "posted", 3 * 24, { final: true });               // no
+  const rejectedNew = await make("rejnew", "rejected", 3, { final: true });           // nothing (< 6h)
+  const pendingOld = await make("pendold", "pending", 30 * 24, { final: true });      // yes, and it becomes "expired"
+  const approvedOld = await make("approld", "approved", 30 * 24, { final: true });    // yes (> 5 days), row stays
+  const posted3d = await make("p3", "posted", 2 * 24, { final: true });               // no (< 3 days)
   const posted8d = await make("p8", "posted", 8 * 24, { final: true });               // yes
   const processing = await make("proc", "processing", 48, { raw: true });             // never
 
@@ -203,7 +204,7 @@ test("retention deletes the right files only and clears their DB paths", async (
   for (const f of [orphanOld, workOld]) fs.utimesSync(f, ago(25), ago(25));
 
   const msg = await runRetention(now);
-  assert.match(msg, /1 raw, 2 final, 2 orphan files · 5\.0 MB freed/);
+  assert.match(msg, /1 raw, 4 final, 2 orphan files · 7\.0 MB freed · 1 unreviewed expired/);
 
   const get = (id: string) => prisma.clip.findUniqueOrThrow({ where: { id } });
   const exists = (rel: string) => fs.existsSync(path.join(storage, rel));
@@ -215,10 +216,14 @@ test("retention deletes the right files only and clears their DB paths", async (
   assert.ok(c.rawPath && exists(c.rawPath)); assert.ok(c.finalPath && exists(c.finalPath));
   c = await get(rejectedOld);
   assert.equal(c.finalPath, null); assert.ok(!exists(`final/${rejectedOld}.mp4`));
-  for (const id of [rejectedNew, pendingOld, approvedOld, posted3d]) {
+  for (const id of [rejectedNew, posted3d]) {
     c = await get(id);
     assert.ok(c.finalPath && exists(c.finalPath), `${c.status} final kept`);
   }
+  c = await get(pendingOld);
+  assert.equal(c.status, "expired"); assert.equal(c.finalPath, null); assert.ok(!exists(`final/${pendingOld}.mp4`));
+  c = await get(approvedOld);
+  assert.equal(c.status, "approved"); assert.equal(c.finalPath, null); assert.ok(!exists(`final/${approvedOld}.mp4`));
   c = await get(posted8d);
   assert.equal(c.finalPath, null); assert.ok(!exists(`final/${posted8d}.mp4`));
   c = await get(processing);

@@ -47,7 +47,8 @@ test("doctor: .env parser handles comments, quotes and blanks", () => {
 });
 
 test("doctor: full run against the stand-ins (--no-download)", { timeout: 120_000 }, async () => {
-  const child = spawn("npx", ["tsx", "scripts/doctor.ts", "--no-download"], { env, stdio: ["ignore", "pipe", "pipe"] });
+  // MIN_FREE_GB=0.001: the build machine's disk may be nearly full (the Storage line would be ❌ then).
+  const child = spawn("npx", ["tsx", "scripts/doctor.ts", "--no-download"], { env: { ...env, MIN_FREE_GB: "0.001" }, stdio: ["ignore", "pipe", "pipe"] });
   let out = "";
   child.stdout.on("data", (d) => (out += d));
   child.stderr.on("data", (d) => (out += d));
@@ -58,6 +59,8 @@ test("doctor: full run against the stand-ins (--no-download)", { timeout: 120_00
   for (const re of [/^✅ Twitch keys/m, /^✅ Twitch login \+ GTA 6 category — token OK, GTA 6 category id 1234567/m,
     /^✅ Live GTA 6 streams — 2 live/m, /^✅ Redis/m, /^✅ Database/m, /^✅ Judge — .*8\.4\/10/m, /^✅ ffmpeg/m]) assert.match(out, re, out);
   assert.match(out, /^⚠️ +Approved streamers — 0 approved/m);
+  // v1.9.4: the storage folder + free space line.
+  assert.match(out, new RegExp(`^✅ Storage — ${path.join(dir, "storage").replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} · \\d+\\.\\d GB free`, "m"), out);
   assert.match(out, /Streamers page/);
   assert.match(out, /^⚠️ +Download \+ render — skipped/m);
   assert.match(out, /^✅ YouTube API key — key works \(trending #1 in US: "I survived 100 days in GTA 6"\)/m);

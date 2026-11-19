@@ -1,6 +1,13 @@
+// Today's schema turned back into the v1.9.1 (1ac085c) one: the v1.9.4 Judge columns, Storage settings and comments removed.
+export function toV191Schema(now: string): string {
+  return now
+    .replace(/^ {2}(judgeObservations|judgeFrames|judgeTokensIn|judgeTokensOut|retainRejectedHrs|retainPendingHrs|retainApprovedDays|retainPostedDays|retainRawHrs|retainRowsDays)\s.*\n/gm, "")
+    .replace(/^ {2}\/\/ v1\.9\.4.*\n/gm, "");
+}
+
 // Today's schema turned back into the v1.9.0 (028c1be) one: the v1.9.1 columns and the Campaign model removed.
 export function toV190Schema(now: string): string {
-  return now
+  return toV191Schema(now)
     .replace(/^ {2}(campaignId|campaign|campaignLink|channelName|watermark)\s.*\n/gm, "")
     .replace(/\n\/\/ v1\.9\.1 Campaign mode:[\s\S]*?\nmodel Campaign \{[\s\S]*?\n\}\n/, "");
 }

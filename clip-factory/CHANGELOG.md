@@ -1,5 +1,12 @@
 # Clip Factory patch notes
 
+## 1.9.4 — 2026-11-19
+- The Judge now looks at 8 frames of each clip, not just the words, and scores on a clear 1-10 scale. Expect real spread: lots of 3-5s, a few 8+, no more 6 for everything.
+- Each clip card shows what the Judge saw ("Saw: ...") under its reason. Analytics shows how its scores spread out, and Settings shows what it costs per clip.
+- Clips you don't use delete themselves: rejected after 6 hours, unreviewed after 2 days (they move to Queue > Expired), approved but not posted after 5 days, posted after 3 days.
+- Settings > Storage shows how much space clips take and has a Free up space now button. When the drive gets nearly full, old clips are cleaned up early by themselves.
+- Store clips on another drive with one line in .env, for example CLIP_STORAGE_DIR=D:/ClipFactory/storage (see README, Storage).
+
 ## 1.9.1 — 2026-11-18
 - ViceCityClips captions: every caption is now a short hook, then the streamer's @name, then #GTA6 #GTAVI #ViceCity plus 1 or 2 extra hashtags the Judge picks.
 - A small see-through @ViceCityClips watermark in the bottom-right corner of new clips. Turn it off or change the name in Settings.

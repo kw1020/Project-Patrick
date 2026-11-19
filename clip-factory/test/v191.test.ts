@@ -127,7 +127,7 @@ test("captionCredits: the @login line or the old link both count (ClipCard warni
 // ---------- Judge ----------
 test("Judge schema has extra_hashtags (enum of the 4 extras) and the prompt keeps its opening + mentions the caption", async () => {
   const { VerdictSchema, JUDGE_SYSTEM } = await import("../src/lib/judge");
-  const base = { score: 7, hook_text: "h", title: "t", hashtags: [], reason: "r", category: "gaming", best_start: null, best_end: null };
+  const base = { observations: "o", score: 7, hook_text: "h", title: "t", hashtags: [], reason: "r", category: "gaming", best_start: null, best_end: null };
   assert.ok(VerdictSchema.safeParse({ ...base, extra_hashtags: ["GTA6Clips", "Gaming"] }).success);
   assert.ok(!VerdictSchema.safeParse({ ...base, extra_hashtags: ["fyp"] }).success);
   assert.ok(JUDGE_SYSTEM.startsWith("You score short clips from streamers and YouTubers"));

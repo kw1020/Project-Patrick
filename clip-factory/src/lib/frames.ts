@@ -28,7 +28,7 @@ export function pickFrameTimes(o: { start: number; end: number; payoffAt?: numbe
   const len = end - start;
   if (len <= 0.05) return [r1(start)];
   const clamp = (t: number) => Math.min(end, Math.max(start, t));
-  const p = o.payoffAt != null && o.payoffAt >= start && o.payoffAt <= end ? o.payoffAt : start + len * 0.6;
+  const p = o.payoffAt != null && o.payoffAt >= start && o.payoffAt <= end ? o.payoffAt : start + Math.min(len, (hardEnd - start) * 0.6);
 
   const picked: number[] = [];
   const tooClose = (t: number) => picked.some((x) => Math.abs(x - t) < 0.4);

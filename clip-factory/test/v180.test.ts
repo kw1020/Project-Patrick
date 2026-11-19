@@ -417,7 +417,10 @@ test("line: window lands on the late payoff; the Judge's best_start/best_end is 
   const before = mock.requests.length;
   assert.match(await runJudge(c.id), /Judge picked 34-56s/);
   const sent = JSON.parse(mock.requests.slice(before).find((r) => r.path.includes("/messages"))!.body.toString());
-  const userMsg = sent.messages[0].content as string;
+  // v1.9.4: 8 labelled frames (image blocks) come first, then the text.
+  const blocks = sent.messages[0].content as { type: string; text?: string }[];
+  assert.equal(blocks.filter((b) => b.type === "image").length, 8);
+  const userMsg = blocks.at(-1)!.text!;
   assert.match(userMsg, new RegExp(`Source video: 60s\\. Proposed window: ${clip.winStart!.toFixed(1)}s to ${winEnd.toFixed(1)}s`));
   assert.match(userMsg, /<source_transcript>/);
   // The Judge can't hear: the burst, the silence and the window edges are in its timeline; no duplicate window transcript.

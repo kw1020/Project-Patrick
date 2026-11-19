@@ -181,6 +181,33 @@ original brief is below, and the status section says what's done. Read both befo
   (blocks nothing). UI: `src/components/Campaigns.tsx` (Campaign select on Streamers rows + Creators cards, "+ New campaign…";
   Campaigns card with two-step delete), Posted page campaign select + link + `?campaign=<id>|none` filter, manual "Posted" form
   campaign link. Unverified against the real Claude API (enum arrays in structured outputs) and on Krew's PC.
+- **v1.9.4 (2026-11-19, launch day): the Judge looks + full range, auto-delete, storage on another drive.** Krew: "The Judge is
+  only giving every video a 6 out of 10", "my disk drive is getting full", "have them auto-delete". Judge (`src/workers/judge.ts`
+  `judgeFrames` + `src/lib/frames.ts`): `pickFrameTimes` = 8 times in the proposed window (older clips: 0..duration) — 2 in the
+  first 3s, payoff/-2/+2 (no payoff or outside → 60% in), the rest greedily farthest from the chosen ones, >= 0.4s apart; ONE
+  ffmpeg run (input seek per frame, scale=640:-2, mjpeg q 6) → base64. User message (`judgeContent`) = per frame a text block
+  `[frame at 31.2s]` + `image` block (base64 image/jpeg), then the text (which says the images are stills); no frames = the old
+  plain-string content (+ "No frames could be taken…" line when ffmpeg failed; JUDGE_FRAMES=off skips). Zod `observations` FIRST
+  (before `score`) → `Clip.judgeObservations` ("Saw: …" on ClipCard). Effort "low" → "medium" (fallbacks unchanged). Prompt SYSTEM
+  rewritten: anchored rubric 1–3/4–5/6/7/8/9–10, "6 is not a safe default", "Most raw clips are NOT good", observe-then-score.
+  Calibration: Redis list `cf:judge:recent` (newest first, kept 100); `calibrationNudge` (`src/lib/judge-stats.ts`): >= 10 of
+  the last 30 with SD < 0.8 → line "Your recent scores have been very similar (mostly X). Use the full range." Usage →
+  `Clip.judgeTokensIn` (input + cache read + cache write) / `judgeTokensOut`, `Clip.judgeFrames`; prices in `src/lib/pricing.ts`
+  ($2/$10 per MTok) → Settings → Judge "~X¢ per clip (last 20)". Analytics `ScoreHistogram` (last 50), Live page line
+  `scoreSummary`. Retention (`src/workers/retention.ts`, Settings `retain*`, defaults 6h/48h/5d/3d/raw 6h/rows 7d; `retentionWindows`):
+  raw right away once cut AND approved/rejected/posted/expired, else retainRawHrs after the cut (`stageAt`), never while stage set;
+  finals rejected 6h, approved (never posted) 5d, posted 3d, failed 24h; pending older than 48h → final+raw deleted, status
+  **"expired"** (Queue "Expired" tab only; not in To review / backlog); rejected/expired rows deleted after 7d unless they have a Post
+  (Moments kept: they're the twitchClipId dedupe); orphans in raw/final/work after 24h. Path clears use raw SQL so `updatedAt` (every
+  window's clock) isn't bumped. Disk pressure (free < 2 × MIN_FREE_GB, checked every 10 min): all windows halved, then the oldest
+  pending finals expire one by one until above. Settings → Storage card (`app/storage-actions.ts`, `src/lib/storage.ts`): fields,
+  usage by raw/final/edits/work/other, free GB, host path, "Free up space now" (= pressure mode). docker-compose: `${CLIP_STORAGE_DIR:-./storage}:/storage`
+  + env `CLIP_STORAGE_HOST_DIR: ${CLIP_STORAGE_DIR:-}`; verified with `docker compose config` here: empty `CLIP_STORAGE_DIR=` and
+  a missing line both give `<project>/storage`, `D:/ClipFactory/storage` stays `D:/ClipFactory/storage` (short syntax handles the
+  drive letter; `test/v194.test.ts` runs it when the docker CLI exists). Tray files stay in the repo's storage (scripts/windows use
+  `$root\storage`). doctor: "Storage" line (folder, host folder, free GB; ❌ < MIN_FREE_GB, ⚠️ < 2x). All schema changes additive
+  (`test/v194.test.ts` pushes from 1ac085c with rows; `toV191Schema` in `test/schema-v173.ts`). Unverified: the real Claude API
+  with image blocks + medium effort, real cost, Docker on a D: drive on Krew's PC.
 - Docker image never built in the sandbox (no daemon); it builds fine on Krew's PC; a clean-copy `npm ci` + `next build` without `.env`
   (what the Dockerfile does) passes.
 - **Suggestions (2026-11-17):** `src/workers/suggest.ts` (queue "suggest", hourly + once ~1 min after start,
@@ -217,8 +244,9 @@ original brief is below, and the status section says what's done. Read both befo
 - **Throughput:** one cut ≈ 30–40s CPU + Whisper ≈ 10–20s → about **1 clip/min**. Inputs must be capped to
   match: the line stops taking new moments when ≥ `MAX_BACKLOG` (12) clips are in progress.
 - **Disk:** a 60s 1080p60 Twitch clip is 30–60 MB raw + ~10 MB final. Uncapped that's ~25 GB/hour.
-  Retention: raw deleted 12h after its clip is cut; finals of rejected/failed clips after 24h; finals of
-  posted clips after 7 days. Grabber pauses below `MIN_FREE_GB` (5) free and the Live page warns.
+  Retention (v1.9.4, Settings → Storage): raw once reviewed / 6h after the cut; rejected 6h; unreviewed 48h → "expired";
+  approved-not-posted 5d; posted 3d; rejected/expired rows 7d; halved below 2 × MIN_FREE_GB. Grabber pauses below
+  `MIN_FREE_GB` (5) free and the Live page warns. Clips can live on another drive (`CLIP_STORAGE_DIR` in .env).
 - **Twitch Helix:** 800 points/min per app token. Retry 429s after `Ratelimit-Reset`. `/streams?game_id` only
   returns the top 500 (5 pages); approved streamers are also looked up by `user_id` so a small approved
   streamer is never missed.

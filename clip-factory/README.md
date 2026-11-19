@@ -143,8 +143,8 @@ docker compose run --rm worker npm run doctor
    detector needs 2 minutes of normal chat before it can spot a spike).
 4. Raise **Min Twitch clip views** in Settings (e.g. 200) once clips pour in, so only the best get made.
 5. Built-in safety limits: the line takes no new moments while 12 clips are in progress, grabbing pauses
-   when less than 5 GB of disk is free (the Live page says so), and old video is deleted automatically
-   (raw after 12h, rejected after a day, posted after a week). Change with `MAX_BACKLOG` / `MIN_FREE_GB` in `.env`.
+   when less than 5 GB of disk is free (the Live page says so), and clips you don't use are deleted automatically
+   (see "Storage" below). Change with `MAX_BACKLOG` / `MIN_FREE_GB` in `.env`.
 6. A faster computer = more clips. One cut takes about a minute on a normal laptop. With 8+ CPU cores, set
    `CUT_CONCURRENCY=2` in `.env`.
 
@@ -239,6 +239,63 @@ Every caption is built the same way (`brandedCaption` in `src/lib/social.ts`):
 4. Each Queue card shows the campaign's checks (✅ / ⚠️). Nothing is blocked: you decide.
 5. When you've submitted a post on Whop, paste the link in **Campaign link** on the Posted page (or in the "Posted" form on the
    card). The Posted page can be filtered by campaign.
+
+## The Judge (v1.9.4)
+
+The Judge (Claude) now **looks at the clip**: 8 still frames from the video (2 from the first seconds, 3 around
+the big moment, the rest spread out) plus the transcript. It first writes what it sees ("Saw: ..." on each card in
+the Queue), then scores on a fixed scale:
+
+| Score | Means |
+|---|---|
+| 1-3 | nothing happens: menus, loading, AFK, dead talk |
+| 4-5 | mildly interesting, no payoff |
+| 6 | decent but forgettable |
+| 7 | a clear moment a fan would enjoy |
+| 8 | a strong moment a stranger would watch to the end |
+| 9-10 | rare, instantly shareable |
+
+Most raw clips are not good, so expect many 3-5s. If its last scores all bunch up on one number it gets told to use
+the full range. **Analytics** shows how the last 50 scores spread out, the Live page shows "Judge: last 50 clips scored
+avg 5.4, range 2-9", and Settings → Judge shows what it costs (roughly 2-4 US cents per clip on Claude Sonnet 5.5; the real number shows there once clips are scored).
+If a frame can't be taken, the clip is scored from the text alone (never held up).
+
+## Storage (v1.9.4): auto-delete + another drive
+
+**Clips you don't use delete themselves** (change the times in Settings → Storage):
+
+- Rejected clips (also the ones the Judge scored below the min score): after **6 hours**.
+- Clips nobody reviewed: the video after **2 days**; the clip moves to Queue → **Expired**.
+- Approved but never posted: the video after **5 days** (the card says "video expired").
+- Posted clips: the video after **3 days** (it's on TikTok/YouTube already).
+- Raw downloads: as soon as you approve or reject the clip, and at most 6 hours after it was cut. Re-cut needs the raw,
+  so re-cut before you decide.
+- Rejected and expired clips disappear from the Queue after 7 days. Clips you posted are kept.
+- When the drive gets nearly full (under 2 × `MIN_FREE_GB`, so 10 GB), the clean-up runs at once with every time halved
+  and deletes the oldest unreviewed videos until there's room again. **Free up space now** on Settings → Storage does the same.
+
+Settings → Storage also shows how much the clips take (raw / finished / edits / work files) and how much is free.
+
+**Store the clips on another drive** (e.g. a big D: drive):
+
+1. Make the folder, e.g. `D:\ClipFactory\storage`.
+2. Open `clip-factory\.env` and set this line (forward slashes, no quotes, nothing after it):
+   ```
+   CLIP_STORAGE_DIR=D:/ClipFactory/storage
+   ```
+3. Restart Clip Factory (tray icon → Stop, then open it again). Settings → Storage shows the new folder.
+4. Optional: to keep the clips you already have, copy the `raw` and `final` folders from the old
+   `clip-factory\storage` into the new folder before restarting.
+
+Leave `CLIP_STORAGE_DIR=` empty to keep using `clip-factory\storage`. The tray's own small files (launcher.log, the
+icon, flags) stay in `clip-factory\storage` either way. With Docker Desktop on WSL 2 (the default) other drives work
+without any File sharing setting.
+
+**Move Docker's own disk too.** Docker's images and the database/Whisper volumes live in Docker Desktop's disk image,
+which is on C: by default, and that's usually what fills C:. Docker Desktop → Settings → Resources → Advanced →
+**Disk image location** → pick a folder on D: → Apply & restart (Docker moves it for you; it can take a few minutes).
+
+`npm run doctor` prints the storage folder and the free space.
 
 ## Settings worth knowing
 

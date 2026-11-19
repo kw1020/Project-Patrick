@@ -27,7 +27,7 @@ export function dirSize(dir: string): number {
  * Where the clips are on Krew's PC, from the compose env (CLIP_STORAGE_DIR passed through as CLIP_STORAGE_HOST_DIR;
  * empty = the default clip-factory/storage folder next to docker-compose.yml). Null outside Docker.
  */
-export function hostStorageDir(env: NodeJS.ProcessEnv = process.env): string | null {
+export function hostStorageDir(env: Record<string, string | undefined> = process.env): string | null {
   if (env.CLIP_STORAGE_HOST_DIR == null) return null;
   return env.CLIP_STORAGE_HOST_DIR.trim() || "clip-factory/storage (the default)";
 }
