@@ -8,6 +8,7 @@ import { CategoryChip } from "./CategoryChip";
 export type ClipView = {
   id: string; status: string; stage: string | null; error: string | null; title: string; caption: string;
   duration: number | null; score: number | null; hook: string | null; judgeReason: string | null; hasVideo: boolean;
+  observations?: string | null; judgeFrames?: number | null; // v1.9.4: what the Judge saw/heard, and how many stills it looked at
   expired?: boolean; // the video was deleted by retention to save disk
   canRecut?: boolean; // the raw video is still there, so it can be re-cut in another editing style
   editStyle?: string | null; editNote?: string | null; version?: number;
@@ -56,7 +57,7 @@ export function ClipCard({ clip, accounts }: { clip: ClipView; accounts: Account
           <video key={clip.version} src={`/api/media/${clip.id}${clip.version ? `?v=${clip.version}` : ""}`} controls preload="metadata" playsInline className="h-full w-full object-contain" />
         ) : (
           <div className="grid h-full place-items-center p-6 text-center text-sm text-zinc-400">
-            {clip.expired ? <span>Video expired (deleted to save space)</span>
+            {clip.expired ? <span>{clip.status === "expired" ? "Expired: nobody reviewed it in time, so the video was deleted to save space" : "Video expired (deleted to save space)"}</span>
               : clip.status === "failed" ? <span className="text-red-300">{clip.error}</span> : <span className="animate-pulse">{STAGE[clip.stage ?? ""] ?? "Working…"}</span>}
           </div>
         )}
@@ -82,6 +83,7 @@ export function ClipCard({ clip, accounts }: { clip: ClipView; accounts: Account
         {clip.judgeReason && (
           <div className="rounded-lg bg-ink px-2.5 py-2 text-xs leading-relaxed text-zinc-300">
             <span className="font-bold text-zinc-100">Judge{clip.score != null ? ` · ${clip.score}/10` : ""}:</span> {clip.judgeReason}
+            {clip.observations && <div className="mt-1 text-zinc-400" data-testid="judge-observations">Saw: {clip.observations}{clip.judgeFrames === 0 ? " (text only, no frames)" : ""}</div>}
             {clip.hook && <div className="mt-1 text-zinc-400">Hook on video: “{clip.hook}”</div>}
           </div>
         )}

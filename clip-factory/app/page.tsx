@@ -7,6 +7,7 @@ import { ago, liveFor, num } from "@/lib/format";
 import { creatorUrl, isGta6 } from "@/lib/social";
 import { AutoRefresh } from "@/components/AutoRefresh";
 import { approveStreamer, runScoutNow } from "./actions";
+import { scoreSummary } from "@/lib/judge-stats";
 
 export const dynamic = "force-dynamic";
 
@@ -36,13 +37,15 @@ function AgentCard({ name, s, idle }: { name: string; s?: AgentStatus; idle?: st
 
 export default async function LivePage({ searchParams }: { searchParams: Promise<{ all?: string }> }) {
   const { all } = await searchParams;
-  const [streams, statuses, counts, suggestionCount, settings] = await Promise.all([
+  const [streams, statuses, counts, suggestionCount, settings, scored] = await Promise.all([
     prisma.streamer.findMany({ where: { platform: "twitch", isLive: true, ...(all ? {} : { approved: true }) }, orderBy: [{ viewers: "desc" }], take: 200 }),
     soft(getStatuses(), {} as Record<string, AgentStatus>),
     prisma.clip.groupBy({ by: ["status"], _count: true }),
     prisma.suggestion.count({ where: { status: "pending", streamer: { approved: false } } }),
     getSettings(),
+    prisma.clip.findMany({ where: { score: { not: null } }, orderBy: { createdAt: "desc" }, take: 50, select: { score: true } }),
   ]);
+  const judgeSum = scoreSummary(scored.map((x) => x.score!));
   const anyGame = settings.gameMode !== "gta6";
   const totalLive = await prisma.streamer.count({ where: { platform: "twitch", isLive: true } });
   const c = Object.fromEntries(counts.map((x) => [x.status, x._count])) as Record<string, number>;
@@ -84,6 +87,7 @@ export default async function LivePage({ searchParams }: { searchParams: Promise
           <div className="text-xs font-bold uppercase tracking-wide text-zinc-400">Production line</div>
           <div className="mt-1 text-sm">{c.processing ?? 0} in the line · <Link href="/queue" className="font-bold text-hot">{c.pending ?? 0} to review</Link></div>
           <div className="text-xs text-zinc-400">{c.approved ?? 0} approved · {c.posted ?? 0} posted · {c.rejected ?? 0} rejected · {c.failed ?? 0} failed</div>
+          {judgeSum && <Link href="/analytics" className="mt-1 block text-xs text-zinc-300 hover:text-white" data-testid="judge-summary">Judge: {judgeSum.text}</Link>}
           {statuses.judge && <div className="mt-1 truncate text-xs text-zinc-500">Judge: {statuses.judge.msg}</div>}
         </div>
       </section>

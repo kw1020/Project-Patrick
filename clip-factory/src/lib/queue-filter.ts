@@ -8,6 +8,8 @@ export const QUEUE_TABS = [
   { key: "posted", label: "Posted" },
   { key: "rejected", label: "Rejected" },
   { key: "failed", label: "Failed" },
+  // v1.9.4: clips nobody reviewed in time (video auto-deleted). Only shown on this tab, never counted as "to review".
+  { key: "expired", label: "Expired" },
 ] as const;
 export type QueueTab = (typeof QUEUE_TABS)[number]["key"];
 

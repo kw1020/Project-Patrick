@@ -7,8 +7,36 @@ import { categoryOff, offReason } from "../lib/category";
 import { audioCues, findPayoff, snapWindowToWords, timedTranscript, validJudgeWindow, windowWords } from "../lib/window";
 import { measureLevels } from "../lib/edit";
 import { probeDuration, type Word } from "../lib/media";
-import { resolveStored } from "../lib/paths";
+import { resolveStored, storagePath } from "../lib/paths";
+import { redis, soft } from "../lib/queues";
+import { extractFrames, pickFrameTimes, type JudgeFrame } from "../lib/frames";
+import { CALIBRATION_WINDOW, calibrationNudge } from "../lib/judge-stats";
 import { MAX_SOURCE_SEC } from "./cutter";
+
+/** v1.9.4: the last Judge scores, newest first (Redis list), for the calibration guard. */
+export const RECENT_SCORES_KEY = "cf:judge:recent";
+export async function recentScores(): Promise<number[]> {
+  const raw = await soft(redis().lrange(RECENT_SCORES_KEY, 0, CALIBRATION_WINDOW - 1), [] as string[]);
+  return raw.map(Number).filter((x) => Number.isFinite(x));
+}
+async function rememberScore(score: number) {
+  await soft(redis().multi().lpush(RECENT_SCORES_KEY, String(score)).ltrim(RECENT_SCORES_KEY, 0, 99).exec(), null);
+}
+
+/**
+ * v1.9.4: stills from the RAW source across the window the Judge is asked about (see pickFrameTimes), or null if ffmpeg
+ * couldn't take them (then the Judge scores from text only; never blocks the clip). JUDGE_FRAMES=off skips them.
+ */
+export async function judgeFrames(clipId: string, raw: string | null, win: { start: number; end: number } | null, payoffAt: number | null, sourceLength: number | null): Promise<{ frames: JudgeFrame[] | null; failed: boolean }> {
+  if ((process.env.JUDGE_FRAMES || "").toLowerCase() === "off" || !raw || !win || win.end - win.start <= 0) return { frames: null, failed: false };
+  try {
+    const times = pickFrameTimes({ start: win.start, end: win.end, payoffAt, sourceLength });
+    return { frames: await extractFrames(raw, times, storagePath("work"), clipId), failed: false };
+  } catch (e) {
+    console.warn(`[judge] ${clipId}: no frames, judging from text only:`, (e as Error).message.split("\n")[0]);
+    return { frames: null, failed: true };
+  }
+}
 
 /** Step 2 — Judge: Claude scores the clip and writes the hook, title and hashtags. Never blocks the line. */
 export async function runJudge(clipId: string) {
@@ -38,6 +66,13 @@ export async function runJudge(clipId: string) {
   const levels = sourceLength && clip.rawPath ? await measureLevels(resolveStored(clip.rawPath), 0, sourceLength).catch(() => [] as number[]) : [];
   const marks = sourceLength && win ? judgeMarks(levels, win, clip.payoffAt) : [];
 
+  // v1.9.4: let it SEE the moment (8 stills over the proposed window; older clips: the whole clip), and nudge it when its
+  // recent scores have all been the same.
+  const raw = clip.rawPath ? (() => { try { return resolveStored(clip.rawPath!); } catch { return null; } })() : null;
+  const frameWin = win ?? (clip.duration ? { start: 0, end: clip.duration } : null);
+  const shot = await judgeFrames(clipId, raw, frameWin, clip.payoffAt, sourceLength);
+  const calibration = calibrationNudge(await recentScores());
+
   const lessons = settings.judgeLearns ? await buildLessons().catch(() => null) : null;
   let verdict;
   try {
@@ -45,7 +80,7 @@ export async function runJudge(clipId: string) {
       streamer: streamer.name, game, durationSec: clip.duration ?? 0, source: moment.source === "chat" ? "chat" : moment.source === "youtube" ? "youtube" : "twitch_clip",
       replayScore: moment.source === "youtube" ? moment.spikeScore : undefined,
       sourceTitle: moment.sourceTitle, sourceViews: moment.sourceViews, transcript: clip.transcript, stats, minScore: settings.minScore,
-      category: clip.category ?? moment.category,
+      category: clip.category ?? moment.category, frames: shot.frames, framesFailed: shot.failed, calibration,
       ...(streamer.campaign?.active ? { campaignRules: streamer.campaign.rules, bannedWords: streamer.campaign.bannedWords } : {}),
       ...(sourceLength && win ? { sourceLength, window: win, timedTranscript: timedTranscript(words, 80, marks), lengthRange: { min: settings.clipMinSec, max: settings.clipMaxSec } } : {}),
     }, lessons?.text ?? null);
@@ -53,6 +88,7 @@ export async function runJudge(clipId: string) {
     return skip(`Judge error: ${(e as Error).message}`.slice(0, 300));
   }
   if (!verdict) return skip("The Judge declined to score this clip");
+  await rememberScore(verdict.score);
 
   const fresh = clip.status === "processing"; // don't overwrite text Krew already edited
   // The Judge's label replaces the first guess. A kind that's off in Settings → auto-rejected by the Cutter.
@@ -84,12 +120,14 @@ export async function runJudge(clipId: string) {
       ...winData,
       score: verdict.score, hookText: verdict.hook_text || null, hashtags: tags, stage: "cut", stageAt: new Date(), category,
       judgeReason: off ? `${offReason(category)} (Judge: ${verdict.reason})` : verdict.reason,
+      judgeObservations: verdict.observations || null, judgeFrames: shot.frames?.length ?? 0,
+      ...(verdict.usage ? { judgeTokensIn: verdict.usage.input, judgeTokensOut: verdict.usage.output } : {}),
       ...(fresh ? { title: hook, caption } : {}),
     },
   });
   const rejected = verdict.score < settings.minScore || off;
   await enqueueCut(clipId, rejected ? 10 : 1);
-  return `${streamer.name}: ${verdict.score}/10 ${category}${moved ? ` (Judge picked ${moved.start}-${Math.round((moved.start + moved.length) * 10) / 10}s)` : ""}${off ? ` (${offReason(category).toLowerCase()})` : verdict.score < settings.minScore ? " (below cut-off)" : ""}`;
+  return `${streamer.name}: ${verdict.score}/10 ${category}${shot.frames ? ` (saw ${shot.frames.length} frames)` : shot.failed ? " (text only: no frames)" : ""}${calibration ? " (nudged: recent scores too similar)" : ""}${moved ? ` (Judge picked ${moved.start}-${Math.round((moved.start + moved.length) * 10) / 10}s)` : ""}${off ? ` (${offReason(category).toLowerCase()})` : verdict.score < settings.minScore ? " (below cut-off)" : ""}`;
 }
 
 /** Length of the source the words cover (seconds): the raw file's duration, never shorter than the window's end. */

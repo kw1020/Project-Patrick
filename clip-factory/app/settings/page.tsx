@@ -5,6 +5,10 @@ import { tiktokConfigured, tiktokRedirectUri } from "@/lib/tiktok";
 import { redirectUri, youtubeConfigured } from "@/lib/youtube";
 import { EDIT_STYLES, JUMP_CUT_MODES, LAYOUTS, parseEditStyle, parseJumpCuts, parseLayoutSetting } from "@/lib/edit-styles";
 import { disconnectAccount, saveAccount, saveSettings } from "../actions";
+import { freeUpSpaceNow, saveStorageSettings } from "../storage-actions";
+import { avgCostCents } from "@/lib/pricing";
+import { fmtBytes, storageUsage } from "@/lib/storage";
+import { minFreeGb } from "@/lib/guards";
 
 export const dynamic = "force-dynamic";
 
@@ -20,8 +24,14 @@ const check = "h-5 w-5 accent-[#ff3d81]";
 const Head = ({ children }: { children: React.ReactNode }) => <div className="text-xs font-bold uppercase tracking-wide text-zinc-400">{children}</div>;
 const Code = ({ children }: { children: React.ReactNode }) => <code className="rounded bg-black/40 px-1">{children}</code>;
 
-export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ msg?: string }> }) {
-  const [{ msg }, s, accounts] = await Promise.all([searchParams, getSettings(), prisma.account.findMany({ orderBy: [{ platform: "asc" }, { createdAt: "asc" }], include: { _count: { select: { posts: true } } } })]);
+export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ msg?: string; storage?: string }> }) {
+  const [{ msg, storage: storageMsg }, s, accounts, costRows, usage] = await Promise.all([searchParams, getSettings(), prisma.account.findMany({ orderBy: [{ platform: "asc" }, { createdAt: "asc" }], include: { _count: { select: { posts: true } } } }),
+    // v1.9.4: what the Judge costs (tokens logged per clip) and what the clips take up on disk.
+    prisma.clip.findMany({ where: { judgeTokensIn: { not: null } }, orderBy: { updatedAt: "desc" }, take: 20, select: { judgeTokensIn: true, judgeTokensOut: true } }),
+    storageUsage(),
+  ]);
+  const cents = avgCostCents(costRows, JUDGE_MODEL);
+  const low = usage.freeGb != null && usage.freeGb < 2 * minFreeGb();
   const justConnected = msg?.startsWith("connected:");
   return (
     <div className="max-w-3xl space-y-6">
@@ -61,6 +71,38 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         <p className="text-xs text-zinc-500">To add a second channel or account, connect again and pick a different one when Google or TikTok asks. TikTok drafts land in that account&apos;s inbox: open TikTok, paste the caption, post. TikTok allows 5 waiting drafts per account per day.</p>
       </div>
 
+      <div id="storage" className="card space-y-4 p-5" data-testid="storage-card">
+        <Head>Storage</Head>
+        {storageMsg && <div className="rounded-lg bg-emerald-500/15 px-3 py-2 text-sm text-emerald-300">{storageMsg}</div>}
+        {low && <div className="rounded-lg bg-red-500/15 px-3 py-2 text-sm text-red-300">Only {usage.freeGb!.toFixed(1)} GB free. Old clips are being deleted early (every time below is halved) until there&apos;s {2 * minFreeGb()} GB.</div>}
+        <div className="grid gap-1 text-sm">
+          <div><span className="text-zinc-400">Clips folder on your PC:</span> <Code>{usage.hostDir ?? usage.dir}</Code></div>
+          {usage.hostDir && <div className="text-xs text-zinc-500">Inside Clip Factory it&apos;s <Code>{usage.dir}</Code>. To use another drive, set <Code>CLIP_STORAGE_DIR</Code> in <Code>.env</Code> (README: Storage) and restart.</div>}
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-zinc-300" data-testid="storage-usage">
+            <span>Raw downloads {fmtBytes(usage.byKind.raw)}</span>
+            <span>Finished clips {fmtBytes(usage.byKind.final)}</span>
+            <span>Edits {fmtBytes(usage.byKind.edits)}</span>
+            <span>Work files {fmtBytes(usage.byKind.work)}</span>
+            {usage.byKind.other > 0 && <span>Other {fmtBytes(usage.byKind.other)}</span>}
+            <span className="font-bold">Total {fmtBytes(usage.total)}</span>
+            <span className={low ? "font-bold text-red-300" : "text-emerald-300"}>{usage.freeGb != null ? `${usage.freeGb.toFixed(1)} GB free on that drive` : "free space unknown"}</span>
+          </div>
+        </div>
+        <form action={saveStorageSettings} className="space-y-3">
+          <p className="text-xs text-zinc-500">Clips you don&apos;t use delete themselves so they don&apos;t take space. A deleted video can&apos;t be played or re-cut; its card says &ldquo;video expired&rdquo;.</p>
+          <Row label="Rejected clips" hint="Includes clips the Judge scored below the min score."><div className="flex items-center gap-2 text-sm">delete after <input name="retainRejectedHrs" type="number" min="1" defaultValue={s.retainRejectedHrs} className="field w-24" /> hours</div></Row>
+          <Row label="Clips nobody reviewed" hint="The video is deleted and the clip moves to Queue → Expired."><div className="flex items-center gap-2 text-sm">delete after <input name="retainPendingHrs" type="number" min="1" defaultValue={s.retainPendingHrs} className="field w-24" /> hours</div></Row>
+          <Row label="Approved but never posted"><div className="flex items-center gap-2 text-sm">delete the video after <input name="retainApprovedDays" type="number" min="1" defaultValue={s.retainApprovedDays} className="field w-24" /> days</div></Row>
+          <Row label="Posted clips" hint="They're on the platform already."><div className="flex items-center gap-2 text-sm">delete the video after <input name="retainPostedDays" type="number" min="1" defaultValue={s.retainPostedDays} className="field w-24" /> days</div></Row>
+          <Row label="Raw downloads" hint="Deleted as soon as you approve or reject the clip. Re-cut needs them."><div className="flex items-center gap-2 text-sm">at most <input name="retainRawHrs" type="number" min="1" defaultValue={s.retainRawHrs} className="field w-24" /> hours after the cut</div></Row>
+          <Row label="Forget rejected / expired clips" hint="Removes them from the Queue entirely. Clips you posted are kept."><div className="flex items-center gap-2 text-sm">after <input name="retainRowsDays" type="number" min="1" defaultValue={s.retainRowsDays} className="field w-24" /> days</div></Row>
+          <div className="flex flex-wrap gap-2">
+            <button className="btn-ghost">Save storage settings</button>
+            <button formAction={freeUpSpaceNow} className="btn-hot" title="Runs the clean-up now with every time halved, and deletes the oldest unreviewed videos if space is still short">Free up space now</button>
+          </div>
+        </form>
+      </div>
+
       <form action={saveSettings} className="space-y-6">
         <div className="card space-y-4 p-5" data-testid="branding">
           <Head>Your channel</Head>
@@ -93,6 +135,10 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           <Row label="Score clips with Claude" hint={`Uses ${JUDGE_MODEL}. Writes the hook, title and hashtags too.`}><input name="judgeEnabled" type="checkbox" defaultChecked={s.judgeEnabled} className={check} /></Row>
           <Row label="Learn from my results" hint={`Shows the Judge which of your posts did best and worst. Starts once ${MIN_POSTS_TO_LEARN} posts are a day old. See Analytics.`}><input name="judgeLearns" type="checkbox" defaultChecked={s.judgeLearns} className={check} /></Row>
           <Row label="Min score" hint="Clips the Judge scores below this go straight to Rejected (you can still rescue them)."><input name="minScore" type="number" step="0.5" defaultValue={s.minScore} className="field w-32" /></Row>
+          <div className="text-xs text-zinc-400" data-testid="judge-cost">
+            The Judge looks at 8 frames of each clip plus its transcript.{" "}
+            {cents != null ? <>Cost: <b className="text-zinc-200">~{cents < 1 ? cents.toFixed(1) : Math.round(cents * 10) / 10}¢ per clip</b> (last {costRows.length}).</> : "Cost per clip shows here once clips have been scored."}
+          </div>
         </div>
 
         <div className="card space-y-4 p-5" data-testid="clips-card">

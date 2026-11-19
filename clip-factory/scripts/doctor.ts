@@ -169,6 +169,21 @@ async function main() {
     return { status: "ok", detail: `settings row OK (Judge cut-off ${s.minScore}, clips ${s.clipMinSec}-${s.clipMaxSec}s, ${s.gameMode === "gta6" ? "GTA 6 only" : "any game"}, standout clips ${s.standoutMin}x the creator's usual, max ${s.maxPerCreatorPerRun} per creator per scan, jump cuts ${s.jumpCuts})` };
   }, "Run `npm run db:push` in the clip-factory folder to create the database, and check DATABASE_URL in .env.");
 
+  // v1.9.4: where the clips are stored and how much room is left (CLIP_STORAGE_DIR in .env moves them to another drive).
+  await check("Storage", 15_000, async () => {
+    const { storageDir } = await import("../src/lib/paths");
+    const { hostStorageDir } = await import("../src/lib/storage");
+    const { freeGb, minFreeGb } = await import("../src/lib/guards");
+    const dir = storageDir(), host = hostStorageDir();
+    fs.mkdirSync(dir, { recursive: true });
+    const free = await freeGb(dir), min = minFreeGb();
+    const where = `${dir}${host ? ` (on your PC: ${host})` : ""}`;
+    const line = `${where} · ${free.toFixed(1)} GB free`;
+    if (free < min) return { status: "fail", detail: `${line} — grabbing is paused below ${min} GB`, fix: "Free up space (Settings -> Storage -> Free up space now) or move the clips to a bigger drive: set CLIP_STORAGE_DIR in .env (see README, Storage)." };
+    if (free < 2 * min) return { status: "warn", detail: `${line} — old clips are being deleted early to make room`, fix: "Move the clips to a bigger drive: set CLIP_STORAGE_DIR in .env (see README, Storage)." };
+    return { status: "ok", detail: line };
+  }, "Check that the storage folder exists and can be written to (CLIP_STORAGE_DIR in .env).");
+
   // ---------- 4. Twitch ----------
   section("Twitch");
   let gameId: string | null = null;

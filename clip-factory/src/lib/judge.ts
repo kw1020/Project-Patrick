@@ -5,11 +5,14 @@ import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
 import { EXTRA_TAGS, cleanExtras, type ExtraTag } from "./social";
+import type { JudgeFrame } from "./frames";
 
 export const JUDGE_MODEL = process.env.JUDGE_MODEL || "claude-sonnet-5-5";
 
+// v1.9.4: `observations` comes BEFORE `score` so the model writes down what it saw and heard first, then scores it.
 const Verdict = z.object({
-  score: z.number().describe("1-10: how likely a stranger scrolling short-form video stops and watches to the end"),
+  observations: z.string().describe("At most 2 plain sentences: what visibly and audibly happens in this clip (from the frames and the transcript), before any judgement"),
+  score: z.number().describe("1-10 on the rubric: how likely a stranger scrolling short-form video stops and watches to the end"),
   hook_text: z.string().describe("Short scroll-stopping hook, max 45 characters, no hashtags or emoji: on screen for the first seconds AND the first line of the post caption"),
   title: z.string().describe("Post title, max 80 characters"),
   hashtags: z.array(z.string()).describe("4-6 hashtags without the # sign"),
@@ -19,7 +22,11 @@ const Verdict = z.object({
   best_start: z.number().nullable().describe("Seconds into the SOURCE where the best stretch starts, or null to keep the proposed window"),
   best_end: z.number().nullable().describe("Seconds into the SOURCE where the best stretch ends (after the payoff lands), or null"),
 });
-export type Verdict = Omit<z.infer<typeof Verdict>, "extra_hashtags"> & { extra_hashtags: ExtraTag[] };
+export type Verdict = Omit<z.infer<typeof Verdict>, "extra_hashtags"> & {
+  extra_hashtags: ExtraTag[];
+  /** v1.9.4: tokens this call used (input = all input incl. cache reads/writes and images); null if the API didn't say. */
+  usage: { input: number; output: number } | null;
+};
 /** The structured-output schema (exported for tests). */
 export const VerdictSchema = Verdict;
 
@@ -43,6 +50,12 @@ export type JudgeInput = {
   // v1.9.1 Campaign mode: the creator's campaign caption rules (free text) + banned words; the hook must follow them.
   campaignRules?: string | null;
   bannedWords?: string | null;
+  // v1.9.4: stills from the source (seconds in the source + base64 JPEG), sent as image blocks before the text.
+  // null/[] = text only; framesFailed = we tried and ffmpeg couldn't take them (the Judge is told).
+  frames?: JudgeFrame[] | null;
+  framesFailed?: boolean;
+  // v1.9.4 calibration guard: one line added when the recent scores barely vary (src/lib/judge-stats.ts calibrationNudge).
+  calibration?: string | null;
 };
 
 export function judgeConfigured() {
@@ -114,7 +127,23 @@ function render(i: JudgeInput) {
   if (i.timedTranscript != null && i.sourceLength) lines.push("", "<source_transcript>", i.timedTranscript.trim() || "(no speech detected in the whole source)", "</source_transcript>");
   else lines.push("", "<transcript>", i.transcript?.trim() || "(no speech detected)", "</transcript>");
   if (i.stats?.chat?.length) lines.push("", "<chat_sample>", ...i.stats.chat.slice(0, 40), "</chat_sample>");
+  if (i.frames?.length) lines.push("", `The ${i.frames.length} images above are stills from the source at the times shown (same seconds as the transcript). Describe what they and the transcript show in observations, then score.`);
+  else if (i.framesFailed) lines.push("", "No frames could be taken from this clip, so judge it from the text only and say so in observations.");
+  if (i.calibration?.trim()) lines.push("", i.calibration.trim());
   return lines.join("\n");
+}
+
+/** The user message: text only (a plain string, as before v1.9.4) or, with frames, "[frame at 31.2s]" + image per frame, then the text. */
+export function judgeContent(input: JudgeInput): string | Anthropic.Beta.Messages.BetaContentBlockParam[] {
+  const text = render(input);
+  if (!input.frames?.length) return text;
+  const blocks: Anthropic.Beta.Messages.BetaContentBlockParam[] = [];
+  for (const f of input.frames) {
+    blocks.push({ type: "text", text: `[frame at ${f.at.toFixed(1)}s]` });
+    blocks.push({ type: "image", source: { type: "base64", media_type: "image/jpeg", data: f.data } });
+  }
+  blocks.push({ type: "text", text });
+  return blocks;
 }
 
 /** Ask Claude to score a clip. Returns null when the model declines or returns nothing usable. */
@@ -126,15 +155,20 @@ export async function judgeClip(input: JudgeInput, lessons: string | null = null
     model: JUDGE_MODEL,
     max_tokens: 8000,
     system,
-    messages: [{ role: "user", content: render(input) }],
-    output_config: { effort: "low", format: zodOutputFormat(Verdict) },
+    messages: [{ role: "user", content: judgeContent(input) }],
+    // v1.9.4: "medium" (was "low") so it actually weighs the frames and the rubric.
+    output_config: { effort: "medium", format: zodOutputFormat(Verdict) },
     // If a safety classifier declines the request, re-run it on Anthropic's recommended fallback model.
     betas: ["server-side-fallback-2026-07-01"],
     fallbacks: "default",
   });
   if (res.stop_reason === "refusal" || !res.parsed_output) return null;
   const v = res.parsed_output;
+  const u = (res as { usage?: { input_tokens?: number | null; output_tokens?: number | null; cache_read_input_tokens?: number | null; cache_creation_input_tokens?: number | null } }).usage;
+  const usage = u && typeof u.input_tokens === "number" && typeof u.output_tokens === "number"
+    ? { input: u.input_tokens + (u.cache_read_input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0), output: u.output_tokens } : null;
   return {
+    observations: (v.observations ?? "").replace(/\s+/g, " ").trim().slice(0, 400),
     score: Math.min(10, Math.max(1, Math.round(v.score * 10) / 10)),
     hook_text: v.hook_text.replace(/[#\n]/g, " ").trim().slice(0, 60),
     title: v.title.replace(/[<>\n]/g, " ").trim().slice(0, 90),
@@ -145,5 +179,6 @@ export async function judgeClip(input: JudgeInput, lessons: string | null = null
     category: v.category === "funny" ? "funny" : "gaming",
     best_start: typeof v.best_start === "number" && Number.isFinite(v.best_start) ? Math.round(v.best_start * 100) / 100 : null,
     best_end: typeof v.best_end === "number" && Number.isFinite(v.best_end) ? Math.round(v.best_end * 100) / 100 : null,
+    usage,
   };
 }

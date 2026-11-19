@@ -5,6 +5,7 @@ import { buildLessons, MIN_POSTS_TO_LEARN } from "@/lib/learning";
 import { getStatuses, soft, type AgentStatus } from "@/lib/queues";
 import { ago, num } from "@/lib/format";
 import { Bars, Spark } from "@/components/Bars";
+import { ScoreHistogram } from "@/components/ScoreHistogram";
 
 export const dynamic = "force-dynamic";
 
@@ -21,12 +22,13 @@ function Tile({ label, value, sub }: { label: string; value: string; sub?: strin
 const hourBucket = (d: Date) => { const h = d.getHours(); return h < 6 ? "Night (0–6)" : h < 12 ? "Morning (6–12)" : h < 18 ? "Afternoon (12–18)" : "Evening (18–24)"; };
 
 export default async function AnalyticsPage() {
-  const [rows, allPosts, settings, lessons, statuses] = await Promise.all([
+  const [rows, allPosts, settings, lessons, statuses, scored] = await Promise.all([
     performance(24),
     prisma.post.findMany({ where: { status: { in: ["live", "draft"] } }, include: { stats: { orderBy: { at: "asc" } }, account: true, clip: true }, orderBy: { postedAt: "desc" }, take: 300 }),
     getSettings(),
     buildLessons(),
     soft(getStatuses(), {} as Record<string, AgentStatus>),
+    prisma.clip.findMany({ where: { score: { not: null } }, orderBy: { createdAt: "desc" }, take: 50, select: { score: true } }),
   ]);
   const live = allPosts.filter((p) => p.status === "live");
   const totalViews = live.reduce((a, p) => a + (p.views ?? 0), 0);
@@ -53,6 +55,7 @@ export default async function AnalyticsPage() {
       </section>
 
       <section className="grid gap-4 lg:grid-cols-2">
+        <ScoreHistogram scores={scored.map((c) => c.score!)} minScore={settings.minScore} />
         <Bars title="By Judge score" rows={breakdown(rows, scoreBucket)} note="If 8–10 isn't on top, the Judge needs more examples (it's learning from these)." />
         <Bars title="By type" rows={breakdown(rows, typeLabel)} note="Funny moments vs gaming moments. Clips from before v1.7.2 have no type and are left out." />
         <Bars title="By how the moment was found" rows={breakdown(rows, sourceLabel)} />

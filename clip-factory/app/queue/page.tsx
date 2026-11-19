@@ -33,7 +33,9 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
     duration: k.duration, score: k.score, hook: k.hookText, judgeReason: k.judgeReason, hasVideo: Boolean(k.finalPath),
     canRecut: Boolean(k.rawPath), editStyle: k.editStyle, editNote: k.editNote, layout: k.layout, version: k.updatedAt.getTime(),
     // Cut once, then removed by the retention job to save disk.
-    expired: !k.finalPath && k.duration != null && ["rejected", "posted", "failed"].includes(k.status) && !k.stage,
+    // v1.9.4: also approved-but-never-posted after retainApprovedDays, and unreviewed clips (status "expired").
+    expired: k.status === "expired" || (!k.finalPath && k.duration != null && ["rejected", "posted", "failed", "approved"].includes(k.status) && !k.stage),
+    observations: k.judgeObservations, judgeFrames: k.judgeFrames,
     streamer: { name: k.moment.streamer.name, login: k.moment.streamer.login, platform: k.moment.streamer.platform },
     source: k.moment.source, vodOffset: k.moment.vodOffset, spikeScore: k.moment.spikeScore, sourceUrl: k.moment.sourceUrl, sourceViews: k.moment.sourceViews,
     category: k.category ?? k.moment.category,
@@ -75,7 +77,8 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
       </div>
       {views.length === 0 ? (
         <div className="card p-10 text-center text-zinc-400">
-          {tab === "pending" && cat === "all" && !f.creator ? "Nothing to review yet. New clips from approved streamers show up here within a few minutes." : "Nothing here."}
+          {tab === "pending" && cat === "all" && !f.creator ? "Nothing to review yet. New clips from approved streamers show up here within a few minutes."
+            : tab === "expired" ? "Nothing expired. Clips nobody reviews in time end up here (their video is deleted to save space, see Settings → Storage)." : "Nothing here."}
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">

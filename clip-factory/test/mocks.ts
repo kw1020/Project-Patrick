@@ -7,7 +7,7 @@ export async function startMocks(port = 0): Promise<Mock> {
   const mock: Mock = {
     url: "", requests: [], close: async () => {}, refreshCount: 0,
     tiktokStatus: { status: "SEND_TO_USER_INBOX", publicaly_available_post_id: [] },
-    verdict: { score: 8.4, hook_text: "He jumped the bridge?!", title: "Impossible bridge jump in GTA 6", hashtags: ["GTA6", "#gaming", "vice city", "GTA6"], reason: "Clear payoff and chat exploded.", category: "gaming", extra_hashtags: ["GTA6Clips"], best_start: null, best_end: null },
+    verdict: { observations: "He drives off the bridge and lands on a moving truck; he screams and chat explodes.", score: 8.4, hook_text: "He jumped the bridge?!", title: "Impossible bridge jump in GTA 6", hashtags: ["GTA6", "#gaming", "vice city", "GTA6"], reason: "Clear payoff and chat exploded.", category: "gaming", extra_hashtags: ["GTA6Clips"], best_start: null, best_end: null },
   };
   const server = http.createServer((req, res) => {
     const chunks: Buffer[] = [];
@@ -18,10 +18,15 @@ export async function startMocks(port = 0): Promise<Mock> {
       const json = (code: number, obj: unknown, headers: Record<string, string> = {}) => { res.writeHead(code, { "Content-Type": "application/json", ...headers }); res.end(JSON.stringify(obj)); };
 
       if (path.startsWith("/v1/messages")) {
-        const text = JSON.parse(body.toString()).messages[0].content as string;
+        // v1.9.4: content is a string (text only) or blocks ("[frame at Xs]" text + image per frame, then the text).
+        const content = JSON.parse(body.toString()).messages[0].content as string | { type: string; text?: string; source?: { type: string; media_type: string; data: string } }[];
+        const blocks = typeof content === "string" ? [{ type: "text", text: content }] : content;
+        if (blocks.some((b) => b.type === "image" && (b.source?.type !== "base64" || b.source?.media_type !== "image/jpeg" || !b.source?.data))) return json(400, { type: "error", error: { type: "invalid_request_error", message: "mock: bad image block" } });
+        const text = blocks.filter((b) => b.type === "text").map((b) => b.text ?? "").join("\n");
+        const images = blocks.filter((b) => b.type === "image").length;
         const verdict = text.includes("(no speech detected)") && text.includes("viewer made") && text.includes(", 600 views") ? { ...mock.verdict, score: 3, reason: "Nothing happens and the audience was flat." } : mock.verdict;
         return json(200, { id: "msg_mock", type: "message", role: "assistant", model: "claude-sonnet-5-5", stop_reason: "end_turn", stop_sequence: null,
-          content: [{ type: "text", text: JSON.stringify(verdict) }], usage: { input_tokens: 10, output_tokens: 10 } });
+          content: [{ type: "text", text: JSON.stringify(verdict) }], usage: { input_tokens: 1200 + images * 330, output_tokens: 400, cache_read_input_tokens: 1500, cache_creation_input_tokens: 0 } });
       }
       // ---- TikTok ----
       const tt = (data: unknown) => json(200, { data, error: { code: "ok", message: "", log_id: "x" } });
