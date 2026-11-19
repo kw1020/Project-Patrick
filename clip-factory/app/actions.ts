@@ -11,11 +11,12 @@ import { approvalReasonFromEvidence } from "@/lib/permission";
 import { loginTakenBy } from "@/lib/streamers";
 import { parseCampaignForm, parseChannelName, parseLink } from "@/lib/campaigns";
 import { brandedCaption, captionHashtags, cleanExtras, defaultExtras, defaultTitle, momentGame } from "@/lib/social";
+import { CHANNEL_KINDS, PLATFORM_LABEL, POST_PLATFORMS, donePost, isApiPostingAccount, isPostingAccount, kindsString, parseChannelLabel, parseFocus, parseHandle, slotAccount } from "@/lib/channels";
 import { approveResolved, DEFAULT_APPROVAL_NOTE, resolveCreators, type ApprovePick, type ApproveResult, type ResolveResult } from "@/lib/creator-lookup";
 
 function refreshAll() {
   try {
-    for (const p of ["/", "/queue", "/workroom", "/posted", "/analytics", "/streamers", "/creators", "/settings"]) revalidatePath(p);
+    for (const p of ["/", "/queue", "/upload", "/workroom", "/posted", "/analytics", "/streamers", "/creators", "/settings"]) revalidatePath(p);
   } catch {
     /* called outside a Next.js request (tests, scripts): no pages to refresh */
   }
@@ -162,7 +163,7 @@ export async function setClipStatus(id: string, status: "pending" | "approved" |
   await prisma.clip.update({ where: { id }, data: { status } });
   // Approving is the human sign-off. Accounts set to "post when I approve" get it now.
   if (status === "approved") {
-    const auto = await prisma.account.findMany({ where: { autoPost: true, error: null } });
+    const auto = await prisma.account.findMany({ where: { autoPost: true, error: null, mode: "api", platform: { in: ["youtube", "tiktok"] } } });
     for (const a of auto) await queueUpload(id, a.id);
   }
   refreshAll();
@@ -177,6 +178,9 @@ async function queueUpload(clipId: string, accountId: string) {
 export async function postToAccount(clipId: string, accountId: string) {
   const clip = await prisma.clip.findUniqueOrThrow({ where: { id: clipId } });
   if (clip.status !== "approved" && clip.status !== "posted") throw new Error("Approve the clip first");
+  const acct = await prisma.account.findUnique({ where: { id: accountId } });
+  if (!acct) throw new Error("That account was disconnected");
+  if (!isApiPostingAccount(acct)) throw new Error("That account is posted to by hand: use Download + copy caption, then Mark posted");
   await queueUpload(clipId, accountId);
   refreshAll();
 }
@@ -232,7 +236,9 @@ export async function updatePost(id: string, form: FormData) {
     const cid = String(form.get("campaignId") || "");
     extra.campaignId = cid && (await prisma.campaign.findUnique({ where: { id: cid } })) ? cid : null;
   }
-  await prisma.post.update({ where: { id }, data: { views: v ? parseInt(v) : null, url: url || null, ...extra } });
+  // v1.9.5: views are only typed in for posts made by hand; the Posted page leaves the field out for synced ones.
+  const views = form.get("views") != null ? { views: v ? parseInt(v) : null } : {};
+  await prisma.post.update({ where: { id }, data: { ...views, url: url || null, ...extra } });
   try { revalidatePath("/posted"); } catch { /* outside a Next.js request (tests) */ }
 }
 
@@ -342,5 +348,149 @@ export async function saveAccount(id: string, form: FormData) {
 /** Posts made through this account stay on the Posted page; they just stop syncing. */
 export async function disconnectAccount(id: string) {
   await prisma.account.delete({ where: { id } });
+  refreshAll();
+}
+
+// ---------- Channels + Upload (v1.9.5) ----------
+function readKinds(form: FormData) {
+  return kindsString(CHANNEL_KINDS.map((k) => k.key).filter((k) => form.get(`kind_${k}`) === "on"));
+}
+
+export async function createChannel(_prev: { error?: string; ok?: string } | null, form: FormData): Promise<{ error?: string; ok?: string; id?: string }> {
+  const name = parseChannelLabel(form.get("name"));
+  if (!name) return { error: "Give the channel a name" };
+  const focus = parseFocus(form.get("focus"));
+  const kinds = readKinds(form);
+  // A GTA channel takes every type of GTA 6 clip unless Krew unticks some.
+  const c = await prisma.channel.create({ data: { name, focus, kinds: kinds.length ? kinds.join(",") : focus === "gta" ? "gaming,funny,edits" : "gaming,funny" } });
+  refreshAll();
+  return { ok: `Made ${name}. Now connect or add its YouTube, TikTok and Instagram below.`, id: c.id };
+}
+
+export async function saveChannel(id: string, form: FormData) {
+  const name = parseChannelLabel(form.get("name"));
+  await prisma.channel.update({
+    where: { id },
+    data: { ...(name ? { name } : {}), ...(form.get("focus") != null ? { focus: parseFocus(form.get("focus")) } : {}), kinds: readKinds(form).join(",") },
+  });
+  refreshAll();
+}
+
+/** Its accounts become "not in a channel" (Krew places them again); posts keep their channel id. */
+export async function deleteChannel(id: string) {
+  const all = await prisma.channel.findMany({ orderBy: { createdAt: "asc" } });
+  if (all.length <= 1) throw new Error("Keep at least one channel");
+  await prisma.account.updateMany({ where: { homeChannelId: id }, data: { homeChannelId: null } });
+  await prisma.clip.updateMany({ where: { channelId: id }, data: { channelId: null } });
+  await prisma.channel.delete({ where: { id } });
+  refreshAll();
+}
+
+/**
+ * "Add handle" (one form: platform + handle + channel, then "Add another"). A by-hand account: Krew downloads the clip
+ * and posts it himself, then presses Mark posted. A channel has one slot per platform: a taken slot is refused (remove that
+ * account first). The same handle on the same platform is moved, not added twice.
+ */
+export async function addManualAccount(_prev: { error?: string; ok?: string } | null, form: FormData): Promise<{ error?: string; ok?: string }> {
+  const platform = String(form.get("platform") || "");
+  if (!(POST_PLATFORMS as readonly string[]).includes(platform)) return { error: "Pick YouTube, TikTok or Instagram" };
+  const handle = parseHandle(form.get("handle"));
+  if (!handle) return { error: "That doesn't look like a handle (letters, numbers, . _ -)" };
+  const channelId = String(form.get("channelId") || "");
+  const channel = channelId ? await prisma.channel.findUnique({ where: { id: channelId } }) : await prisma.channel.findFirst({ orderBy: { createdAt: "asc" } });
+  if (!channel) return { error: "Make a channel first" };
+  const accounts = await prisma.account.findMany({ where: { platform } });
+  const same = accounts.find((a) => a.mode === "manual" && (a.handle ?? "").toLowerCase() === handle.toLowerCase());
+  const taken = slotAccount(accounts.filter((a) => a.id !== same?.id), channel.id, platform);
+  if (taken) return { error: `${channel.name} already has a ${PLATFORM_LABEL[platform]} account (${taken.handle ?? taken.channelTitle}). Remove it first.` };
+  if (same) {
+    await prisma.account.update({ where: { id: same.id }, data: { homeChannelId: channel.id } });
+    refreshAll();
+    return { ok: `${handle} (${PLATFORM_LABEL[platform]}) moved to ${channel.name}` };
+  }
+  await prisma.account.create({
+    data: { platform, mode: "manual", handle, channelTitle: handle, username: handle.slice(1), refreshToken: "", homeChannelId: channel.id },
+  });
+  refreshAll();
+  return { ok: `Added ${handle} (${PLATFORM_LABEL[platform]}) to ${channel.name}` };
+}
+
+/** Move an account to a channel ("" = not in a channel). Refused when that channel's slot for the platform is taken. */
+export async function setAccountChannel(accountId: string, channelId: string) {
+  const channel = channelId ? await prisma.channel.findUnique({ where: { id: channelId } }) : null;
+  if (channelId && !channel) throw new Error("That channel was deleted");
+  const acct = await prisma.account.findUniqueOrThrow({ where: { id: accountId } });
+  if (channel) {
+    const taken = slotAccount(await prisma.account.findMany({ where: { platform: acct.platform, id: { not: acct.id } } }), channel.id, acct.platform);
+    if (taken) throw new Error(`${channel.name} already has a ${PLATFORM_LABEL[acct.platform]} account. Remove it first.`);
+  }
+  await prisma.account.update({ where: { id: accountId }, data: { homeChannelId: channel?.id ?? null } });
+  refreshAll();
+}
+
+/**
+ * Upload "Post to all" (Krew's rule: what goes on a channel's YouTube goes on its TikTok + Instagram too): uploads to every
+ * API-connected account of the channel that doesn't have it yet (YouTube upload, TikTok inbox draft; single attempt each).
+ * By-hand accounts are left for the Download + copy caption → Mark posted checklist. Refuses clips that aren't approved.
+ */
+export async function postToAll(clipId: string, channelId: string): Promise<{ queued: string[]; byHand: string[] }> {
+  const clip = await prisma.clip.findUniqueOrThrow({ where: { id: clipId }, include: { posts: true } });
+  if (clip.status !== "approved" && clip.status !== "posted") throw new Error("Approve the clip first");
+  const accounts = await prisma.account.findMany({ where: { homeChannelId: channelId, platform: { in: [...POST_PLATFORMS] } }, orderBy: { createdAt: "asc" } });
+  const slots = POST_PLATFORMS.map((p) => slotAccount(accounts, channelId, p)).filter((a): a is (typeof accounts)[number] => Boolean(a));
+  const queued: string[] = [], byHand: string[] = [];
+  for (const a of slots) {
+    if (a.disabled || donePost(clip.posts, a.id)) continue; // disabled (e.g. Instagram banned it): skipped
+    const label = `${PLATFORM_LABEL[a.platform]} ${a.handle ?? a.channelTitle ?? ""}`.trim();
+    if (isApiPostingAccount(a) && !a.error) { await queueUpload(clipId, a.id); queued.push(label); }
+    else byHand.push(label);
+  }
+  refreshAll();
+  return { queued, byHand };
+}
+
+/** Upload: send this clip to another channel ("" = back to automatic, by its category). */
+export async function setClipChannel(clipId: string, channelId: string) {
+  if (channelId && !(await prisma.channel.findUnique({ where: { id: channelId } }))) throw new Error("That channel was deleted");
+  await prisma.clip.update({ where: { id: clipId }, data: { channelId: channelId || null } });
+  refreshAll();
+}
+
+/**
+ * Upload "Mark posted" for one account (by-hand accounts; also works for an API account Krew posted to himself).
+ * Optional post link + campaign link. Refuses clips Krew hasn't approved. Marking again updates the same post.
+ */
+export async function markPostedToAccount(clipId: string, accountId: string, form: FormData) {
+  const [clip, acct] = await Promise.all([
+    prisma.clip.findUnique({ where: { id: clipId }, include: { posts: true, moment: { select: { streamer: { select: { campaignId: true } } } } } }),
+    prisma.account.findUnique({ where: { id: accountId } }),
+  ]);
+  if (!clip) throw new Error("That clip is gone");
+  if (!acct || !isPostingAccount(acct)) throw new Error("That account was removed");
+  if (clip.status !== "approved" && clip.status !== "posted") throw new Error("Approve the clip first");
+  const url = parseLink(form.get("url"));
+  const campaignLink = parseLink(form.get("campaignLink"));
+  const existing = donePost(clip.posts, acct.id);
+  if (existing) {
+    await prisma.post.update({ where: { id: existing.id }, data: { ...(url ? { url } : {}), ...(campaignLink ? { campaignLink } : {}) } });
+  } else {
+    await prisma.post.create({
+      data: { clipId, platform: acct.platform, accountId: acct.id, channelId: acct.homeChannelId ?? null, status: "live", url, campaignLink, campaignId: clip.moment.streamer.campaignId ?? null },
+    });
+  }
+  await prisma.clip.update({ where: { id: clipId }, data: { status: "posted" } });
+  refreshAll();
+}
+
+/** Settings Channels card: switch an account off (skipped by Post to all, not waited for) or back on. */
+export async function setAccountDisabled(accountId: string, disabled: boolean) {
+  const a = await prisma.account.findUniqueOrThrow({ where: { id: accountId } });
+  await prisma.account.update({ where: { id: accountId }, data: { disabled, ...(disabled ? { error: a.error ?? "Switched off in Settings" } : { error: null }) } });
+  refreshAll();
+}
+
+/** Settings: forget the Twitch login used for follower counts. */
+export async function disconnectTwitch() {
+  await prisma.account.deleteMany({ where: { platform: "twitch" } });
   refreshAll();
 }

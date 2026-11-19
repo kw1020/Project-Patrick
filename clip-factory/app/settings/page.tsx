@@ -4,11 +4,16 @@ import { MIN_POSTS_TO_LEARN } from "@/lib/learning";
 import { tiktokConfigured, tiktokRedirectUri } from "@/lib/tiktok";
 import { redirectUri, youtubeConfigured } from "@/lib/youtube";
 import { EDIT_STYLES, JUMP_CUT_MODES, LAYOUTS, parseEditStyle, parseJumpCuts, parseLayoutSetting } from "@/lib/edit-styles";
-import { disconnectAccount, saveAccount, saveSettings } from "../actions";
+import { disconnectAccount, disconnectTwitch, saveAccount, saveSettings } from "../actions";
 import { freeUpSpaceNow, saveStorageSettings } from "../storage-actions";
 import { avgCostCents } from "@/lib/pricing";
 import { fmtBytes, storageUsage } from "@/lib/storage";
 import { minFreeGb } from "@/lib/guards";
+import { ChannelsCard, type ChannelAccountView } from "@/components/ChannelsCard";
+import { isApiPostingAccount, isPostingAccount } from "@/lib/channels";
+import { ensureChannels } from "@/lib/to-post";
+import { twitchConfigured } from "@/lib/twitch";
+import { twitchRedirectUri } from "@/lib/twitch-user";
 
 export const dynamic = "force-dynamic";
 
@@ -25,13 +30,21 @@ const Head = ({ children }: { children: React.ReactNode }) => <div className="te
 const Code = ({ children }: { children: React.ReactNode }) => <code className="rounded bg-black/40 px-1">{children}</code>;
 
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ msg?: string; storage?: string }> }) {
-  const [{ msg, storage: storageMsg }, s, accounts, costRows, usage] = await Promise.all([searchParams, getSettings(), prisma.account.findMany({ orderBy: [{ platform: "asc" }, { createdAt: "asc" }], include: { _count: { select: { posts: true } } } }),
+  await ensureChannels().catch(() => null);
+  const [{ msg, storage: storageMsg }, s, all, costRows, usage, channels] = await Promise.all([searchParams, getSettings(), prisma.account.findMany({ orderBy: [{ platform: "asc" }, { createdAt: "asc" }], include: { _count: { select: { posts: true } } } }),
     // v1.9.4: what the Judge costs (tokens logged per clip) and what the clips take up on disk.
     prisma.clip.findMany({ where: { judgeTokensIn: { not: null } }, orderBy: { updatedAt: "desc" }, take: 20, select: { judgeTokensIn: true, judgeTokensOut: true } }),
     storageUsage(),
+    prisma.channel.findMany({ orderBy: { createdAt: "asc" } }),
   ]);
   const cents = avgCostCents(costRows, JUDGE_MODEL);
   const low = usage.freeGb != null && usage.freeGb < 2 * minFreeGb();
+  // v1.9.5: OAuth-connected YouTube/TikTok (auto-post + privacy) here; by-hand accounts live in the Channels card; Twitch has its own card.
+  const accounts = all.filter((a) => isApiPostingAccount(a));
+  const twitchUser = all.find((a) => a.platform === "twitch") ?? null;
+  const channelAccounts: ChannelAccountView[] = all.filter(isPostingAccount).map((a) => ({
+    id: a.id, platform: a.platform, label: a.handle ?? a.channelTitle ?? a.platform, mode: a.mode, error: a.error, homeChannelId: a.homeChannelId, posts: a._count.posts, disabled: a.disabled,
+  }));
   const justConnected = msg?.startsWith("connected:");
   return (
     <div className="max-w-3xl space-y-6">
@@ -41,7 +54,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
       </div>
 
       <div className="card space-y-4 p-5">
-        <Head>Posting accounts</Head>
+        <Head>Connected posting accounts</Head>
         {msg && <div className={`rounded-lg px-3 py-2 text-sm ${justConnected ? "bg-emerald-500/15 text-emerald-300" : "bg-red-500/15 text-red-300"}`}>{justConnected ? `Connected ${msg.slice(10)}.` : msg}</div>}
         {accounts.length === 0 && <div className="text-sm text-zinc-400">Nothing connected yet. Approved clips can still be downloaded and posted by hand.</div>}
         <div className="divide-y divide-line">
@@ -101,6 +114,23 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
             <button formAction={freeUpSpaceNow} className="btn-hot" title="Runs the clean-up now with every time halved, and deletes the oldest unreviewed videos if space is still short">Free up space now</button>
           </div>
         </form>
+      </div>
+
+      <ChannelsCard channels={channels.map((c) => ({ id: c.id, name: c.name, kinds: c.kinds, focus: c.focus }))} accounts={channelAccounts}
+        canConnect={{ youtube: youtubeConfigured(), tiktok: tiktokConfigured() }} />
+
+      <div className="card space-y-3 p-5" id="twitch-connect" data-testid="twitch-connect">
+        <Head>Twitch follower counts</Head>
+        <p className="text-xs text-zinc-500">Suggestions rank big streamers by followers (5M+, 2M+). Twitch only shows follower counts to a signed-in account, so connect yours once (read-only: it can&apos;t post or change anything). In your Twitch app at dev.twitch.tv the OAuth Redirect URL must be exactly <Code>{twitchRedirectUri()}</Code>.</p>
+        {twitchUser ? (
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="rounded-md bg-violet-500/20 px-2 py-1 text-[11px] font-black uppercase text-violet-200">Twitch</span>
+            <div className="min-w-40 flex-1"><div className="font-semibold">{twitchUser.channelTitle}</div>{twitchUser.error ? <div className="text-xs text-red-300">{twitchUser.error}</div> : <div className="text-xs text-zinc-500">Connected: follower counts on</div>}</div>
+            {twitchUser.error && <a href="/api/twitch/connect" className="btn-hot">Reconnect</a>}
+            <form action={disconnectTwitch}><button className="btn-bad">Disconnect</button></form>
+          </div>
+        ) : twitchConfigured() ? <a href="/api/twitch/connect" className="btn-hot">Connect Twitch (for follower counts)</a>
+          : <div className="text-xs text-zinc-400">Add <Code>TWITCH_CLIENT_ID</Code> / <Code>TWITCH_CLIENT_SECRET</Code> to <Code>.env</Code> first.</div>}
       </div>
 
       <form action={saveSettings} className="space-y-6">

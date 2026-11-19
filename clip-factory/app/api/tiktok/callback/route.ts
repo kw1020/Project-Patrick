@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { revalidatePath } from "next/cache";
+import { assignHomeChannel } from "@/lib/to-post";
 import { appUrl } from "@/lib/youtube";
 import { connectTikTok } from "@/lib/tiktok";
 
@@ -10,6 +11,7 @@ export async function GET(req: NextRequest) {
   const back = (msg: string) => {
     const res = NextResponse.redirect(`${appUrl()}/settings?msg=${encodeURIComponent(msg)}`);
     res.cookies.delete("tt_state");
+    res.cookies.delete("cf_channel");
     res.cookies.delete("tt_verifier");
     return res;
   };
@@ -18,6 +20,7 @@ export async function GET(req: NextRequest) {
   if (!code || !state || !verifier || state !== req.cookies.get("tt_state")?.value) return back("Sign-in check failed. Try connecting again.");
   try {
     const acct = await connectTikTok(code, verifier);
+    await assignHomeChannel(acct.id, req.cookies.get("cf_channel")?.value).catch(() => null);
     revalidatePath("/settings");
     return back(acct.error ? acct.error : `connected:${acct.channelTitle}`);
   } catch (e) {

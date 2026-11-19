@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getSettings, prisma } from "@/lib/db";
-import { breakdown, judgeCorrelation, lengthBucket, performance, scoreBucket, sourceLabel, typeLabel } from "@/lib/analytics";
+import { breakdown, judgeCorrelation, lengthBucket, performance, platformLabel, scoreBucket, sourceLabel, typeLabel } from "@/lib/analytics";
 import { buildLessons, MIN_POSTS_TO_LEARN } from "@/lib/learning";
 import { getStatuses, soft, type AgentStatus } from "@/lib/queues";
 import { ago, num } from "@/lib/format";
@@ -21,10 +21,15 @@ function Tile({ label, value, sub }: { label: string; value: string; sub?: strin
 
 const hourBucket = (d: Date) => { const h = d.getHours(); return h < 6 ? "Night (0–6)" : h < 12 ? "Morning (6–12)" : h < 18 ? "Afternoon (12–18)" : "Evening (18–24)"; };
 
-export default async function AnalyticsPage() {
+export default async function AnalyticsPage({ searchParams }: { searchParams: Promise<{ channel?: string }> }) {
+  const { channel: cf } = await searchParams;
+  const channels = await prisma.channel.findMany({ orderBy: { createdAt: "asc" } });
+  // v1.9.5: ?channel=<id> | none applies to every breakdown and the post list (the Judge's lessons stay account-wide).
+  const chan = cf === "none" ? "none" : cf && channels.some((c) => c.id === cf) ? cf : "all";
+  const chanWhere = chan === "all" ? undefined : chan === "none" ? null : chan;
   const [rows, allPosts, settings, lessons, statuses, scored] = await Promise.all([
-    performance(24),
-    prisma.post.findMany({ where: { status: { in: ["live", "draft"] } }, include: { stats: { orderBy: { at: "asc" } }, account: true, clip: true }, orderBy: { postedAt: "desc" }, take: 300 }),
+    performance(24, chanWhere),
+    prisma.post.findMany({ where: { status: { in: ["live", "draft"] }, ...(chanWhere !== undefined ? { channelId: chanWhere } : {}) }, include: { stats: { orderBy: { at: "asc" } }, account: true, clip: true }, orderBy: { postedAt: "desc" }, take: 300 }),
     getSettings(),
     buildLessons(),
     soft(getStatuses(), {} as Record<string, AgentStatus>),
@@ -36,6 +41,8 @@ export default async function AnalyticsPage() {
   const rho = judgeCorrelation(rows);
   const top = [...rows].sort((a, b) => b.perf - a.perf).slice(0, 5);
   const statsById = new Map(allPosts.map((p) => [p.id, p.stats.map((s) => s.views)]));
+  const channelName = (r: { channelId: string | null }) => (r.channelId ? channels.find((c) => c.id === r.channelId)?.name ?? "(deleted channel)" : "No channel");
+  const pill = (on: boolean) => `whitespace-nowrap rounded-md px-3 py-1 ${on ? "bg-panel font-bold" : "text-zinc-400 hover:text-white"}`;
 
   return (
     <div className="space-y-6">
@@ -47,6 +54,14 @@ export default async function AnalyticsPage() {
         <div className="text-xs text-zinc-500">Stats synced {statuses.stats ? ago(statuses.stats.at) : "not yet"}{statuses.stats && !statuses.stats.ok ? ` (error: ${statuses.stats.msg})` : ""}</div>
       </div>
 
+      {channels.length > 0 && (
+        <div className="flex max-w-full gap-1 overflow-x-auto rounded-lg border border-line p-1 text-sm" role="tablist" aria-label="Channel" data-testid="analytics-channel">
+          <Link href="/analytics" role="tab" aria-selected={chan === "all"} className={pill(chan === "all")}>All channels</Link>
+          {channels.map((c) => <Link key={c.id} href={`/analytics?channel=${c.id}`} role="tab" aria-selected={chan === c.id} className={pill(chan === c.id)}>{c.name}</Link>)}
+          <Link href="/analytics?channel=none" role="tab" aria-selected={chan === "none"} className={pill(chan === "none")}>No channel</Link>
+        </div>
+      )}
+
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Tile label="Total views" value={num(totalViews)} sub={`${live.length} live posts${drafts ? ` · ${drafts} TikTok drafts waiting` : ""}`} />
         <Tile label="Posts a day old (used for learning)" value={String(rows.length)} sub={rows.length < MIN_POSTS_TO_LEARN ? `Judge starts learning at ${MIN_POSTS_TO_LEARN}` : "Judge is learning from these"} />
@@ -56,6 +71,8 @@ export default async function AnalyticsPage() {
 
       <section className="grid gap-4 lg:grid-cols-2">
         <ScoreHistogram scores={scored.map((c) => c.score!)} minScore={settings.minScore} />
+        <Bars title="By platform" rows={breakdown(rows, platformLabel)} />
+        {chan === "all" && <Bars title="By channel" rows={breakdown(rows, channelName)} note="Each post is compared with its own account's typical post." />}
         <Bars title="By Judge score" rows={breakdown(rows, scoreBucket)} note="If 8–10 isn't on top, the Judge needs more examples (it's learning from these)." />
         <Bars title="By type" rows={breakdown(rows, typeLabel)} note="Funny moments vs gaming moments. Clips from before v1.7.2 have no type and are left out." />
         <Bars title="By how the moment was found" rows={breakdown(rows, sourceLabel)} />

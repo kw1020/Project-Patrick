@@ -8,6 +8,8 @@ import { creatorUrl, isGta6 } from "@/lib/social";
 import { AutoRefresh } from "@/components/AutoRefresh";
 import { approveStreamer, runScoutNow } from "./actions";
 import { scoreSummary } from "@/lib/judge-stats";
+import { redirect } from "next/navigation";
+import { twitchReturnRedirect } from "@/lib/twitch-user";
 
 export const dynamic = "force-dynamic";
 
@@ -35,8 +37,12 @@ function AgentCard({ name, s, idle }: { name: string; s?: AgentStatus; idle?: st
   );
 }
 
-export default async function LivePage({ searchParams }: { searchParams: Promise<{ all?: string }> }) {
-  const { all } = await searchParams;
+export default async function LivePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const sp = await searchParams;
+  // v1.9.5: Twitch sends Krew back here (the redirect URI registered in his Twitch app is exactly APP_URL).
+  const twitchReturn = twitchReturnRedirect(sp);
+  if (twitchReturn) redirect(twitchReturn);
+  const all = typeof sp.all === "string" ? sp.all : undefined;
   const [streams, statuses, counts, suggestionCount, settings, scored] = await Promise.all([
     prisma.streamer.findMany({ where: { platform: "twitch", isLive: true, ...(all ? {} : { approved: true }) }, orderBy: [{ viewers: "desc" }], take: 200 }),
     soft(getStatuses(), {} as Record<string, AgentStatus>),

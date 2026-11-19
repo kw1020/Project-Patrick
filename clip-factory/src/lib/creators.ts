@@ -21,6 +21,7 @@ export type CreatorRow = {
   lastClipAt: Date | null;
   webcam?: "manual" | "auto" | null; // v1.9.0: typed-in webcam box, one found automatically (Streamer.facecamAuto), or none
   campaignId?: string | null; // v1.9.1 Campaign mode
+  followers?: number | null; // v1.9.5: Twitch follower count (Connect Twitch in Settings)
 };
 export type CreatorSummary = { total: number; twitch: number; youtube: number; live: number; paused: number };
 
@@ -62,6 +63,7 @@ export async function creatorStats(): Promise<CreatorRow[]> {
       views: a?.views ?? 0, lastClipAt: a?.last ?? null,
       webcam: s.facecam ? "manual" : s.facecamAuto ? "auto" : null,
       campaignId: s.campaignId,
+      followers: s.followers,
     };
   }));
 }

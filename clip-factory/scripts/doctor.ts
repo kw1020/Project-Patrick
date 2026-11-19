@@ -295,7 +295,7 @@ async function main() {
   // ---------- 7. Accounts ----------
   section("Connected accounts");
   let accounts: Awaited<ReturnType<typeof prisma.account.findMany>> = [];
-  try { accounts = await withTimeout(prisma.account.findMany({ orderBy: { createdAt: "asc" } }), 30_000); } catch { /* the Database line already says why */ }
+  try { accounts = await withTimeout(prisma.account.findMany({ where: { mode: "api", platform: { in: ["youtube", "tiktok"] } }, orderBy: { createdAt: "asc" } }), 30_000); } catch { /* the Database line already says why */ }
   if (!accounts.length) {
     print("Accounts", { status: "warn", detail: "no YouTube or TikTok accounts connected", fix: "Optional: connect them on the Settings page so approved clips can be posted." });
   }

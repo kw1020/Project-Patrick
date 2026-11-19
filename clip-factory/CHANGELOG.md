@@ -1,5 +1,11 @@
 # Clip Factory patch notes
 
+## 1.9.5 — 2026-11-19
+- Channels: your 4 brands (ViceCityClips, StreamHeistClips, WantedLevelClips, ClipFactoryGG) are set up with their YouTube, TikTok and Instagram handles. Connect, change or add more in Settings.
+- New Upload page next to the Queue: one column per channel with the clips you approved. Post to all uploads to YouTube and sends the TikTok draft; for the others it is Download + copy caption, then Mark posted. Move to... sends a clip to another channel.
+- Posted and Analytics can be looked at per channel and per platform. YouTube views are now tracked from the post link, even for videos you posted yourself.
+- Suggestions now put the biggest streamers first, with 5M+ and 2M+ follower badges and a Big only filter. Connect Twitch once in Settings to turn it on.
+
 ## 1.9.4 — 2026-11-19
 - The Judge now looks at 8 frames of each clip, not just the words, and scores on a clear 1-10 scale. Expect real spread: lots of 3-5s, a few 8+, no more 6 for everything.
 - Each clip card shows what the Judge saw ("Saw: ...") under its reason. Analytics shows how its scores spread out, and Settings shows what it costs per clip.

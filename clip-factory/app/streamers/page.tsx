@@ -3,17 +3,18 @@ import { prisma } from "@/lib/db";
 import { Avatar } from "@/components/Avatar";
 import { ago, compact, num } from "@/lib/format";
 import { AddStreamer, AddYouTubeChannel } from "@/components/AddStreamer";
-import { creatorUrl } from "@/lib/social";
+import { creatorUrl, isGta6 } from "@/lib/social";
 import { SuggestionActions } from "@/components/SuggestionActions";
 import { getStatuses, soft, type AgentStatus } from "@/lib/queues";
 import { approveStreamer, removeStreamer, resetFacecamAuto, saveStreamer, scanSuggestionsNow } from "../actions";
 import { BulkAddCreators } from "@/components/BulkAddCreators";
 import { CampaignSelect, CampaignsCard } from "@/components/Campaigns";
+import { filterSuggestions, followersText, followerTier, rankSuggestions, tierLabel, top21Index } from "@/lib/suggest-rank";
 
 export const dynamic = "force-dynamic";
 
-export default async function StreamersPage({ searchParams }: { searchParams: Promise<{ add?: string; sg?: string }> }) {
-  const { add, sg } = await searchParams;
+export default async function StreamersPage({ searchParams }: { searchParams: Promise<{ add?: string; sg?: string; big?: string; gta?: string }> }) {
+  const { add, sg, big, gta } = await searchParams;
   const [approved, discovered, twitchSuggestions, ytSuggestions, statuses, campaigns] = await Promise.all([
     prisma.streamer.findMany({ where: { approved: true }, orderBy: [{ isLive: "desc" }, { viewers: "desc" }, { name: "asc" }], include: { _count: { select: { moments: true } } } }),
     prisma.streamer.findMany({ where: { approved: false, platform: "twitch" }, orderBy: [{ isLive: "desc" }, { peakViewers: "desc" }], take: 40 }),
@@ -22,6 +23,11 @@ export default async function StreamersPage({ searchParams }: { searchParams: Pr
     soft(getStatuses(), {} as Record<string, AgentStatus>),
     prisma.campaign.findMany({ orderBy: [{ active: "desc" }, { createdAt: "asc" }], include: { _count: { select: { streamers: true } } } }),
   ]);
+  // v1.9.5: ranked by followers (Krew's top 21 pinned first) once Twitch is connected in Settings; else by peak viewers.
+  const byFollowers = (await prisma.account.count({ where: { platform: "twitch", error: null } })) > 0;
+  const filters = { bigOnly: big !== "0", gtaNow: gta === "1" };
+  const rankedTwitch = rankSuggestions(twitchSuggestions.map((x) => ({ ...x, name: x.streamer.name, login: x.streamer.login, followers: x.streamer.followers })), byFollowers);
+  const shownTwitch = filterSuggestions(rankedTwitch, { ...filters, byFollowers, isGta6 });
   const campaignViews = campaigns.map(({ _count, createdAt: _c, updatedAt: _u, source: _s, ...c }) => ({ ...c, creators: _count.streamers }));
   const tab: "twitch" | "youtube" = sg === "youtube" ? "youtube" : "twitch";
   return (
@@ -30,7 +36,7 @@ export default async function StreamersPage({ searchParams }: { searchParams: Pr
         <h1 className="text-2xl font-black">Streamers</h1>
         <p className="text-sm text-zinc-400">The Grabber only pulls from this list.</p>
       </div>
-      <Suggestions tab={tab} twitch={twitchSuggestions} youtube={ytSuggestions}
+      <Suggestions tab={tab} twitch={shownTwitch} twitchTotal={twitchSuggestions.length} youtube={ytSuggestions} byFollowers={byFollowers} filters={filters}
         twitchStatus={statuses.suggest_twitch ?? statuses.suggest} youtubeStatus={statuses.suggest_youtube} hasYouTubeKey={Boolean(process.env.YOUTUBE_API_KEY)} />
       <BulkAddCreators />
       <AddStreamer key={add} prefill={add} />
@@ -94,8 +100,8 @@ function parseReasons(json: string): string[] {
   try { const v = JSON.parse(json); return Array.isArray(v) ? v.map(String) : []; } catch { return []; }
 }
 
-function Suggestions({ tab, twitch, youtube, twitchStatus, youtubeStatus, hasYouTubeKey }: {
-  tab: "twitch" | "youtube"; twitch: SuggestionRow[]; youtube: SuggestionRow[];
+function Suggestions({ tab, twitch, twitchTotal, youtube, twitchStatus, youtubeStatus, hasYouTubeKey, byFollowers, filters }: {
+  tab: "twitch" | "youtube"; twitch: SuggestionRow[]; twitchTotal: number; youtube: SuggestionRow[]; byFollowers: boolean; filters: { bigOnly: boolean; gtaNow: boolean };
   twitchStatus?: AgentStatus; youtubeStatus?: AgentStatus; hasYouTubeKey: boolean;
 }) {
   const items = tab === "youtube" ? youtube : twitch;
@@ -107,7 +113,7 @@ function Suggestions({ tab, twitch, youtube, twitchStatus, youtubeStatus, hasYou
     <section className="space-y-3">
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div className="min-w-0">
-          <h2 className="text-lg font-black">Suggested for you {twitch.length + youtube.length > 0 && <span className="text-zinc-500">({twitch.length + youtube.length})</span>}</h2>
+          <h2 className="text-lg font-black">Suggested for you {twitchTotal + youtube.length > 0 && <span className="text-zinc-500">({twitchTotal + youtube.length})</span>}</h2>
           <p className="text-xs text-zinc-400">
             {tab === "youtube" ? "Big YouTube channels trending right now." : "Big streamers whose viewers clip a lot."} Nobody is approved until you press Approve.
             {status && <> · last scan {ago(status.at)}</>}
@@ -118,12 +124,23 @@ function Suggestions({ tab, twitch, youtube, twitchStatus, youtubeStatus, hasYou
       </div>
       <div className="flex gap-1" role="tablist">
         <Link href="/streamers" scroll={false} role="tab" aria-selected={tab === "twitch"} className={tabCls(tab === "twitch")}>
-          Twitch <span className="text-zinc-500">({twitch.length})</span>
+          Twitch <span className="text-zinc-500">({twitchTotal})</span>
         </Link>
         <Link href="/streamers?sg=youtube" scroll={false} role="tab" aria-selected={tab === "youtube"} className={tabCls(tab === "youtube")}>
           YouTube <span className="text-zinc-500">({youtube.length})</span>
         </Link>
       </div>
+      {tab === "twitch" && (
+        <div className="flex flex-wrap items-center gap-2 text-xs" data-testid="suggest-filters">
+          {byFollowers ? (
+            <Link href={sgHref({ ...filters, bigOnly: !filters.bigOnly })} scroll={false} aria-pressed={filters.bigOnly} className={chipCls(filters.bigOnly)}>Big only (2M+)</Link>
+          ) : (
+            <span className="rounded-full border border-sun/30 bg-sun/10 px-3 py-1 text-amber-200" data-testid="connect-twitch-note">Ranked by peak viewers. <a href="/settings#twitch-connect" className="font-bold underline">Connect Twitch in Settings to rank by followers</a></span>
+          )}
+          <Link href={sgHref({ ...filters, gtaNow: !filters.gtaNow })} scroll={false} aria-pressed={filters.gtaNow} className={chipCls(filters.gtaNow)}>GTA 6 now</Link>
+          {twitch.length < twitchTotal && <span className="text-zinc-500">showing {twitch.length} of {twitchTotal}</span>}
+        </div>
+      )}
       {tab === "youtube" && !hasYouTubeKey ? <YouTubeKeySetup /> : items.length === 0 ? (
         <div className="card p-6 text-sm text-zinc-400">
           No suggestions yet. The first scan runs about a minute after Clip Factory starts, then every hour.
@@ -135,6 +152,15 @@ function Suggestions({ tab, twitch, youtube, twitchStatus, youtubeStatus, hasYou
       )}
     </section>
   );
+}
+
+const chipCls = (on: boolean) => `rounded-full border px-3 py-1 font-semibold ${on ? "border-hot bg-hot/15 text-white" : "border-line text-zinc-400 hover:text-white"}`;
+function sgHref(f: { bigOnly: boolean; gtaNow: boolean }) {
+  const q = new URLSearchParams();
+  if (!f.bigOnly) q.set("big", "0");
+  if (f.gtaNow) q.set("gta", "1");
+  const s = q.toString();
+  return s ? `/streamers?${s}` : "/streamers";
 }
 
 function Chips({ reasons }: { reasons: string }) {
@@ -176,6 +202,11 @@ function TwitchCard({ sg }: { sg: SuggestionRow }) {
           <div className="font-bold tabular-nums">{num(sg.viewers)}</div>
           <div className="text-[11px] text-zinc-500">viewers</div>
         </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-1.5" data-testid="suggest-badges">
+        {top21Index(s.name, s.login) >= 0 && <span className="rounded-full bg-hot/20 px-2 py-0.5 text-[11px] font-black text-hot">Krew&apos;s top 21</span>}
+        {tierLabel(s.followers) && <span className={`rounded-full px-2 py-0.5 text-[11px] font-black ${followerTier(s.followers) === 2 ? "bg-sun text-black" : "bg-sun/20 text-sun"}`}>{tierLabel(s.followers)}</span>}
+        {s.followers != null && <span className="text-xs font-semibold text-zinc-300">{followersText(s.followers)}</span>}
       </div>
       <Chips reasons={sg.reasons} />
       <Permission sg={sg} aboutUrl={`https://www.twitch.tv/${s.login}/about`} aboutLabel="About panels" where="or Discord" />

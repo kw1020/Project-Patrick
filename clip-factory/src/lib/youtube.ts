@@ -128,3 +128,41 @@ export async function fetchStats(acct: Account, ids: string[]): Promise<Map<stri
   }
   return out;
 }
+
+/** v1.9.5: the video id in a YouTube link (Shorts, watch, youtu.be, live, embed), or null. */
+export function youtubeIdFromUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  let u: URL;
+  try { u = new URL(/^https?:\/\//i.test(url.trim()) ? url.trim() : `https://${url.trim()}`); } catch { return null; }
+  const host = u.hostname.replace(/^(www\.|m\.|music\.)/, "");
+  let id: string | null = null;
+  if (host === "youtu.be") id = u.pathname.split("/")[1] ?? null;
+  else if (host === "youtube.com") {
+    const m = u.pathname.match(/^\/(shorts|live|embed|v)\/([^/?#]+)/);
+    id = m ? m[2] : u.pathname === "/watch" ? u.searchParams.get("v") : null;
+  }
+  return id && /^[A-Za-z0-9_-]{6,20}$/.test(id) ? id : null;
+}
+
+/**
+ * v1.9.5: public views/likes/comments with the plain API key (YOUTUBE_API_KEY), no OAuth: for posts Krew made by hand on
+ * YouTube (manual accounts). 50 ids per call, 1 quota unit each.
+ */
+export async function fetchPublicStats(ids: string[]): Promise<Map<string, VideoStats>> {
+  const out = new Map<string, VideoStats>();
+  const key = process.env.YOUTUBE_API_KEY;
+  if (!key || !ids.length) return out;
+  const uniq = [...new Set(ids)];
+  for (let i = 0; i < uniq.length; i += 50) {
+    const u = new URL(API_URL() + "/videos");
+    u.search = new URLSearchParams({ part: "statistics", id: uniq.slice(i, i + 50).join(","), key }).toString();
+    const res = await fetch(u, { headers: { Accept: "application/json" } });
+    const j = (await res.json().catch(() => ({}))) as any;
+    if (!res.ok) throw new Error(`YouTube API ${res.status}: ${j.error?.message || "request failed"}`);
+    for (const v of j.items ?? []) {
+      const s = v.statistics ?? {};
+      out.set(v.id, { views: Number(s.viewCount ?? 0), likes: s.likeCount != null ? Number(s.likeCount) : null, comments: s.commentCount != null ? Number(s.commentCount) : null });
+    }
+  }
+  return out;
+}

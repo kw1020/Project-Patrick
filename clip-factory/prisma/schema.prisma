@@ -37,6 +37,8 @@ model Streamer {
   paused        Boolean   @default(false) // still approved, but the clips poller / spike detector / YouTube scanner skip them (Creators page)
   campaignId    String?   // v1.9.1: the Whop Content Rewards campaign this creator's clips are for (captions follow its rules)
   campaign      Campaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  followers     Int?      // v1.9.5: Twitch follower count (needs the Twitch user token from Settings), refreshed at most daily
+  followersAt   DateTime? // v1.9.5: when followers was last fetched
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   moments       Moment[]
@@ -94,6 +96,7 @@ model Clip {
   judgeTokensOut    Int?
   category    String? // funny | gaming: the moment's guess at first, replaced by the Judge's label; null on older rows
   postError   String? // last YouTube upload error
+  channelId   String? // v1.9.5: the Channel this clip goes to when Krew picked one on To post (null = by category, src/lib/channels.ts)
   title      String?
   caption    String?
   // processing -> pending (waiting for review) -> approved | rejected -> posted ; failed on error
@@ -126,6 +129,7 @@ model Post {
   error      String?
   campaignLink String? // v1.9.1: where Krew submitted this post on Whop (Content Rewards)
   campaignId   String? // v1.9.1: the campaign it was submitted to (plain id, no relation: deleting a campaign keeps the post)
+  channelId    String? // v1.9.5: the Channel (ViceCityClips…) of the account it went to (plain id, no relation)
   stats      PostStat[]
 }
 
@@ -170,6 +174,19 @@ model Settings {
   retainPostedDays    Int     @default(3)  // posted: final deleted (it's on the platform already)
   retainRawHrs        Int     @default(6)  // raw: deleted once cut + reviewed, and at most this long after the cut
   retainRowsDays      Int     @default(7)  // rejected / expired clip rows deleted after this (clips with posts are kept)
+  migratedChannels    Boolean @default(false) // v1.9.5 one-time: first Channel made from channelName, existing accounts put in it
+}
+
+// v1.9.5: one of Krew's brands (e.g. "ViceCityClips") = up to one YouTube + one TikTok + one Instagram account that all get the same
+// clips. kinds = which clips go there by default (comma list of gaming | funny | edits). No relations: plain ids on
+// Account.homeChannelId / Clip.channelId / Post.channelId, so deleting a channel never deletes posts.
+model Channel {
+  id        String   @id @default(cuid())
+  name      String
+  kinds     String   @default("gaming,funny") // which clip types it takes (comma list of gaming | funny | edits)
+  focus     String   @default("any") // gta = GTA 6 clips of any type (ViceCityClips) | any = clips whose type is in kinds
+  color     String?
+  createdAt DateTime @default(now())
 }
 
 // v1.9.1 Campaign mode: a Whop Content Rewards campaign. Creators are tagged with one (Streamer.campaignId) and their
@@ -190,9 +207,11 @@ model Campaign {
 }
 
 // Connected posting accounts. Several per platform (e.g. two YouTube channels, a TikTok).
+// v1.9.5: mode "manual" = just a handle Krew posts to by hand (refreshToken ""), any platform incl. instagram;
+// platform "twitch" (mode api) = the Twitch user token used only to read follower counts (never posts).
 model Account {
   id           String    @id @default(cuid())
-  platform     String    // youtube | tiktok
+  platform     String    // youtube | tiktok | instagram | twitch (follower counts only)
   channelId    String?   // YouTube channel id / TikTok open_id
   channelTitle String?   // shown in the dashboard
   username     String?   // TikTok @handle (for post links)
@@ -202,6 +221,10 @@ model Account {
   autoPost     Boolean   @default(false) // post (YouTube) / send draft (TikTok) when Krew approves
   privacy      String    @default("public") // YouTube: public | unlisted | private
   error        String?   // set when the platform rejects the token (reconnect needed)
+  mode         String    @default("api") // v1.9.5: api (OAuth-connected) | manual (a handle Krew posts to by hand)
+  handle       String?   // v1.9.5: e.g. "@vicecityclips" (manual accounts; shown on To post)
+  homeChannelId String?  // v1.9.5: the Channel this account belongs to (Account.channelId is the platform's own id)
+  disabled     Boolean   @default(false) // v1.9.5: skipped by Post to all, not needed for "posted everywhere" (why: in error)
   createdAt    DateTime  @default(now())
   posts        Post[]
 

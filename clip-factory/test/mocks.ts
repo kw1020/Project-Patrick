@@ -1,13 +1,19 @@
 // Stand-in Anthropic + Google/YouTube + TikTok + Twitch servers for tests (no real keys or network).
 import http from "node:http";
 
-export type Mock = { tiktokStatus: Record<string, unknown>; refreshCount: number; url: string; requests: { method: string; path: string; headers: http.IncomingHttpHeaders; body: Buffer }[]; close: () => Promise<void>; verdict: Record<string, unknown> };
+export type Mock = { tiktokStatus: Record<string, unknown>; refreshCount: number; url: string; requests: { method: string; path: string; headers: http.IncomingHttpHeaders; body: Buffer }[]; close: () => Promise<void>; verdict: Record<string, unknown>;
+  followers: Record<string, number>; // v1.9.5: Helix /channels/followers totals by broadcaster_id (missing = 1000)
+  /** v1.9.3: what the stand-in Claude returns for Supreme (claude-opus-5-5) and QA (image) requests. */
+  supreme: Record<string, unknown>; qa: Record<string, unknown>; supremeStop: string; usage: { input_tokens: number; output_tokens: number };
+};
 
 export async function startMocks(port = 0): Promise<Mock> {
   const mock: Mock = {
     url: "", requests: [], close: async () => {}, refreshCount: 0,
     tiktokStatus: { status: "SEND_TO_USER_INBOX", publicaly_available_post_id: [] },
     verdict: { observations: "He drives off the bridge and lands on a moving truck; he screams and chat explodes.", score: 8.4, hook_text: "He jumped the bridge?!", title: "Impossible bridge jump in GTA 6", hashtags: ["GTA6", "#gaming", "vice city", "GTA6"], reason: "Clear payoff and chat exploded.", category: "gaming", extra_hashtags: ["GTA6Clips"], best_start: null, best_end: null },
+    followers: {},
+    supreme: { picks: [] }, qa: { ok: true, issues: [] }, supremeStop: "end_turn", usage: { input_tokens: 10, output_tokens: 10 },
   };
   const server = http.createServer((req, res) => {
     const chunks: Buffer[] = [];
@@ -42,7 +48,13 @@ export async function startMocks(port = 0): Promise<Mock> {
       if (path.startsWith("/v2/video/query/")) return tt({ videos: [{ id: "7300000000000000001", view_count: 12000, like_count: 900, comment_count: 40 }] });
 
       // ---- Twitch (client-credentials token + Helix) ----
-      if (path.startsWith("/oauth2/token") && req.method === "POST") return json(200, { access_token: "twitch-mock-token", expires_in: 5000000, token_type: "bearer" });
+      if (path.startsWith("/oauth2/token") && req.method === "POST") {
+        const f = new URLSearchParams(body.toString());
+        // v1.9.5: the user-token flow (authorization code + refresh) gets a refresh token; the app token doesn't.
+        if (f.get("grant_type") === "authorization_code") return json(f.get("code") === "bad" ? 400 : 200, f.get("code") === "bad" ? { status: 400, message: "Invalid authorization code" } : { access_token: "twitch-user-token", refresh_token: "twitch-user-refresh", expires_in: 14000, scope: ["moderator:read:followers"], token_type: "bearer" });
+        if (f.get("grant_type") === "refresh_token") return json(200, { access_token: "twitch-user-token2", refresh_token: "twitch-user-refresh2", expires_in: 14000, token_type: "bearer" });
+        return json(200, { access_token: "twitch-mock-token", expires_in: 5000000, token_type: "bearer" });
+      }
       if (path.startsWith("/helix/")) {
         const u = new URL(path, "http://x"), ep = u.pathname.slice("/helix".length);
         const gta = { id: "1234567", name: "Grand Theft Auto VI", box_art_url: "", igdb_id: "" };
@@ -57,6 +69,13 @@ export async function startMocks(port = 0): Promise<Mock> {
           { id: "ClipOne", url: "https://clips.twitch.tv/ClipOne", broadcaster_id: "u1", broadcaster_name: "Kai", creator_name: "fan1", video_id: "", game_id: gta.id, title: "bridge jump", view_count: 5400, created_at: now, thumbnail_url: "", duration: 28.5, vod_offset: null },
           { id: "ClipTwo", url: "https://clips.twitch.tv/ClipTwo", broadcaster_id: "u2", broadcaster_name: "Mira", creator_name: "fan2", video_id: "", game_id: gta.id, title: "cops lol", view_count: 300, created_at: now, thumbnail_url: "", duration: 40, vod_offset: null },
         ], pagination: {} });
+        if (ep === "/channels/followers") {
+          if (!String(req.headers.authorization).startsWith("Bearer twitch-user-token")) return json(401, { error: "Unauthorized", status: 401, message: "user token required" });
+          const b = u.searchParams.get("broadcaster_id") || "";
+          return json(200, { total: mock.followers[b] ?? 1000, data: [], pagination: {} });
+        }
+        if (ep === "/users" && !u.searchParams.has("login") && !u.searchParams.has("id") && String(req.headers.authorization).startsWith("Bearer twitch-user-token"))
+          return json(200, { data: [{ id: "krew-tw-1", login: "krewclips", display_name: "KrewClips", profile_image_url: "" }] });
         if (ep === "/users") return json(200, { data: [...u.searchParams.getAll("login"), ...u.searchParams.getAll("id")].map((x, i) => ({ id: `u${i + 1}`, login: x.toLowerCase(), display_name: x, profile_image_url: "" })) });
         return json(404, { error: "Not Found", status: 404, message: "mock: no helix " + ep });
       }

@@ -208,6 +208,41 @@ original brief is below, and the status section says what's done. Read both befo
   `$root\storage`). doctor: "Storage" line (folder, host folder, free GB; ❌ < MIN_FREE_GB, ⚠️ < 2x). All schema changes additive
   (`test/v194.test.ts` pushes from 1ac085c with rows; `toV191Schema` in `test/schema-v173.ts`). Unverified: the real Claude API
   with image blocks + medium effort, real cost, Docker on a D: drive on Krew's PC.
+- **v1.9.5 (2026-11-19): Channels + Upload page, per-channel Posted/Analytics, Suggestions by followers.** All schema changes additive,
+  no new uniques (`test/v195.test.ts` pushes from de19280 with rows; `toV194Schema` in `test/schema-v173.ts`; built as "1.9.2" before v1.9.4 landed). `Channel {name, kinds
+  (gaming,funny,edits), focus (gta|any, free text), color}` = one brand with ONE YouTube + ONE TikTok + ONE Instagram slot (Krew: what
+  goes on its YouTube goes on its TikTok + Instagram). `Account.homeChannelId` (NOT `Account.channelId`: that's the platform's own id,
+  part of `@@unique([platform, channelId])`), `Account.mode` api|manual (manual = a handle Krew posts to himself, refreshToken ""),
+  `Account.handle`; platform "twitch" (mode api) = the Twitch USER token, only for follower counts, never posts. `Clip.channelId`
+  (Krew's pick; null = automatic), `Post.channelId` (from the account), `Streamer.followers/followersAt`, `Settings.migratedChannels`.
+  `ensureChannels` (`src/lib/to-post.ts`, worker start + web layout, once, only if no Channel exists): seeds Krew's 4 brands
+  (`src/lib/channel-seeds.ts`, fixed ids main/streamheist/wantedlevel/clipfactorygg: ViceCityClips gta all kinds, StreamHeistClips
+  funny, WantedLevelClips gaming, ClipFactoryGG edits) with by-hand accounts for their public handles; an already-connected account
+  matching a seed (`matchesSeed`: handle/username/title, YouTube channel id, or YouTube title = brand name) takes that slot instead;
+  ClipFactoryGG's Instagram is seeded `Account.disabled` (+ note in `error`: Instagram disabled it). Leftover posting accounts go to a
+  free slot of the first channel, else "Not in a channel yet". `Account.disabled`: skipped by `postToAll`, not waited for by
+  `toPostItems`; Turn off/on in the Channels card (`setAccountDisabled`). Focus/kinds map onto v2.0's Account.purpose (gta+all = all). Routing `channelForClip` (`src/lib/channels.ts`, pure):
+  pick > GTA 6 clip (momentGame/isGta6) → first gta channel taking its type > first non-gta channel taking its type > null ("No
+  channel", Krew picks). Upload (Krew: "an upload page next to the queue with all columns of all four channels"; `app/upload/page.tsx`,
+  `/to-post` redirects there; one column per channel + a "No channel" column, header = 3 handle dots + "X waiting"; md+ = side by side
+  w-80 scrolling sideways, phone = stacked; `src/components/ToPostCard.tsx` with "Move to…" = `setClipChannel`; Nav badge `toPostCount`): approved clips +
+  clips posted through this flow (a post with channelId) not yet on every slot account; `postToAll` queues every api YouTube/TikTok
+  account (`enqueuePost`, single attempt), by-hand rows = Download + copy caption (`downloadAndCopy`: clipboard + `/api/media/<id>?download=1`)
+  → `markPostedToAccount` (link + campaign link); "Post one" menu = `postToAccount`. Poster + `postToAccount` refuse manual/twitch
+  accounts; Queue buttons / auto-post / stats sync / doctor only use api YouTube/TikTok. Settings Channels card
+  (`src/components/ChannelsCard.tsx`): quick "Add an account by handle" (platform + handle + channel, form resets for the next),
+  per channel name/focus/kinds + 3 slots (Connect = `/api/<yt|tiktok>/connect?channel=<id>` → cookie `cf_channel` → callback
+  `assignHomeChannel`; or Add handle), "Not in a channel yet" list. Posted: `?channel=&platform=` + grouped by channel; views typed in
+  only for by-hand posts. `syncManualYouTube` (in runStatsSync): by-hand posts with a YouTube link → `fetchPublicStats` with
+  YOUTUBE_API_KEY (no OAuth). Analytics `?channel=` on every breakdown + "By platform"/"By channel". Twitch user token
+  (`src/lib/twitch-user.ts`): `/api/twitch/connect` → id.twitch.tv authorize, scope moderator:read:followers, redirect_uri EXACTLY
+  APP_URL (Krew registered http://localhost:3000) → Twitch returns to the Live page `/?code&state`, which `redirect()`s to
+  `/api/twitch/callback` (`twitchReturnRedirect`; state cookie `tw_state`). Followers = Helix `/channels/followers?broadcaster_id&first=1`
+  `total`, cached a day per streamer. Suggest scan: up to 150 lookups/scan (top 21 first, then viewers), deep-check pool = KREW_TOP_21
+  found + top 40 by tier/followers; ranking `rankSuggestions` (`src/lib/suggest-rank.ts`): top 21 pinned in Krew's order, then tier
+  5M+/2M+/below, then score; no token = peak viewers then score + note. Streamers page chips "Big only (2M+)" (default on, `?big=0`
+  off) and "GTA 6 now" (`?gta=1`); also refreshes approved creators' followers (Creators page). Unverified against real Twitch
+  user-token OAuth / followers API and on Krew's PC.
 - Docker image never built in the sandbox (no daemon); it builds fine on Krew's PC; a clean-copy `npm ci` + `next build` without `.env`
   (what the Dockerfile does) passes.
 - **Suggestions (2026-11-17):** `src/workers/suggest.ts` (queue "suggest", hourly + once ~1 min after start,

@@ -296,6 +296,34 @@ which is on C: by default, and that's usually what fills C:. Docker Desktop → 
 **Disk image location** → pick a folder on D: → Apply & restart (Docker moves it for you; it can take a few minutes).
 
 `npm run doctor` prints the storage folder and the free space.
+## Channels + Upload (v1.9.5)
+- **Channels** (Settings → Channels): a channel is one of your brands, e.g. **ViceCityClips**, with up to one YouTube, one
+  TikTok and one Instagram account. What goes on its YouTube goes on its TikTok and Instagram too. Each slot is either
+  **Connect** (YouTube / TikTok login, posts for you) or **Add handle** (an account you post to yourself; Instagram is always
+  by hand). To add many accounts quickly use **Add an account by handle** at the top: platform + @handle + channel, Add,
+  then type the next one. On first start (only when there are no channels yet) Clip Factory sets up your 4 brands with their
+  handles: **ViceCityClips** (GTA 6, every type), **StreamHeistClips** (funny), **WantedLevelClips** (gaming), **ClipFactoryGG**
+  (edits; its Instagram is switched **Off** because Instagram disabled it: appeal in the app, then press Turn on). Accounts you
+  already connected take their brand's slot. Turn off any account (Settings → Channels) and Post to all skips it.
+- **Focus + types**: a GTA 6 channel gets every GTA 6 clip (funny, gaming, edits). An "Any game" channel gets clips of the
+  types you tick. A clip that fits no channel shows in a "No channel" column on Upload: use its Move to… menu.
+- **Upload** (menu, right after Queue; badge = clips still to post): one column per channel (ViceCityClips | StreamHeistClips |
+  WantedLevelClips | ClipFactoryGG), each headed by its 3 handles (green dot = connected, amber = by hand, grey = off) and
+  "X waiting". Approved clips sit in their channel's column, best first (GTA 6 → ViceCityClips, funny → StreamHeistClips,
+  gaming → WantedLevelClips, edits → ClipFactoryGG; **Move to…** on a card moves it), each with its caption + hashtags (copy
+  button, campaign checks) and one row per account. **Post to all** uploads to the channel's connected YouTube and sends the
+  TikTok draft (one try each, never a second upload); for by-hand accounts press **Download + copy caption** (downloads the
+  video and copies the caption in one click), post it in the app, then **Mark posted** (post link + campaign link optional).
+  Each connected row also has its own Post to YouTube / Send to TikTok button. A clip leaves the column (and shows on Posted)
+  when every account of its channel has it. On a narrow screen (Chromebook) the columns scroll sideways; on a phone they stack.
+  The Queue is now mainly for Approve / Reject; its post buttons still work.
+- **Posted** and **Analytics** can be filtered by channel (and Posted by platform). Views of YouTube posts you made yourself
+  are read from the post link every 15 minutes when `YOUTUBE_API_KEY` is set; type in views for TikTok and Instagram posts you
+  made by hand.
+- **Suggestions by followers**: Settings → **Connect Twitch (for follower counts)** once (read-only). In your Twitch app
+  (dev.twitch.tv → your app) the OAuth Redirect URL must be exactly `http://localhost:3000`. Then suggestions show
+  "6.2M followers" with **5M+ / 2M+** badges, "Big only (2M+)" is on by default, "GTA 6 now" shows who is in GTA 6, and
+  your top 21 are pinned first when found. Without it suggestions are ranked by viewers. The Creators page shows followers too.
 
 ## Settings worth knowing
 

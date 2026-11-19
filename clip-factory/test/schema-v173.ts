@@ -1,6 +1,16 @@
+// Today's schema turned back into the v1.9.4 (de19280) one: the v1.9.5 columns (Channels, manual accounts, followers)
+// and the Channel model removed.
+export function toV194Schema(now: string): string {
+  return now
+    .replace(/^ {2}\w+ +\w+\??(?: +@default\([^)]*\))? *\/\/ v1\.9\.5.*\n/gm, "")
+    .replace(/^\/\/ v1\.9\.5: mode "manual".*\n\/\/ platform "twitch".*\n/m, "")
+    .replace("  platform     String    // youtube | tiktok | instagram | twitch (follower counts only)\n", "  platform     String    // youtube | tiktok\n")
+    .replace(/\n\/\/ v1\.9\.5: one of Krew's brands[\s\S]*?\nmodel Channel \{[\s\S]*?\n\}\n/, "");
+}
+
 // Today's schema turned back into the v1.9.1 (1ac085c) one: the v1.9.4 Judge columns, Storage settings and comments removed.
 export function toV191Schema(now: string): string {
-  return now
+  return toV194Schema(now)
     .replace(/^ {2}(judgeObservations|judgeFrames|judgeTokensIn|judgeTokensOut|retainRejectedHrs|retainPendingHrs|retainApprovedDays|retainPostedDays|retainRawHrs|retainRowsDays)\s.*\n/gm, "")
     .replace(/^ {2}\/\/ v1\.9\.4.*\n/gm, "");
 }

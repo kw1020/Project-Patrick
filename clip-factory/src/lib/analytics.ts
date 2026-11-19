@@ -7,6 +7,7 @@ export type PerfRow = {
   streamer: string; source: string; score: number | null; hook: string | null; title: string | null;
   transcript: string | null; duration: number | null;
   category: string | null; // funny | gaming (null on older clips)
+  channelId: string | null; // v1.9.5: the Channel the post went to (null = before channels / posted from the Queue by hand)
 };
 
 function median(xs: number[]) {
@@ -17,9 +18,9 @@ function median(xs: number[]) {
 }
 
 /** Live posts that have views and are at least `minAgeHrs` old (young posts haven't settled). */
-export async function performance(minAgeHrs = 24): Promise<PerfRow[]> {
+export async function performance(minAgeHrs = 24, channelId?: string | null): Promise<PerfRow[]> {
   const posts = await prisma.post.findMany({
-    where: { status: "live", views: { not: null }, postedAt: { lt: new Date(Date.now() - minAgeHrs * 3600_000) } },
+    where: { status: "live", views: { not: null }, postedAt: { lt: new Date(Date.now() - minAgeHrs * 3600_000) }, ...(channelId !== undefined ? { channelId } : {}) },
     include: { account: true, clip: { include: { moment: { include: { streamer: true } } } } },
   });
   const group = (p: (typeof posts)[number]) => p.accountId ?? `manual:${p.platform}`;
@@ -32,6 +33,7 @@ export async function performance(minAgeHrs = 24): Promise<PerfRow[]> {
       perf: Math.round((p.views! / Math.max(1, med)) * 100) / 100,
       streamer: p.clip.moment.streamer.name, source: p.clip.moment.source, score: p.clip.score, hook: p.clip.hookText, title: p.clip.title,
       transcript: p.clip.transcript, duration: p.clip.duration, category: p.clip.category ?? p.clip.moment.category,
+      channelId: p.channelId ?? null,
     };
   });
 }
@@ -49,6 +51,7 @@ export function breakdown(rows: PerfRow[], keyOf: (r: PerfRow) => string | null)
 export const scoreBucket = (r: PerfRow) => (r.score == null ? "Not scored" : r.score >= 8 ? "Judge 8–10" : r.score >= 6 ? "Judge 6–7.9" : "Judge under 6");
 export const lengthBucket = (r: PerfRow) => (r.duration == null ? null : r.duration < 25 ? "Under 25s" : r.duration < 35 ? "25–35s" : "35s+");
 export const typeLabel = (r: PerfRow) => (r.category === "funny" ? "Funny" : r.category === "gaming" ? "Gaming" : null);
+export const platformLabel = (r: PerfRow) => (r.platform === "youtube" ? "YouTube" : r.platform === "tiktok" ? "TikTok" : r.platform === "instagram" ? "Instagram" : r.platform);
 export const sourceLabel = (r: PerfRow) => (r.source === "chat" ? "Chat spike" : r.source === "youtube" ? "YouTube peak" : "Twitch clip");
 
 /** Spearman rank correlation between Judge score and performance (-1..1), or null with too few scored posts. */

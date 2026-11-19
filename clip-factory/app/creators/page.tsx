@@ -1,3 +1,4 @@
+import { followersText } from "@/lib/suggest-rank";
 import Link from "next/link";
 import { Avatar } from "@/components/Avatar";
 import { CreatorActions } from "@/components/CreatorActions";
@@ -45,6 +46,7 @@ function Card({ c, campaigns }: { c: CreatorRow; campaigns: { id: string; name: 
           </div>
           <div className="truncate text-xs text-zinc-400">
             {c.live ? <span className="text-red-400">● Live{c.gameName ? ` · ${c.gameName}` : ""} · {compact(c.viewers)} watching</span> : yt ? `youtube.com/@${c.login}` : `twitch.tv/${c.login}`}
+            {c.followers != null && <span className="text-zinc-300" data-testid="creator-followers"> · {followersText(c.followers)}</span>}
           </div>
         </div>
       </div>

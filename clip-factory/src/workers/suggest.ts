@@ -4,6 +4,8 @@ import { findPermissionEvidence, type PermissionEvidence } from "../lib/permissi
 import { compact } from "../lib/format";
 import { setStatus } from "../lib/queues";
 import { runYouTubeSuggestScan } from "./suggest-youtube";
+import { fetchFollowersMany, followersStale, getTwitchUserAccount, refreshApprovedFollowers } from "../lib/twitch-user";
+import { followerTier, rankSuggestions, top21Index } from "../lib/suggest-rank";
 
 // Suggestions: streamers Krew could approve — mainly big ones whose viewers clip a lot.
 // This NEVER approves anyone. It only writes Suggestion rows; Krew approves on the Streamers page with a reason.
@@ -14,6 +16,7 @@ const KEEP = 25;              // pending suggestions kept
 const FRESH_MS = 50 * 60_000; // pending suggestions scored this recently aren't re-scored (hourly scan always re-scores)
 const SEEN_DAYS = 7;          // GTA-Scout streamers seen this recently are candidates too
 const DAY = 86_400_000;
+const FOLLOWER_LOOKUPS = 150; // v1.9.5: follower counts fetched per scan (1 Helix point each; cached a day per streamer)
 
 type Candidate = {
   twitchId: string; login: string; name: string; viewers: number; live: boolean;
@@ -84,7 +87,7 @@ async function runTwitchSuggestScan(): Promise<string> {
   // A YouTube channel with the same name doesn't block a Twitch suggestion (login is unique per platform since v1.7.1).
   const [approved, existing, seenByScout] = await Promise.all([
     prisma.streamer.findMany({ where: { approved: true, platform: "twitch" }, select: { twitchId: true } }),
-    prisma.suggestion.findMany({ where: { platform: "twitch" }, include: { streamer: { select: { twitchId: true } } } }),
+    prisma.suggestion.findMany({ where: { platform: "twitch" }, include: { streamer: { select: { twitchId: true, name: true, login: true, followers: true } } } }),
     prisma.streamer.findMany({ where: { platform: "twitch", approved: false, lastSeenAt: { gte: new Date(now.getTime() - SEEN_DAYS * DAY) } } }),
   ]);
   const approvedIds = new Set(approved.map((s) => s.twitchId));
@@ -104,10 +107,36 @@ async function runTwitchSuggestScan(): Promise<string> {
     if (cands.has(s.twitchId)) continue;
     cands.set(s.twitchId, { twitchId: s.twitchId, login: s.login, name: s.name, viewers: s.isLive ? s.viewers : s.peakViewers, live: s.isLive, gameName: s.gameName, title: s.streamTitle });
   }
-  const pool = [...cands.values()]
-    .filter((c) => !approvedIds.has(c.twitchId) &&!skip.has(c.twitchId))
-    .sort((a, b) => b.viewers - a.viewers)
-    .slice(0, DEEP_CHECK);
+  const open = [...cands.values()].filter((c) => !approvedIds.has(c.twitchId) && !skip.has(c.twitchId));
+
+  // v1.9.5: follower counts (Twitch user token from Settings), cached on Streamer.followers and refreshed at most daily.
+  const userAcct = await getTwitchUserAccount().catch(() => null);
+  const followers = new Map<string, number>();
+  let fetched = 0;
+  if (userAcct) {
+    const known = await prisma.streamer.findMany({ where: { twitchId: { in: [...cands.keys()] } }, select: { id: true, twitchId: true, followers: true, followersAt: true } });
+    const byTw = new Map(known.map((k) => [k.twitchId, k]));
+    for (const k of known) if (k.followers != null && !followersStale(k.followersAt)) followers.set(k.twitchId, k.followers);
+    const want = open.filter((c) => !followers.has(c.twitchId))
+      .sort((a, b) => (top21Index(b.name, b.login) >= 0 ? 1 : 0) - (top21Index(a.name, a.login) >= 0 ? 1 : 0) || b.viewers - a.viewers);
+    const got = await fetchFollowersMany(userAcct, want.map((c) => c.twitchId), FOLLOWER_LOOKUPS);
+    fetched = got.size;
+    for (const [id, n] of got) {
+      followers.set(id, n);
+      const row = byTw.get(id);
+      if (row) await prisma.streamer.update({ where: { id: row.id }, data: { followers: n, followersAt: now } }).catch(() => {});
+    }
+    // Cached counts of fresh pending suggestions count too.
+    for (const s of existing) if (s.streamer.followers != null && !followers.has(s.streamer.twitchId)) followers.set(s.streamer.twitchId, s.streamer.followers);
+  }
+  const byFollowers = Boolean(userAcct) && followers.size > 0;
+  const fol = (id: string) => followers.get(id) ?? null;
+
+  // Deep check: Krew's top 21 always, then the biggest by follower tier/count (or by viewers without the token).
+  const pinned = open.filter((c) => top21Index(c.name, c.login) >= 0);
+  const rest = open.filter((c) => top21Index(c.name, c.login) < 0)
+    .sort((a, b) => byFollowers ? followerTier(fol(b.twitchId)) - followerTier(fol(a.twitchId)) || (fol(b.twitchId) ?? -1) - (fol(a.twitchId) ?? -1) || b.viewers - a.viewers : b.viewers - a.viewers);
+  const pool = [...pinned, ...rest.slice(0, DEEP_CHECK)];
 
   // Bios (+ avatars) in batches of 100, then each candidate's clips from the last 7 days (one page each).
   const users = pool.length ? await getUsers({ ids: pool.map((c) => c.twitchId) }) : [];
@@ -136,10 +165,11 @@ async function runTwitchSuggestScan(): Promise<string> {
 
   // Top 25 overall: newly scored candidates compete with pending suggestions that are still fresh.
   const freshPending = existing.filter((s) => s.status === "pending" && skip.has(s.streamer.twitchId));
-  const ranked = [
-    ...freshPending.map((s) => ({ kind: "fresh" as const, score: s.score, streamerId: s.streamerId })),
-    ...scored.map((s) => ({ kind: "new" as const, score: s.score, s })),
-  ].sort((a, b) => b.score - a.score).slice(0, KEEP);
+  // v1.9.5: Krew's top 21 first, then by follower tier (5M+, 2M+), then score (without the token: peak viewers, then score).
+  const ranked = rankSuggestions([
+    ...freshPending.map((s) => ({ kind: "fresh" as const, score: s.score, streamerId: s.streamerId, name: s.streamer.name, login: s.streamer.login, followers: fol(s.streamer.twitchId), viewers: s.viewers })),
+    ...scored.map((s) => ({ kind: "new" as const, score: s.score, s, name: s.user?.display_name || s.c.name, login: s.c.login, followers: fol(s.c.twitchId), viewers: s.c.viewers })),
+  ], byFollowers).slice(0, KEEP + pinned.length);
 
   const keepIds: string[] = [];
   let added = 0;
@@ -151,6 +181,7 @@ async function runTwitchSuggestScan(): Promise<string> {
       login: c.login, name: user?.display_name || c.name,
       ...(user?.profile_image_url ? { profileImage: user.profile_image_url } : {}),
       ...(c.live ? { gameName: c.gameName, streamTitle: c.title, lastSeenAt: now } : {}),
+      ...(followers.has(c.twitchId) ? { followers: followers.get(c.twitchId)!, followersAt: now } : {}),
     };
     let streamer;
     try {
@@ -175,5 +206,8 @@ async function runTwitchSuggestScan(): Promise<string> {
   // Pending suggestions that fell out of the top 25 aren't kept (dismissed ones stay, to remember "Not now").
   await prisma.suggestion.deleteMany({ where: { platform: "twitch", status: "pending", streamerId: { notIn: keepIds } } });
 
-  return `${keepIds.length} suggestions (${added} new) · checked ${pool.length} of ${cands.size} streamers`;
+  // Approved creators' follower counts too (Creators page), at most daily each.
+  const approvedFetched = userAcct ? await refreshApprovedFollowers(userAcct).catch(() => 0) : 0;
+  const rankNote = userAcct ? ` · ranked by followers (${fetched + approvedFetched} looked up)` : " · ranked by viewers: Connect Twitch in Settings to rank by followers";
+  return `${keepIds.length} suggestions (${added} new) · checked ${pool.length} of ${cands.size} streamers${rankNote}`;
 }

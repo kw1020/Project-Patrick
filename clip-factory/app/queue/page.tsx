@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 export default async function QueuePage({ searchParams }: { searchParams: Promise<{ tab?: string; cat?: string; creator?: string }> }) {
   const f = parseQueueParams(await searchParams);
   const { tab, cat } = f;
-  const accounts = (await prisma.account.findMany({ where: { error: null }, orderBy: [{ platform: "asc" }, { createdAt: "asc" }] }))
+  const accounts = (await prisma.account.findMany({ where: { error: null, mode: "api", platform: { in: ["youtube", "tiktok"] } }, orderBy: [{ platform: "asc" }, { createdAt: "asc" }] }))
     .map((a) => ({ id: a.id, platform: a.platform, label: a.channelTitle ?? a.platform, autoPost: a.autoPost, privacy: a.privacy }));
   const autoCount = accounts.filter((a) => a.autoPost).length;
   const [clips, counts, catCounts, creator] = await Promise.all([
@@ -49,7 +49,7 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
       <AutoRefresh seconds={tab === "processing" || tab === "approved" ? 8 : 30} />
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">
-          <h1 className="text-2xl font-black">Queue</h1>
+          <h1 className="text-2xl font-black">Queue <Link href="/upload" className="ml-2 align-middle text-sm font-semibold text-emerald-300 hover:underline" data-testid="to-post-link">Ready to post → Upload</Link></h1>
           <p className="text-sm text-zinc-400">Nothing posts without your OK. {autoCount ? `Approve also sends the clip to ${autoCount} account${autoCount > 1 ? "s" : ""} (set in Settings). TikTok drafts are finished in the TikTok app.` : "Approve, then post with the account buttons, or download and post by hand."}</p>
         </div>
         <div className="flex flex-wrap gap-1 rounded-lg border border-line p-1 text-sm">
