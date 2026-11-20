@@ -10,6 +10,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=deno /deno /usr/local/bin/deno
 # opencv-python-headless: face/webcam detection for the layouts (scripts/detect_cam.py, bundled Haar cascades, no downloads)
 RUN python3 -m venv /opt/py && /opt/py/bin/pip install --no-cache-dir -U "yt-dlp[default]" faster-whisper "opencv-python-headless==4.10.0.84"
+# v2.0.9: yt-dlp needs deno >= 2.3 (ours is 2.1.4, so it is ignored) or node >= 22 for YouTube; without one YouTube
+# throttles downloads to a crawl (Krew: a video "still going 2hrs to download"). Node 22 is this image's own runtime.
+RUN echo '--js-runtimes node' > /etc/yt-dlp.conf
 ENV PATH="/opt/py/bin:$PATH" PYTHON=/opt/py/bin/python NEXT_TELEMETRY_DISABLED=1
 
 WORKDIR /app

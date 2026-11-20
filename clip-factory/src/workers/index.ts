@@ -91,8 +91,8 @@ async function main() {
   const workers = [
     worker("scout", 1, () => runScout(chat)),
     worker("clips", 1, () => runClipsPoll()),
-    worker("grab", 2, (job) => runGrab(job.data.clipId)),
-    worker("transcribe", 1, (job) => runTranscribe(job.data.clipId)),
+    worker("grab", Number(process.env.GRAB_CONCURRENCY || 3), (job) => runGrab(job.data.clipId)), // v2.0.9: downloads mostly wait on the network
+    worker("transcribe", Number(process.env.TRANSCRIBE_CONCURRENCY || 1), (job) => runTranscribe(job.data.clipId)),
     worker("judge", 3, (job) => runJudge(job.data.clipId)),
     worker("cut", Number(process.env.CUT_CONCURRENCY || 1), (job) => runCut(job.data.clipId, job.data.style, job.data.jumpCuts, job.data.layout, Boolean(job.data.qaAfter))), // ffmpeg is CPU-heavy: one at a time
     worker("youtube", 1, (job) => runYouTubeJob(job.name)), // v2.0.8: YouTube scout (find channels) + scanner

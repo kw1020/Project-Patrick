@@ -1,5 +1,11 @@
 # Clip Factory patch notes
 
+## 2.0.9 — 2026-11-20
+- Fix: YouTube downloads were throttled to a crawl (a video could take hours). Clip Factory now gives the downloader the tool YouTube requires, so they run at full speed.
+- Faster downloads: 3 clips download at once instead of 2, and each download pulls several pieces of the video in parallel.
+- New speed settings in .env: how many clips download, get captions and get cut at the same time, and how many fit in the line.
+- On a strong PC (8+ cores) raise the cut and caption numbers to 2 for about twice the clips per hour.
+
 ## 2.0.8 — 2026-11-20
 - New YouTube scout: it finds the YouTube channels of the Twitch creators you already approved (their main channel and their clips channel) and clips their normal YouTube videos too.
 - A channel is only added by itself when it is surely the same person: their Twitch bio links it, the channel links back to their Twitch, or it has exactly their name and a big following. Maybes show up in Suggestions, YouTube tab, for one click.

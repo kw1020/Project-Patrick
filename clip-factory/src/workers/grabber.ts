@@ -48,7 +48,8 @@ export type Downloadable = { source: string; sourceUrl: string | null; vodId: st
  * sections around the payoff). A Twitch clip is always downloaded whole (<= 60s).
  */
 export function ytdlpArgs(moment: Downloadable, outBase: string, range?: { from: number; to: number }): string[] {
-  const common = ["--no-playlist", "--no-part", "--no-progress", "--quiet", "--merge-output-format", "mp4", "-o", `${outBase}.%(ext)s`, "--print", "after_move:filepath"];
+  // v2.0.9: -N = download several pieces of a section at once (HLS/DASH fragments), much faster on long VODs/videos.
+  const common = ["-N", process.env.YTDLP_FRAGMENTS || "4", "--no-playlist", "--no-part", "--no-progress", "--quiet", "--merge-output-format", "mp4", "-o", `${outBase}.%(ext)s`, "--print", "after_move:filepath"];
   const sect = (from: number, to: number) => ["--download-sections", `*${Math.max(0, Math.round(from * 10) / 10)}-${Math.round(to * 10) / 10}`];
   if (moment.source === "youtube") {
     if (!moment.sourceUrl || moment.vodOffset == null) throw new Error("YouTube moment has no video URL or peak time");

@@ -475,6 +475,9 @@ original brief is below, and the status section says what's done. Read both befo
   "yt_scout"), Creators card "YouTube: @x, @y" / "Same creator on Twitch" (`creatorLinks`) or the scout's last note. **UNVERIFIED:** real
   YouTube captions (this sandbox gets YouTube's bot check, so the VTT fixture is hand-made in YouTube's rolling format), whether yt-dlp's
   channel tab JSON has `channel_follower_count`/`description`, real Data API search quota, Helix bio text, Krew's PC.
+- **v2.0.9 (2026-11-20): speed knobs** (Krew: "speed up the downloading process to get more clips faster"). Env: `GRAB_CONCURRENCY`
+  (default 3, was fixed 2), `TRANSCRIBE_CONCURRENCY` (1), existing `CUT_CONCURRENCY` (1) / `MAX_BACKLOG` (12), `YTDLP_FRAGMENTS` (4 → yt-dlp
+  `-N`, first arg of the grabber's `common`). All listed in .env.example. **Throttling fix:** yt-dlp 2026.10 needs deno >= 2.3 (`MIN_SUPPORTED_VERSION` in yt_dlp/utils/_jsruntime.py) or node >= 22; our deno 2.1.4 was ignored ("No supported JavaScript runtime" warning → YouTube throttles downloads, 2h for a video on Krew's PC), so the Dockerfile writes `/etc/yt-dlp.conf` = `--js-runtimes node` (the image's Node 22). The cutter (~30-40s CPU per clip) is the real ceiling.
 - Docker image never built in the sandbox (no daemon); it builds fine on Krew's PC; a clean-copy `npm ci` + `next build` without `.env`
   (what the Dockerfile does) passes.
 - **Suggestions (2026-11-17):** `src/workers/suggest.ts` (queue "suggest", hourly + once ~1 min after start,
