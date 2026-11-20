@@ -22,7 +22,33 @@ export type CreatorRow = {
   webcam?: "manual" | "auto" | null; // v1.9.0: typed-in webcam box, one found automatically (Streamer.facecamAuto), or none
   campaignId?: string | null; // v1.9.1 Campaign mode
   followers?: number | null; // v1.9.5: Twitch follower count (Connect Twitch in Settings)
+  // v2.0.8 YouTube scout: the same creator on the other platform (a Twitch row's YouTube channels, main first; a YouTube row's Twitch)
+  linked?: { id: string; login: string; name: string; platform: string }[];
+  ytLookupNote?: string | null; // v2.0.8: what the scout found last time (Twitch rows with no YouTube yet)
 };
+
+type LinkRow = { id: string; login: string; name: string; platform: string; approved: boolean; youtubeId: string | null; linkedFromId: string | null };
+
+/** v2.0.8: each creator's linked rows on the other platform (approved YouTube channels for a Twitch row; the Twitch row for a YouTube one). Pure. */
+export function creatorLinks(rows: LinkRow[]): Map<string, { id: string; login: string; name: string; platform: string }[]> {
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  const out = new Map<string, { id: string; login: string; name: string; platform: string }[]>();
+  const push = (key: string, r: LinkRow) => {
+    const list = out.get(key) ?? [];
+    if (!list.some((x) => x.id === r.id)) list.push({ id: r.id, login: r.login, name: r.name, platform: r.platform });
+    out.set(key, list);
+  };
+  for (const tw of rows.filter((r) => r.platform === "twitch")) {
+    const main = tw.youtubeId ? byId.get(tw.youtubeId) : undefined;
+    if (main?.approved && main.platform === "youtube") push(tw.id, main);
+    for (const y of rows) if (y.platform === "youtube" && y.approved && y.linkedFromId === tw.id) push(tw.id, y);
+  }
+  for (const y of rows.filter((r) => r.platform === "youtube" && r.linkedFromId)) {
+    const tw = byId.get(y.linkedFromId!);
+    if (tw && tw.platform === "twitch") push(y.id, tw);
+  }
+  return out;
+}
 export type CreatorSummary = { total: number; twitch: number; youtube: number; live: number; paused: number };
 
 const CUT = new Set(["pending", "approved", "rejected", "posted"]);
@@ -40,6 +66,10 @@ export async function creatorStats(): Promise<CreatorRow[]> {
     }),
   ]);
   const momentCount = new Map(moments.map((m) => [m.streamerId, m._count]));
+  // v2.0.8: Twitch rows a linked YouTube row points at may be unapproved; fetch them for the "Same creator" line.
+  const owners = [...new Set(streamers.map((s) => s.linkedFromId).filter((x): x is string => !!x && !ids.includes(x)))];
+  const extra = owners.length ? await prisma.streamer.findMany({ where: { id: { in: owners } } }) : [];
+  const links = creatorLinks([...streamers, ...extra]);
   const agg = new Map<string, { clips: number; approved: number; posted: number; views: number; last: Date | null }>();
   for (const c of clips) {
     const id = c.moment.streamerId;
@@ -64,6 +94,8 @@ export async function creatorStats(): Promise<CreatorRow[]> {
       webcam: s.facecam ? "manual" : s.facecamAuto ? "auto" : null,
       campaignId: s.campaignId,
       followers: s.followers,
+      linked: links.get(s.id) ?? [],
+      ytLookupNote: s.ytLookupNote,
     };
   }));
 }

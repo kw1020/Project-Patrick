@@ -48,7 +48,7 @@ export type JudgeInput = {
   sourceTitle?: string | null;
   sourceViews?: number;
   transcript: string | null;
-  stats?: { kind?: string; ratio?: number; rate?: number; baseline?: number; hypeShare?: number; laughShare?: number; viewers?: number; chat?: string[] } | null;
+  stats?: { kind?: string; ratio?: number; rate?: number; baseline?: number; hypeShare?: number; laughShare?: number; viewers?: number; chat?: string[]; captions?: string; signals?: string[] } | null;
   minScore: number;
   category?: string | null; // the pipeline's first guess (chat laughs / Twitch category / title), evidence only
   // v1.8.0: the whole source, so the Judge can pick the best stretch itself (best_start/best_end).
@@ -117,7 +117,12 @@ function render(i: JudgeInput) {
     `Clip length: ${Math.round(i.durationSec)}s`,
     `Auto-reject cut-off: below ${i.minScore}`,
   ];
-  if (i.source === "youtube") {
+  if (i.source === "youtube" && i.stats?.kind === "captions") {
+    // v2.0.8 captions route: a new video with no most-replayed data yet; the moment came from its auto-captions.
+    lines.push(`Found as: a reaction in a new YouTube video's auto-captions (${i.sourceViews ?? 0} views, no most-replayed data yet; signals: ${(i.stats.signals ?? []).join(", ") || "?"})`);
+    if (i.sourceTitle) lines.push(`Video title: ${i.sourceTitle}`);
+    if (i.stats.captions?.trim()) lines.push(`What the captions say around it: "${i.stats.captions.trim().slice(0, 300)}"`);
+  } else if (i.source === "youtube") {
     lines.push(`Found as: the most-replayed part of a YouTube video (${i.sourceViews ?? 0} views, replay score ${i.replayScore ?? "?"})`);
     if (i.sourceTitle) lines.push(`Video title: ${i.sourceTitle}`);
   } else if (i.source === "twitch_clip") {

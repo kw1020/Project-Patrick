@@ -13,7 +13,7 @@ import { runJudge } from "./judge";
 import { migrateLegacySettings, runPost, runPostEdit, runStatsSync } from "./poster";
 import { runEdit, runEditAuto } from "./edit";
 import { runSpikeCheck } from "./spike";
-import { runYouTubeScan } from "./youtube";
+import { runYouTubeJob } from "./youtube";
 import { runSuggestScan } from "./suggest";
 import { runQa, runSupreme } from "./supreme";
 import { migrateV180Settings, migrateV190Settings, migrateV198Settings } from "./migrate";
@@ -95,7 +95,7 @@ async function main() {
     worker("transcribe", 1, (job) => runTranscribe(job.data.clipId)),
     worker("judge", 3, (job) => runJudge(job.data.clipId)),
     worker("cut", Number(process.env.CUT_CONCURRENCY || 1), (job) => runCut(job.data.clipId, job.data.style, job.data.jumpCuts, job.data.layout, Boolean(job.data.qaAfter))), // ffmpeg is CPU-heavy: one at a time
-    worker("youtube", 1, () => runYouTubeScan()),
+    worker("youtube", 1, (job) => runYouTubeJob(job.name)), // v2.0.8: YouTube scout (find channels) + scanner
     worker("suggest", 1, () => runSuggestScan()),
     worker("supreme", 1, () => runSupreme()), // v1.9.6 Supreme Judge
     worker("qa", 1, (job) => runQa(job.data.clipId)), // v1.9.6 video check

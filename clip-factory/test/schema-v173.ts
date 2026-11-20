@@ -1,6 +1,11 @@
+// Today's schema turned back into the v2.0.7 (02b6d06) one: every line marked "v2.0.8" (YouTube scout link columns) removed.
+export function toV207Schema(now: string): string {
+  return now.replace(/^ {2}.*\/\/ v2\.0\.8[: ].*\n/gm, "");
+}
+
 // Today's schema turned back into the v2.0.5 (adfefea) one: the v2.0.6 per-channel editing + approve-upload + clean-up columns removed.
 export function toV205Schema(now: string): string {
-  return now
+  return toV207Schema(now)
     .replace(/^ {2}\/\/ v2\.0\.6 .*\n/gm, "")
     .replace(/^ {2}editStyle {4}String\? \/\/ hype \| clean \| meme\n/m, "")
     .replace(/^ {2}layout {7}String\? \/\/ auto \| split \| fullcam \| blur\n/m, "")

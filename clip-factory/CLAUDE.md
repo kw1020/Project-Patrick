@@ -444,6 +444,37 @@ original brief is below, and the status section says what's done. Read both befo
   video's channel as an APPROVED `yt:<channel_id>` Streamer; skips times within 15s of existing moments of that URL. Why: brand-new
   videos have no heatmap (the scanner skips them for 6h). Cloud sessions can read captions (`yt-dlp --write-auto-subs`) to pick
   times but can't download video (403 without deno/PO token).
+- **v2.0.8 (2026-11-20): YouTube scout** (Krew: "a second scout who searches for YouTube videos ... of the people we make, and then they
+  can clip from those"). Schema additive, no uniques (`test/v208.test.ts` pushes from the 02b6d06 schema with rows; `toV207Schema` in
+  `test/schema-v173.ts` strips every line marked "v2.0.8", `toV205Schema` chains through it): `Streamer.youtubeId` (Twitch row → Streamer.id
+  of its main YouTube row), `Streamer.linkedFromId` (YouTube row → its Twitch row; main + clips channels), `Streamer.ytLookupAt/ytLookupNote`
+  (cache), `Suggestion.linkedFromId` (a scout "maybe" card). **Finding channels** `src/workers/yt-scout.ts` `runYouTubeScout` (runs at
+  the start of every "youtube" job via `runYouTubeJob`; Streamers "Find YouTube channels now" = job name "find" = manual, then the scan):
+  approved, not-paused Twitch rows with no youtubeId, never looked up first, re-looked after 14 days (errors after 1 day); 3 per run,
+  15/day (manual up to 30/day; Redis `cf:ytscout:creators:<UTC day>`). Per creator: Helix `/users` bio links (Twitch PANELS are not in
+  Helix, so not read), `channels?forHandle=@login` and `@name` (1 unit), ONE `search.list` by name (Redis `cf:ytscout:search:<day>`, max 20/day
+  of its 100/day bucket); no key / quota gone → yt-dlp (`resolveChannel` now returns `channel_follower_count`/`description`; `ytSearchChannels`
+  = `ytsearch5:`). Rules `src/lib/yt-match.ts` `matchConfidence`: SURE = bio links the channel, or its description links twitch.tv/<login>,
+  or @handle/title equals login/name AND >= `BIG_SUBS` (100K) subscribers; else name contained either way = MAYBE; clips/second channels only
+  via the two link rules. Sure → `linkChannel`: approved YouTube row, approvalNote `autoNote` "Same creator as approved Twitch @login (linked
+  automatically)", linkedFromId; reuses an approved row; NEVER re-approves a row Krew removed (`approvedAt` set + not approved); same-platform
+  login clash → skipped. Twitch.youtubeId = the sure "main" with most subs. Maybe (only when nothing sure) → unapproved YouTube row + pending
+  Suggestion (platform youtube, linkedFromId, reasons "maybe the YouTube of Twitch @x", max 2, "Not now" respected); the hourly trending scan
+  never deletes these (`linkedFromId: null` in its prune) and `approveSuggestion` links them. **Captions route** (`src/lib/yt-captions.ts`,
+  pure; `videoCaptions` in ytdlp.ts = `yt-dlp --skip-download --write-auto-subs --sub-langs en --sub-format vtt` into a temp dir, removed):
+  in `runYouTubeScan`, a video with NO heatmap uploaded within clipLookbackHrs reads its captions (heatmap stays first choice). `parseVtt`
+  drops YouTube's rolling repeats (cues < 50ms; a cue's first line equal to the last kept line). `captionSignals`: [Laughter]/[Screaming] 3,
+  [Applause]/[Cheering]/[Gasps] 2, [Music] 0.75 (never a moment alone), reaction phrase 1.5 (max 3/line: "oh my god", "no way", "bro",
+  "let's go"…), ALL-CAPS line 2, short exclamation line 0.75. Score = sum in a 10s window >= `CAPTION_MIN_SCORE` 4.5, centred on its
+  strongest signal; not in the first 20s / last 20s / sponsor zones (line -10..+45s: "sponsored", "use code", "link in the description"…) /
+  outro (an "thanks for watching" line in the last 25% → to the end); peaks >= 45s apart (also vs existing moments); value = score/20 (0-1 like
+  the heatmap). Moment.stats `{kind:"captions", captions: <snippet>, signals}` → the Judge's "Found as: a reaction in a new YouTube video's
+  auto-captions … What the captions say around it". No caption peaks → status no_heatmap (6h recheck). **Per-creator cap**: the scanner now
+  sends at most `maxPerCreatorPerRun` moments per creator per scan (a Twitch creator + linked channels = one; linked channels of a paused Twitch
+  creator are skipped); a capped video stays "partial". UI: Streamers "YouTube scout" card (`src/lib/yt-scout-status.ts` line + status
+  "yt_scout"), Creators card "YouTube: @x, @y" / "Same creator on Twitch" (`creatorLinks`) or the scout's last note. **UNVERIFIED:** real
+  YouTube captions (this sandbox gets YouTube's bot check, so the VTT fixture is hand-made in YouTube's rolling format), whether yt-dlp's
+  channel tab JSON has `channel_follower_count`/`description`, real Data API search quota, Helix bio text, Krew's PC.
 - Docker image never built in the sandbox (no daemon); it builds fine on Krew's PC; a clean-copy `npm ci` + `next build` without `.env`
   (what the Dockerfile does) passes.
 - **Suggestions (2026-11-17):** `src/workers/suggest.ts` (queue "suggest", hourly + once ~1 min after start,
@@ -533,6 +564,10 @@ and in `Moment.stats` (the Judge sees the laugh share). A spike of a kind switch
   approves on its own schedule; Suggestions and the bulk lookup only suggest). Since 2026-11-17 (Krew: "I just want to hit
   approve and it gets approved") a reason is OPTIONAL: `approvalNote` = typed note, else the suggestion's permission quote,
   else "Approved by Krew" (`DEFAULT_APPROVAL_NOTE`, `src/lib/creator-lookup.ts`; logic in `setApproved`).
+  **Deliberate extension (v2.0.8, Krew asked for it):** the YouTube scout adds an APPROVED YouTube row on its own only when it is SURELY the
+  same person as a Twitch creator Krew already approved (bio link, link back to twitch.tv/<login>, or exact name + 100K+ subscribers;
+  approvalNote "Same creator as approved Twitch @login (linked automatically)"). That is the creator Krew approved, not a new one. Anything less
+  sure is only a Suggestion, and a channel Krew removed is never re-approved by the scout.
 - Nothing posts without Krew pressing Approve. The Poster refuses clips that aren't approved; "auto-upload"
   only means the Approve click also uploads. Uploads are single-attempt so a retry can't double-post.
 - Every caption credits the creator. Since v1.9.1 (Krew's exact format) every caption is built by `brandedCaption` in

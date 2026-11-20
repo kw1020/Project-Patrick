@@ -169,7 +169,7 @@ async function scan(region: string): Promise<string> {
   }
 
   // 4. Top 25: newly scored channels compete with fresh pending YouTube suggestions.
-  const freshPending = existing.filter((s) => s.status === "pending" && skip.has(s.streamer.twitchId));
+  const freshPending = existing.filter((s) => s.status === "pending" && !s.linkedFromId && skip.has(s.streamer.twitchId));
   const ranked = [
     ...freshPending.map((s) => ({ kind: "fresh" as const, score: s.score, streamerId: s.streamerId })),
     ...scored.map((s) => ({ kind: "new" as const, score: s.score, s })),
@@ -215,7 +215,8 @@ async function scan(region: string): Promise<string> {
     keepIds.push(streamer.id);
   }
   // Pending YouTube suggestions that fell out of the top 25 go (dismissed ones stay, to remember "Not now").
-  await prisma.suggestion.deleteMany({ where: { platform: "youtube", status: "pending", streamerId: { notIn: keepIds } } });
+  // v2.0.8: the YouTube scout's cards ("maybe the YouTube of Twitch @x", linkedFromId set) are not trending picks and stay.
+  await prisma.suggestion.deleteMany({ where: { platform: "youtube", status: "pending", linkedFromId: null, streamerId: { notIn: keepIds } } });
 
   const extra = [
     noHandle ? `${noHandle} without an @handle skipped` : "",

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
-import { enqueueCut, enqueueGrab, enqueuePost, enqueueQa, enqueueTranscribe, pokeScout, pokeSuggest, pokeSupreme, pokeYouTube } from "@/lib/queues";
+import { enqueueCut, enqueueGrab, enqueuePost, enqueueQa, enqueueTranscribe, pokeScout, pokeSuggest, pokeSupreme, pokeYouTube, pokeYouTubeFind } from "@/lib/queues";
 import { fixPlan, parseQa } from "@/lib/qa";
 import { probeDuration } from "@/lib/media";
 import { resolveStored } from "@/lib/paths";
@@ -145,12 +145,26 @@ export async function approveSuggestion(id: string, _prev: { error?: string; ok?
   // Same path as every approval: setApproved pokes the Scout (Twitch) or the YouTube scanner (YouTube).
   await setApproved(sug.streamerId, true, note.slice(0, 500));
   await prisma.suggestion.update({ where: { id }, data: { status: "approved" } });
+  // v2.0.8: a YouTube scout card ("maybe the YouTube of Twitch @x"): approving it links the two on the Creators page.
+  if (yt && sug.linkedFromId) {
+    const tw = await prisma.streamer.findUnique({ where: { id: sug.linkedFromId }, select: { id: true, platform: true, youtubeId: true } });
+    if (tw?.platform === "twitch") {
+      await prisma.streamer.update({ where: { id: sug.streamerId }, data: { linkedFromId: tw.id } });
+      if (!tw.youtubeId) await prisma.streamer.update({ where: { id: tw.id }, data: { youtubeId: sug.streamerId } });
+    }
+  }
   refreshAll();
   return { ok: yt ? `${sug.streamer.name} approved. Scanning their newest videos now.` : `${sug.streamer.name} approved. Looking for their clips now.` };
 }
 
 export async function dismissSuggestion(id: string) {
   await prisma.suggestion.update({ where: { id }, data: { status: "dismissed", dismissedUntil: new Date(Date.now() + 30 * 86_400_000) } });
+  refreshAll();
+}
+
+/** v2.0.8 Streamers page "Find YouTube channels now": the YouTube scout runs right away (then the YouTube scanner). */
+export async function findYouTubeChannelsNow() {
+  await pokeYouTubeFind();
   refreshAll();
 }
 

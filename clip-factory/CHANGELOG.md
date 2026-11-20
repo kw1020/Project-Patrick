@@ -1,5 +1,12 @@
 # Clip Factory patch notes
 
+## 2.0.8 — 2026-11-20
+- New YouTube scout: it finds the YouTube channels of the Twitch creators you already approved (their main channel and their clips channel) and clips their normal YouTube videos too.
+- A channel is only added by itself when it is surely the same person: their Twitch bio links it, the channel links back to their Twitch, or it has exactly their name and a big following. Maybes show up in Suggestions, YouTube tab, for one click.
+- Brand-new uploads no longer wait for YouTube's "most replayed" data: Clip Factory reads the video's captions and picks the moments with laughing, screaming and "no way" / "oh my god" reactions, skipping intros, sponsor reads and outros. The Judge sees what was said.
+- Streamers page: a YouTube scout line (channels found, videos checked, moments sent) and a "Find YouTube channels now" button. Creators page shows each creator's YouTube next to their Twitch.
+- Fair mix: each creator (Twitch and their YouTube together) gets at most 2 new YouTube moments per scan (Settings, clips per creator). Every clip still waits in the Queue for your approval.
+
 ## 2.0.7 — 2026-11-19
 - New: clip chosen moments of any YouTube video with one command, for brand-new videos that YouTube has no "most replayed" data for yet.
 - Each time you give is the moment itself; Clip Factory takes the build-up before it and the reaction after, then the Judge scores it as usual.

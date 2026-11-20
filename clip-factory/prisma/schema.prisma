@@ -39,6 +39,11 @@ model Streamer {
   campaign      Campaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
   followers     Int?      // v1.9.5: Twitch follower count (needs the Twitch user token from Settings), refreshed at most daily
   followersAt   DateTime? // v1.9.5: when followers was last fetched
+  // v2.0.8 YouTube scout: a Twitch creator's YouTube channel(s) (plain ids, no relations)
+  youtubeId     String?   // v2.0.8: on a Twitch row, the Streamer.id of its main YouTube channel (found automatically or approved from Suggestions)
+  linkedFromId  String?   // v2.0.8: on a YouTube row, the Streamer.id of the Twitch creator it belongs to (main + clips channels)
+  ytLookupAt    DateTime? // v2.0.8: on a Twitch row, when the scout last looked for its YouTube channel
+  ytLookupNote  String?   // v2.0.8: what that look-up found ("found @x", "not found", "maybe @y (in Suggestions)", "error: ...")
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   moments       Moment[]
@@ -326,6 +331,7 @@ model Suggestion {
   gameName       String?   // category when scored
   status         String    @default("pending")
   dismissedUntil DateTime?
+  linkedFromId   String?   // v2.0.8: YouTube scout: the Twitch Streamer.id this channel may belong to (not sure enough to link it)
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 }

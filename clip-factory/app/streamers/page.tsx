@@ -6,7 +6,8 @@ import { AddStreamer, AddYouTubeChannel } from "@/components/AddStreamer";
 import { creatorUrl, isGta6 } from "@/lib/social";
 import { SuggestionActions } from "@/components/SuggestionActions";
 import { getStatuses, soft, type AgentStatus } from "@/lib/queues";
-import { approveStreamer, removeStreamer, resetFacecamAuto, saveStreamer, scanSuggestionsNow } from "../actions";
+import { approveStreamer, findYouTubeChannelsNow, removeStreamer, resetFacecamAuto, saveStreamer, scanSuggestionsNow } from "../actions";
+import { ytScoutLine, ytScoutSummary, type YtScoutSummary } from "@/lib/yt-scout-status";
 import { BulkAddCreators } from "@/components/BulkAddCreators";
 import { CampaignSelect, CampaignsCard } from "@/components/Campaigns";
 import { filterSuggestions, followersText, followerTier, rankSuggestions, tierLabel, top21Index } from "@/lib/suggest-rank";
@@ -15,13 +16,14 @@ export const dynamic = "force-dynamic";
 
 export default async function StreamersPage({ searchParams }: { searchParams: Promise<{ add?: string; sg?: string; big?: string; gta?: string }> }) {
   const { add, sg, big, gta } = await searchParams;
-  const [approved, discovered, twitchSuggestions, ytSuggestions, statuses, campaigns] = await Promise.all([
+  const [approved, discovered, twitchSuggestions, ytSuggestions, statuses, campaigns, scout] = await Promise.all([
     prisma.streamer.findMany({ where: { approved: true }, orderBy: [{ isLive: "desc" }, { viewers: "desc" }, { name: "asc" }], include: { _count: { select: { moments: true } } } }),
     prisma.streamer.findMany({ where: { approved: false, platform: "twitch" }, orderBy: [{ isLive: "desc" }, { peakViewers: "desc" }], take: 40 }),
     prisma.suggestion.findMany({ where: { status: "pending", platform: "twitch", streamer: { approved: false, platform: "twitch" } }, orderBy: { score: "desc" }, include: { streamer: true } }),
     prisma.suggestion.findMany({ where: { status: "pending", platform: "youtube", streamer: { approved: false, platform: "youtube" } }, orderBy: { score: "desc" }, include: { streamer: true } }),
     soft(getStatuses(), {} as Record<string, AgentStatus>),
     prisma.campaign.findMany({ orderBy: [{ active: "desc" }, { createdAt: "asc" }], include: { _count: { select: { streamers: true } } } }),
+    ytScoutSummary(),
   ]);
   // v1.9.5: ranked by followers (Krew's top 21 pinned first) once Twitch is connected in Settings; else by peak viewers.
   const byFollowers = (await prisma.account.count({ where: { platform: "twitch", error: null } })) > 0;
@@ -38,6 +40,7 @@ export default async function StreamersPage({ searchParams }: { searchParams: Pr
       </div>
       <Suggestions tab={tab} twitch={shownTwitch} twitchTotal={twitchSuggestions.length} youtube={ytSuggestions} byFollowers={byFollowers} filters={filters}
         twitchStatus={statuses.suggest_twitch ?? statuses.suggest} youtubeStatus={statuses.suggest_youtube} hasYouTubeKey={Boolean(process.env.YOUTUBE_API_KEY)} />
+      <YouTubeScout summary={scout} status={statuses.yt_scout} scan={statuses.youtube} />
       <BulkAddCreators />
       <AddStreamer key={add} prefill={add} />
       <AddYouTubeChannel />
@@ -243,6 +246,25 @@ function YouTubeCard({ sg }: { sg: SuggestionRow }) {
       <Permission sg={sg} aboutUrl={`https://www.youtube.com/@${s.login}/about`} aboutLabel="channel About page" where="(links, business email) or their clipping-campaign page" />
       <div className="mt-auto"><SuggestionActions id={sg.id} name={s.name} /></div>
     </div>
+  );
+}
+
+/** v2.0.8: the YouTube scout's line + "Find YouTube channels now". */
+function YouTubeScout({ summary, status, scan }: { summary: YtScoutSummary; status?: AgentStatus; scan?: AgentStatus }) {
+  return (
+    <section className="card flex flex-wrap items-center gap-3 p-4" data-testid="yt-scout">
+      <div className="min-w-0 flex-1 basis-72">
+        <div className="font-bold">YouTube scout</div>
+        <p className="text-xs text-zinc-300 [overflow-wrap:anywhere]" data-testid="yt-scout-line">{ytScoutLine(summary)}</p>
+        <p className="text-xs text-zinc-500 [overflow-wrap:anywhere]">
+          Finds the YouTube channels of your approved Twitch creators and clips their normal videos too (new uploads from their captions).
+          A sure match is added as approved; a maybe goes to Suggestions, YouTube tab.
+          {status && <> · last look {ago(status.at)}: <span className={status.ok ? "text-zinc-400" : "text-red-300"}>{status.msg}</span></>}
+          {scan && !scan.ok && <> · <span className="text-red-300">scanner failed: {scan.msg}</span></>}
+        </p>
+      </div>
+      <form action={findYouTubeChannelsNow}><button className="btn-ghost text-xs">Find YouTube channels now</button></form>
+    </section>
   );
 }
 

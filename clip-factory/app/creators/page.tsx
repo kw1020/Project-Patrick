@@ -51,6 +51,17 @@ function Card({ c, campaigns }: { c: CreatorRow; campaigns: { id: string; name: 
         </div>
       </div>
 
+      {c.linked && c.linked.length > 0 ? (
+        <div className="text-xs text-zinc-300 [overflow-wrap:anywhere]" data-testid="creator-linked">
+          {yt ? "Same creator on Twitch: " : "YouTube: "}
+          {c.linked.map((l, i) => (
+            <span key={l.id}>{i > 0 && ", "}<a href={creatorUrl(l)} target="_blank" className="font-semibold hover:text-hot">{l.platform === "youtube" ? `@${l.login}` : `twitch.tv/${l.login}`}</a></span>
+          ))}
+        </div>
+      ) : !yt && c.ytLookupNote ? (
+        <div className="text-xs text-zinc-500 [overflow-wrap:anywhere]" data-testid="creator-linked">YouTube scout: {c.ytLookupNote}</div>
+      ) : null}
+
       <div className="text-xs text-zinc-500 [overflow-wrap:anywhere]">
         Approved {ago(c.approvedAt)}{c.approvalNote ? <> · <span className="text-zinc-400">&ldquo;{c.approvalNote}&rdquo;</span></> : null}
       </div>

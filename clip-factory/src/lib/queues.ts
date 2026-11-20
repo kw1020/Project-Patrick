@@ -74,6 +74,11 @@ export async function pokeYouTube() {
   await queue("youtube").add("youtube", {}, { removeOnComplete: true });
 }
 
+/** v2.0.8 "Find YouTube channels now" (Streamers page): the YouTube scout looks creators up right away, then the scanner runs. */
+export async function pokeYouTubeFind() {
+  await queue("youtube").add("find", {}, { removeOnComplete: true, attempts: 1 });
+}
+
 /** Ask the worker to run the Suggestions scan now ("Scan now" on the Streamers page). */
 export async function pokeSuggest() {
   await queue("suggest").add("suggest", {}, { removeOnComplete: true, attempts: 1 });

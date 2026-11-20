@@ -1,5 +1,8 @@
 // YouTube via yt-dlp only (no API key): resolve a channel, list its newest videos, read a video's
 // "most replayed" heatmap. Every call goes through ytdlpBin() so tests (and Krew) can swap the binary.
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { run } from "./media";
 
 export const ytdlpBin = () => process.env.YTDLP || "yt-dlp";
@@ -29,7 +32,10 @@ export function channelPageUrl(input: string): string | null {
   return url ? `https://www.youtube.com/${url[1]}` : null;
 }
 
-export type YtChannel = { channelId: string; handle: string; title: string; avatar: string | null };
+export type YtChannel = {
+  channelId: string; handle: string; title: string; avatar: string | null;
+  subscribers?: number | null; description?: string | null; // v2.0.8 YouTube scout (yt-dlp's channel_follower_count / description, when given)
+};
 
 /** Look a channel up (one flat listing call). Throws with a plain message when it can't. */
 export async function resolveChannel(input: string): Promise<YtChannel> {
@@ -50,7 +56,10 @@ export async function resolveChannel(input: string): Promise<YtChannel> {
   if (!handle) throw new Error("Couldn't find this channel's @handle (needed for the credit link). Paste the @handle instead.");
   const thumbs: any[] = Array.isArray(j.thumbnails) ? j.thumbnails : [];
   const avatar = thumbs.find((t) => t.id === "avatar_uncropped")?.url ?? thumbs.find((t) => t.width && t.width === t.height)?.url ?? null;
-  return { channelId, handle, title: String(j.channel || j.uploader || handle).replace(/ - Videos$/, ""), avatar };
+  return {
+    channelId, handle, title: String(j.channel || j.uploader || handle).replace(/ - Videos$/, ""), avatar,
+    subscribers: num(j.channel_follower_count), description: typeof j.description === "string" ? j.description : null,
+  };
 }
 
 export type YtListed = { id: string; url: string; title: string | null; duration: number | null; uploadDate: Date | null };
@@ -82,6 +91,38 @@ export async function videoInfo(id: string): Promise<YtVideo> {
     uploadDate: ytDate(j), heatmap: heat.length ? heat : null,
     categories: [...(Array.isArray(j.categories) ? j.categories : []), j.category].filter((c): c is string => typeof c === "string" && c.trim() !== ""),
   };
+}
+
+/**
+ * v2.0.8: channel ids of the first `n` results of a YouTube search (yt-dlp `ytsearch`, no API key), in result order, each once.
+ * The flat result entries are videos; their channel_id is what we want.
+ */
+export async function ytSearchChannels(query: string, n = 5): Promise<string[]> {
+  const j = await ytJson(["--flat-playlist", `ytsearch${n}:${query}`], 60_000);
+  const ids: string[] = [];
+  for (const e of Array.isArray(j.entries) ? j.entries : []) {
+    const id = e?.channel_id;
+    if (typeof id === "string" && /^UC[\w-]{22}$/.test(id) && !ids.includes(id)) ids.push(id);
+  }
+  return ids;
+}
+
+/**
+ * v2.0.8 captions route: the video's English auto-captions (WebVTT text), or null when it has none. Only the captions are
+ * fetched (`--skip-download`), which works even where the video download itself is blocked. Temp files are removed.
+ */
+export async function videoCaptions(id: string): Promise<string | null> {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "cf-subs-"));
+  try {
+    await run(ytdlpBin(), ["--skip-download", "--write-auto-subs", "--sub-langs", "en", "--sub-format", "vtt", "--no-warnings", "--no-playlist",
+      "-o", path.join(dir, "%(id)s.%(ext)s"), videoUrl(id)], { timeoutMs: 90_000 });
+    const file = fs.readdirSync(dir).find((f) => f.endsWith(".vtt"));
+    if (!file) return null;
+    const text = fs.readFileSync(path.join(dir, file), "utf8");
+    return /-->/.test(text) ? text : null;
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 }
 
 export const videoUrl = (id: string) => `https://www.youtube.com/watch?v=${id}`;
