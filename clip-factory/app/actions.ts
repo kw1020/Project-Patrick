@@ -1,10 +1,11 @@
 "use server";
 
+import fs from "node:fs";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { enqueueCut, enqueueGrab, enqueuePost, enqueueQa, enqueueTranscribe, pokeScout, pokeSuggest, pokeSupreme, pokeYouTube, pokeYouTubeFind } from "@/lib/queues";
 import { fixPlan, parseQa } from "@/lib/qa";
-import { probeDuration } from "@/lib/media";
+import { brokenVideo, probeDuration } from "@/lib/media";
 import { resolveStored } from "@/lib/paths";
 import { resolveChannel } from "@/lib/ytdlp";
 import { getUsers, twitchConfigured } from "@/lib/twitch";
@@ -215,7 +216,15 @@ export async function postToAccount(clipId: string, accountId: string) {
 }
 
 export async function retryClip(id: string) {
-  const clip = await prisma.clip.findUniqueOrThrow({ where: { id } });
+  let clip = await prisma.clip.findUniqueOrThrow({ where: { id } });
+  // v2.0.10: a broken raw (download cut off by a restart) is downloaded again instead of failing the same way forever.
+  if (clip.rawPath) {
+    const abs = (() => { try { return resolveStored(clip.rawPath!); } catch { return null; } })();
+    if (!abs || !fs.existsSync(abs) || (await brokenVideo(abs))) {
+      if (abs) fs.rmSync(abs, { force: true });
+      clip = await prisma.clip.update({ where: { id }, data: { rawPath: null, words: null } });
+    }
+  }
   const stage = !clip.rawPath ? "grab" : clip.words == null ? "transcribe" : "cut";
   await prisma.clip.update({ where: { id }, data: { status: "processing", error: null, stage, stageAt: new Date() } });
   if (stage === "grab") await enqueueGrab(clip.momentId, id);

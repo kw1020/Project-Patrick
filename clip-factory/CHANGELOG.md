@@ -1,5 +1,10 @@
 # Clip Factory patch notes
 
+## 2.0.10 — 2026-11-20
+- Fix: downloads cut off by a restart left broken files ("moov atom not found", "matches no streams"). Clip Factory now checks every download and fetches it again if it's broken.
+- Retry on a clip in Problems now downloads the video again when the old file is broken, instead of failing the same way.
+- Leftover pieces of an interrupted download are cleaned up before the next try.
+
 ## 2.0.9 — 2026-11-20
 - Fix: YouTube downloads were throttled to a crawl (a video could take hours). Clip Factory now gives the downloader the tool YouTube requires, so they run at full speed.
 - Faster downloads: 3 clips download at once instead of 2, and each download pulls several pieces of the video in parallel.

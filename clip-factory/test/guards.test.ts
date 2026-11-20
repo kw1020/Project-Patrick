@@ -14,10 +14,13 @@ const H = 3600_000;
 
 before(async () => {
   // Fake yt-dlp: writes the file named by -o (with %(ext)s → mp4) and prints its path, like --print after_move:filepath.
+  // v2.0.10: the grabber now checks the download is a real video, so the fake copies a tiny real mp4.
+  const sample = path.join(dir, "sample.mp4");
+  execFileSync("ffmpeg", ["-y", "-v", "error", "-f", "lavfi", "-i", "testsrc=size=160x120:rate=15:duration=2", "-c:v", "libx264", "-preset", "ultrafast", sample]);
   const fake = path.join(dir, "fake-ytdlp.js");
   fs.writeFileSync(fake, `#!/usr/bin/env node
 const a = process.argv.slice(2); const o = a[a.indexOf("-o") + 1].replace("%(ext)s", "mp4");
-require("fs").writeFileSync(o, "video"); console.log(o);
+require("fs").copyFileSync(${JSON.stringify(sample)}, o); console.log(o);
 `);
   fs.chmodSync(fake, 0o755);
   Object.assign(process.env, {

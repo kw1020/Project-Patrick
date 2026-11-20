@@ -27,6 +27,25 @@ export async function probeDuration(file: string): Promise<number> {
   return d;
 }
 
+/**
+ * v2.0.10: is this a complete, playable video? A download killed mid-way (e.g. Clip Factory restarted) leaves an mp4 with no
+ * index ("moov atom not found") or no video stream ("Stream specifier ':v' matches no streams"). Returns null when fine,
+ * else a plain reason.
+ */
+export async function brokenVideo(file: string): Promise<string | null> {
+  try {
+    const { stdout } = await run("ffprobe", ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height:format=duration", "-of", "json", file]);
+    const j = JSON.parse(stdout || "{}");
+    const v = j.streams?.[0];
+    if (!v?.width || !v?.height) return "the download has no video in it";
+    const d = parseFloat(j.format?.duration);
+    if (!Number.isFinite(d) || d < 1) return "the download is empty or cut short";
+    return null;
+  } catch (e) {
+    return /moov atom not found|Invalid data/i.test((e as Error).message) ? "the download was cut off before it finished" : `the download can't be read (${(e as Error).message.split("\n")[0].slice(0, 120)})`;
+  }
+}
+
 /** Which slice of the source to keep. Twitch clips are ≤60s; keep the middle so we get build-up + payoff. */
 export function pickWindow(duration: number, minSec: number, maxSec: number) {
   const len = Math.min(duration, Math.max(minSec, maxSec));

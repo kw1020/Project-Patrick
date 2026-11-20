@@ -478,6 +478,11 @@ original brief is below, and the status section says what's done. Read both befo
 - **v2.0.9 (2026-11-20): speed knobs** (Krew: "speed up the downloading process to get more clips faster"). Env: `GRAB_CONCURRENCY`
   (default 3, was fixed 2), `TRANSCRIBE_CONCURRENCY` (1), existing `CUT_CONCURRENCY` (1) / `MAX_BACKLOG` (12), `YTDLP_FRAGMENTS` (4 → yt-dlp
   `-N`, first arg of the grabber's `common`). All listed in .env.example. **Throttling fix:** yt-dlp 2026.10 needs deno >= 2.3 (`MIN_SUPPORTED_VERSION` in yt_dlp/utils/_jsruntime.py) or node >= 22; our deno 2.1.4 was ignored ("No supported JavaScript runtime" warning → YouTube throttles downloads, 2h for a video on Krew's PC), so the Dockerfile writes `/etc/yt-dlp.conf` = `--js-runtimes node` (the image's Node 22). The cutter (~30-40s CPU per clip) is the real ceiling.
+- **v2.0.10 (2026-11-20): broken downloads.** Krew's Problems list after the v2.0.9 rebuild: "moov atom not found", "Stream specifier ':v'
+  matches no streams", "could not read the video size". Cause: `--no-part` + a download killed by the restart left a half mp4 under the
+  final name; the retried job's yt-dlp saw the file and skipped. Now `runGrab` → `removeLeftovers(outBase)` (raw/<clipId>.*), yt-dlp
+  with `--force-overwrites`, then `brokenVideo` (ffprobe: video stream + duration >= 1s; `src/lib/media.ts`) → broken = deleted +
+  "Download failed: … Press Retry.". `retryClip`: a missing/broken raw → rawPath + words cleared → stage grab. `test/v2010.test.ts`.
 - Docker image never built in the sandbox (no daemon); it builds fine on Krew's PC; a clean-copy `npm ci` + `next build` without `.env`
   (what the Dockerfile does) passes.
 - **Suggestions (2026-11-17):** `src/workers/suggest.ts` (queue "suggest", hourly + once ~1 min after start,

@@ -1,6 +1,7 @@
 import fs from "node:fs";
+import path from "node:path";
 import { prisma } from "../lib/db";
-import { run } from "../lib/media";
+import { brokenVideo, run } from "../lib/media";
 import { storageDir, storagePath } from "../lib/paths";
 import { enqueueTranscribe, getStatuses, queue, setStatus, type AgentStatus } from "../lib/queues";
 import { freeGb, minFreeGb } from "../lib/guards";
@@ -32,12 +33,26 @@ export async function runGrab(clipId: string) {
   if (last && !last.ok) await setStatus("disk", true, `${free.toFixed(1)} GB free — grabbing again`);
 
   const outBase = storagePath("raw", clipId);
+  // v2.0.10: a half-written file from a killed download (Clip Factory restarted) must never be reused: yt-dlp would see the
+  // name and skip the download. Remove leftovers, download, then check the file really is a whole video.
+  removeLeftovers(outBase);
   const file = await ytdlpDownload(moment, outBase);
+  const bad = await brokenVideo(file);
+  if (bad) {
+    fs.rmSync(file, { force: true });
+    throw new Error(`Download failed: ${bad}. Press Retry.`);
+  }
 
   const rel = "raw/" + file.split(/[\\/]/).pop();
   await prisma.clip.update({ where: { id: clipId }, data: { rawPath: rel, stage: "transcribe", stageAt: new Date(), error: null } });
   await enqueueTranscribe(clipId);
   return `downloaded ${rel}`;
+}
+
+/** Delete raw/<clipId>.* left by an earlier, interrupted download. */
+export function removeLeftovers(outBase: string) {
+  const dir = path.dirname(outBase), base = path.basename(outBase);
+  try { for (const f of fs.readdirSync(dir)) if (f.startsWith(base + ".")) fs.rmSync(path.join(dir, f), { force: true }); } catch { /* no dir yet */ }
 }
 
 export type Downloadable = { source: string; sourceUrl: string | null; vodId: string | null; vodOffset: number | null };
@@ -49,7 +64,7 @@ export type Downloadable = { source: string; sourceUrl: string | null; vodId: st
  */
 export function ytdlpArgs(moment: Downloadable, outBase: string, range?: { from: number; to: number }): string[] {
   // v2.0.9: -N = download several pieces of a section at once (HLS/DASH fragments), much faster on long VODs/videos.
-  const common = ["-N", process.env.YTDLP_FRAGMENTS || "4", "--no-playlist", "--no-part", "--no-progress", "--quiet", "--merge-output-format", "mp4", "-o", `${outBase}.%(ext)s`, "--print", "after_move:filepath"];
+  const common = ["-N", process.env.YTDLP_FRAGMENTS || "4", "--no-playlist", "--no-part", "--force-overwrites", "--no-progress", "--quiet", "--merge-output-format", "mp4", "-o", `${outBase}.%(ext)s`, "--print", "after_move:filepath"];
   const sect = (from: number, to: number) => ["--download-sections", `*${Math.max(0, Math.round(from * 10) / 10)}-${Math.round(to * 10) / 10}`];
   if (moment.source === "youtube") {
     if (!moment.sourceUrl || moment.vodOffset == null) throw new Error("YouTube moment has no video URL or peak time");
